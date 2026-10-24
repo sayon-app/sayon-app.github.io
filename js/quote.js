@@ -478,7 +478,7 @@ function onQuoteSourceChange() {
   renderQuoteEditor();
   renderQuoteLock();
   editor.style.display = 'flex';
-  editor.querySelectorAll('.quote-item-desc').forEach(fitQuoteText);
+  editor.querySelectorAll('.quote-item-desc, .quote-item-detail, .quote-textarea').forEach(fitQuoteText);
 }
 
 function renderQuoteSourceSummary(src) {
@@ -515,6 +515,7 @@ function renderQuoteEditor() {
   renderQuoteItems();
   renderQuoteCompanyGaps();
   renderQuoteAnswer();
+  ['qPaymentTerms', 'qExclusions', 'qNotes'].forEach(id => fitQuoteText(document.getElementById(id)));
 }
 
 // What's missing from the business details, which every quote's header shows.
@@ -577,8 +578,8 @@ function renderQuoteItems() {
         <textarea class="quote-input quote-item-desc" rows="1" placeholder="Description" aria-label="Description"
           oninput="fitQuoteText(this); updateQuoteItem('${it.id}','desc',this.value)">${escapeHtml(it.desc)}</textarea>
         <button class="quote-item-remove" onclick="removeQuoteItem('${it.id}')" aria-label="Remove line" title="Remove line">✕</button>
-        <input class="quote-input quote-item-detail" value="${escapeHtml(it.detail)}" placeholder="Details (optional)" aria-label="Details"
-          oninput="updateQuoteItem('${it.id}','detail',this.value)">
+        <textarea class="quote-input quote-item-detail" rows="1" placeholder="Details (optional)" aria-label="Details"
+          oninput="fitQuoteText(this); updateQuoteItem('${it.id}','detail',this.value)">${escapeHtml(it.detail)}</textarea>
         <div class="quote-item-nums">
           <label>Qty<input class="quote-input" type="number" min="0" step="any" inputmode="decimal" value="${it.qty}"
             oninput="updateQuoteItem('${it.id}','qty',this.value)"></label>
@@ -588,10 +589,10 @@ function renderQuoteItems() {
             oninput="markQuotePriceSet('${it.id}'); updateQuoteItem('${it.id}','price',this.value)" onchange="rememberQuotePrice('${it.key}', parseFloat(this.value))"></label>
           <div class="quote-item-total" id="qiTotal_${it.id}">${formatAUD(lineTotal(it))}</div>
         </div>
-        ${isStartingPrice(it) ? '<div class="quote-item-start">Starting price. Set your own price; it is remembered for next time.</div>' : ''}
+        ${isStartingPrice(it) ? '<div class="quote-item-start">Starting price</div>' : ''}
         ${it.source ? `<div class="quote-item-source">From report · ${escapeHtml(it.source)}</div>` : ''}
       </div>`).join('');
-    wrap.querySelectorAll('.quote-item-desc').forEach(fitQuoteText);
+    wrap.querySelectorAll('.quote-item-desc, .quote-item-detail').forEach(fitQuoteText);
   }
   renderQuoteTotals();
 }
@@ -599,6 +600,8 @@ function renderQuoteItems() {
 // Grows a line's description box to fit its text, so long names wrap
 // instead of being cut off on a phone.
 function fitQuoteText(el) {
+  // A hidden box measures 0 high, so it's sized once it's shown.
+  if (!el || !el.offsetParent) return;
   el.style.height = 'auto';
   el.style.height = el.scrollHeight + 2 + 'px';
 }
@@ -1223,7 +1226,7 @@ function buildQuotePDF(q) {
   drawPdfSignature(doc, { x: M + colW + 8, y, w: colW, caption: 'Client signature',
     image: accepted && accepted.signature,
     note: accepted && !accepted.signature ? `Accepted ${QUOTE_ANSWER_METHODS[accepted.method] || ''}`.trim() : '' });
-  valueOnLine(accepted && formatAnswerDate(accepted.date), M + (colW + 8) * 2);
+  valueOnLine(accepted && formatLongDate(accepted.date), M + (colW + 8) * 2);
   drawPdfSignature(doc, { x: M + (colW + 8) * 2, y, w: colW, caption: 'Date' });
   y += 8;
 

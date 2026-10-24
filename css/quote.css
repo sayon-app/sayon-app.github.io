@@ -91,7 +91,7 @@
   min-height: 44px;
 }
 .quote-input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
-.quote-textarea { resize: vertical; line-height: 1.45; }
+.quote-textarea { resize: vertical; line-height: 1.45; min-height: 72px; overflow: hidden; }
 select.quote-input { cursor: pointer; }
 
 .quote-source-summary { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
@@ -124,7 +124,7 @@ select.quote-input { cursor: pointer; }
   background: var(--surface);
 }
 .quote-item-desc { font-weight: 600; width: calc(100% - 44px); resize: none; overflow: hidden; line-height: 1.35; min-height: 40px; display: block; font-family: inherit; }
-.quote-item-detail { margin-top: 6px; font-size: 13px; color: var(--text2); }
+.quote-item-detail { margin-top: 6px; font-size: 13px; color: var(--text2); resize: none; overflow: hidden; line-height: 1.4; display: block; width: 100%; font-family: inherit; }
 .quote-item-remove {
   position: absolute;
   top: 10px;

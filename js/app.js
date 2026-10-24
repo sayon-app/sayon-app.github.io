@@ -452,8 +452,10 @@ function areaEvidence(zoneId) {
     if (!f || f.termiteActivity === 'NONE') return;
     if (textAreas([f.activityLocation, f.damageDescription].join(' ')).includes(zoneId)) out.push(`Finding ${i + 1}${f.activityLocation ? ` (${short(f.activityLocation)})` : ''}`);
   });
+  shownBorerFindings().forEach((b, i) => {
+    if (textAreas([b.location, b.timberAffected, b.description].join(' ')).includes(zoneId)) out.push(`Borer finding ${i + 1}${b.location ? ` (${short(b.location)})` : ''}`);
+  });
   const other = [
-    ['Borers', ['ACTIVE', 'INACTIVE'].includes(reportData.borerActivity), reportData.borerDetails],
     ['Wood decay', reportData.decayFound === 'YES', reportData.decayDetails],
     ['Chemical delignification', reportData.delignification === 'YES', reportData.delignificationDetails],
   ];
@@ -1637,8 +1639,8 @@ FIELDS (every one null unless the note gives it):
 "structureType":string,"height":string,"wallConstruction":string,"roofType":string,"floorType":string,"facadeDirection":string,"constructionEra":"Pre-1920s"|"1920s-1940s"|"1945-1965"|"1965-1985"|"1985-2003"|"Post-2003","occupancyStatus":string,"weatherConditions":string,"temperature":string,"humidity":string,"rainLast24h":string,
 "existingSystem":string,"existingSystemOther":string,"durableNoticePresent":"YES"|"NO","hardLandscaping":"YES"|"NO","zone25mmVisible":"YES"|"NO","softLandscaping":"YES"|"NO","zone75mmVisible":"YES"|"NO","antCapSoldered":"YES"|"NO"|"N/A",
 "areaStatus":{"interior"|"exterior"|"subfloor"|"roofvoid"|"outbuildings"|"site"|"fences"|"retainingwalls"|"landscapingtimbers":"INSPECTED"|"PARTIAL"|"NOT"|"NA"},"areaResult":{same area keys:"CLEAR"|"FOUND"},"obstructions":string,"restrictedAccess":string,"noAccessAreas":string,"highRiskAreas":string,"hinderedAreas":string,"hinderedAreasDetail":string,
-"findings":[{"termiteActivity":"ACTIVE"|"INACTIVE"|"NONE","species":string,"damageDescription":string,"activityLocation":string,"nestLocated":"YES"|"NO","structuralConcern":"YES"|"NO"}],
-"borerActivity":"ACTIVE"|"INACTIVE"|"NONE","borerDetails":string,"decayFound":"YES"|"NO","decayDetails":string,"delignification":"YES"|"NO","delignificationDetails":string,"previousTreatment":"YES"|"NO","previousTreatmentDetails":string,
+"findings":[{"termiteActivity":"ACTIVE"|"INACTIVE"|"NONE","species":string,"damageDescription":string,"activityLocation":string,"timberAffected":string,"nestLocated":"YES"|"NO","structuralConcern":"YES"|"NO"}],
+"borerActivity":"ACTIVE"|"INACTIVE"|"NONE","borerFindings":[{"borerActivity":"ACTIVE"|"INACTIVE","borerType":string,"location":string,"timberAffected":string,"description":string,"structuralConcern":"YES"|"NO"}],"decayFound":"YES"|"NO","decayDetails":string,"delignification":"YES"|"NO","delignificationDetails":string,"previousTreatment":"YES"|"NO","previousTreatmentDetails":string,
 "moistureReadings":"YES"|"NO","waterLeaks":"YES"|"NO","leakLocation":string,"moistureMeterReadings":[{"location":string,"reading":string}],"timberSoil":"YES"|"NO","slabEdge":"CLEAR"|"OBSTRUCTED","weepHoles":"CLEAR"|"BRIDGED"|"NONE","siteDrainage":"ADEQUATE"|"POOR","subfloorDrainage":"ADEQUATE"|"POOR","antCapping":"INTACT"|"GAPS"|"NONE","antCappingDetails":string,"subfloorVentilation":"ADEQUATE"|"POOR","nonDurableTimber":"YES"|"NO","nonDurableTimberDetails":string,
 "riskLevel":"LOW"|"MEDIUM"|"HIGH","treatmentRecommended":"YES"|"NO","treatmentType":string,"inspectionFrequency":string,"invasiveInspection":"YES"|"NO","invasiveInspectionDetails":string,"otherRecommendations":string}
 
@@ -1687,6 +1689,7 @@ TERMITE FINDINGS (findings is always an array; it holds termites only):
 - termiteActivity: "ACTIVE" only when live termites were seen ("live termites", "active termites", "workers moving", "live ones in the tree"). "INACTIVE" when workings, mud leads, mudding, damage, galleries or exit holes were found but no live termites ("old workings", "nothing alive", "past activity", "doesn't seem active now"). When species, damage or a location is described without a clear live sighting, it is INACTIVE, never ACTIVE. "NONE": use ONLY when the note states that the whole property was clear of termites and evidence and reports nothing anywhere; then species, damageDescription, activityLocation, nestLocated and structuralConcern are all null. A clear remark about one area ("no termite activity in the roof void", "nothing in the subfloor") never creates a NONE entry: when the note has real findings elsewhere, record only those, and when it has no findings and is about one area, return an empty array.
 - Suspected activity: when the inspector suspects termites somewhere but can't confirm them ("could be activity in the wall but I'm not sure", damp skirting they want opened up), it is still its own findings entry: termiteActivity null, activityLocation where, and damageDescription what they saw, starting "Suspected, not confirmed:". Never drop it, and never merge it into another finding.
 - activityLocation: where, in the inspector's terms: the element and the room or side ("skirting board, bedroom three, downstairs"; "rear bearer and joist above it, under the back room"; "gum tree in the backyard, about 15 m from the house"). Distances from the house and "not touching any building" belong here.
+- timberAffected: the timber members the evidence is in or on, named plainly and joined with ", " ("Bearer, Joist", "Skirting", "Door frame", "Roof timbers"). Use these names where they fit: Bearer, Joist, Floorboards, Stud, Top plate, Bottom plate, Skirting, Architrave, Door frame, Window frame, Roof timbers, Deck, Fence, Tree or stump. Null when the note names no timber (mud leads up a brick pier only, or a slab edge).
 - damageDescription: only what was seen (mud packing, hollow when tapped, galleries, timbers eaten out, frass, exit holes, bubbling paint), the element and the place, and the inspector's own hedges ("possible nest in the tree", "possibly past activity"). "No damage visible" is a fact: keep it. NEVER a severity or extent word (minor, moderate, severe, extensive, significant, extreme, major, heavy, bad): drop the word and keep the observation, even when the inspector says it. Never an activity grade ("high activity"). Never the inspector's opinion on whether the structure is or is not compromised, sound, safe or affected: drop it in every wording. Never a risk statement.
 - species: ONLY a genus or species the inspector names, formatted as "Coptotermes acinaciformis", "Nasutitermes exitiosus", or at genus level "Coptotermes spp." when they name a genus without the species or are unsure of the species ("looks like Coptotermes"). When they say they could not identify it (dictation turns "couldn't be identified" into "can be identified"; read the sense), use exactly "Species not identified — further investigation required", on the finding it was said about. When species is never raised, null. A garbled Latin-sounding word ("copter terms", "copper termites") in a species slot is the nearest genus from: Coptotermes, Schedorhinotermes, Nasutitermes, Heterotermes, Microcerotermes, Cryptotermes, Mastotermes, Porotermes. Never name a species from damage, location or habit.
 - nestLocated: "YES" only when the inspector states a nest was found or located. "Possible nest", "could be a nest", "might be nesting in there" is NOT a located nest: leave nestLocated null and keep the hedge in damageDescription. "NO" only when they say no nest was found. Otherwise null (the report prints any value as a checked answer).
@@ -1694,7 +1697,13 @@ TERMITE FINDINGS (findings is always an array; it holds termites only):
 
 BORERS AND WOOD DECAY (never in findings):
 - borerActivity: "ACTIVE" only for fresh frass, fresh or bright exit holes, or live beetles. "INACTIVE" for old or dark exit holes, old borer damage, or borer evidence with nothing fresh. "NONE" when the inspector says no borers were found. Null when borers are not raised.
-- borerDetails: the borer named (Anobium, Lyctus or powderpost, Queensland pine beetle, European house borer), where, and what was seen, with no severity words.
+- borerFindings: one entry per distinct place borers were found, like termite findings: a new entry when the place changes. Empty or null when no borers were found. Each entry:
+  - borerActivity: "ACTIVE" or "INACTIVE" for that place, by the same rule as borerActivity.
+  - borerType: the borer named, as "Anobium (furniture beetle)", "Lyctus (powderpost beetle)", "Queensland pine beetle" or "European house borer", or "Not identified" when the inspector says so. Null when not named.
+  - location: where, in the inspector's terms (the room, side or area).
+  - timberAffected: the timber members affected, named as for termite findings ("Floorboards", "Roof timbers").
+  - description: what was seen (exit holes, frass, tunnelling, dark or bright holes), with no severity words.
+  - structuralConcern: "YES" when the inspector recommends a builder, carpenter or engineer look at the borer damage; "NO" when they say no referral is needed. Otherwise null.
 - decayFound: "YES" for rot, fungal decay, soft, spongy or crumbling timber. "NO" when they say no rot or decay. Null when not raised.
 - decayDetails: where the decay is and what was seen, with no severity words.
 - previousTreatment: "YES" when the inspector sees signs the property was treated for termites before: drill holes in the slab, paving or brickwork (often plugged), dusting residue, or bait or monitoring stations in the ground. "NO" when they say there is no sign of a previous treatment. Null when not raised. It is about past treatment evidence, not an installed system the inspector names (that is existingSystem), although both can be filled. previousTreatmentDetails: what and where, in their words ("plugged drill holes along the rear patio").
@@ -3805,7 +3814,7 @@ function countExtractFilled(before) {
   (reportData.findings || []).forEach(f => {
     if (!f) return;
     const old = before.findings[f.id] || {};
-    ['termiteActivity', 'species', 'damageDescription', 'activityLocation', 'nestLocated', 'structuralConcern']
+    ['termiteActivity', 'species', 'damageDescription', 'activityLocation', 'timberAffected', 'nestLocated', 'structuralConcern']
       .forEach(k => { if (!isBlankValue(f[k]) && f[k] !== old[k]) n++; });
   });
   JOB_SUMMARY_FIELDS.forEach(id => { const el = document.getElementById(id); if (el && el.value.trim() && el.value !== before.job[id]) n++; });
@@ -4139,7 +4148,7 @@ const APPEND_TEXT_KEYS = new Set(['hinderedAreas', 'hinderedAreasDetail', 'noAcc
 const NIL_TEXT_KEYS = new Set(['hinderedAreas', 'hinderedAreasDetail', 'noAccessAreas', 'highRiskAreas', 'borerDetails', 'decayDetails', 'delignificationDetails', 'nonDurableTimberDetails', 'previousTreatmentDetails', 'leakLocation', 'treatmentType', 'existingSystemOther']);
 const isNilText = v => /^\s*(nil|none|no|n\/a|na|not applicable|nothing|not stated|not mentioned|unknown)\s*[.!]?\s*$/i.test(String(v));
 const hasRealFinding = list => list.some(f => f.termiteActivity === 'ACTIVE' || f.termiteActivity === 'INACTIVE');
-const findingHasData = f => !!(f.termiteActivity || f.species || f.damageDescription || f.activityLocation || f.nestLocated || f.structuralConcern);
+const findingHasData = f => !!(f.termiteActivity || f.species || f.damageDescription || f.activityLocation || f.timberAffected || f.nestLocated || f.structuralConcern);
 // The words that identify a place or an observation, for telling whether a
 // later note is only repeating an earlier one ("kitchen skirting board"
 // after "skirting board, kitchen, east wall").
@@ -4169,7 +4178,7 @@ function mergeFindingInto(have, f) {
   let changed = false;
   if (f.termiteActivity && (!have.termiteActivity || (f.termiteActivity === 'ACTIVE' && have.termiteActivity === 'INACTIVE'))) { have.termiteActivity = f.termiteActivity; changed = true; }
   if (keyWords(f.activityLocation).length > keyWords(have.activityLocation).length && repeatsPlace(f.activityLocation, have.activityLocation)) { have.activityLocation = f.activityLocation; changed = true; }
-  ['species', 'damageDescription', 'nestLocated', 'structuralConcern'].forEach(k => { if (!have[k] && f[k]) { have[k] = f[k]; changed = true; } });
+  ['species', 'timberAffected', 'damageDescription', 'nestLocated', 'structuralConcern'].forEach(k => { if (!have[k] && f[k]) { have[k] = f[k]; changed = true; } });
   return changed;
 }
 
@@ -4206,6 +4215,7 @@ function populateFields(data, transcript) {
       species: f.species || null,
       damageDescription: f.damageDescription || null,
       activityLocation: f.activityLocation || null,
+      timberAffected: f.timberAffected || null,
       nestLocated: f.nestLocated || null,
       structuralConcern: f.structuralConcern || null,
     })).filter(findingHasData);
@@ -4319,6 +4329,7 @@ function populateFields(data, transcript) {
   if (values.moistureReadings === 'NO' && !values.waterLeaks && reportData.waterLeaks === 'YES') delete values.moistureReadings;
   if (values.existingSystem !== undefined && values.existingSystem !== null && !hasIdentifiedSystem(String(values.existingSystem))) delete values.existingSystem;
   NIL_TEXT_KEYS.forEach(k => { if (values[k] !== undefined && values[k] !== null && isNilText(values[k])) values[k] = k === 'hinderedAreas' ? '' : null; });
+  mergeBorerExtraction(values);
 
   // All non-findings fields, in an order where a field that reveals or
   // clears another is written first (moisture before leaks before the leak
@@ -4456,6 +4467,7 @@ function setFindingField(id, key, val) {
 const CHOICE_SETS = {
   activity:  [['ACTIVE', 'bad', 'Live termites seen'], ['INACTIVE', 'warn', 'Evidence, none live'], ['NONE', 'good', 'Nothing found']],
   borer:     [['ACTIVE', 'bad', 'Fresh frass or holes'], ['INACTIVE', 'warn', 'Old holes only'], ['NONE', 'good', 'None seen']],
+  borerCard: [['ACTIVE', 'bad', 'Fresh frass or holes'], ['INACTIVE', 'warn', 'Old holes only']],
   yesno:     [['YES', 'bad'], ['NO', 'good'], ['N/A', 'neutral']],
   wantyes:   [['YES', 'good'], ['NO', 'bad'], ['N/A', 'neutral']],   // NO is the concern
   neutral:   [['YES', 'neutral'], ['NO', 'neutral'], ['N/A', 'neutral']],
@@ -4522,7 +4534,6 @@ function buildChoiceCards() {
 // A detail box only shows while its question could need one: a "no" answer
 // hides it, unless something was already written there.
 const DETAIL_FIELD_FOR = {
-  borerActivity: ['borerDetails', ['NONE']],
   decayFound: ['decayDetails', ['NO', 'N/A']],
   delignification: ['delignificationDetails', ['NO', 'N/A']],
   previousTreatment: ['previousTreatmentDetails', ['NO', 'N/A']],
@@ -4540,6 +4551,7 @@ function syncDetailField(key) {
 
 function syncChoiceCards(key) {
   syncDetailField(key);
+  if (key === 'borerActivity') renderBorerFindings();
   const panel = document.getElementById('choices-' + key);
   if (!panel) return;
   const val = reportData[key] || '';
@@ -4655,6 +4667,7 @@ function findingCardHTML(finding, index, total) {
         <div class="findings-details" style="display:block">
           <div class="section-fields">
             <div class="field field-wide"><div class="field-label">Location of Activity</div>${fv('activityLocation','text')}</div>
+            <div class="field field-wide"><div class="field-label">Timber Affected</div>${fv('timberAffected','text')}${pickChipsHTML(id, 'timberAffected', TIMBER_PARTS, finding.timberAffected)}</div>
             <div class="field field-wide"><div class="field-label">Damage Description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${fv('damageDescription','text')}</div>
             <div class="field"><div class="field-label">Species / Genus</div>${fv('species','specieslist')}</div>
             <div class="field choice-field"><div class="field-label">Termite Nest Found?</div>${fv('nestLocated','yesno')}</div>
@@ -4679,6 +4692,7 @@ function renderFindingsUI() {
   list.innerHTML = findings.map((f, i) => findingCardHTML(f, i, findings.length)).join('');
   hydrateSpotPhotos(list);
   renderAreaFindingPrompts();
+  renderBorerFindings();
 
   if (addBtn) {
     const atCap = findings.length >= MAX_FINDINGS;
@@ -4698,7 +4712,7 @@ let activeFindingEdit = null;
 function startFindingEdit(findingId, key, type) {
   activeFindingEdit = { findingId, key };
 
-  const finding = getFindings().find(f => f.id === findingId);
+  const finding = findAnyFinding(findingId);
   if (!finding) return;
 
   // For species, show a dropdown select
@@ -4759,9 +4773,10 @@ function startFindingEdit(findingId, key, type) {
 
 function commitFindingEdit(findingId, key, value, deferRender) {
   activeFindingEdit = null;
-  const finding = getFindings().find(f => f.id === findingId);
+  const finding = findAnyFinding(findingId);
   if (!finding) return;
   finding[key] = value || null;
+  if (isBorerFinding(finding)) syncBorerFromCards(key === 'borerActivity');
   if (key === 'species' && value) {
     setTimeout(() => triggerSpeciesIntelligence(value), 400);
   }
@@ -4774,6 +4789,191 @@ function commitFindingEdit(findingId, key, value, deferRender) {
   updateProgress();
   saveDraft();
   ensureTreatmentForLiveTermites();
+}
+
+// ── TIMBER AND BORER PICKS ───────────────────────────────────────────────
+// Tap chips under a text field: each adds its word to the field, or takes
+// it out again. The field stays free text, so the inspector can still type.
+const TIMBER_PARTS = ['Bearer', 'Joist', 'Floorboards', 'Stud', 'Top plate', 'Bottom plate', 'Skirting', 'Architrave', 'Door frame', 'Window frame', 'Roof timbers', 'Deck', 'Fence', 'Tree or stump'];
+const BORER_TYPES = ['Anobium (furniture beetle)', 'Lyctus (powderpost beetle)', 'Queensland pine beetle', 'European house borer', 'Not identified'];
+const PICK_SINGLE = new Set(['borerType']);
+
+const splitPicks = v => String(v || '').split(/\s*,\s*/).filter(Boolean);
+
+function pickChipsHTML(id, key, options, value) {
+  const have = splitPicks(value).map(x => x.toLowerCase());
+  return `<div class="obs-items pick-chips">${options.map(o => `<button type="button" class="obs-item-btn${have.includes(o.toLowerCase()) ? ' selected' : ''}" aria-pressed="${have.includes(o.toLowerCase())}" onclick="togglePick('${id}','${key}',this.textContent)">${escapeHtml(o)}</button>`).join('')}</div>`;
+}
+
+function togglePick(id, key, word) {
+  const finding = findAnyFinding(id);
+  if (!finding) return;
+  let picks = splitPicks(finding[key]);
+  const at = picks.findIndex(x => x.toLowerCase() === word.toLowerCase());
+  if (at >= 0) picks.splice(at, 1);
+  else picks = PICK_SINGLE.has(key) ? [word] : [...picks, word];
+  commitFindingEdit(id, key, picks.join(', '));
+}
+
+// ── BORER FINDINGS ───────────────────────────────────────────────────────
+// reportData.borerFindings: one card per place borers were found, each
+// { id, borerActivity, borerType, location, timberAffected, description,
+// structuralConcern }, with its own photos like a termite finding. The
+// overall answer (reportData.borerActivity) stays the question the report
+// asks, and the cards are the detail behind ACTIVE or INACTIVE.
+// reportData.borerDetails is kept as one line written from the cards, for
+// the summary page, the quote and older reports.
+const MAX_BORER_FINDINGS = 6;
+
+function isBorerFinding(f) { return !!f && (reportData.borerFindings || []).includes(f); }
+function findAnyFinding(id) { return getFindings().find(f => f.id === id) || getBorerFindings().find(f => f.id === id); }
+const borersFound = () => ['ACTIVE', 'INACTIVE'].includes(reportData.borerActivity);
+
+function getBorerFindings() {
+  if (!Array.isArray(reportData.borerFindings)) {
+    reportData.borerFindings = [];
+    // A report from before borer cards: its one line of borer detail
+    // becomes the first card.
+    if (borersFound() && String(reportData.borerDetails || '').trim()) {
+      reportData.borerFindings.push({ id: genFindingId(), borerActivity: reportData.borerActivity, description: String(reportData.borerDetails).trim() });
+    }
+  }
+  return reportData.borerFindings;
+}
+
+// The cards shown, and printed: only while the answer says borers were found.
+function shownBorerFindings() { return borersFound() ? getBorerFindings().filter(borerHasData) : []; }
+const borerHasData = b => !!(b && (b.borerActivity || b.borerType || b.location || b.timberAffected || b.description || b.structuralConcern));
+
+function borerLine(b) {
+  const where = [b.location, b.timberAffected && !String(b.location || '').toLowerCase().includes(b.timberAffected.toLowerCase()) ? b.timberAffected : ''].filter(Boolean).join(', ');
+  return [b.borerType, where, b.description].filter(Boolean).join(': ');
+}
+
+// After a card changes: rewrite the one-line detail, and lift the overall
+// answer to the strongest card (live borers in one card make it ACTIVE).
+function syncBorerFromCards(activityChanged) {
+  const cards = getBorerFindings();
+  reportData.borerDetails = cards.filter(borerHasData).map(borerLine).filter(Boolean).join('. ') || null;
+  if (!activityChanged) return;
+  const acts = cards.map(b => b.borerActivity);
+  const overall = acts.includes('ACTIVE') ? 'ACTIVE' : acts.includes('INACTIVE') ? 'INACTIVE' : null;
+  const el = document.getElementById('f-borerActivity');
+  if (overall && overall !== reportData.borerActivity && el) commitEdit(el, 'borerActivity', overall);
+}
+
+function addBorerFinding(activity) {
+  const cards = getBorerFindings();
+  if (cards.length >= MAX_BORER_FINDINGS) return;
+  cards.push({ id: genFindingId(), borerActivity: activity || (reportData.borerActivity === 'ACTIVE' ? null : reportData.borerActivity) || null });
+  renderBorerFindings();
+  saveDraft();
+}
+
+function removeBorerFinding(id) {
+  const cards = getBorerFindings();
+  const index = cards.findIndex(b => b.id === id);
+  if (index < 0) return;
+  const removed = cards[index];
+  reportData.borerFindings = cards.filter(b => b.id !== id);
+  syncBorerFromCards();
+  renderBorerFindings();
+  saveDraft();
+  showToast(`Borer finding ${index + 1} removed`, 'info', { label: 'Undo', run: () => {
+    const list = getBorerFindings();
+    if (list.some(b => b.id === removed.id)) return;
+    list.splice(Math.min(index, list.length), 0, removed);
+    syncBorerFromCards();
+    renderBorerFindings();
+    saveDraft();
+  } });
+}
+
+function borerCardHTML(b, index) {
+  const id = b.id;
+  const act = b.borerActivity;
+  const fv = (key, hint) => `<div class="field-val${b[key] ? ' filled' : ''}" onclick="startFindingEdit('${id}','${key}','text')">${b[key] ? escapeHtml(b[key]) : '—'}</div>`;
+  return `
+    <div class="finding-card borer-card" id="finding-card-${id}">
+      <div class="finding-card-header">
+        <span class="finding-card-label">${b.location ? `<span class="finding-card-title">${escapeHtml(b.location)}</span><small>Borer finding ${index + 1}</small>` : `Borer finding ${index + 1}`}</span>
+        <span class="finding-activity-chip ${act || 'unset'}">${act || '—'}</span>
+        <button class="finding-remove-btn" onclick="removeBorerFinding('${id}')" title="Remove this borer finding">✕</button>
+      </div>
+      <div class="finding-card-body">
+        <div class="findings-gate choice-panel${act ? '' : ' unset'}" role="radiogroup" aria-label="Borer activity here">
+          <div class="field-label">Borer Activity Here</div>
+          ${choiceCardsHTML('borerCard', 'borer-' + id, act, `data-finding="${id}" data-fkey="borerActivity"`)}
+        </div>
+        <div class="findings-details" style="display:block">
+        <div class="section-fields">
+          <div class="field field-wide"><div class="field-label">Location</div>${fv('location')}</div>
+          <div class="field field-wide"><div class="field-label">Timber Affected</div>${fv('timberAffected')}${pickChipsHTML(id, 'timberAffected', TIMBER_PARTS, b.timberAffected)}</div>
+          <div class="field field-wide"><div class="field-label">Borer Type</div>${fv('borerType')}${pickChipsHTML(id, 'borerType', BORER_TYPES, b.borerType)}</div>
+          <div class="field field-wide"><div class="field-label">What Was Seen <span class="field-hint">Exit holes, frass, tunnelling. No severity opinion.</span></div>${fv('description')}</div>
+          <div class="field choice-field"><div class="field-label">Refer to a Builder or Engineer?</div><div class="choice-panel${b.structuralConcern ? '' : ' unset'}" role="radiogroup">${choiceCardsHTML('finding', `structuralConcern-${id}`, b.structuralConcern, `data-finding="${id}" data-fkey="structuralConcern"`)}</div></div>
+          <div class="field field-wide finding-photos"><div class="field-label">Photos of this finding</div>${spotPhotosHTML(findingPhotoSection(id))}</div>
+        </div>
+        ${b.structuralConcern === 'YES' ? `<div class="warn-note note-info" style="margin:0 0 10px"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Referral recorded. The PDF recommends a licensed builder or engineer assess this damage.</div>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderBorerFindings() {
+  const wrap = document.getElementById('borerFindingsWrap');
+  const list = document.getElementById('borerFindingsList');
+  if (!wrap || !list) return;
+  wrap.style.display = borersFound() ? '' : 'none';
+  if (!borersFound()) return;
+  const cards = getBorerFindings();
+  // Don't redraw under a field being typed in.
+  if (activeFindingEdit && cards.some(b => b.id === activeFindingEdit.findingId) && list.contains(document.activeElement)) return;
+  list.innerHTML = cards.map(borerCardHTML).join('');
+  hydrateSpotPhotos(list);
+  const add = document.getElementById('addBorerBtn');
+  if (add) {
+    add.disabled = cards.length >= MAX_BORER_FINDINGS;
+    add.querySelector('span').textContent = cards.length ? 'Add Another Borer Finding' : 'Add Where Borers Were Found';
+  }
+}
+
+// Borer findings from one extracted note: a card at a place already
+// recorded fills that card in; anything else is a new card.
+function mergeBorerExtraction(values) {
+  const incoming = [];
+  if (Array.isArray(values.borerFindings)) {
+    values.borerFindings.filter(b => b && typeof b === 'object').forEach(b => incoming.push({
+      borerActivity: ['ACTIVE', 'INACTIVE'].includes(b.borerActivity) ? b.borerActivity : null,
+      borerType: b.borerType || null, location: b.location || null, timberAffected: b.timberAffected || null,
+      description: b.description || null, structuralConcern: b.structuralConcern || null,
+    }));
+  }
+  // An older-style answer: one line of borer detail.
+  if (typeof values.borerDetails === 'string' && values.borerDetails.trim() && !incoming.length) {
+    incoming.push({ borerActivity: null, description: values.borerDetails.trim() });
+  }
+  delete values.borerFindings;
+  delete values.borerDetails;
+  const real = incoming.filter(borerHasData);
+  if (!real.length) return;
+  const overall = ['ACTIVE', 'INACTIVE'].includes(values.borerActivity) ? values.borerActivity : null;
+  const cards = getBorerFindings();
+  real.forEach(b => {
+    if (!b.borerActivity) b.borerActivity = overall || (borersFound() ? reportData.borerActivity : 'INACTIVE');
+    const same = cards.find(k => k.location && b.location && (repeatsPlace(k.location, b.location) || repeatsPlace(b.location, k.location)))
+      || cards.find(k => !k.location && k.description && ((b.location && repeatsPlace(k.description, b.location)) || (b.description && k.description.toLowerCase() === b.description.toLowerCase())));
+    if (same) {
+      if (b.borerActivity === 'ACTIVE') same.borerActivity = 'ACTIVE';
+      ['borerType', 'location', 'timberAffected', 'description', 'structuralConcern'].forEach(k => { if (!same[k] && b[k]) same[k] = b[k]; });
+    } else if (cards.length < MAX_BORER_FINDINGS) {
+      cards.push({ id: genFindingId(), ...b });
+    }
+  });
+  const acts = cards.map(b => b.borerActivity);
+  if (values.borerActivity !== 'NONE') values.borerActivity = acts.includes('ACTIVE') ? 'ACTIVE' : (values.borerActivity || reportData.borerActivity || 'INACTIVE');
+  syncBorerFromCards();
+  renderBorerFindings();
 }
 
 // ── HIGH RISK AREA PROMPT ────────────────────────────────────────────────
@@ -5356,6 +5556,9 @@ function applyFieldCascade(key, value, el, prev) {
 }
 
 function commitEdit(el, key, value) {
+  if (key === 'borerActivity' && ['ACTIVE', 'INACTIVE'].includes(value) && !getBorerFindings().length) {
+    reportData.borerFindings.push({ id: genFindingId(), borerActivity: value });
+  }
   el.classList.remove('editing');
   el.innerHTML = ''; // clear input + actions bar before re-rendering
 
@@ -9324,7 +9527,7 @@ function reportSummary() {
   const evidence = fs.filter(f => f.termiteActivity === 'INACTIVE');
   // Damage counts wherever it was found, including alongside live termites.
   const damaged = fs.filter(f => f.termiteActivity === 'INACTIVE' || (f.termiteActivity === 'ACTIVE' && !isBlankValue(f.damageDescription)));
-  const structural = fs.some(f => f.structuralConcern === 'YES');
+  const structural = fs.some(f => f.structuralConcern === 'YES') || shownBorerFindings().some(b => b.structuralConcern === 'YES');
   const unanswered = findingsMissingReferral();
   const conducive = [];
   if (reportData.waterLeaks === 'YES') conducive.push(`water leak${reportData.leakLocation ? ` (${reportData.leakLocation})` : ''}`);
@@ -9376,7 +9579,7 @@ function reportSummary() {
       ['Termite nest found?', withNest.length ? 'YES' : nestNo ? 'NO' : NR, withNest.length ? 'bad' : nestNo ? 'good' : 'none', REPORT_PARTS.findings, places(withNest)],
       ['Termite workings or damage found?', damaged.length ? 'YES' : fs.length ? 'NO' : NR, damaged.length ? 'warn' : fs.length ? 'good' : 'none', REPORT_PARTS.findings, places(damaged)],
       ['Borers found?', { ACTIVE: 'ACTIVE', INACTIVE: 'OLD DAMAGE', NONE: 'NO' }[reportData.borerActivity] || NR,
-        { ACTIVE: 'bad', INACTIVE: 'warn', NONE: 'good' }[reportData.borerActivity] || 'none', REPORT_PARTS.findings, reportData.borerDetails || ''],
+        { ACTIVE: 'bad', INACTIVE: 'warn', NONE: 'good' }[reportData.borerActivity] || 'none', REPORT_PARTS.findings, shownBorerFindings().map(b => b.location || borerLine(b)).filter(Boolean).join('; ')],
       ['Wood decay (rot) found?', { YES: 'YES', NO: 'NO' }[reportData.decayFound] || NR,
         { YES: 'warn', NO: 'good' }[reportData.decayFound] || 'none', REPORT_PARTS.findings, reportData.decayDetails || ''],
       ['Chemical delignification found?', { YES: 'YES', NO: 'NO' }[reportData.delignification] || NR,
@@ -10879,18 +11082,17 @@ async function buildReportPdf() {
     ? reportData.findings
     : [{ termiteActivity: reportData.termiteActivity, species: reportData.species, damageDescription: reportData.damageDescription, activityLocation: reportData.activityLocation, nestLocated: reportData.nestLocated, structuralConcern: reportData.structuralConcern }];
 
-  // ── Premium finding card renderer ────────────────────────────────────
-  function findingCard(f, idx) {
-    const activity  = (f.termiteActivity || '').toUpperCase();
-    const isActive  = activity === 'ACTIVE';
-    const isInactive= activity === 'INACTIVE';
-    const actCol    = isActive ? C.danger : isInactive ? C.warn : C.inkMuted;
-    const actBg     = isActive ? [253,242,240] : isInactive ? [253,247,234] : [248,246,243];
-    const actLabel  = isActive ? 'LIVE TERMITES PRESENT' : isInactive ? 'EVIDENCE ONLY — NO LIVE TERMITES' : activity ? 'NO ACTIVITY FOUND' : 'NOT RECORDED';
-
-    const descLines = f.damageDescription ? doc.splitTextToSize(f.damageDescription, CW-10).length : 0;
-    const locLines  = f.activityLocation  ? doc.splitTextToSize(f.activityLocation,  CW-10).length : 0;
-    const cardEstH  = 18 + 14 + (f.species ? 12 : 0) + (descLines * 4.5 + 8) + (locLines * 4.5 + 8) + (f.nestLocated ? 10 : 0) + (f.structuralConcern === 'YES' ? 20 : 0) + 8;
+  // ── Finding card renderer ────────────────────────────────────────────
+  // One card per termite or borer finding: a coloured header with the
+  // status, then the labelled facts, the builder referral and the photos.
+  // card: { heading, status, tone (bad | warn | none), species, fields:
+  // [[label, value, colour?]], referral, photosId }
+  function pestCard(card) {
+    const actCol = card.tone === 'bad' ? C.danger : card.tone === 'warn' ? C.warn : C.inkMuted;
+    const actBg  = card.tone === 'bad' ? [253,242,240] : card.tone === 'warn' ? [253,247,234] : [248,246,243];
+    const fields = card.fields.filter(([, v]) => v && String(v).trim());
+    const lines  = fields.reduce((n, [, v]) => n + doc.splitTextToSize(String(v), CW - 12).length, 0);
+    const cardEstH = 18 + (card.species ? 17 : 0) + fields.length * 9.5 + lines * 4.5 + (card.referral ? 20 : 0) + 8;
 
     if (y + Math.min(cardEstH, 60) > 275) newPage();
 
@@ -10904,61 +11106,41 @@ async function buildReportPdf() {
     doc.setFillColor(...actBg); doc.rect(M, y, CW, headerH, 'F');
     doc.setFillColor(...actCol); doc.rect(M, y, 1.5, headerH, 'F');
     doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);
-    doc.text(`TERMITE FINDING ${idx + 1}`, M+8, y+5.5);
+    doc.text(card.heading, M+8, y+5.5);
     doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...actCol);
-    doc.text(actLabel, M+8, y+10.5);
+    doc.text(card.status, M+8, y+10.5);
     y += headerH + 5;
 
     // Species
-    if (f.species && f.species.trim()) {
+    if (card.species) {
       doc.setFillColor(245,243,240); doc.roundedRect(bodyX, y, bodyW, 10, 1, 1, 'F');
       doc.setDrawColor(...C.rule); doc.setLineWidth(0.3); doc.roundedRect(bodyX, y, bodyW, 10, 1, 1, 'D');
       doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);
       doc.text('SPECIES / GENUS', bodyX+4, y+4.5);
       doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...C.ink);
-      doc.text(f.species, bodyX+4, y+8.5);
+      doc.text(card.species, bodyX+4, y+8.5);
       y += 17;
     }
 
-    // Location
-    if (f.activityLocation && f.activityLocation.trim()) {
-      if (y > 272) newPage();
+    // The facts, each a small label over its value. A coloured value is a
+    // short answer (YES / NO), set in bold.
+    fields.forEach(([label, value, colour]) => {
+      if (y > 268) newPage();
       doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
-      doc.text('LOCATION OF ACTIVITY', bodyX, y); y += 4.5;
-      doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...C.ink);
-      const locW = doc.splitTextToSize(f.activityLocation, bodyW);
-      if (y + locW.length*4.5 > 278) newPage();
-      doc.text(locW, bodyX, y); y += locW.length * 4.5 + 5;
-    }
-
-    // Damage description
-    if (f.damageDescription && f.damageDescription.trim()) {
-      if (y > 265) newPage();
-      doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
-      doc.text('DAMAGE / WORKINGS DESCRIPTION', bodyX, y); y += 4.5;
-      doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...C.ink);
-      const descW = doc.splitTextToSize(f.damageDescription, bodyW);
-      if (y + descW.length*4.5 > 278) newPage();
-      doc.text(descW, bodyX, y); y += descW.length * 4.5 + 5;
-    }
-
-    // Was a nest found? Read after where and what was seen.
-    if (y > 272) newPage();
-    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
-    doc.text('TERMITE NEST FOUND?', bodyX, y); y += 4.5;
-    const nestVal = f.nestLocated === 'YES' ? 'YES' : f.nestLocated ? 'NO' : 'NOT RECORDED';
-    const nestCol = f.nestLocated === 'YES' ? C.danger : f.nestLocated ? C.safe : C.inkMuted;
-    doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
-    doc.setTextColor(...nestCol);
-    doc.text(nestVal, bodyX, y); y += 7;
+      doc.text(label.toUpperCase(), bodyX, y); y += 4.5;
+      doc.setFont('helvetica', colour ? 'bold' : 'normal'); doc.setFontSize(8.5); doc.setTextColor(...(colour || C.ink));
+      const w = doc.splitTextToSize(String(value), bodyW);
+      if (y + w.length * 4.5 > 278) newPage();
+      doc.text(w, bodyX, y); y += w.length * 4.5 + 3.5;
+    });
 
     // Builder / engineer referral
-    if (f.structuralConcern === 'YES') {
+    if (card.referral) {
       callout('Builder or engineer referral', 'The inspector recommends a licensed builder or structural engineer assess this damage, and any effect on the structure, before work proceeds.', 'bad', bodyX, bodyW);
     }
 
     // This finding's own photos, inside its card.
-    const fPhotos = f.id ? ((reportData.photosBySection || {})[findingPhotoSection(f.id)] || []) : [];
+    const fPhotos = card.photosId ? ((reportData.photosBySection || {})[findingPhotoSection(card.photosId)] || []) : [];
     if (fPhotos.length) {
       if (y + 12 > 270) newPage();
       doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
@@ -10966,13 +11148,49 @@ async function buildReportPdf() {
       photoGrid(fPhotos, bodyX, bodyW);
     }
 
-    y += 3;
+    // A card that ends on a line of text needs less room below it.
+    y += card.referral || fPhotos.length ? 3 : 0;
     // The outline only fits a card that stayed on one page.
     if (doc.internal.getNumberOfPages() === cardStartPage) {
       doc.setDrawColor(...C.rule); doc.setLineWidth(0.4);
       doc.rect(M, cardStartY, CW, y - cardStartY, 'D');
     }
     y += 8;
+  }
+
+  function findingCard(f, idx) {
+    const activity = (f.termiteActivity || '').toUpperCase();
+    const nest = f.nestLocated === 'YES' ? ['YES', C.danger] : f.nestLocated ? ['NO', C.safe] : ['NOT RECORDED', C.inkMuted];
+    pestCard({
+      heading: `TERMITE FINDING ${idx + 1}`,
+      status: activity === 'ACTIVE' ? 'LIVE TERMITES PRESENT' : activity === 'INACTIVE' ? 'EVIDENCE ONLY — NO LIVE TERMITES' : activity ? 'NO ACTIVITY FOUND' : 'NOT RECORDED',
+      tone: activity === 'ACTIVE' ? 'bad' : activity === 'INACTIVE' ? 'warn' : 'none',
+      species: f.species && f.species.trim(),
+      fields: [
+        ['Location of activity', f.activityLocation],
+        ['Timber affected', f.timberAffected],
+        ['Damage / workings description', f.damageDescription],
+        ['Termite nest found?', nest[0], nest[1]],
+      ],
+      referral: f.structuralConcern === 'YES',
+      photosId: f.id,
+    });
+  }
+
+  function borerCard(b, idx) {
+    pestCard({
+      heading: `BORER FINDING ${idx + 1}`,
+      status: b.borerActivity === 'ACTIVE' ? 'ACTIVE BORERS — FRESH FRASS OR HOLES' : 'OLD BORER DAMAGE — NOTHING FRESH',
+      tone: b.borerActivity === 'ACTIVE' ? 'bad' : 'warn',
+      fields: [
+        ['Location', b.location],
+        ['Timber affected', b.timberAffected],
+        ['Borer type', b.borerType],
+        ['What was seen', b.description],
+      ],
+      referral: b.structuralConcern === 'YES',
+      photosId: b.id,
+    });
   }
 
   subhead('TERMITES');
@@ -10983,7 +11201,8 @@ async function buildReportPdf() {
   // rather than silently implying "none found" (row() drops empty values).
   subhead('BORERS, WOOD DECAY & CHEMICAL DELIGNIFICATION');
   row('Borers of Seasoned Timber', reportData.borerActivity || 'Not recorded');
-  if (reportData.borerDetails) row('Borer Type, Location & Evidence', reportData.borerDetails);
+  const borerCards = shownBorerFindings();
+  if (borerCards.length) { gap(4); borerCards.forEach(borerCard); }
   row('Wood Decay Fungi (Rot)', reportData.decayFound || 'Not recorded');
   if (reportData.decayDetails) row('Wood Decay Location & Evidence', reportData.decayDetails);
   row('Chemical Delignification', reportData.delignification || 'Not recorded');

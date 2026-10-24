@@ -123,7 +123,7 @@
     {
       "id": "borer-type",
       "kind": "mentions",
-      "path": "borerDetails",
+      "path": "borerFindings",
       "all": [
         [
           "lyctus",
@@ -136,7 +136,7 @@
     {
       "id": "borer-where",
       "kind": "mentions",
-      "path": "borerDetails",
+      "path": "borerFindings",
       "all": [
         [
           "floorboard",
@@ -149,7 +149,7 @@
     {
       "id": "borer-details-clean",
       "kind": "mentions",
-      "path": "borerDetails",
+      "path": "borerFindings",
       "none": [
         "minor",
         "moderate",

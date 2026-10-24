@@ -4514,10 +4514,32 @@ function buildChoiceCards() {
     if (field) field.classList.add('choice-field');
     syncChoiceCards(key);
     new MutationObserver(() => syncChoiceCards(key)).observe(el, { childList: true, characterData: true, subtree: true });
+    const detail = DETAIL_FIELD_FOR[key] && document.getElementById('f-' + DETAIL_FIELD_FOR[key][0]);
+    if (detail) new MutationObserver(() => syncDetailField(key)).observe(detail, { childList: true, characterData: true, subtree: true });
   });
 }
 
+// A detail box only shows while its question could need one: a "no" answer
+// hides it, unless something was already written there.
+const DETAIL_FIELD_FOR = {
+  borerActivity: ['borerDetails', ['NONE']],
+  decayFound: ['decayDetails', ['NO', 'N/A']],
+  delignification: ['delignificationDetails', ['NO', 'N/A']],
+  previousTreatment: ['previousTreatmentDetails', ['NO', 'N/A']],
+  nonDurableTimber: ['nonDurableTimberDetails', ['NO', 'N/A']],
+  antCapping: ['antCappingDetails', ['INTACT']],
+};
+
+function syncDetailField(key) {
+  const [detailKey, noAnswers] = DETAIL_FIELD_FOR[key] || [];
+  const field = detailKey && document.getElementById('f-' + detailKey)?.closest('.field');
+  if (!field) return;
+  const hide = noAnswers.includes(reportData[key]) && !String(reportData[detailKey] || '').trim();
+  field.style.display = hide ? 'none' : '';
+}
+
 function syncChoiceCards(key) {
+  syncDetailField(key);
   const panel = document.getElementById('choices-' + key);
   if (!panel) return;
   const val = reportData[key] || '';
@@ -4635,7 +4657,7 @@ function findingCardHTML(finding, index, total) {
             <div class="field field-wide"><div class="field-label">Location of Activity</div>${fv('activityLocation','text')}</div>
             <div class="field field-wide"><div class="field-label">Damage Description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${fv('damageDescription','text')}</div>
             <div class="field"><div class="field-label">Species / Genus</div>${fv('species','specieslist')}</div>
-            <div class="field choice-field"><div class="field-label">Workings / Nest Located</div>${fv('nestLocated','yesno')}</div>
+            <div class="field choice-field"><div class="field-label">Termite Nest Found?</div>${fv('nestLocated','yesno')}</div>
             <div class="field choice-field"><div class="field-label">Refer to a Builder or Engineer?</div>${fv('structuralConcern','yesno')}</div>
             <div class="field field-wide finding-photos"><div class="field-label">Photos of this finding</div>${spotPhotosHTML(findingPhotoSection(id))}</div>
           </div>
@@ -10463,7 +10485,7 @@ async function buildReportPdf() {
     hinderedAreas:'Hindered Access: Where', obstructions:'Areas Not Inspected', restrictedAccess:'Obstructions', hinderedAreasDetail:'What Hindered Access', noAccessAreas:'Restricted Access: Where & Why', highRiskAreas:'High Risk Areas',
     previousTreatment:'Evidence of Previous Treatment', previousTreatmentDetails:'Previous Treatment: What & Where', siteDrainage:'Site Drainage', subfloorDrainage:'Subfloor Drainage',
     borerActivity:'Borers of Seasoned Timber', borerDetails:'Borer Type, Location & Evidence', decayFound:'Wood Decay Fungi (Rot)', decayDetails:'Wood Decay Location & Evidence',
-    termiteActivity:'Termite Activity Status', species:'Species', damageDescription:'Damage Description', activityLocation:'Location of Activity', nestLocated:'Workings / Nest Located', structuralConcern:'Builder / Engineer Referral',
+    termiteActivity:'Termite Activity Status', species:'Species', damageDescription:'Damage Description', activityLocation:'Location of Activity', nestLocated:'Termite Nest Found?', structuralConcern:'Builder / Engineer Referral',
     waterLeaks:'Water Leaks', leakLocation:'Location of Moisture Ingress', moistureReadings:'Moisture Readings', timberSoil:'Timber-to-Soil Contact', slabEdge:'Slab Edge Concealed', weepHoles:'Weep Holes (Clear / Bridged)', existingSystem:'Existing System',
     durableNoticePresent:'Durable Notice Present', hardLandscaping:'Hard Landscaping Adjacent', zone25mmVisible:'25mm Inspection Zone Visible', softLandscaping:'Soft Landscaping Adjacent', zone75mmVisible:'75mm Inspection Zone Visible', antCapSoldered:'Ant Cap Joins Soldered',
     treatmentRecommended:'Treatment Recommended', treatmentType:'Treatment Type', inspectionFrequency:'Inspection Frequency', riskLevel:'Risk of Termite Attack',
@@ -10898,16 +10920,6 @@ async function buildReportPdf() {
       y += 17;
     }
 
-    // Was a nest found?
-    if (y > 272) newPage();
-    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
-    doc.text('TERMITE NEST FOUND?', bodyX, y); y += 4.5;
-    const nestVal = f.nestLocated === 'YES' ? 'YES' : f.nestLocated ? 'NO' : 'NOT RECORDED';
-    const nestCol = f.nestLocated === 'YES' ? C.danger : f.nestLocated ? C.safe : C.inkMuted;
-    doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
-    doc.setTextColor(...nestCol);
-    doc.text(nestVal, bodyX, y); y += 7;
-
     // Location
     if (f.activityLocation && f.activityLocation.trim()) {
       if (y > 272) newPage();
@@ -10930,9 +10942,18 @@ async function buildReportPdf() {
       doc.text(descW, bodyX, y); y += descW.length * 4.5 + 5;
     }
 
+    // Was a nest found? Read after where and what was seen.
+    if (y > 272) newPage();
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
+    doc.text('TERMITE NEST FOUND?', bodyX, y); y += 4.5;
+    const nestVal = f.nestLocated === 'YES' ? 'YES' : f.nestLocated ? 'NO' : 'NOT RECORDED';
+    const nestCol = f.nestLocated === 'YES' ? C.danger : f.nestLocated ? C.safe : C.inkMuted;
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
+    doc.setTextColor(...nestCol);
+    doc.text(nestVal, bodyX, y); y += 7;
+
     // Builder / engineer referral
     if (f.structuralConcern === 'YES') {
-      y += 2;
       callout('Builder or engineer referral', 'The inspector recommends a licensed builder or structural engineer assess this damage, and any effect on the structure, before work proceeds.', 'bad', bodyX, bodyW);
     }
 

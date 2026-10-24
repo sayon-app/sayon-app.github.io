@@ -2777,6 +2777,9 @@ body.report-locked #micDock { opacity: 0.4; }
 .signature-status.signed { color: var(--green); }
 
 .signature-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 12px;
   font-weight: 600;
   color: var(--text2);
@@ -3230,6 +3233,16 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 }
 .findings-add-btn:hover { border-color: var(--accent); color: var(--accent2); }
 .findings-add-btn.at-cap { opacity: 0.4; cursor: not-allowed; }
+/* Borer finding cards sit inside the borers box, under the borer question. */
+#borerFindingsList { display: flex; flex-direction: column; gap: 10px; }
+.system-verify .borer-card .section-fields { padding: 14px 16px; }
+.borer-findings .findings-add-btn { margin: 10px 0 0; width: 100%; }
+.borer-findings .findings-add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Tap chips under a text field (timber affected, borer type): one row
+   that scrolls sideways, so the card stays short. */
+.obs-items.pick-chips { padding: 8px 0 2px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.obs-items.pick-chips::-webkit-scrollbar { display: none; }
+.pick-chips .obs-item-btn { flex: none; white-space: nowrap; }
 
 /* ── DASHBOARD ── */
 .dashboard-overlay {

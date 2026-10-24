@@ -298,7 +298,7 @@
           <div class="quote-grid">
             <label class="quote-field"><span>Client</span><input class="quote-input" id="qClient" oninput="onQuoteFieldInput()"></label>
             <label class="quote-field"><span>Phone</span><input class="quote-input" id="qClientPhone" type="tel" inputmode="tel" onchange="tidyPhoneInput(this)" oninput="onQuoteFieldInput()"></label>
-            <label class="quote-field"><span>Email</span><input class="quote-input" id="qClientEmail" type="email" oninput="onQuoteFieldInput()"></label>
+            <label class="quote-field wide"><span>Email</span><input class="quote-input" id="qClientEmail" type="email" oninput="onQuoteFieldInput()"></label>
             <label class="quote-field wide"><span>Property address</span><input class="quote-input" id="qAddress" oninput="onQuoteFieldInput()"></label>
             <label class="quote-field"><span>Quote no.</span><input class="quote-input" id="qNumber" oninput="onQuoteFieldInput()"></label>
             <label class="quote-field"><span>Valid for (days)</span><input class="quote-input" id="qValidDays" type="number" min="1" inputmode="numeric" oninput="onQuoteFieldInput()"></label>
@@ -315,7 +315,7 @@
           <div id="quoteSystemChoice" class="quote-system-choice" style="display:none"></div>
           <div id="quoteItems"></div>
           <button class="quote-add-btn" onclick="addQuoteItem()">+ Add line</button>
-          <div class="quote-hint">Prices are before GST. Each line starts at the rate you last quoted for it, so per-metre and per-station rates carry over to your next quote.</div>
+          <div class="quote-hint">Prices are before GST. Lines marked <b>Starting price</b> use a suggested rate until you set your own. After that, each line starts at the rate you last quoted for it.</div>
         </div>
 
         <div class="quote-card quote-totals">
@@ -326,16 +326,16 @@
           </div>
           <div class="quote-total-row grand"><span>Total</span><span id="qTotal">$0.00</span></div>
           <label class="quote-field quote-terms-field"><span>Payment terms</span>
-            <textarea class="quote-input quote-textarea" id="qPaymentTerms" rows="3" placeholder="e.g. 50% deposit to book, balance on completion" oninput="onQuoteFieldInput()"></textarea>
+            <textarea class="quote-input quote-textarea" id="qPaymentTerms" rows="3" placeholder="e.g. 50% deposit to book, balance on completion" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea>
           </label>
         </div>
 
         <div class="quote-card">
           <label class="quote-card-title" for="qExclusions">Exclusions &amp; work by others</label>
           <div class="quote-hint" style="margin:2px 0 8px">One per line. Pre-filled from builder referrals, moisture sources and inaccessible areas in the report.</div>
-          <textarea class="quote-input quote-textarea" id="qExclusions" rows="5" oninput="onQuoteFieldInput()"></textarea>
+          <textarea class="quote-input quote-textarea" id="qExclusions" rows="5" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea>
           <label class="quote-card-title" for="qNotes" style="margin-top:14px;display:block">Terms &amp; notes</label>
-          <textarea class="quote-input quote-textarea" id="qNotes" rows="4" oninput="onQuoteFieldInput()"></textarea>
+          <textarea class="quote-input quote-textarea" id="qNotes" rows="4" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea>
         </div>
 
         <div class="quote-card quote-answer" id="quoteAnswer" style="display:none"></div>
@@ -1370,8 +1370,15 @@
             <p class="system-verify-hint">AS 4349.3 timber pests other than termites. Record what you saw, even if it's none.</p>
             <div class="section-fields">
               <div class="field"><div class="field-label">Borers of Seasoned Timber</div><div class="field-val" id="f-borerActivity" onclick="startEdit(this,'borerActivity','activity')">—</div></div>
+              <!-- One card per place borers were found (renderBorerFindings) -->
+              <div class="field field-wide borer-findings" id="borerFindingsWrap" style="display:none">
+                <div id="borerFindingsList"></div>
+                <button type="button" class="findings-add-btn" id="addBorerBtn" onclick="addBorerFinding()">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                  <span>Add Another Borer Finding</span>
+                </button>
+              </div>
               <div class="field"><div class="field-label">Wood Decay Fungi (Rot)</div><div class="field-val" id="f-decayFound" onclick="startEdit(this,'decayFound','yesno')">—</div></div>
-              <div class="field field-wide"><div class="field-label">Borer Type, Location &amp; Evidence</div><div class="field-val" id="f-borerDetails" onclick="startEdit(this,'borerDetails','text')">—</div></div>
               <div class="field field-wide"><div class="field-label">Wood Decay Location &amp; Evidence</div><div class="field-val" id="f-decayDetails" onclick="startEdit(this,'decayDetails','text')">—</div></div>
               <div class="field"><div class="field-label">Chemical Delignification</div><div class="field-val" id="f-delignification" onclick="startEdit(this,'delignification','yesno')">—</div></div>
               <div class="field field-wide"><div class="field-label">Delignification Location &amp; Evidence</div><div class="field-val" id="f-delignificationDetails" onclick="startEdit(this,'delignificationDetails','text')">—</div></div>

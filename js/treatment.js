@@ -474,13 +474,14 @@ function buildTreatmentCertificatePDF(q) {
     doc.setFont(font.fontName, font.fontStyle); doc.setFontSize(size); doc.setTextColor(color);
   };
   // Lighter headings than the quote's numbered ones, so most certificates
-  // fit one page.
+  // fit one page. Teal like the report's subheads, with a clear gap above
+  // so a heading never sits on the table or box before it.
   const section = title => {
-    ensure(22);
-    y += 1;
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...C.ink);
+    ensure(24);
+    y += 2.5;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...C.accentDark);
     pdfTracked(doc, title, M, y, { cs: 0.6 });
-    doc.setFillColor(...C.rule); doc.rect(M, y + 2, CW, 0.3, 'F');
+    doc.setFillColor(...C.accentLight); doc.rect(M, y + 2, CW, 0.5, 'F');
     y += 6.5;
   };
   const para = (text, opts = {}) => {
@@ -592,7 +593,7 @@ function buildTreatmentCertificatePDF(q) {
       });
       y += rowH;
     });
-    y += 2;
+    y += 4;
   }
 
   // ── DURABLE NOTICE AND SITE PLAN ── The wording on the notice itself
@@ -641,7 +642,7 @@ function buildTreatmentCertificatePDF(q) {
     try { doc.addImage(t.sketch, 'JPEG', px, top, planW, planH); } catch (e) {}
     doc.setDrawColor(...C.rule); doc.setLineWidth(0.3); doc.rect(px, top, planW, planH);
   }
-  y = top + boxH + 2.5;
+  y = top + boxH + 3.5;
 
   // ── NEXT STEPS ──
   const steps = [];

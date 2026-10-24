@@ -51,8 +51,15 @@ const TREATMENT_NOTICE = {
   none: 'No durable notice placed',
 };
 
-function treatmentCertNumber(q) {
-  return 'TC-' + String(q.number || '').replace(/^Q-?/i, '');
+function treatmentCertNumber(q, prefix = 'TC') {
+  return prefix + '-' + String(q.number || '').replace(/^Q-?/i, '');
+}
+
+// A chemical barrier or a baiting system is a termite management system
+// left in place, so the client also gets a certificate of installation.
+const INSTALLED_SYSTEMS = ['barrier', 'bait'];
+function installedSystems(t) {
+  return INSTALLED_SYSTEMS.filter(k => t && t.methods && k in t.methods);
 }
 
 function formatClockTime(t) {
@@ -161,8 +168,9 @@ function renderTreatmentBlock(q) {
       ${t.nextInspection ? `<div class="quote-answer-note">Next inspection due ${escapeHtml(formatAnswerDate(t.nextInspection))}</div>` : ''}
       ${treatmentSourceReport().propertyState === 'QLD' ? '<div class="quote-answer-note">In Queensland, email alone isn\'t enough: also hand the client a printed copy, or leave one in their letterbox.</div>' : ''}
       <div class="quote-step-actions">
-        <button class="quote-btn primary" onclick="emailTreatmentCertificate()">Email certificate</button>
+        <button class="quote-btn primary" onclick="emailTreatmentCertificate()">Email ${installedSystems(t).length ? 'certificates' : 'certificate'}</button>
         <button class="quote-link-btn" onclick="downloadTreatmentCertificate()">Certificate PDF</button>
+        ${installedSystems(t).length ? '<button class="quote-link-btn" onclick="downloadTreatmentCertificate(true)">Installation certificate PDF</button>' : ''}
         <button class="quote-link-btn" onclick="openTreatmentRecord()">Edit</button>
       </div>
     </div>`;
@@ -420,14 +428,15 @@ function saveTreatmentRecord() {
 }
 
 // ── CERTIFICATE PDF ──
-function downloadTreatmentCertificate() {
+function downloadTreatmentCertificate(install = false) {
   const q = quoteState;
   if (!q || !q.treatment) return;
+  const name = install ? 'Certificate of installation' : 'Treatment certificate';
   ensureJsPDFLoaded()
-    .then(() => buildTreatmentCertificatePDF(q))
-    .then(({ blob, fname }) => { track('certificate_pdf_made'); return deliverPdfBlob(blob, fname, {
-      title: 'Treatment certificate',
-      text: `Treatment certificate — ${q.address || 'Property'}`,
+    .then(() => buildTreatmentCertificatePDF(q, { install }))
+    .then(({ blob, fname }) => { track('certificate_pdf_made', { install }); return deliverPdfBlob(blob, fname, {
+      title: name,
+      text: `${name} — ${q.address || 'Property'}`,
       readyToast: 'Certificate ready — choose where to save or send it',
     }); })
     .catch(e => {
@@ -448,21 +457,27 @@ function emailTreatmentCertificate() {
       .catch(e => showToast((e && e.message) || 'Could not load the PDF tools', 'error'));
     return;
   }
+  const install = installedSystems(q.treatment).length > 0;
   sendPdfsToClient({
-    files: [buildTreatmentCertificatePDF(q)],
+    files: [buildTreatmentCertificatePDF(q), ...(install ? [buildTreatmentCertificatePDF(q, { install: true })] : [])],
     to: (q.clientEmail || '').trim(),
-    subject: `Termite treatment certificate — ${q.address || 'your property'}`,
-    body: clientMessage({ client: q.client, address: q.address, docs: 'termite treatment certificate', signOff: q.treatment.technician }),
+    subject: `Termite treatment ${install ? 'and installation certificates' : 'certificate'} — ${q.address || 'your property'}`,
+    body: clientMessage({ client: q.client, address: q.address, docs: install ? 'termite treatment certificate and certificate of installation' : 'termite treatment certificate', signOff: q.treatment.technician }),
   }).then(sent => { if (sent) { markCertificateSent(q); track('certificate_sent'); } });
 }
 
-function buildTreatmentCertificatePDF(q) {
+// The treatment certificate, or with install set, the certificate of
+// installation for the barrier or baiting system left in place. Both come
+// from the same treatment record.
+function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   const C = PDF_COLORS;
   const t = q.treatment;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = 210, M = 15, CW = W - M * 2, BOTTOM = 281;
   const company = getCompanyDetails();
-  const number = treatmentCertNumber(q);
+  const number = treatmentCertNumber(q, install ? 'IC' : 'TC');
+  const docName = install ? 'Certificate of Installation' : 'Treatment Certificate';
+  const systems = installedSystems(t);
   let y = 0;
 
   // A new page keeps the text style it broke in, as the header changes it.
@@ -470,7 +485,7 @@ function buildTreatmentCertificatePDF(q) {
     if (y + h <= BOTTOM) return;
     const font = doc.getFont(), size = doc.getFontSize(), color = doc.getTextColor();
     doc.addPage();
-    y = drawPdfRunningHeader(doc, company, 'Treatment Certificate', q.address, number);
+    y = drawPdfRunningHeader(doc, company, docName, q.address, number);
     doc.setFont(font.fontName, font.fontStyle); doc.setFontSize(size); doc.setTextColor(color);
   };
   // Lighter headings than the quote's numbered ones, so most certificates
@@ -512,13 +527,13 @@ function buildTreatmentCertificatePDF(q) {
     y += h + 1;
   };
 
-  y = drawPdfDocCover(doc, company, { compact: true, kicker: 'Termite management', title: 'Treatment Certificate', date: formatLongDate(t.date), left: [
+  y = drawPdfDocCover(doc, company, { compact: true, kicker: install ? 'Termite management system' : 'Termite management', title: docName, date: formatLongDate(t.date), left: [
     ['CLIENT', q.client || 'Not specified'],
     ['PROPERTY ADDRESS', q.address || 'Not specified'],
     ['CONTACT', [q.clientPhone, q.clientEmail].map(v => (v || '').trim()).filter(Boolean).join('  ·  ')],
   ], right: [
     ['CERTIFICATE NO.', number],
-    ['TREATMENT DATE', formatLongDate(t.date) + (t.start ? `, ${formatClockTime(t.start)}${t.finish ? ` to ${formatClockTime(t.finish)}` : ''}` : '')],
+    [install ? 'INSTALLATION DATE' : 'TREATMENT DATE', formatLongDate(t.date) + (t.start ? `, ${formatClockTime(t.start)}${t.finish ? ` to ${formatClockTime(t.finish)}` : ''}` : '')],
     ['TECHNICIAN', t.technician],
     ['LICENCE NO.', t.licence],
     ['SUPERVISOR', t.supervisor],
@@ -526,7 +541,7 @@ function buildTreatmentCertificatePDF(q) {
   ] });
 
   // ── WHAT WAS DONE ──
-  section('TREATMENT CARRIED OUT');
+  section(install ? 'SYSTEM INSTALLED' : 'TREATMENT CARRIED OUT');
   // Pest, equipment and weather in a row of small labelled cells.
   // A species qualifier ("not identified, further investigation required")
   // belongs on the inspection report, not on a certificate for work done.
@@ -534,7 +549,7 @@ function buildTreatmentCertificatePDF(q) {
   cellRow([['Pest treated', pest], ['Equipment', t.equipment], ['Weather', t.weather]]);
   Object.entries(t.methods || {}).forEach(([key, qty]) => {
     const m = TREATMENT_METHODS[key];
-    if (!m) return;
+    if (!m || (install && !systems.includes(key))) return;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
     const text = m.label + (m.qty && qty ? ` (${qty} ${m.qty})` : '');
     const lines = doc.splitTextToSize(text, CW - 6);
@@ -545,7 +560,8 @@ function buildTreatmentCertificatePDF(q) {
   });
 
   // Where, in the same row style.
-  if (t.areas || t.notTreated) { y += 1.5; cellRow([['Areas treated', t.areas], ['Areas not treated', t.notTreated]]); }
+  if (install) { y += 1.5; cellRow([['Where it was installed', t.areas], ['Areas not covered', t.notTreated], ['Installed to', 'AS 3660.2 and the manufacturer\'s directions']]); }
+  else if (t.areas || t.notTreated) { y += 1.5; cellRow([['Areas treated', t.areas], ['Areas not treated', t.notTreated]]); }
 
   // ── PRODUCTS ──
   const products = (t.products || []).filter(p => p.name || p.active);
@@ -578,7 +594,7 @@ function buildTreatmentCertificatePDF(q) {
       doc.setFontSize(7.5);
       const active = p.name && p.active ? doc.splitTextToSize(p.active, cols[0].w - 3) : [];
       const rowH = Math.max(cells[0].length * 4 + active.length * 3.4, ...cells.slice(1).map(l => l.length * 4)) + 4;
-      if (y + rowH > BOTTOM) { doc.addPage(); y = drawPdfRunningHeader(doc, company, 'Treatment Certificate', q.address, number); head(); }
+      if (y + rowH > BOTTOM) { doc.addPage(); y = drawPdfRunningHeader(doc, company, docName, q.address, number); head(); }
       if (i % 2 === 1) { doc.setFillColor(...C.rowAlt); doc.rect(M, y, CW, rowH, 'F'); }
       doc.setDrawColor(...C.ruleLight); doc.setLineWidth(0.25); doc.line(M, y + rowH, M + CW, y + rowH);
       let x = M + 3;
@@ -602,7 +618,7 @@ function buildTreatmentCertificatePDF(q) {
   const planW = t.sketch ? 64 : 0, planH = planW * 0.75;
   const boxW = t.sketch ? CW - planW - 5 : CW, ncols = t.sketch ? 2 : 3;
   const cellW = (boxW - 8 - (ncols - 1) * 5) / ncols;
-  const methodNames = Object.keys(t.methods || {}).map(k => TREATMENT_METHODS[k] && TREATMENT_METHODS[k].label).filter(Boolean);
+  const methodNames = Object.keys(t.methods || {}).filter(k => !install || systems.includes(k)).map(k => TREATMENT_METHODS[k] && TREATMENT_METHODS[k].label).filter(Boolean);
   // Chemical life only when a chemical was applied, not on a baiting-only
   // job, and only for the chemicals (not the baits).
   const BAITS = /exterra|sentricon|trelona|chlorfluazuron|noviflumuron|novaluron|bistrifluron|hexaflumuron/i;
@@ -646,16 +662,20 @@ function buildTreatmentCertificatePDF(q) {
 
   // ── NEXT STEPS ──
   const steps = [];
-  if (t.cautions) steps.push(`Safety and re-entry: ${t.cautions}`);
+  if (install) {
+    // What keeps the installed system working.
+    if (systems.includes('barrier')) steps.push('The barrier only works while the treated soil stays unbroken. Do not dig, pave, build or garden against the house without asking us first.');
+    if (systems.includes('bait')) steps.push('The bait stations need checking as often as the manufacturer directs. Do not move, cover or remove them.');
+  } else if (t.cautions) steps.push(`Safety and re-entry: ${t.cautions}`);
   if (t.nextInspection) steps.push(`Book your next timber pest inspection by ${formatLongDate(t.nextInspection)}. AS 3660.2 recommends one at least every 12 months.`);
   // Three short points, so the signature stays on page 1.
-  steps.push(((t.methods || {}).barrier !== undefined ? 'Do not dig or build against the treated soil without asking us. ' : '') +
+  steps.push((!install && (t.methods || {}).barrier !== undefined ? 'Do not dig or build against the treated soil without asking us. ' : '') +
     'Keep weep holes clear and leaks fixed, and call us if you see termites or mud leads.');
   // The list stays together, so it never starts at the foot of a page.
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
   const stepLines = steps.map(st => doc.splitTextToSize(st, CW - 7));
   ensure(12 + stepLines.reduce((a, l) => a + l.length * 3.9 + 0.8, 0));
-  section('KEEPING THE PROPERTY PROTECTED');
+  section(install ? 'LOOKING AFTER THE SYSTEM' : 'KEEPING THE PROPERTY PROTECTED');
   stepLines.forEach((lines, i) => {
     ensure(lines.length * 3.9 + 2);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...C.accentDark);
@@ -686,10 +706,12 @@ function buildTreatmentCertificatePDF(q) {
     doc.text(`Supervised by ${t.supervisor}${t.supervisorLicence ? `, licence ${t.supervisorLicence}` : ''}`, M, y);
     y += 5;
   }
-  para('The treatment above was carried out by this technician in line with the product label directions and AS 3660.2. It does not repair existing damage, and no treatment can guarantee termites will never return. Regular inspections are the best protection.',
+  para(install
+    ? 'The system above was installed by this technician in line with the manufacturer\'s directions, the product label and AS 3660.2. It does not repair existing damage, and no system can guarantee termites will never return. Regular inspections are the best protection.'
+    : 'The treatment above was carried out by this technician in line with the product label directions and AS 3660.2. It does not repair existing damage, and no treatment can guarantee termites will never return. Regular inspections are the best protection.',
     { size: 7, lh: 3.2, color: C.inkMuted });
 
-  drawPdfDocFooters(doc, `Certificate ${number}${company.name ? `  ·  ${company.name}` : ''}`);
+  drawPdfDocFooters(doc, `${install ? 'Installation certificate' : 'Certificate'} ${number}${company.name ? `  ·  ${company.name}` : ''}`);
   const safe = (q.address || 'Property').replace(/[^\w]+/g, '_').substring(0, 25);
-  return { blob: doc.output('blob'), fname: `SAYON_Treatment_Certificate_${number.replace(/[^\w-]+/g, '')}_${safe}.pdf` };
+  return { blob: doc.output('blob'), fname: `SAYON_${install ? 'Installation' : 'Treatment'}_Certificate_${number.replace(/[^\w-]+/g, '')}_${safe}.pdf` };
 }

@@ -1045,7 +1045,7 @@
     {
       "id": "borer-details-clean",
       "kind": "mentions",
-      "path": "borerDetails",
+      "path": "borerFindings",
       "none": [
         "anobium",
         "lyctus",

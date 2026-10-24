@@ -326,8 +326,11 @@ function buildQuoteItemsFromReport(rd, system) {
 
   // Active borers get treated; old borer damage and rot are repairs for a
   // builder, so they go in the exclusions instead (buildQuoteExclusions).
+  // The detail names the places with live borers, not the old damage.
   if (rd.borerActivity === 'ACTIVE') {
-    items.push(newQuoteItem('borer', { detail: rd.borerDetails || '', source: 'Finding: active borers' }));
+    const live = (Array.isArray(rd.borerFindings) ? rd.borerFindings : []).filter(b => b && b.borerActivity === 'ACTIVE')
+      .map(b => [b.location, b.timberAffected].filter(Boolean).join(', ')).filter(Boolean);
+    items.push(newQuoteItem('borer', { detail: live.length ? live.join('; ') : (rd.borerDetails || ''), source: 'Finding: active borers' }));
   }
 
   if (rd.timberSoil === 'YES') {

@@ -1370,8 +1370,15 @@
             <p class="system-verify-hint">AS 4349.3 timber pests other than termites. Record what you saw, even if it's none.</p>
             <div class="section-fields">
               <div class="field"><div class="field-label">Borers of Seasoned Timber</div><div class="field-val" id="f-borerActivity" onclick="startEdit(this,'borerActivity','activity')">—</div></div>
+              <!-- One card per place borers were found (renderBorerFindings) -->
+              <div class="field field-wide borer-findings" id="borerFindingsWrap" style="display:none">
+                <div id="borerFindingsList"></div>
+                <button type="button" class="findings-add-btn" id="addBorerBtn" onclick="addBorerFinding()">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                  <span>Add Another Borer Finding</span>
+                </button>
+              </div>
               <div class="field"><div class="field-label">Wood Decay Fungi (Rot)</div><div class="field-val" id="f-decayFound" onclick="startEdit(this,'decayFound','yesno')">—</div></div>
-              <div class="field field-wide"><div class="field-label">Borer Type, Location &amp; Evidence</div><div class="field-val" id="f-borerDetails" onclick="startEdit(this,'borerDetails','text')">—</div></div>
               <div class="field field-wide"><div class="field-label">Wood Decay Location &amp; Evidence</div><div class="field-val" id="f-decayDetails" onclick="startEdit(this,'decayDetails','text')">—</div></div>
               <div class="field"><div class="field-label">Chemical Delignification</div><div class="field-val" id="f-delignification" onclick="startEdit(this,'delignification','yesno')">—</div></div>
               <div class="field field-wide"><div class="field-label">Delignification Location &amp; Evidence</div><div class="field-val" id="f-delignificationDetails" onclick="startEdit(this,'delignificationDetails','text')">—</div></div>

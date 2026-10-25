@@ -76,7 +76,6 @@ body.dark-screen {
 }
 body.dark-screen.high-contrast { --border: #5B6B7C; --border2: #7A8C9E; --text2: #D4DEE7; --text3: #B4C2CF; }
 body.dark-screen .choice-panel { box-shadow: inset 0 0 0 1px var(--border2); }
-body.dark-screen .findings-gate.unset { box-shadow: inset 0 0 0 2px var(--tone-warn); }
 body.dark-screen .risk-high   { background: rgba(255,90,79,0.16);  color: #FF8A80; border-color: rgba(255,90,79,0.5); }
 body.dark-screen .risk-medium { background: rgba(255,176,0,0.14);  color: #FFC53D; border-color: rgba(255,176,0,0.5); }
 body.dark-screen .risk-low    { background: rgba(94,234,212,0.14); color: #5EEAD4; border-color: rgba(94,234,212,0.5); }
@@ -3014,7 +3013,6 @@ body.large-touch .select-cards .choice-card { min-height: 72px; }
 /* Findings gating question: termite activity, which every finding must
    answer. Taller cards, and an amber frame until it's answered. */
 .findings-gate { margin: 8px 6px 0; padding: 8px; }
-.findings-gate.unset { box-shadow: inset 0 0 0 3px var(--tone-warn); }
 .findings-gate .field-label {
   color: var(--act-ink);
   font-size: 14px;

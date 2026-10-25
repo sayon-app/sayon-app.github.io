@@ -57,6 +57,13 @@ As of 2026-10-05, about 10:50 UTC. Written for a model starting with no context.
 
 ## 2. Decision log
 
+- 2026-10-25, **the scan's top 10 fixed** (baz: "fix them"; scan doc https://claude.ai/artifact/B4wEeKZV6rEhfJVdH1ZBGK). Rules that came out of it:
+  - **Two phones editing one report keep both versions.** Each saved report remembers the account copy it was built on (`cloudSavedAt`). When the account has a newer copy from elsewhere, that copy takes the report's place and this phone's version is saved beside it as "(copy from this phone)" (`keepBothCopies`). Saves of one report go up one at a time (`reportSaveChains`), so a phone's own quick saves never clash with each other.
+  - **Deletes and photo removals offer Undo.** The account copy goes once the Undo window passes (`DELETE_UNDO_MS`); deletes made offline wait in `korva_pending_deletes_<uid>`. A finished report asks first.
+  - **A backup (version 2) carries every report, its photos and the accessibility settings**, and restoring adds to what's on the phone (newer copy wins) instead of replacing it. Never the sign-in or company details.
+  - **A quote is dated the day it was first sent or answered** (`issuedAt`, kept while the quote is unchanged), so VALID UNTIL doesn't move on a resend. Money is added up in whole cents.
+  - **A signature needs real ink**: a tap or a dot doesn't count.
+
 - 2026-10-25, **the wave under the mic follows the speech results, not the microphone**: each batch of recognised words kicks the bars up and they settle while it's quiet (`pulseWave`, `driveWave`). Reason: baz wanted it to show it's hearing; reading the mic itself would open a second mic user, not proven safe on iPhone.
 - 2026-10-25, **"What and where" boxes are drop-downs like Wall Construction**, with "Other (type it)" last (High Risk Areas, Previous Treatment, Non-durable Timber). Previous Treatment, Wood Decay, Delignification and Non-durable Timber are each split into What (the old `*Details` key) and Where (`previousTreatmentWhere`, `decayWhere`, `delignificationWhere`, `nonDurableTimberWhere`), each its own drop-down; older reports keep both in What. Reason: baz finds the drop-down quick and compact.
 - 2026-10-25, **a finding is ACTIVE or INACTIVE, never "suspected"** (baz: "if its active it becomes a possible management problem, cant just leave as suspected"). A spot the inspector only suspects, with no live termites, workings, mud or damage seen there, is not a finding card: extraction puts it in the invasive inspection recommendation, high risk areas, or the moisture and leak fields. A SUSPECTED status was built and dropped the same day.

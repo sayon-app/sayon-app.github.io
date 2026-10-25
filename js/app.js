@@ -1706,7 +1706,7 @@ BORERS AND WOOD DECAY (never in findings):
   - structuralConcern: "YES" when the inspector recommends a builder, carpenter or engineer look at the borer damage; "NO" when they say no referral is needed. Otherwise null.
 - decayFound: "YES" for rot, fungal decay, soft, spongy or crumbling timber. "NO" when they say no rot or decay. Null when not raised.
 - decayDetails: where the decay is and what was seen, with no severity words.
-- previousTreatment: "YES" when the inspector sees signs the property was treated for termites before: drill holes in the slab, paving or brickwork (often plugged), dusting residue, or bait or monitoring stations in the ground. "NO" when they say there is no sign of a previous treatment. Null when not raised. It is about past treatment evidence, not an installed system the inspector names (that is existingSystem), although both can be filled. previousTreatmentDetails: what and where, in their words ("plugged drill holes along the rear patio").
+- previousTreatment: "YES" when the inspector sees signs the property was treated for termites before: drill holes in the slab, paving or brickwork (often plugged), dusting residue, or bait or monitoring stations in the ground. "NO" when they say there is no sign of a previous treatment. Null when not raised. It is about past treatment evidence, not an installed system the inspector names (that is existingSystem), although both can be filled. previousTreatmentDetails: what and where, in their words ("plugged drill holes along the rear patio"), naming the kind of treatment with these terms where they fit: drill and inject soil treatment, plugged drill holes, bait stations, monitoring stations, dusting residue, reticulation system, physical barrier, treatment notice in meter box.
 - delignification: chemical delignification, where chemicals or salt air break down the timber surface so it looks furry, hairy or fibrous (often on roof timbers near the coast or near chimneys). "YES" when the inspector reports it, "NO" when they say there is none. Null when not raised. delignificationDetails: where and what was seen.
 
 MOISTURE AND CONDUCIVE CONDITIONS:
@@ -5118,6 +5118,8 @@ function wireInlineTextEdit(input, onSave, onCancel, onBlur) {
   input.addEventListener('blur', () => finish(onBlur || onSave, input.value));
 }
 
+// The last choice in a list that opens a typing box instead of saving.
+const OTHER_TYPE_IT = 'Other (type it)';
 function startEdit(el, key, type) {
   if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
   if (el.classList.contains('editing')) return;
@@ -5301,6 +5303,42 @@ function startEdit(el, key, type) {
       'Combination System — Physical + Chemical',
       'System Present — Type Unidentified',
     ],
+    // "What and where" boxes: pick the usual answer, or type your own.
+    highrisk: [
+      'Subfloor',
+      'Roof void',
+      'Wall cavities',
+      'Behind stored goods',
+      'Under floor coverings',
+      'Behind fixed cabinetry',
+      'Concealed slab edge',
+      'Wet areas (bathroom, laundry, kitchen)',
+      'Garage',
+      'Outbuildings',
+      OTHER_TYPE_IT,
+    ],
+    prevtreatment: [
+      'Drill and inject soil treatment',
+      'Plugged drill holes',
+      'Bait stations',
+      'Monitoring stations',
+      'Dusting residue',
+      'Reticulation system',
+      'Physical barrier',
+      'Treatment notice in meter box',
+      OTHER_TYPE_IT,
+    ],
+    nondurable: [
+      'Timber retaining wall',
+      'Landscaping sleepers',
+      'Fence posts in soil',
+      'Timber stumps',
+      'Deck or pergola posts',
+      'Garden edging',
+      'Untreated pine framing',
+      'Firewood stacked against the house',
+      OTHER_TYPE_IT,
+    ],
     weatherconditions: [
       'Fine and dry',
       'Overcast',
@@ -5355,8 +5393,12 @@ function startEdit(el, key, type) {
     const opts = cur && !OPTIONS[type].includes(cur) ? [cur, ...OPTIONS[type]] : OPTIONS[type];
     input.innerHTML = (cur ? '' : '<option value="" selected>Choose…</option>') +
       opts.map(o => `<option value="${escapeHtml(o)}" ${cur===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
-    input.addEventListener('change', () => commitEdit(el, key, input.value));
-    input.addEventListener('blur',   () => commitEdit(el, key, input.value));
+    let switched = false;
+    input.addEventListener('change', () => {
+      if (input.value === OTHER_TYPE_IT) { switched = true; el.classList.remove('editing'); startEdit(el, key, 'text'); return; }
+      commitEdit(el, key, input.value);
+    });
+    input.addEventListener('blur', () => { if (!switched && el.classList.contains('editing')) commitEdit(el, key, input.value); });
   } else {
     input = document.createElement('input');
     input.type = 'text';
@@ -5507,7 +5549,7 @@ function cancelEdit(el, key) {
 function commitActive() {
   if (activeEditEl && activeEditEl.classList.contains('editing')) {
     const input = activeEditEl.querySelector('input, select');
-    if (input && input.value.trim()) {
+    if (input && input.value.trim() && input.value !== OTHER_TYPE_IT) {
       const key = activeEditEl.id.replace('f-', '');
       commitEdit(activeEditEl, key, input.value);
     } else if (input) {

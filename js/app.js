@@ -456,8 +456,8 @@ function areaEvidence(zoneId) {
     if (textAreas([b.location, b.timberAffected, b.description].join(' ')).includes(zoneId)) out.push(`Borer finding ${i + 1}${b.location ? ` (${short(b.location)})` : ''}`);
   });
   const other = [
-    ['Wood decay', reportData.decayFound === 'YES', reportData.decayDetails],
-    ['Chemical delignification', reportData.delignification === 'YES', reportData.delignificationDetails],
+    ['Wood decay', reportData.decayFound === 'YES', whatWhere(reportData.decayDetails, reportData.decayWhere)],
+    ['Chemical delignification', reportData.delignification === 'YES', whatWhere(reportData.delignificationDetails, reportData.delignificationWhere)],
   ];
   other.forEach(([label, found, details]) => {
     if (found && textAreas(details).includes(zoneId)) out.push(`${label} (${short(details)})`);
@@ -1640,8 +1640,8 @@ FIELDS (every one null unless the note gives it):
 "existingSystem":string,"existingSystemOther":string,"durableNoticePresent":"YES"|"NO","hardLandscaping":"YES"|"NO","zone25mmVisible":"YES"|"NO","softLandscaping":"YES"|"NO","zone75mmVisible":"YES"|"NO","antCapSoldered":"YES"|"NO"|"N/A",
 "areaStatus":{"interior"|"exterior"|"subfloor"|"roofvoid"|"outbuildings"|"site"|"fences"|"retainingwalls"|"landscapingtimbers":"INSPECTED"|"PARTIAL"|"NOT"|"NA"},"areaResult":{same area keys:"CLEAR"|"FOUND"},"obstructions":string,"restrictedAccess":string,"noAccessAreas":string,"highRiskAreas":string,"hinderedAreas":string,"hinderedAreasDetail":string,
 "findings":[{"termiteActivity":"ACTIVE"|"INACTIVE"|"NONE","species":string,"damageDescription":string,"activityLocation":string,"timberAffected":string,"nestLocated":"YES"|"NO","structuralConcern":"YES"|"NO"}],
-"borerActivity":"ACTIVE"|"INACTIVE"|"NONE","borerFindings":[{"borerActivity":"ACTIVE"|"INACTIVE","borerType":string,"location":string,"timberAffected":string,"description":string,"structuralConcern":"YES"|"NO"}],"decayFound":"YES"|"NO","decayDetails":string,"delignification":"YES"|"NO","delignificationDetails":string,"previousTreatment":"YES"|"NO","previousTreatmentDetails":string,"previousTreatmentWhere":string,
-"moistureReadings":"YES"|"NO","waterLeaks":"YES"|"NO","leakLocation":string,"moistureMeterReadings":[{"location":string,"reading":string}],"timberSoil":"YES"|"NO","slabEdge":"CLEAR"|"OBSTRUCTED","weepHoles":"CLEAR"|"BRIDGED"|"NONE","siteDrainage":"ADEQUATE"|"POOR","subfloorDrainage":"ADEQUATE"|"POOR","antCapping":"INTACT"|"GAPS"|"NONE","antCappingDetails":string,"subfloorVentilation":"ADEQUATE"|"POOR","nonDurableTimber":"YES"|"NO","nonDurableTimberDetails":string,
+"borerActivity":"ACTIVE"|"INACTIVE"|"NONE","borerFindings":[{"borerActivity":"ACTIVE"|"INACTIVE","borerType":string,"location":string,"timberAffected":string,"description":string,"structuralConcern":"YES"|"NO"}],"decayFound":"YES"|"NO","decayDetails":string,"decayWhere":string,"delignification":"YES"|"NO","delignificationDetails":string,"delignificationWhere":string,"previousTreatment":"YES"|"NO","previousTreatmentDetails":string,"previousTreatmentWhere":string,
+"moistureReadings":"YES"|"NO","waterLeaks":"YES"|"NO","leakLocation":string,"moistureMeterReadings":[{"location":string,"reading":string}],"timberSoil":"YES"|"NO","slabEdge":"CLEAR"|"OBSTRUCTED","weepHoles":"CLEAR"|"BRIDGED"|"NONE","siteDrainage":"ADEQUATE"|"POOR","subfloorDrainage":"ADEQUATE"|"POOR","antCapping":"INTACT"|"GAPS"|"NONE","antCappingDetails":string,"subfloorVentilation":"ADEQUATE"|"POOR","nonDurableTimber":"YES"|"NO","nonDurableTimberDetails":string,"nonDurableTimberWhere":string,
 "riskLevel":"LOW"|"MEDIUM"|"HIGH","treatmentRecommended":"YES"|"NO","treatmentType":string,"inspectionFrequency":string,"invasiveInspection":"YES"|"NO","invasiveInspectionDetails":string,"otherRecommendations":string}
 
 DROPDOWN FIELDS: the app shows these as pick-lists. Return the list value EXACTLY as written below when the inspector's words fit one; when they describe something the list cannot express, return their words instead (never a list value that adds a fact they did not state).
@@ -1705,9 +1705,9 @@ BORERS AND WOOD DECAY (never in findings):
   - description: what was seen (exit holes, frass, tunnelling, dark or bright holes), with no severity words.
   - structuralConcern: "YES" when the inspector recommends a builder, carpenter or engineer look at the borer damage; "NO" when they say no referral is needed. Otherwise null.
 - decayFound: "YES" for rot, fungal decay, soft, spongy or crumbling timber. "NO" when they say no rot or decay. Null when not raised.
-- decayDetails: where the decay is and what was seen, with no severity words.
+- decayDetails: what was seen, without the place ("soft, spongy timber", "fungal growth"), with no severity words. decayWhere: where it is, in their words ("rear deck bearers", "bathroom window sill"). Null when they give no place.
 - previousTreatment: "YES" when the inspector sees signs the property was treated for termites before: drill holes in the slab, paving or brickwork (often plugged), dusting residue, or bait or monitoring stations in the ground. "NO" when they say there is no sign of a previous treatment. Null when not raised. It is about past treatment evidence, not an installed system the inspector names (that is existingSystem), although both can be filled. previousTreatmentDetails: what was seen, without the place ("plugged drill holes"), naming it with these terms where they fit: drill and inject soil treatment, plugged drill holes, bait stations, monitoring stations, dusting residue, reticulation system, physical barrier, treatment notice in meter box. previousTreatmentWhere: where it was seen, in their words ("along the rear patio", "slab perimeter, front and left side"). Null when they give no place.
-- delignification: chemical delignification, where chemicals or salt air break down the timber surface so it looks furry, hairy or fibrous (often on roof timbers near the coast or near chimneys). "YES" when the inspector reports it, "NO" when they say there is none. Null when not raised. delignificationDetails: where and what was seen.
+- delignification: chemical delignification, where chemicals or salt air break down the timber surface so it looks furry, hairy or fibrous (often on roof timbers near the coast or near chimneys). "YES" when the inspector reports it, "NO" when they say there is none. Null when not raised. delignificationDetails: what was seen, without the place ("furry, fibrous timber surface"). delignificationWhere: where it is ("roof timbers near the chimney"). Null when they give no place.
 
 MOISTURE AND CONDUCIVE CONDITIONS:
 - moistureMeterReadings: one row per reading taken, location and the value as said ("28%"). A reading taken with no value stated keeps the row with reading null; never invent a number or a placeholder. Readings called normal or dry are still rows.
@@ -1720,7 +1720,7 @@ MOISTURE AND CONDUCIVE CONDITIONS:
 - siteDrainage: "ADEQUATE" when the inspector says the site drains well; "POOR" for poor, inadequate or no drainage around the building: water pooling, ponding, ground falling towards the house, soggy soil against the walls, downpipes discharging at the walls. Null when not raised.
 - subfloorDrainage: the same for the subfloor: "POOR" for water lying or pooling in the subfloor, wet or boggy subfloor soil, or drainage the inspector calls poor; "ADEQUATE" when they say it is dry and drains well. Null when not raised or there is no subfloor.
 - subfloorVentilation: "ADEQUATE" when the inspector says the subfloor is well ventilated or vents are fine; "POOR" for poor, inadequate, little or blocked ventilation, too few vents, or a stuffy, damp, humid subfloor they put down to airflow. Null when not raised or there is no subfloor.
-- nonDurableTimber: "YES" when untreated, non-durable or softwood timber is used where it gets wet or touches the ground (pine sleepers, untreated garden edging, untreated posts, untreated decking near soil). "NO" when they say the timber there is treated or durable. nonDurableTimberDetails: what and where, in their words. Null when not raised. This is separate from timberSoil, and both can be YES.
+- nonDurableTimber: "YES" when untreated, non-durable or softwood timber is used where it gets wet or touches the ground (pine sleepers, untreated garden edging, untreated posts, untreated decking near soil). "NO" when they say the timber there is treated or durable. nonDurableTimberDetails: what the timber is, without the place ("untreated pine sleepers"). nonDurableTimberWhere: where it is, in their words ("rear garden bed against the house"). Null when not raised. This is separate from timberSoil, and both can be YES.
 
 EXISTING SYSTEM AND VERIFICATION:
 - durableNoticePresent: "YES" when a durable notice, sticker or plate was seen or read out (in the meter box or elsewhere). "NO" when they looked and found none. Null when not raised. This field stands on its own: fill it even when no system was found.
@@ -2712,6 +2712,28 @@ function dismissServerTranscript() {
   if (panel) panel.style.display = 'none';
 }
 
+// The wave under the mic moves with what the phone hears: each batch of
+// words it recognises kicks the bars up, and they settle back while it's
+// quiet. It reads the speech results, not the microphone, so it never opens
+// a second mic (two at once isn't proven safe on iPhone) and it only moves
+// when words are actually coming through.
+let waveLevel = 0, waveFrame = 0;
+function pulseWave() { waveLevel = Math.min(1, waveLevel + 0.55); }
+function driveWave(on) {
+  cancelAnimationFrame(waveFrame);
+  const bars = [...document.querySelectorAll('#waveform .wave-bar')];
+  if (!on) { waveLevel = 0; bars.forEach(b => { b.style.height = ''; }); return; }
+  const tick = t => {
+    waveLevel *= 0.95;
+    bars.forEach((b, i) => {
+      const swing = 0.55 + 0.45 * Math.sin(t / 90 + i * 1.3);
+      b.style.height = (3 + 1.5 * (0.5 + 0.5 * Math.sin(t / 400 + i)) + 14 * waveLevel * swing).toFixed(1) + 'px';
+    });
+    waveFrame = requestAnimationFrame(tick);
+  };
+  waveFrame = requestAnimationFrame(tick);
+}
+
 function startRecording() {
   const SR = getSpeechRecognitionCtor();
   if (!SR) { showToast('Speech recognition not supported — tap the transcript box to type instead', 'error'); return; }
@@ -2780,6 +2802,7 @@ function startRecording() {
       }
       currentTranscript += final;
       pendingInterim = interim;
+      pulseWave();
       const box = document.getElementById('transcriptBox');
       box.textContent = currentTranscript + interim;
       box.classList.add('active');
@@ -2849,6 +2872,7 @@ function startRecording() {
   document.getElementById('voiceBtn').classList.add('recording');
   document.getElementById('voiceBtnText').textContent = 'Recording… Hold to Stop';
   document.getElementById('waveform').classList.add('show');
+  driveWave(true);
   document.getElementById('extractBtn').disabled = true;
 
   // EXPERIMENTAL, opt-in (see the state-declaration comment above) — started
@@ -2919,6 +2943,7 @@ function stopRecording() {
   document.getElementById('voiceBtn').classList.remove('recording');
   document.getElementById('voiceBtnText').textContent = 'Tap to Speak';
   document.getElementById('waveform').classList.remove('show');
+  driveWave(false);
   if (currentTranscript.trim()) document.getElementById('extractBtn').disabled = false;
   recognitionEnded.then(() => {
     if (!isRecording && currentTranscript.trim()) document.getElementById('extractBtn').disabled = false;
@@ -3951,9 +3976,9 @@ function renderField(el, key, val) {
 // Text fields that hold a list of places or observations. A later note
 // adds to them instead of replacing them, so "borer holes in the subfloor"
 // survives a second note about rot in a fascia.
-const APPEND_TEXT_KEYS = new Set(['hinderedAreas', 'hinderedAreasDetail', 'noAccessAreas', 'highRiskAreas', 'borerDetails', 'decayDetails', 'delignificationDetails', 'nonDurableTimberDetails', 'previousTreatmentDetails', 'previousTreatmentWhere', 'leakLocation', 'otherRecommendations', 'invasiveInspectionDetails']);
+const APPEND_TEXT_KEYS = new Set(['hinderedAreas', 'hinderedAreasDetail', 'noAccessAreas', 'highRiskAreas', 'borerDetails', 'decayDetails', 'decayWhere', 'delignificationDetails', 'delignificationWhere', 'nonDurableTimberDetails', 'nonDurableTimberWhere', 'previousTreatmentDetails', 'previousTreatmentWhere', 'leakLocation', 'otherRecommendations', 'invasiveInspectionDetails']);
 // Free-text fields where "None", "Nil" or "N/A" means nothing to record.
-const NIL_TEXT_KEYS = new Set(['hinderedAreas', 'hinderedAreasDetail', 'noAccessAreas', 'highRiskAreas', 'borerDetails', 'decayDetails', 'delignificationDetails', 'nonDurableTimberDetails', 'previousTreatmentDetails', 'previousTreatmentWhere', 'leakLocation', 'treatmentType', 'existingSystemOther']);
+const NIL_TEXT_KEYS = new Set(['hinderedAreas', 'hinderedAreasDetail', 'noAccessAreas', 'highRiskAreas', 'borerDetails', 'decayDetails', 'decayWhere', 'delignificationDetails', 'delignificationWhere', 'nonDurableTimberDetails', 'nonDurableTimberWhere', 'previousTreatmentDetails', 'previousTreatmentWhere', 'leakLocation', 'treatmentType', 'existingSystemOther']);
 const isNilText = v => /^\s*(nil|none|no|n\/a|na|not applicable|nothing|not stated|not mentioned|unknown)\s*[.!]?\s*$/i.test(String(v));
 const hasRealFinding = list => list.some(f => f.termiteActivity === 'ACTIVE' || f.termiteActivity === 'INACTIVE');
 const findingHasData = f => !!(f.termiteActivity || f.species || f.damageDescription || f.activityLocation || f.timberAffected || f.nestLocated || f.structuralConcern);
@@ -4352,7 +4377,9 @@ const DETAIL_FIELD_FOR = {
 };
 
 // More detail boxes that show and hide with the first one.
-const MORE_DETAIL_FIELDS = { previousTreatment: ['previousTreatmentWhere'] };
+const MORE_DETAIL_FIELDS = { previousTreatment: ['previousTreatmentWhere'], decayFound: ['decayWhere'], delignification: ['delignificationWhere'], nonDurableTimber: ['nonDurableTimberWhere'] };
+// "what (where)" for the summary and other one-line uses.
+const whatWhere = (what, where) => [what, where && `(${where})`].filter(Boolean).join(' ');
 
 function syncDetailField(key) {
   const [detailKey, noAnswers] = DETAIL_FIELD_FOR[key] || [];
@@ -5350,14 +5377,59 @@ function startEdit(el, key, type) {
       OTHER_TYPE_IT,
     ],
     nondurable: [
+      'Untreated pine sleepers',
+      'Untreated garden edging',
+      'Untreated posts',
+      'Untreated decking',
       'Timber retaining wall',
-      'Landscaping sleepers',
-      'Fence posts in soil',
-      'Timber stumps',
-      'Deck or pergola posts',
-      'Garden edging',
       'Untreated pine framing',
-      'Firewood stacked against the house',
+      'Firewood stack',
+      OTHER_TYPE_IT,
+    ],
+    nondurablewhere: [
+      'Against the house',
+      'Front garden',
+      'Rear garden',
+      'Side of the house',
+      'Along the fence',
+      'Deck or patio',
+      'Subfloor',
+      OTHER_TYPE_IT,
+    ],
+    decaywhat: [
+      'Soft or spongy timber',
+      'Crumbling timber',
+      'Fungal growth',
+      'Brown rot, cubed cracking',
+      'White rot, stringy and bleached',
+      'Timber rotted through',
+      'Paint bubbling over damp timber',
+      OTHER_TYPE_IT,
+    ],
+    decaywhere: [
+      'Subfloor bearers or joists',
+      'Floorboards',
+      'Window frames or sills',
+      'Door frames',
+      'Fascia or barge boards',
+      'Deck or pergola',
+      'Wet areas (bathroom, laundry)',
+      'Roof timbers',
+      'Fence or retaining wall',
+      OTHER_TYPE_IT,
+    ],
+    delignwhat: [
+      'Furry or hairy timber surface',
+      'Fibrous, fluffy timber',
+      'Timber surface breaking down',
+      OTHER_TYPE_IT,
+    ],
+    delignwhere: [
+      'Roof timbers',
+      'Near the chimney',
+      'Coastal side of the house',
+      'Subfloor timbers',
+      'Near stored chemicals or pool',
       OTHER_TYPE_IT,
     ],
     weatherconditions: [
@@ -9506,7 +9578,7 @@ function reportSummary() {
   if (reportData.subfloorVentilation === 'POOR') conducive.push('poor subfloor ventilation');
   if (reportData.siteDrainage === 'POOR') conducive.push('poor site drainage');
   if (reportData.subfloorDrainage === 'POOR') conducive.push('poor subfloor drainage');
-  if (reportData.nonDurableTimber === 'YES') conducive.push(`untreated or non-durable timber in a damp area${reportData.nonDurableTimberDetails ? ` (${reportData.nonDurableTimberDetails})` : ''}`);
+  if (reportData.nonDurableTimber === 'YES') conducive.push(`untreated or non-durable timber in a damp area${whatWhere(reportData.nonDurableTimberDetails, reportData.nonDurableTimberWhere) ? ` (${whatWhere(reportData.nonDurableTimberDetails, reportData.nonDurableTimberWhere)})` : ''}`);
   const places = list => list.map(f => f.activityLocation).filter(Boolean).join('; ');
   const NR = 'NOT RECORDED';
   const limitedZones = areasNotFullyInspected();
@@ -9547,11 +9619,11 @@ function reportSummary() {
       ['Borers found?', { ACTIVE: 'ACTIVE', INACTIVE: 'OLD DAMAGE', NONE: 'NO' }[reportData.borerActivity] || NR,
         { ACTIVE: 'bad', INACTIVE: 'warn', NONE: 'good' }[reportData.borerActivity] || 'none', REPORT_PARTS.findings, shownBorerFindings().map(b => b.location || borerLine(b)).filter(Boolean).join('; ')],
       ['Wood decay (rot) found?', { YES: 'YES', NO: 'NO' }[reportData.decayFound] || NR,
-        { YES: 'warn', NO: 'good' }[reportData.decayFound] || 'none', REPORT_PARTS.findings, reportData.decayDetails || ''],
+        { YES: 'warn', NO: 'good' }[reportData.decayFound] || 'none', REPORT_PARTS.findings, whatWhere(reportData.decayDetails, reportData.decayWhere)],
       ['Chemical delignification found?', { YES: 'YES', NO: 'NO' }[reportData.delignification] || NR,
-        { YES: 'warn', NO: 'good' }[reportData.delignification] || 'none', REPORT_PARTS.findings, reportData.delignificationDetails || ''],
+        { YES: 'warn', NO: 'good' }[reportData.delignification] || 'none', REPORT_PARTS.findings, whatWhere(reportData.delignificationDetails, reportData.delignificationWhere)],
       ['Evidence of a previous termite treatment?', { YES: 'YES', NO: 'NO' }[reportData.previousTreatment] || NR,
-        { YES: 'warn', NO: 'good' }[reportData.previousTreatment] || 'none', REPORT_PARTS.findings, [reportData.previousTreatmentDetails, reportData.previousTreatmentWhere && `(${reportData.previousTreatmentWhere})`].filter(Boolean).join(' ')],
+        { YES: 'warn', NO: 'good' }[reportData.previousTreatment] || 'none', REPORT_PARTS.findings, whatWhere(reportData.previousTreatmentDetails, reportData.previousTreatmentWhere)],
     ] },
     { title: 'Safety & risk', items: [
       ['Builder or engineer referral?', structural ? 'YES' : unanswered.length ? 'NOT ANSWERED' : fs.length ? 'NO' : NR,
@@ -10653,13 +10725,13 @@ async function buildReportPdf() {
     constructionEra:'Year / Period of Construction', standard:'Applicable Standard',
     hinderedAreas:'Hindered Access: Where', obstructions:'Areas Not Inspected', restrictedAccess:'Obstructions', hinderedAreasDetail:'What Hindered Access', noAccessAreas:'Restricted Access: Where & Why', highRiskAreas:'High Risk Areas',
     previousTreatment:'Evidence of Previous Treatment', previousTreatmentDetails:'Previous Treatment: What', previousTreatmentWhere:'Previous Treatment: Where', siteDrainage:'Site Drainage', subfloorDrainage:'Subfloor Drainage',
-    borerActivity:'Borers of Seasoned Timber', borerDetails:'Borer Type, Location & Evidence', decayFound:'Wood Decay Fungi (Rot)', decayDetails:'Wood Decay Location & Evidence',
+    borerActivity:'Borers of Seasoned Timber', borerDetails:'Borer Type, Location & Evidence', decayFound:'Wood Decay Fungi (Rot)', decayDetails:'Wood Decay: What', decayWhere:'Wood Decay: Where',
     termiteActivity:'Termite Activity Status', species:'Species', damageDescription:'Damage Description', activityLocation:'Location of Activity', nestLocated:'Termite Nest Found?', structuralConcern:'Builder / Engineer Referral',
     waterLeaks:'Water Leaks', leakLocation:'Location of Moisture Ingress', moistureReadings:'Moisture Readings', timberSoil:'Timber-to-Soil Contact', slabEdge:'Slab Edge Concealed', weepHoles:'Weep Holes (Clear / Bridged)', existingSystem:'Existing System',
     durableNoticePresent:'Durable Notice Present', hardLandscaping:'Hard Landscaping Adjacent', zone25mmVisible:'25mm Inspection Zone Visible', softLandscaping:'Soft Landscaping Adjacent', zone75mmVisible:'75mm Inspection Zone Visible', antCapSoldered:'Ant Cap Joins Soldered',
     treatmentRecommended:'Treatment Recommended', treatmentType:'Treatment Type', inspectionFrequency:'Inspection Frequency', riskLevel:'Risk of Termite Attack',
     invasiveInspection:'Invasive Inspection Recommended', invasiveInspectionDetails:'Invasive Inspection: Where, Why & When', otherRecommendations:'Other Recommendations', antCapping:'Ant Capping', antCappingDetails:'Ant Capping: Where & What',
-    delignification:'Chemical Delignification', delignificationDetails:'Delignification Location & Evidence', subfloorVentilation:'Subfloor Ventilation', nonDurableTimber:'Non-durable Timber in Damp Areas', nonDurableTimberDetails:'Non-durable Timber: What & Where',
+    delignification:'Chemical Delignification', delignificationDetails:'Delignification: What', delignificationWhere:'Delignification: Where', subfloorVentilation:'Subfloor Ventilation', nonDurableTimber:'Non-durable Timber in Damp Areas', nonDurableTimberDetails:'Non-durable Timber: What', nonDurableTimberWhere:'Non-durable Timber: Where',
   };
 
   function notesBlock(sectionKey) {
@@ -11170,9 +11242,11 @@ async function buildReportPdf() {
   const borerCards = shownBorerFindings();
   if (borerCards.length) { gap(4); borerCards.forEach(borerCard); }
   row('Wood Decay Fungi (Rot)', reportData.decayFound || 'Not recorded');
-  if (reportData.decayDetails) row('Wood Decay Location & Evidence', reportData.decayDetails);
+  if (reportData.decayDetails) row('Wood Decay: What Was Seen', reportData.decayDetails);
+  if (reportData.decayWhere) row('Wood Decay: Where', reportData.decayWhere);
   row('Chemical Delignification', reportData.delignification || 'Not recorded');
-  if (reportData.delignificationDetails) row('Delignification Location & Evidence', reportData.delignificationDetails);
+  if (reportData.delignificationDetails) row('Delignification: What Was Seen', reportData.delignificationDetails);
+  if (reportData.delignificationWhere) row('Delignification: Where', reportData.delignificationWhere);
   gap(3);
 
   subhead('PREVIOUS TERMITE TREATMENT');
@@ -11248,7 +11322,8 @@ async function buildReportPdf() {
   condRow('Ant Capping', 'antCapping');
   if (reportData.antCappingDetails) row('Ant Capping: Where & What', reportData.antCappingDetails);
   condRow('Non-durable Timber in Damp Areas', 'nonDurableTimber');
-  if (reportData.nonDurableTimberDetails) row('Non-durable Timber: What & Where', reportData.nonDurableTimberDetails);
+  if (reportData.nonDurableTimberDetails) row('Non-durable Timber: What', reportData.nonDurableTimberDetails);
+  if (reportData.nonDurableTimberWhere) row('Non-durable Timber: Where', reportData.nonDurableTimberWhere);
   gap(4);
 
   notesBlock('conducive');

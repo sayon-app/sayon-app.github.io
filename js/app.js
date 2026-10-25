@@ -2768,8 +2768,8 @@ function startRecording() {
             lowConfidenceFlagged = true;
           }
           finalChunk = correctKnownMishearings(finalChunk);
-          const stopAt = finalChunk.search(VOICE_STOP_RE);
-          if (stopAt >= 0) { finalChunk = finalChunk.slice(0, stopAt); stopByVoice = true; }
+          // Cut from the stop words on, again if the phone repeated them.
+          for (let stopAt; (stopAt = finalChunk.search(VOICE_STOP_RE)) >= 0;) { finalChunk = finalChunk.slice(0, stopAt); stopByVoice = true; }
           if (finalChunk.trim()) final += finalChunk.trim() + ' ';
         }
         else interim += e.results[i][0].transcript;

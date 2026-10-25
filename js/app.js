@@ -2714,73 +2714,93 @@ function startRecording() {
   dismissServerTranscript();
   recordingStartText = currentTranscript;
 
-  recognition = new SR();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = 'en-AU';
+  // Browsers end a speech session on their own after a quiet stretch or a
+  // minute or so of talk. While the inspector still has recording on, open a
+  // new session straight away so the phone keeps listening room to room,
+  // even when nobody is speaking into it. stopRecording() replaces onend, so
+  // a deliberate stop never restarts. A session that keeps dying at once
+  // (mic taken by another app) stops after a few tries instead of looping.
+  let quickEnds = 0;
+  const listen = () => {
+    const startedAt = Date.now();
+    recognition = new SR();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-AU';
 
-  // Safari re-delivers results it has already finalised (the same index
-  // comes back as final again, or the same phrase arrives as a fresh final
-  // result a moment later), which doubled phrases like "Wall construction
-  // Wall construction". Commit each result index once, and drop a final
-  // chunk that exactly repeats the one just committed.
-  let committedUpTo = -1;
-  let lastFinalText = '';
-  let lastFinalAt = 0;
+    // Safari re-delivers results it has already finalised (the same index
+    // comes back as final again, or the same phrase arrives as a fresh final
+    // result a moment later), which doubled phrases like "Wall construction
+    // Wall construction". Commit each result index once, and drop a final
+    // chunk that exactly repeats the one just committed.
+    let committedUpTo = -1;
+    let lastFinalText = '';
+    let lastFinalAt = 0;
 
-  recognition.onresult = (e) => {
-    let interim = '', final = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      if (e.results[i].isFinal) {
-        if (i <= committedUpTo) continue;
-        committedUpTo = i;
-        const rawChunk = e.results[i][0].transcript.trim();
-        const now = Date.now();
-        if (rawChunk.toLowerCase() === lastFinalText && now - lastFinalAt < 3000) continue;
-        lastFinalText = rawChunk.toLowerCase();
-        lastFinalAt = now;
-        let finalChunk = e.results[i][0].transcript;
-        // Some platforms never populate confidence (comes back as exactly
-        // 0 or undefined) - treat that as "unknown", not "low", so this
-        // doesn't false-flag every result on devices that don't support it.
-        const conf = e.results[i][0].confidence;
-        if (typeof conf === 'number' && conf > 0 && conf < 0.6) {
-          lowConfidenceFlagged = true;
+    recognition.onresult = (e) => {
+      let interim = '', final = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          if (i <= committedUpTo) continue;
+          committedUpTo = i;
+          const rawChunk = e.results[i][0].transcript.trim();
+          const now = Date.now();
+          if (rawChunk.toLowerCase() === lastFinalText && now - lastFinalAt < 3000) continue;
+          lastFinalText = rawChunk.toLowerCase();
+          lastFinalAt = now;
+          let finalChunk = e.results[i][0].transcript;
+          // Some platforms never populate confidence (comes back as exactly
+          // 0 or undefined) - treat that as "unknown", not "low", so this
+          // doesn't false-flag every result on devices that don't support it.
+          const conf = e.results[i][0].confidence;
+          if (typeof conf === 'number' && conf > 0 && conf < 0.6) {
+            lowConfidenceFlagged = true;
+          }
+          finalChunk = correctKnownMishearings(finalChunk);
+          final += finalChunk + ' ';
         }
-        finalChunk = correctKnownMishearings(finalChunk);
-        final += finalChunk + ' ';
+        else interim += e.results[i][0].transcript;
       }
-      else interim += e.results[i][0].transcript;
-    }
-    currentTranscript += final;
-    const box = document.getElementById('transcriptBox');
-    box.textContent = currentTranscript + interim;
-    box.classList.add('active');
-    const warnEl = document.getElementById('lowConfidenceWarning');
-    if (warnEl) warnEl.classList.toggle('show', lowConfidenceFlagged);
-  };
-
-  recognition.onerror = (e) => {
-    // FIX: this used to silently discard the error entirely, so when
-    // recognition failed or produced garbage there was no way to tell
-    // whether it was a network drop, a mic/permission problem, no speech
-    // detected, or something else — every failure looked identical from
-    // the outside. Surface the actual reason (console + toast) so a bad
-    // field test can actually be diagnosed instead of guessed at.
-    const reason = (e && e.error) ? e.error : 'unknown';
-    console.warn('Speech recognition error:', reason);
-    const messages = {
-      'network': 'No signal for voice recording. Tap the box and use your keyboard\'s mic to dictate instead — the note will be saved and filled in when you\'re back online.',
-      'no-speech': 'No speech detected — recording stopped.',
-      'audio-capture': 'Microphone not available — check mic permission and that no other app is using it.',
-      'not-allowed': 'Microphone permission denied — enable it in your browser/device settings.',
-      'service-not-allowed': 'Speech service not allowed — check your browser/device permissions.',
-      'language-not-supported': 'This device doesn\'t support en-AU speech recognition.',
+      currentTranscript += final;
+      const box = document.getElementById('transcriptBox');
+      box.textContent = currentTranscript + interim;
+      box.classList.add('active');
+      const warnEl = document.getElementById('lowConfidenceWarning');
+      if (warnEl) warnEl.classList.toggle('show', lowConfidenceFlagged);
     };
-    showToast(messages[reason] || `Speech recognition stopped (${reason})`, 'error');
-    stopRecording();
+
+    recognition.onerror = (e) => {
+      // FIX: this used to silently discard the error entirely, so when
+      // recognition failed or produced garbage there was no way to tell
+      // whether it was a network drop, a mic/permission problem, no speech
+      // detected, or something else — every failure looked identical from
+      // the outside. Surface the actual reason (console + toast) so a bad
+      // field test can actually be diagnosed instead of guessed at.
+      const reason = (e && e.error) ? e.error : 'unknown';
+      console.warn('Speech recognition error:', reason);
+      // A quiet stretch (moving between rooms, phone in a pocket) is not a
+      // reason to stop: onend opens a fresh session and keeps listening.
+      if (reason === 'no-speech' || reason === 'aborted') return;
+      const messages = {
+        'network': 'No signal for voice recording. Tap the box and use your keyboard\'s mic to dictate instead — the note will be saved and filled in when you\'re back online.',
+        'audio-capture': 'Microphone not available — check mic permission and that no other app is using it.',
+        'not-allowed': 'Microphone permission denied — enable it in your browser/device settings.',
+        'service-not-allowed': 'Speech service not allowed — check your browser/device permissions.',
+        'language-not-supported': 'This device doesn\'t support en-AU speech recognition.',
+      };
+      showToast(messages[reason] || `Speech recognition stopped (${reason})`, 'error');
+      stopRecording();
+    };
+    recognition.onend = () => {
+      if (!isRecording) return;
+      quickEnds = Date.now() - startedAt < 1500 ? quickEnds + 1 : 0;
+      if (quickEnds >= 5) { showToast('Recording stopped: the microphone kept dropping out', 'error'); stopRecording(); return; }
+      try { listen(); } catch (e) { stopRecording(); }
+    };
+    recognition.start();
   };
-  recognition.start();
+  listen();
+  holdScreenAwake();
   isRecording = true;
   updateVoiceHud();
   document.getElementById('voiceBtn').classList.add('recording');
@@ -2808,7 +2828,21 @@ function waitForRecognitionEnd(rec) {
   });
 }
 
+// The screen stays on while recording: a phone that locks itself in a
+// pocket stops hearing, because the browser drops the mic.
+let screenWakeLock = null;
+async function holdScreenAwake() {
+  try { if (navigator.wakeLock && !screenWakeLock) { screenWakeLock = await navigator.wakeLock.request('screen'); screenWakeLock.addEventListener('release', () => { screenWakeLock = null; }); } } catch (e) {}
+}
+function releaseScreenAwake() {
+  try { if (screenWakeLock) screenWakeLock.release(); } catch (e) {}
+  screenWakeLock = null;
+}
+// The lock is let go whenever the app is hidden, so take it again on return.
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && isRecording) holdScreenAwake(); });
+
 function stopRecording() {
+  releaseScreenAwake();
   const recognitionEnded = waitForRecognitionEnd(recognition);
   if (recognition) recognition.stop();
   isRecording = false;

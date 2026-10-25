@@ -4666,7 +4666,7 @@ function findingCardHTML(finding, index, total) {
         ${showDetails ? `
         <div class="findings-details" style="display:block">
           <div class="section-fields">
-            <div class="field field-wide"><div class="field-label">Location of Activity</div>${fv('activityLocation','text')}</div>
+            <div class="field field-wide"><div class="field-label">Location of Activity</div>${fv('activityLocation','text')}${pickChipsHTML(id, 'activityLocation', PLACES, finding.activityLocation)}</div>
             <div class="field field-wide"><div class="field-label">Timber Affected</div>${fv('timberAffected','text')}${pickChipsHTML(id, 'timberAffected', TIMBER_PARTS, finding.timberAffected)}</div>
             <div class="field field-wide"><div class="field-label">Damage Description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${fv('damageDescription','text')}${pickChipsHTML(id, 'damageDescription', TERMITE_SIGNS, finding.damageDescription)}</div>
             <div class="field"><div class="field-label">Species / Genus</div>${fv('species','specieslist')}</div>
@@ -4794,14 +4794,15 @@ function commitFindingEdit(findingId, key, value, deferRender) {
 // ── TIMBER AND BORER PICKS ───────────────────────────────────────────────
 // Tap chips under a text field: each adds its word to the field, or takes
 // it out again. The field stays free text, so the inspector can still type.
+const PLACES = ['Subfloor', 'Roof void', 'Kitchen', 'Bathroom', 'Laundry', 'Bedroom', 'Living room', 'Hallway', 'Garage', 'Front', 'Rear', 'Left side', 'Right side', 'Deck', 'Yard', 'Fence line'];
 const TIMBER_PARTS = ['Bearer', 'Joist', 'Floorboards', 'Stud', 'Top plate', 'Bottom plate', 'Skirting', 'Architrave', 'Door frame', 'Window frame', 'Roof timbers', 'Deck', 'Fence', 'Tree or stump'];
 const BORER_TYPES = ['Anobium (furniture beetle)', 'Lyctus (powderpost beetle)', 'Queensland pine beetle', 'European house borer', 'Not identified'];
 const TERMITE_SIGNS = ['Mud leads', 'Mud packing', 'Workings', 'Galleries', 'Hollow when tapped', 'Live termites', 'Timber damage', 'Bubbling paint'];
 const BORER_SIGNS = ['Exit holes', 'Frass', 'Tunnelling', 'Old dark holes', 'Fresh bright holes'];
 const PICK_SINGLE = new Set(['borerType']);
-// Description fields read as one sentence: a phrase added after the first
-// starts lower case ("Mud leads, workings, hollow when tapped").
-const PICK_PHRASE = new Set(['damageDescription', 'description']);
+// Description and location fields read as one phrase: a pick added after
+// the first starts lower case ("Mud leads, workings, hollow when tapped").
+const PICK_PHRASE = new Set(['damageDescription', 'description', 'activityLocation', 'location']);
 
 const splitPicks = v => String(v || '').split(/\s*,\s*/).filter(Boolean);
 
@@ -4997,7 +4998,7 @@ function borerCardHTML(b, index) {
         </div>
         <div class="findings-details" style="display:block">
         <div class="section-fields">
-          <div class="field field-wide"><div class="field-label">Location</div>${fv('location')}</div>
+          <div class="field field-wide"><div class="field-label">Location</div>${fv('location')}${pickChipsHTML(id, 'location', PLACES, b.location)}</div>
           <div class="field field-wide"><div class="field-label">Timber Affected</div>${fv('timberAffected')}${pickChipsHTML(id, 'timberAffected', TIMBER_PARTS, b.timberAffected)}</div>
           <div class="field field-wide"><div class="field-label">Borer Type</div>${fv('borerType')}${pickChipsHTML(id, 'borerType', BORER_TYPES, b.borerType)}</div>
           <div class="field field-wide"><div class="field-label">What Was Seen <span class="field-hint">Exit holes, frass, tunnelling. No severity opinion.</span></div>${fv('description')}${pickChipsHTML(id, 'description', BORER_SIGNS, b.description)}</div>

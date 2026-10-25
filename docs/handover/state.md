@@ -57,6 +57,7 @@ As of 2026-10-05, about 10:50 UTC. Written for a model starting with no context.
 
 ## 2. Decision log
 
+- 2026-10-25, **"What and where" boxes are drop-downs like Wall Construction**, with "Other (type it)" last (High Risk Areas, Previous Treatment, Non-durable Timber). Previous Treatment is split into What (`previousTreatmentDetails`) and Where (`previousTreatmentWhere`), each its own drop-down; older reports keep both in What. Reason: baz finds the drop-down quick and compact.
 - 2026-10-25, **a finding is ACTIVE or INACTIVE, never "suspected"** (baz: "if its active it becomes a possible management problem, cant just leave as suspected"). A spot the inspector only suspects, with no live termites, workings, mud or damage seen there, is not a finding card: extraction puts it in the invasive inspection recommendation, high risk areas, or the moisture and leak fields. A SUSPECTED status was built and dropped the same day.
 - 2026-10-25, **words still being heard when the phone ends a speech session are kept.** Reason: the same test lost a whole room when the session restarted mid-sentence.
 - 2026-10-25, **one voice button: hands-free mode folded into the record button.** Recording keeps going through quiet stretches, fills the report on each pause, and "Stop Sayon" ends it. Reason: baz wants a phone in a shirt pocket to fill the report room by room, and the wake word was a second way of doing the same thing.

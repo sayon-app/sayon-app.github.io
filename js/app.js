@@ -1640,7 +1640,7 @@ FIELDS (every one null unless the note gives it):
 "existingSystem":string,"existingSystemOther":string,"durableNoticePresent":"YES"|"NO","hardLandscaping":"YES"|"NO","zone25mmVisible":"YES"|"NO","softLandscaping":"YES"|"NO","zone75mmVisible":"YES"|"NO","antCapSoldered":"YES"|"NO"|"N/A",
 "areaStatus":{"interior"|"exterior"|"subfloor"|"roofvoid"|"outbuildings"|"site"|"fences"|"retainingwalls"|"landscapingtimbers":"INSPECTED"|"PARTIAL"|"NOT"|"NA"},"areaResult":{same area keys:"CLEAR"|"FOUND"},"obstructions":string,"restrictedAccess":string,"noAccessAreas":string,"highRiskAreas":string,"hinderedAreas":string,"hinderedAreasDetail":string,
 "findings":[{"termiteActivity":"ACTIVE"|"INACTIVE"|"NONE","species":string,"damageDescription":string,"activityLocation":string,"timberAffected":string,"nestLocated":"YES"|"NO","structuralConcern":"YES"|"NO"}],
-"borerActivity":"ACTIVE"|"INACTIVE"|"NONE","borerFindings":[{"borerActivity":"ACTIVE"|"INACTIVE","borerType":string,"location":string,"timberAffected":string,"description":string,"structuralConcern":"YES"|"NO"}],"decayFound":"YES"|"NO","decayDetails":string,"delignification":"YES"|"NO","delignificationDetails":string,"previousTreatment":"YES"|"NO","previousTreatmentDetails":string,
+"borerActivity":"ACTIVE"|"INACTIVE"|"NONE","borerFindings":[{"borerActivity":"ACTIVE"|"INACTIVE","borerType":string,"location":string,"timberAffected":string,"description":string,"structuralConcern":"YES"|"NO"}],"decayFound":"YES"|"NO","decayDetails":string,"delignification":"YES"|"NO","delignificationDetails":string,"previousTreatment":"YES"|"NO","previousTreatmentDetails":string,"previousTreatmentWhere":string,
 "moistureReadings":"YES"|"NO","waterLeaks":"YES"|"NO","leakLocation":string,"moistureMeterReadings":[{"location":string,"reading":string}],"timberSoil":"YES"|"NO","slabEdge":"CLEAR"|"OBSTRUCTED","weepHoles":"CLEAR"|"BRIDGED"|"NONE","siteDrainage":"ADEQUATE"|"POOR","subfloorDrainage":"ADEQUATE"|"POOR","antCapping":"INTACT"|"GAPS"|"NONE","antCappingDetails":string,"subfloorVentilation":"ADEQUATE"|"POOR","nonDurableTimber":"YES"|"NO","nonDurableTimberDetails":string,
 "riskLevel":"LOW"|"MEDIUM"|"HIGH","treatmentRecommended":"YES"|"NO","treatmentType":string,"inspectionFrequency":string,"invasiveInspection":"YES"|"NO","invasiveInspectionDetails":string,"otherRecommendations":string}
 
@@ -1706,7 +1706,7 @@ BORERS AND WOOD DECAY (never in findings):
   - structuralConcern: "YES" when the inspector recommends a builder, carpenter or engineer look at the borer damage; "NO" when they say no referral is needed. Otherwise null.
 - decayFound: "YES" for rot, fungal decay, soft, spongy or crumbling timber. "NO" when they say no rot or decay. Null when not raised.
 - decayDetails: where the decay is and what was seen, with no severity words.
-- previousTreatment: "YES" when the inspector sees signs the property was treated for termites before: drill holes in the slab, paving or brickwork (often plugged), dusting residue, or bait or monitoring stations in the ground. "NO" when they say there is no sign of a previous treatment. Null when not raised. It is about past treatment evidence, not an installed system the inspector names (that is existingSystem), although both can be filled. previousTreatmentDetails: what and where, in their words ("plugged drill holes along the rear patio"), naming the kind of treatment with these terms where they fit: drill and inject soil treatment, plugged drill holes, bait stations, monitoring stations, dusting residue, reticulation system, physical barrier, treatment notice in meter box.
+- previousTreatment: "YES" when the inspector sees signs the property was treated for termites before: drill holes in the slab, paving or brickwork (often plugged), dusting residue, or bait or monitoring stations in the ground. "NO" when they say there is no sign of a previous treatment. Null when not raised. It is about past treatment evidence, not an installed system the inspector names (that is existingSystem), although both can be filled. previousTreatmentDetails: what was seen, without the place ("plugged drill holes"), naming it with these terms where they fit: drill and inject soil treatment, plugged drill holes, bait stations, monitoring stations, dusting residue, reticulation system, physical barrier, treatment notice in meter box. previousTreatmentWhere: where it was seen, in their words ("along the rear patio", "slab perimeter, front and left side"). Null when they give no place.
 - delignification: chemical delignification, where chemicals or salt air break down the timber surface so it looks furry, hairy or fibrous (often on roof timbers near the coast or near chimneys). "YES" when the inspector reports it, "NO" when they say there is none. Null when not raised. delignificationDetails: where and what was seen.
 
 MOISTURE AND CONDUCIVE CONDITIONS:
@@ -3951,9 +3951,9 @@ function renderField(el, key, val) {
 // Text fields that hold a list of places or observations. A later note
 // adds to them instead of replacing them, so "borer holes in the subfloor"
 // survives a second note about rot in a fascia.
-const APPEND_TEXT_KEYS = new Set(['hinderedAreas', 'hinderedAreasDetail', 'noAccessAreas', 'highRiskAreas', 'borerDetails', 'decayDetails', 'delignificationDetails', 'nonDurableTimberDetails', 'previousTreatmentDetails', 'leakLocation', 'otherRecommendations', 'invasiveInspectionDetails']);
+const APPEND_TEXT_KEYS = new Set(['hinderedAreas', 'hinderedAreasDetail', 'noAccessAreas', 'highRiskAreas', 'borerDetails', 'decayDetails', 'delignificationDetails', 'nonDurableTimberDetails', 'previousTreatmentDetails', 'previousTreatmentWhere', 'leakLocation', 'otherRecommendations', 'invasiveInspectionDetails']);
 // Free-text fields where "None", "Nil" or "N/A" means nothing to record.
-const NIL_TEXT_KEYS = new Set(['hinderedAreas', 'hinderedAreasDetail', 'noAccessAreas', 'highRiskAreas', 'borerDetails', 'decayDetails', 'delignificationDetails', 'nonDurableTimberDetails', 'previousTreatmentDetails', 'leakLocation', 'treatmentType', 'existingSystemOther']);
+const NIL_TEXT_KEYS = new Set(['hinderedAreas', 'hinderedAreasDetail', 'noAccessAreas', 'highRiskAreas', 'borerDetails', 'decayDetails', 'delignificationDetails', 'nonDurableTimberDetails', 'previousTreatmentDetails', 'previousTreatmentWhere', 'leakLocation', 'treatmentType', 'existingSystemOther']);
 const isNilText = v => /^\s*(nil|none|no|n\/a|na|not applicable|nothing|not stated|not mentioned|unknown)\s*[.!]?\s*$/i.test(String(v));
 const hasRealFinding = list => list.some(f => f.termiteActivity === 'ACTIVE' || f.termiteActivity === 'INACTIVE');
 const findingHasData = f => !!(f.termiteActivity || f.species || f.damageDescription || f.activityLocation || f.timberAffected || f.nestLocated || f.structuralConcern);
@@ -4334,8 +4334,10 @@ function buildChoiceCards() {
     if (field) field.classList.add('choice-field');
     syncChoiceCards(key);
     new MutationObserver(() => syncChoiceCards(key)).observe(el, { childList: true, characterData: true, subtree: true });
-    const detail = DETAIL_FIELD_FOR[key] && document.getElementById('f-' + DETAIL_FIELD_FOR[key][0]);
-    if (detail) new MutationObserver(() => syncDetailField(key)).observe(detail, { childList: true, characterData: true, subtree: true });
+    if (DETAIL_FIELD_FOR[key]) [DETAIL_FIELD_FOR[key][0], ...(MORE_DETAIL_FIELDS[key] || [])].forEach(k => {
+      const detail = document.getElementById('f-' + k);
+      if (detail) new MutationObserver(() => syncDetailField(key)).observe(detail, { childList: true, characterData: true, subtree: true });
+    });
   });
 }
 
@@ -4349,12 +4351,18 @@ const DETAIL_FIELD_FOR = {
   antCapping: ['antCappingDetails', ['INTACT']],
 };
 
+// More detail boxes that show and hide with the first one.
+const MORE_DETAIL_FIELDS = { previousTreatment: ['previousTreatmentWhere'] };
+
 function syncDetailField(key) {
   const [detailKey, noAnswers] = DETAIL_FIELD_FOR[key] || [];
-  const field = detailKey && document.getElementById('f-' + detailKey)?.closest('.field');
-  if (!field) return;
-  const hide = noAnswers.includes(reportData[key]) && !String(reportData[detailKey] || '').trim();
-  field.style.display = hide ? 'none' : '';
+  if (!detailKey) return;
+  [detailKey, ...(MORE_DETAIL_FIELDS[key] || [])].forEach(k => {
+    const field = document.getElementById('f-' + k)?.closest('.field');
+    if (!field) return;
+    const hide = noAnswers.includes(reportData[key]) && !String(reportData[k] || '').trim();
+    field.style.display = hide ? 'none' : '';
+  });
 }
 
 function syncChoiceCards(key) {
@@ -5315,6 +5323,19 @@ function startEdit(el, key, type) {
       'Wet areas (bathroom, laundry, kitchen)',
       'Garage',
       'Outbuildings',
+      OTHER_TYPE_IT,
+    ],
+    prevtreatmentwhere: [
+      'Slab perimeter',
+      'Around the whole house',
+      'Front of the house',
+      'Rear of the house',
+      'Patio or paving',
+      'Paths and driveway',
+      'Garage',
+      'Subfloor',
+      'Garden beds',
+      'Meter box',
       OTHER_TYPE_IT,
     ],
     prevtreatment: [
@@ -9530,7 +9551,7 @@ function reportSummary() {
       ['Chemical delignification found?', { YES: 'YES', NO: 'NO' }[reportData.delignification] || NR,
         { YES: 'warn', NO: 'good' }[reportData.delignification] || 'none', REPORT_PARTS.findings, reportData.delignificationDetails || ''],
       ['Evidence of a previous termite treatment?', { YES: 'YES', NO: 'NO' }[reportData.previousTreatment] || NR,
-        { YES: 'warn', NO: 'good' }[reportData.previousTreatment] || 'none', REPORT_PARTS.findings, reportData.previousTreatmentDetails || ''],
+        { YES: 'warn', NO: 'good' }[reportData.previousTreatment] || 'none', REPORT_PARTS.findings, [reportData.previousTreatmentDetails, reportData.previousTreatmentWhere && `(${reportData.previousTreatmentWhere})`].filter(Boolean).join(' ')],
     ] },
     { title: 'Safety & risk', items: [
       ['Builder or engineer referral?', structural ? 'YES' : unanswered.length ? 'NOT ANSWERED' : fs.length ? 'NO' : NR,
@@ -10631,7 +10652,7 @@ async function buildReportPdf() {
     height:'Height', facadeDirection:'Orientation', occupancyStatus:'Occupancy Status', weatherConditions:'Weather Conditions', temperature:'Temperature', humidity:'Humidity', rainLast24h:'Rain in the Last 24 Hours',
     constructionEra:'Year / Period of Construction', standard:'Applicable Standard',
     hinderedAreas:'Hindered Access: Where', obstructions:'Areas Not Inspected', restrictedAccess:'Obstructions', hinderedAreasDetail:'What Hindered Access', noAccessAreas:'Restricted Access: Where & Why', highRiskAreas:'High Risk Areas',
-    previousTreatment:'Evidence of Previous Treatment', previousTreatmentDetails:'Previous Treatment: What & Where', siteDrainage:'Site Drainage', subfloorDrainage:'Subfloor Drainage',
+    previousTreatment:'Evidence of Previous Treatment', previousTreatmentDetails:'Previous Treatment: What', previousTreatmentWhere:'Previous Treatment: Where', siteDrainage:'Site Drainage', subfloorDrainage:'Subfloor Drainage',
     borerActivity:'Borers of Seasoned Timber', borerDetails:'Borer Type, Location & Evidence', decayFound:'Wood Decay Fungi (Rot)', decayDetails:'Wood Decay Location & Evidence',
     termiteActivity:'Termite Activity Status', species:'Species', damageDescription:'Damage Description', activityLocation:'Location of Activity', nestLocated:'Termite Nest Found?', structuralConcern:'Builder / Engineer Referral',
     waterLeaks:'Water Leaks', leakLocation:'Location of Moisture Ingress', moistureReadings:'Moisture Readings', timberSoil:'Timber-to-Soil Contact', slabEdge:'Slab Edge Concealed', weepHoles:'Weep Holes (Clear / Bridged)', existingSystem:'Existing System',
@@ -11156,7 +11177,8 @@ async function buildReportPdf() {
 
   subhead('PREVIOUS TERMITE TREATMENT');
   row('Evidence of Previous Treatment', reportData.previousTreatment || 'Not recorded');
-  if (reportData.previousTreatmentDetails) row('What Was Seen & Where', reportData.previousTreatmentDetails);
+  if (reportData.previousTreatmentDetails) row('What Was Seen', reportData.previousTreatmentDetails);
+  if (reportData.previousTreatmentWhere) row('Where', reportData.previousTreatmentWhere);
   gap(5);
 
   disclaimer('This inspection describes the location and visible extent of timber pest activity only. It does not assess structural damage severity — a licensed builder or structural engineer must be engaged for that purpose. Where live termites are found, concealed activity must be assumed in all areas not inspected.');

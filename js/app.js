@@ -1706,7 +1706,7 @@ BORERS AND WOOD DECAY (never in findings):
   - structuralConcern: "YES" when the inspector recommends a builder, carpenter or engineer look at the borer damage; "NO" when they say no referral is needed. Otherwise null.
 - decayFound: "YES" for rot, fungal decay, soft, spongy or crumbling timber. "NO" when they say no rot or decay. Null when not raised.
 - decayDetails: where the decay is and what was seen, with no severity words.
-- previousTreatment: "YES" when the inspector sees signs the property was treated for termites before: drill holes in the slab, paving or brickwork (often plugged), dusting residue, or bait or monitoring stations in the ground. "NO" when they say there is no sign of a previous treatment. Null when not raised. It is about past treatment evidence, not an installed system the inspector names (that is existingSystem), although both can be filled. previousTreatmentDetails: what and where, in their words ("plugged drill holes along the rear patio").
+- previousTreatment: "YES" when the inspector sees signs the property was treated for termites before: drill holes in the slab, paving or brickwork (often plugged), dusting residue, or bait or monitoring stations in the ground. "NO" when they say there is no sign of a previous treatment. Null when not raised. It is about past treatment evidence, not an installed system the inspector names (that is existingSystem), although both can be filled. previousTreatmentDetails: what and where, in their words ("plugged drill holes along the rear patio"), naming the kind of treatment with these terms where they fit: drill and inject soil treatment, plugged drill holes, bait stations, monitoring stations, dusting residue, reticulation system, physical barrier, treatment notice in meter box.
 - delignification: chemical delignification, where chemicals or salt air break down the timber surface so it looks furry, hairy or fibrous (often on roof timbers near the coast or near chimneys). "YES" when the inspector reports it, "NO" when they say there is none. Null when not raised. delignificationDetails: where and what was seen.
 
 MOISTURE AND CONDUCIVE CONDITIONS:
@@ -1976,6 +1976,7 @@ function openApp(appName) {
     initSignaturePads();
     installReportLockGuard();
     buildChoiceCards();
+    buildReportPicks();
     buildSelectCards();
     enhanceFieldsWithNotes();
     renderSavedList();
@@ -4610,13 +4611,55 @@ const BORER_SIGNS = ['Exit holes', 'Frass', 'Tunnelling', 'Old dark holes', 'Fre
 const PICK_SINGLE = new Set(['borerType']);
 // Description and location fields read as one phrase: a pick added after
 // the first starts lower case ("Mud leads, workings, hollow when tapped").
-const PICK_PHRASE = new Set(['damageDescription', 'description', 'activityLocation', 'location']);
+const PICK_PHRASE = new Set(['damageDescription', 'description', 'activityLocation', 'location', 'previousTreatmentDetails']);
+// Tap chips under report-wide text fields, the same as on finding cards.
+const REPORT_PICKS = {
+  previousTreatmentDetails: ['Drill and inject soil treatment', 'Plugged drill holes', 'Bait stations', 'Monitoring stations', 'Dusting residue', 'Reticulation system', 'Physical barrier', 'Treatment notice in meter box'],
+};
 
 const splitPicks = v => String(v || '').split(/\s*,\s*/).filter(Boolean);
 
 function pickChipsHTML(id, key, options, value) {
   const have = splitPicks(value).map(x => x.toLowerCase());
   return `<div class="obs-items pick-chips">${options.map(o => `<button type="button" class="obs-item-btn${have.includes(o.toLowerCase()) ? ' selected' : ''}" aria-pressed="${have.includes(o.toLowerCase())}" onclick="togglePick('${id}','${key}',this.textContent)">${escapeHtml(o)}</button>`).join('')}</div>`;
+}
+
+function buildReportPicks() {
+  Object.entries(REPORT_PICKS).forEach(([key, options]) => {
+    const el = document.getElementById('f-' + key);
+    if (!el || document.getElementById('picks-' + key)) return;
+    const box = document.createElement('div');
+    box.id = 'picks-' + key;
+    box.className = 'obs-items pick-chips';
+    box.innerHTML = options.map(o => `<button type="button" class="obs-item-btn" aria-pressed="false" onclick="toggleReportPick('${key}',this.textContent)">${escapeHtml(o)}</button>`).join('');
+    el.insertAdjacentElement('afterend', box);
+    syncReportPicks(key);
+    new MutationObserver(() => syncReportPicks(key)).observe(el, { childList: true, characterData: true, subtree: true });
+  });
+}
+
+function syncReportPicks(key) {
+  const have = splitPicks(reportData[key]).map(x => x.toLowerCase());
+  document.querySelectorAll(`#picks-${key} button`).forEach(b => {
+    const on = have.includes(b.textContent.toLowerCase());
+    b.classList.toggle('selected', on);
+    b.setAttribute('aria-pressed', on);
+  });
+}
+
+function toggleReportPick(key, word) {
+  const el = document.getElementById('f-' + key);
+  if (!el) return;
+  let picks = splitPicks(reportData[key]);
+  const at = picks.findIndex(x => x.toLowerCase() === word.toLowerCase());
+  if (at >= 0) picks.splice(at, 1);
+  else picks = [...picks, PICK_PHRASE.has(key) && picks.length ? word.charAt(0).toLowerCase() + word.slice(1) : word];
+  if (picks.length) { const v = picks.join(', '); commitEdit(el, key, v.charAt(0).toUpperCase() + v.slice(1)); return; }
+  reportData[key] = null;
+  el.classList.remove('filled');
+  el.textContent = '—';
+  updateProgress();
+  saveDraft();
 }
 
 function togglePick(id, key, word) {

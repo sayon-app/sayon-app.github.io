@@ -118,9 +118,10 @@ Closing line 9010: "This report must be read in its entirety…"
 4. Invasive inspection (4458): not included; needs a separate written agreement and fee.
 5. Access (4461): client arranges safe access; a return visit may cost extra.
 6. The report (4464): for the client's use only; no third-party reliance without written consent.
-7. Fee (4467): {fee}.
-8. Special requests (4470): {notes}.
-9. Your rights (4473): nothing limits Australian Consumer Law rights.
+7. Voice notes: the inspector may dictate into a phone app that may pick up nearby conversation; it's turned into text for the report and the audio isn't kept. A signed agreement with this clause hides the voice pop-up's consent line.
+8. Fee: {fee}.
+9. Special requests: {notes}.
+10. Your rights: nothing limits Australian Consumer Law rights.
 - Closing (4476): "By signing, you confirm… before the inspection starts. You also agree to sign it electronically and to receive the report by email." The second sentence is main-only; see section 6.
 
 ## 4. Quote PDF and treatment certificate

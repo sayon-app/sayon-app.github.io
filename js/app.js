@@ -2324,6 +2324,16 @@ function getSpeechRecognitionCtor() {
 
 // ── VOICE ─────────────────────────────────────────────────────────────────
 function toggleRecording() {
+  // A short tap while recording is a pocket brush, not a stop (see the
+  // pocket lock). Keyboard and switch access send no press, so they stop.
+  const held = Date.now() - voiceBtnDownAt;
+  const pressed = voiceBtnDownAt > 0;
+  voiceBtnDownAt = 0;
+  if (isRecording && pressed && held < STOP_HOLD_MS) {
+    onVoiceBtnUp();
+    showToast('Hold Stop for a moment to end the recording', 'info');
+    return;
+  }
   isRecording ? stopRecording() : startRecording();
 }
 
@@ -2810,10 +2820,11 @@ function startRecording() {
   };
   listen();
   holdScreenAwake();
+  setPocketLock(true);
   isRecording = true;
   updateVoiceHud();
   document.getElementById('voiceBtn').classList.add('recording');
-  document.getElementById('voiceBtnText').textContent = 'Recording… Tap to Stop';
+  document.getElementById('voiceBtnText').textContent = 'Recording… Hold to Stop';
   document.getElementById('waveform').classList.add('show');
   document.getElementById('extractBtn').disabled = true;
 
@@ -2837,6 +2848,30 @@ function waitForRecognitionEnd(rec) {
   });
 }
 
+// Pocket lock: while recording, a shield under the voice popover takes
+// every touch, so the page behind can't be scrolled or tapped from a pocket,
+// the transcript box can't be typed into and the popover's close button is
+// hidden. Stop needs a press of about half a second (or "Stop Sayon"), so a
+// brush against the screen doesn't end the recording.
+const STOP_HOLD_MS = 500;
+let voiceBtnDownAt = 0;
+function onVoiceBtnDown() {
+  voiceBtnDownAt = Date.now();
+  if (isRecording) document.getElementById('voiceBtnText').textContent = 'Keep holding to stop…';
+}
+function onVoiceBtnUp() {
+  if (isRecording) document.getElementById('voiceBtnText').textContent = 'Recording… Hold to Stop';
+}
+function setPocketLock(on) {
+  const shield = document.getElementById('pocketShield');
+  if (shield) shield.hidden = !on;
+  document.body.classList.toggle('pocket-lock', on);
+  const box = document.getElementById('transcriptBox');
+  if (box) box.setAttribute('contenteditable', on ? 'false' : 'true');
+  if (on && document.activeElement && document.activeElement.blur) document.activeElement.blur();
+}
+document.getElementById('pocketShield')?.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
 // The screen stays on while recording: a phone that locks itself in a
 // pocket stops hearing, because the browser drops the mic.
 let screenWakeLock = null;
@@ -2852,6 +2887,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 
 function stopRecording() {
   releaseScreenAwake();
+  setPocketLock(false);
   clearTimeout(autoFillTimer);
   const recognitionEnded = waitForRecognitionEnd(recognition);
   if (recognition) recognition.stop();

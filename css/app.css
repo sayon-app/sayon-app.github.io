@@ -3799,67 +3799,7 @@ body.dark-screen .area-status-btn.status-na { background: rgba(147,163,179,0.2);
   border-color: rgba(var(--green-rgb),0.35);
   color: var(--green);
 }
-.hf-toggle-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  /* Solid, so the description reads against the popover's dark gradient. */
-  background: var(--surface);
-  border: 1px solid rgba(var(--accent-rgb), 0.15);
-  border-radius: 10px;
-  margin-bottom: 2px;
-}
-.hf-toggle-info {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-  color: var(--accent2);
-}
-.hf-toggle-info svg { flex-shrink: 0; margin-top: 1px; }
-.hf-toggle-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text);
-  margin-bottom: 3px;
-}
-.hf-toggle-desc {
-  font-size: 11px;
-  color: var(--text2);
-  line-height: 1.5;
-}
-.hf-toggle-desc strong { color: var(--accent2); }
 
-.hf-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--surface2);
-  border-radius: 8px;
-  font-size: 12px;
-  color: var(--text2);
-  font-weight: 500;
-}
-.hf-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text3);
-  flex-shrink: 0;
-  transition: background 0.3s;
-}
-.hf-status-dot.listening { background: var(--accent2); animation: hfPulse 1.5s ease-in-out infinite; }
-.hf-status-dot.active    { background: var(--risk);   animation: hfPulse 0.8s ease-in-out infinite; }
-.hf-status-dot.processing{ background: var(--yellow); animation: hfPulse 0.5s ease-in-out infinite; }
-.hf-status-dot.speaking  { background: var(--blue);   animation: hfPulse 1s ease-in-out infinite; }
-
-@keyframes hfPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.5; transform: scale(0.8); }
-}
 /* ── SPECIES INTELLIGENCE PANEL ── */
 
 .species-confirm {
@@ -4170,7 +4110,6 @@ button:focus-visible,
   transition: opacity 0.2s, border-width 0.2s;
 }
 body[data-voice] .voice-hud { opacity: 1; }
-body[data-voice="armed"] .voice-hud { border-width: 3px; opacity: 0.6; }
 body[data-voice="listening"] .voice-hud,
 body[data-voice="thinking"] .voice-hud {
   border-width: 10px;
@@ -4565,9 +4504,6 @@ body:not(.dark-screen) .voice-popover-header {
 body:not(.dark-screen) .voice-popover-title { font-size: 15px; letter-spacing: -0.2px; color: rgb(var(--glow-ink)); }
 body:not(.dark-screen) #voicePopoverTitleText { color: var(--text); }
 body:not(.dark-screen) .voice-popover-close { border-radius: 50%; border-color: transparent; background: rgba(var(--glow),0.08); color: var(--text2); }
-body:not(.dark-screen) .hf-toggle-row { border: 0; border-radius: 14px; background: rgba(var(--glow),0.07); padding: 11px 12px; margin: 0; }
-body:not(.dark-screen) .hf-toggle-info { color: rgb(var(--glow-ink)); }
-body:not(.dark-screen) .hf-toggle-desc strong { color: rgb(var(--glow-ink)); }
 body:not(.dark-screen) .toggle-switch.on { background: linear-gradient(180deg, #2DD4BF, #0D9488); }
 body:not(.dark-screen) .toggle-switch.on::after { background: #FFFFFF; box-shadow: 0 1px 4px rgba(0,0,0,0.25); }
 

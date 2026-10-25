@@ -30,7 +30,7 @@ Read this before you touch voice capture, transcript cleanup, `SYSTEM_PROMPT` or
 
 **Other prompts and helpers:**
 - **`TRANSCRIPT_CLEANUP_PROMPT`**: `1770–1776`, 1,689 chars. It is used by `suggestTranscriptCleanup` (`1781`) with claude-sonnet-5, max_tokens 8000 and effort low (`1795–1798`). It only suggests changes; nothing is applied until the inspector taps Apply (`1840–1855`).
-- **`correctKnownMishearings`**: `1702–1741`, 17 regex replacements. Its only call site is `2099`, on final Web Speech or native results. The hands-free path (`2394`, `2397`), the server transcript (`2040`) and typed edits (`2201`) skip it.
+- **`correctKnownMishearings`**: `1702–1741`, 17 regex replacements. Its only call site is `2099`, on final Web Speech or native results. The server transcript (`2040`) and typed edits (`2201`) skip it.
 - **`TRANSCRIPTION_VOCAB`**: `1750–1756`. It is only used as the Whisper `initial_prompt` (`1977–1981`, worker `839–850`).
 - **Narrow prompts**: `PLATE_SYSTEM_PROMPT` `1215–1231` (2,087 chars) and `INSECT_ID_SYSTEM_PROMPT` `1239–1270` (2,602 chars).
 
@@ -53,7 +53,7 @@ Read this before you touch voice capture, transcript cleanup, `SYSTEM_PROMPT` or
 - **WAITING NOTES** (`2843–2949`). Notes are stored in `reportData.pendingNotes`, capped at `MAX_PENDING_NOTES = 50` (`2851`).
   - `processPendingNotes` (`2907`) runs oldest first and stops at the first failure (`2920–2928`). It skips locked reports (`2908`) and stops if a different report is opened.
   - It is triggered by the `online` event (`6550`), at `6560`, at `6799`, at app init (`1372`), and after any successful extraction.
-  - Hands-free mode `hfAutoExtract` (`2469`) calls the same `processTranscript` and ignores text under 8 characters.
+  - While recording, `autoFillFromPause` (VOICE AUTO-FILL) calls the same `processTranscript({ whileRecording: true })` after a 6 s pause once there are 6 words.
 - **Worker constraints** (`worker/worker.js`):
   - `ALLOWED_MODEL='claude-sonnet-5'` (`117`) is forced at `258`.
   - `MAX_TOKENS_CEILING=16000` (`121`), applied as `Math.min(body.max_tokens||ceiling, ceiling)` (`259`).

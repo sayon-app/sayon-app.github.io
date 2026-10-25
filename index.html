@@ -1306,6 +1306,10 @@
             <h3><span class="sec-num">6.</span>Findings</h3>
             <span class="sec-badge empty" id="sts-findings">Not started</span>
           </div>
+          <!-- One tap fills every blank question here with "nothing found" (markNothingFound) -->
+          <button type="button" class="nothing-found-btn" id="nothingFound-findings" onclick="markNothingFound('findings')" hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><strong>No timber pests found</strong><small>Fills the blank answers. Change any that differ.</small></span>
+          </button>
 
           <!-- High risk area prompt — shown when activity found + uninspected areas + no high risk flagged -->
           <div class="high-risk-prompt" id="highRiskPrompt" style="display:none">
@@ -1431,6 +1435,9 @@
             <h3><span class="sec-num">7.</span>Conducive Conditions</h3>
             <span class="sec-badge empty" id="sts-conducive">Not started</span>
           </div>
+          <button type="button" class="nothing-found-btn" id="nothingFound-conducive" onclick="markNothingFound('conducive')" hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><strong>No conducive conditions</strong><small>Fills the blank answers. Change any that differ.</small></span>
+          </button>
           <div class="section-fields">
             <div class="field"><div class="field-label">Moisture Detected</div><div class="field-val" id="f-moistureReadings" onclick="startEdit(this,'moistureReadings','yesno')">—</div></div>
             <!-- Water leaks and location only show if moisture detected = YES -->

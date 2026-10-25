@@ -217,7 +217,7 @@
         <div class="ob-check-item"><span class="ob-check-num">3</span><span>Hit Extract — AI fills the report fields automatically</span></div>
         <div class="ob-check-item"><span class="ob-check-num">4</span><span>Generate and share the PDF directly from the app</span></div>
       </div>
-      <p style="font-size:11px;color:var(--text3);line-height:1.6;margin-top:4px">Tip: Say <strong style="color:var(--accent2)">"Hey Sayon"</strong> to use hands-free mode — perfect for under-house inspections.</p>
+      <p style="font-size:11px;color:var(--text3);line-height:1.6;margin-top:4px">Tip: Start recording, pop the phone in your pocket and talk room by room. Each pause fills the report. Say <strong style="color:var(--accent2)">"Stop Sayon"</strong> when you're done.</p>
       <button class="auth-btn" onclick="obFinish()">Start Inspecting →</button>
     </div>
   </div>
@@ -1637,24 +1637,6 @@
     <div class="voice-popover-header">
       <span class="voice-popover-title"><svg class="icon " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span id="voicePopoverTitleText">Voice Capture</span><span class="test-mode-badge" id="testModeBadge" hidden>Test mode on</span></span>
       <button class="voice-popover-close" onclick="toggleVoicePopover()"><svg class="icon " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
-    </div>
-
-    <!-- Hands-Free Mode toggle -->
-    <div class="hf-toggle-row">
-      <div class="hf-toggle-info">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
-        <div>
-          <div class="hf-toggle-label">Hands-Free Mode</div>
-          <div class="hf-toggle-desc">Say <strong>"Hey Sayon"</strong> to start dictating. Sayon listens, fills fields and navigates automatically.</div>
-        </div>
-      </div>
-      <button class="toggle-switch" id="handsFreeToggle" onclick="toggleHandsFreeMode()" title="Toggle hands-free mode"></button>
-    </div>
-
-    <!-- Hands-free status bar — visible when HF mode is active -->
-    <div class="hf-status" id="hfStatus" style="display:none">
-      <div class="hf-status-dot" id="hfStatusDot"></div>
-      <span id="hfStatusText">Listening for "Hey Sayon"…</span>
     </div>
 
     <button class="voice-btn" id="voiceBtn" onclick="toggleRecording()">

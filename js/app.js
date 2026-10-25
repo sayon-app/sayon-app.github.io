@@ -2780,8 +2780,11 @@ function startRecording() {
       box.classList.add('active');
       const warnEl = document.getElementById('lowConfidenceWarning');
       if (warnEl) warnEl.classList.toggle('show', lowConfidenceFlagged);
-      if (stopByVoice) {
-        // "Stop Sayon": stop, then fill in the rest once the last phrase is in.
+      if (!stopByVoice && VOICE_STOP_RE.test(interim)) stopByVoice = true;
+      if (stopByVoice && isRecording) {
+        // "Stop Sayon": stop, then fill in the rest once the last phrase is
+        // in. Heard first in the live text, the final copy that follows the
+        // stop has the words cut off above and doesn't stop twice.
         stopRecording();
         playTone(440, 200, 0.2);
         setTimeout(() => { if (!isRecording && currentTranscript.trim()) processTranscript(); }, 2100);
@@ -2980,7 +2983,11 @@ function usePrompt(el) {
 // Fill report, so it can be checked first.
 const AUTO_FILL_PAUSE_MS = 6000;
 const AUTO_FILL_MIN_WORDS = 6;
-const VOICE_STOP_RE = /\b(?:stop|done|pause)\s+(?:sayon|say on|saying|sayin|zion|sion)\b|\bstop listening\b/i;
+// Phones punctuate and mishear the name ("Stop. Simon.", "stop saying"),
+// so the words can be split by punctuation and "Sayon" has its common
+// mishearings. It's checked on the live (interim) text as well as the
+// final text, because some phones only finalise a phrase after a pause.
+const VOICE_STOP_RE = /\b(?:stop|done|pause|finish)[\s,.!?-]+(?:sayon|say on|sayan|saying|sayin|zion|sion|xion|scion|simon|sean|shaun|cyan|saigon|siam)\b|\bstop listening\b/i;
 let autoFillTimer = null;
 let autoFillRunning = false;
 let autoFilledThisRecording = false;

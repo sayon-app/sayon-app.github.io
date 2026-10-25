@@ -2780,7 +2780,7 @@ function startRecording() {
       box.classList.add('active');
       const warnEl = document.getElementById('lowConfidenceWarning');
       if (warnEl) warnEl.classList.toggle('show', lowConfidenceFlagged);
-      if (!stopByVoice && VOICE_STOP_RE.test(interim)) stopByVoice = true;
+      if (!stopByVoice && VOICE_STOP_LIVE_RE.test(interim)) stopByVoice = true;
       if (stopByVoice && isRecording) {
         // "Stop Sayon": stop, then fill in the rest once the last phrase is
         // in. Heard first in the live text, the final copy that follows the
@@ -2987,7 +2987,11 @@ const AUTO_FILL_MIN_WORDS = 6;
 // so the words can be split by punctuation and "Sayon" has its common
 // mishearings. It's checked on the live (interim) text as well as the
 // final text, because some phones only finalise a phrase after a pause.
-const VOICE_STOP_RE = /\b(?:stop|done|pause|finish)[\s,.!?-]+(?:sayon|say on|sayan|saying|sayin|zion|sion|xion|scion|simon|sean|shaun|cyan|saigon|siam)\b|\bstop listening\b/i;
+const VOICE_STOP_LIVE_RE = /\b(?:stop|done|pause|finish)[\s,.!?-]+(?:sayon|say on|sayan|saying|sayin|zion|sion|xion|scion|simon|sean|shaun|cyan|saigon|siam)\b|\bstop listening\b/i;
+// "Stops on" and "stop son" (how a phone heard it in the 25 Oct pocket
+// test) are ordinary words too ("the lead stops on the bearer"), so they
+// only count as the last words of a finished phrase, never in live text.
+const VOICE_STOP_RE = new RegExp(VOICE_STOP_LIVE_RE.source + '|\\bstops?[\\s,.!?-]+(?:on|son)[\\s,.!?]*$', 'i');
 let autoFillTimer = null;
 let autoFillRunning = false;
 let autoFilledThisRecording = false;

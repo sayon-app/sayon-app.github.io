@@ -4668,7 +4668,7 @@ function findingCardHTML(finding, index, total) {
           <div class="section-fields">
             <div class="field field-wide"><div class="field-label">Location of Activity</div>${fv('activityLocation','text')}</div>
             <div class="field field-wide"><div class="field-label">Timber Affected</div>${fv('timberAffected','text')}${pickChipsHTML(id, 'timberAffected', TIMBER_PARTS, finding.timberAffected)}</div>
-            <div class="field field-wide"><div class="field-label">Damage Description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${fv('damageDescription','text')}</div>
+            <div class="field field-wide"><div class="field-label">Damage Description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${fv('damageDescription','text')}${pickChipsHTML(id, 'damageDescription', TERMITE_SIGNS, finding.damageDescription)}</div>
             <div class="field"><div class="field-label">Species / Genus</div>${fv('species','specieslist')}</div>
             <div class="field choice-field"><div class="field-label">Termite Nest Found?</div>${fv('nestLocated','yesno')}</div>
             <div class="field choice-field"><div class="field-label">Refer to a Builder or Engineer?</div>${fv('structuralConcern','yesno')}</div>
@@ -4796,7 +4796,12 @@ function commitFindingEdit(findingId, key, value, deferRender) {
 // it out again. The field stays free text, so the inspector can still type.
 const TIMBER_PARTS = ['Bearer', 'Joist', 'Floorboards', 'Stud', 'Top plate', 'Bottom plate', 'Skirting', 'Architrave', 'Door frame', 'Window frame', 'Roof timbers', 'Deck', 'Fence', 'Tree or stump'];
 const BORER_TYPES = ['Anobium (furniture beetle)', 'Lyctus (powderpost beetle)', 'Queensland pine beetle', 'European house borer', 'Not identified'];
+const TERMITE_SIGNS = ['Mud leads', 'Mud packing', 'Workings', 'Galleries', 'Hollow when tapped', 'Live termites', 'Timber damage', 'Bubbling paint'];
+const BORER_SIGNS = ['Exit holes', 'Frass', 'Tunnelling', 'Old dark holes', 'Fresh bright holes'];
 const PICK_SINGLE = new Set(['borerType']);
+// Description fields read as one sentence: a phrase added after the first
+// starts lower case ("Mud leads, workings, hollow when tapped").
+const PICK_PHRASE = new Set(['damageDescription', 'description']);
 
 const splitPicks = v => String(v || '').split(/\s*,\s*/).filter(Boolean);
 
@@ -4811,8 +4816,93 @@ function togglePick(id, key, word) {
   let picks = splitPicks(finding[key]);
   const at = picks.findIndex(x => x.toLowerCase() === word.toLowerCase());
   if (at >= 0) picks.splice(at, 1);
-  else picks = PICK_SINGLE.has(key) ? [word] : [...picks, word];
+  else if (PICK_SINGLE.has(key)) picks = [word];
+  else picks = [...picks, PICK_PHRASE.has(key) && picks.length ? word.charAt(0).toLowerCase() + word.slice(1) : word];
   commitFindingEdit(id, key, picks.join(', '));
+}
+
+// ── NOTHING FOUND SHORTCUTS ──────────────────────────────────────────────
+// For a job typed or tapped instead of spoken: one tap fills every blank
+// question in a section with its clean answer, and the inspector changes
+// only what was different. Answered questions are never touched, questions
+// that depend on the build (slab edge, subfloor, weep holes) are only filled
+// once the floor and walls are known, and Undo puts the blanks back.
+const CONDUCIVE_CLEAN = { moistureReadings: 'NO', siteDrainage: 'ADEQUATE', timberSoil: 'NO', nonDurableTimber: 'NO', weepHoles: 'CLEAR', slabEdge: 'CLEAR', subfloorDrainage: 'ADEQUATE', subfloorVentilation: 'ADEQUATE', antCapping: 'INTACT' };
+
+function nothingFoundAnswers(section) {
+  if (section === 'findings') return { borerActivity: 'NONE', decayFound: 'NO', delignification: 'NO' };
+  const floor = String(reportData.floorType || '').toLowerCase();
+  const walls = String(reportData.wallConstruction || '').toLowerCase();
+  const fits = {
+    weepHoles: /brick|masonry|render/.test(walls),
+    slabEdge: /slab/.test(floor),
+    subfloorDrainage: /timber|stump|suspended|pier/.test(floor),
+  };
+  fits.subfloorVentilation = fits.antCapping = fits.subfloorDrainage;
+  return Object.fromEntries(Object.entries(CONDUCIVE_CLEAN).filter(([k]) => fits[k] !== false));
+}
+
+const termitesUnanswered = () => !(reportData.findings || []).some(f => f && findingHasData(f));
+
+function nothingFoundBlanks(section) {
+  const blanks = Object.keys(nothingFoundAnswers(section)).filter(k => isBlankValue(reportData[k]) && document.getElementById('f-' + k));
+  if (section === 'findings' && termitesUnanswered()) blanks.unshift('termites');
+  return blanks;
+}
+
+function markNothingFound(section) {
+  const answers = nothingFoundAnswers(section);
+  const blanks = nothingFoundBlanks(section);
+  if (!blanks.length) return;
+  // What Undo restores: the filled keys and anything their answers clear.
+  const keys = [...Object.keys(answers), 'waterLeaks', 'leakLocation'];
+  const before = Object.fromEntries(keys.map(k => [k, reportData[k]]));
+  const beforeFindings = JSON.stringify(reportData.findings || null);
+  blanks.forEach(key => {
+    if (key === 'termites') commitFindingEdit(getFindings()[0].id, 'termiteActivity', 'NONE');
+    else commitEdit(document.getElementById('f-' + key), key, answers[key]);
+  });
+  const left = [];
+  if (section === 'conducive') {
+    if (!reportData.floorType) left.push('slab edge and subfloor (set the floor type first)');
+    if (!reportData.wallConstruction) left.push('weep holes (set the walls first)');
+  }
+  showToast(`Filled ${blanks.length} clean answer${blanks.length === 1 ? '' : 's'}${left.length ? `. Left blank: ${left.join('; ')}` : ''}`, 'success', { label: 'Undo', run: () => {
+    keys.forEach(key => {
+      const el = document.getElementById('f-' + key);
+      if (isBlankValue(before[key])) {
+        delete reportData[key];
+        if (el) { el.classList.remove('filled'); el.textContent = '—'; getFieldLabel(el)?.querySelector('.edited-dot')?.remove(); }
+      } else {
+        reportData[key] = before[key];
+        if (el) renderField(el, key, before[key]);
+      }
+    });
+    const waterWrap = document.getElementById('waterLeakWrap');
+    if (waterWrap) waterWrap.style.display = reportData.moistureReadings === 'YES' ? '' : 'none';
+    reportData.findings = JSON.parse(beforeFindings) || undefined;
+    renderFindingsUI();
+    updateProgress();
+    checkFindingsGate();
+    saveDraft();
+  } });
+}
+
+// Each button shows only while its section has a blank it can fill, and
+// says "else" or "other" once something has been recorded there.
+function syncNothingFoundButtons() {
+  ['findings', 'conducive'].forEach(section => {
+    const btn = document.getElementById('nothingFound-' + section);
+    if (!btn) return;
+    btn.hidden = !nothingFoundBlanks(section).length;
+    const somethingFound = section === 'findings'
+      ? (reportData.findings || []).some(f => f && ['ACTIVE', 'INACTIVE'].includes(f.termiteActivity)) || borersFound() || reportData.decayFound === 'YES' || reportData.delignification === 'YES'
+      : reportData.waterLeaks === 'YES' || Object.entries(CONDUCIVE_CLEAN).some(([k, clean]) => !isBlankValue(reportData[k]) && ![clean, 'N/A'].includes(reportData[k]) && !(k === 'weepHoles' && reportData[k] === 'NONE'));
+    const title = btn.querySelector('strong');
+    if (title) title.textContent = section === 'findings'
+      ? (somethingFound ? 'Nothing else found' : 'No timber pests found')
+      : (somethingFound ? 'No other conducive conditions' : 'No conducive conditions');
+  });
 }
 
 // ── BORER FINDINGS ───────────────────────────────────────────────────────
@@ -4910,7 +5000,7 @@ function borerCardHTML(b, index) {
           <div class="field field-wide"><div class="field-label">Location</div>${fv('location')}</div>
           <div class="field field-wide"><div class="field-label">Timber Affected</div>${fv('timberAffected')}${pickChipsHTML(id, 'timberAffected', TIMBER_PARTS, b.timberAffected)}</div>
           <div class="field field-wide"><div class="field-label">Borer Type</div>${fv('borerType')}${pickChipsHTML(id, 'borerType', BORER_TYPES, b.borerType)}</div>
-          <div class="field field-wide"><div class="field-label">What Was Seen <span class="field-hint">Exit holes, frass, tunnelling. No severity opinion.</span></div>${fv('description')}</div>
+          <div class="field field-wide"><div class="field-label">What Was Seen <span class="field-hint">Exit holes, frass, tunnelling. No severity opinion.</span></div>${fv('description')}${pickChipsHTML(id, 'description', BORER_SIGNS, b.description)}</div>
           <div class="field choice-field"><div class="field-label">Refer to a Builder or Engineer?</div><div class="choice-panel${b.structuralConcern ? '' : ' unset'}" role="radiogroup">${choiceCardsHTML('finding', `structuralConcern-${id}`, b.structuralConcern, `data-finding="${id}" data-fkey="structuralConcern"`)}</div></div>
           <div class="field field-wide finding-photos"><div class="field-label">Photos of this finding</div>${spotPhotosHTML(findingPhotoSection(id))}</div>
         </div>
@@ -5708,6 +5798,7 @@ function updateProgress() {
     const label = document.getElementById('progressRingLabel');
     if (label) label.style.display = locked ? '' : 'none';
   }
+  syncNothingFoundButtons();
 }
 
 // ── SIGNATURE PADS ──────────────────────────────────────────────────────

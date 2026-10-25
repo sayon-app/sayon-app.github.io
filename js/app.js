@@ -5762,17 +5762,7 @@ function agreementFormValues() {
   };
 }
 
-// The voice pop-up reminds the inspector to tell people they're recording,
-// unless the client has signed an agreement that already says so (the
-// default wording's "Voice notes" clause; a business's own wording may not).
-const agreementCoversVoice = () => /voice|dictat|record/i.test((reportData.agreement && reportData.agreement.text) || '');
-function syncVoiceConsentNote() {
-  const note = document.getElementById('voiceConsentNote');
-  if (note) note.hidden = agreementCoversVoice();
-}
-
 function renderAgreementBanner() {
-  syncVoiceConsentNote();
   const banner = document.getElementById('agreementBanner');
   if (!banner) return;
   const a = reportData.agreement;

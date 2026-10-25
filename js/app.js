@@ -5691,13 +5691,16 @@ Please arrange safe access to all areas on the day. Any area we can't get into w
 6. The report
 You will receive a written report after the inspection. It is for your use only and must not be relied on by anyone else without our written consent.
 
-7. Fee
+7. Voice notes
+The inspector may dictate notes into a phone app as they go, and the phone may pick up conversation nearby. What it hears is turned into text to write your report. The audio is not kept.
+
+8. Fee
 {fee}
 
-8. Special requests
+9. Special requests
 {notes}
 
-9. Your rights
+10. Your rights
 Nothing in this agreement limits your rights under the Australian Consumer Law.
 
 By signing, you confirm you have read and agree to this agreement before the inspection starts. You also agree to sign it electronically and to receive the report by email.`;
@@ -5759,7 +5762,17 @@ function agreementFormValues() {
   };
 }
 
+// The voice pop-up reminds the inspector to tell people they're recording,
+// unless the client has signed an agreement that already says so (the
+// default wording's "Voice notes" clause; a business's own wording may not).
+const agreementCoversVoice = () => /voice|dictat|record/i.test((reportData.agreement && reportData.agreement.text) || '');
+function syncVoiceConsentNote() {
+  const note = document.getElementById('voiceConsentNote');
+  if (note) note.hidden = agreementCoversVoice();
+}
+
 function renderAgreementBanner() {
+  syncVoiceConsentNote();
   const banner = document.getElementById('agreementBanner');
   if (!banner) return;
   const a = reportData.agreement;

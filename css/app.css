@@ -1621,6 +1621,7 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   pointer-events: auto;
 }
 
+.voice-privacy-hint[hidden] { display: none; }
 .voice-popover-header {
   display: flex;
   align-items: center;

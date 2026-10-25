@@ -131,36 +131,15 @@
     },
     {
       "id": "suspected-bathroom",
-      "kind": "findingMatch",
+      "kind": "mentions",
+      "path": "invasiveInspectionDetails",
+      "all": [
+        [
+          "bathroom"
+        ]
+      ],
       "weight": 3,
-      "why": "damp bathroom skirting boards and door frame, possible activity in the wall, not confirmed",
-      "checks": [
-        {
-          "kind": "mentions",
-          "path": "activityLocation",
-          "all": [
-            [
-              "bathroom"
-            ],
-            [
-              "skirting",
-              "door frame"
-            ]
-          ]
-        },
-        {
-          "kind": "mentions",
-          "path": "damageDescription",
-          "all": [
-            [
-              "suspected",
-              "possible",
-              "not confirmed",
-              "unconfirmed"
-            ]
-          ]
-        }
-      ]
+      "why": "damp bathroom skirting boards and door frame, possible activity in the wall, not confirmed: no finding card (a finding is active or inactive, baz 2026-10-25), so it lives in the invasive inspection recommendation"
     },
     {
       "id": "leak",

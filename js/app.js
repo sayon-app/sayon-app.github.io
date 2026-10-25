@@ -1687,7 +1687,7 @@ HINDERED AND RESTRICTED ACCESS: five fields, each with one meaning. The report s
 TERMITE FINDINGS (findings is always an array; it holds termites only):
 - One entry per distinct place where live termites or termite evidence was found. A new entry when the location, the status or the species changes ("and over near the...", "separately", "also"). Never merge two places into one entry, and never put a finding's details in another finding.
 - termiteActivity: "ACTIVE" only when live termites were seen ("live termites", "active termites", "workers moving", "live ones in the tree"). "INACTIVE" when workings, mud leads, mudding, damage, galleries or exit holes were found but no live termites ("old workings", "nothing alive", "past activity", "doesn't seem active now"). When species, damage or a location is described without a clear live sighting, it is INACTIVE, never ACTIVE. "NONE": use ONLY when the note states that the whole property was clear of termites and evidence and reports nothing anywhere; then species, damageDescription, activityLocation, nestLocated and structuralConcern are all null. A clear remark about one area ("no termite activity in the roof void", "nothing in the subfloor") never creates a NONE entry: when the note has real findings elsewhere, record only those, and when it has no findings and is about one area, return an empty array.
-- Suspected activity: when the inspector suspects termites somewhere but can't confirm them ("could be activity in the wall but I'm not sure", damp skirting they want opened up), it is still its own findings entry: termiteActivity null, activityLocation where, and damageDescription what they saw, starting "Suspected, not confirmed:". Never drop it, and never merge it into another finding.
+- Suspected only: a finding is ACTIVE or INACTIVE, never "suspected". When the inspector only suspects termites somewhere and saw no live termites, workings, mud, galleries or damage there (timber hollow when tapped or damp with nothing else, "could be activity in the wall but I'm not sure"), it is not a findings entry: record it where it belongs instead, invasiveInspection "YES" with invasiveInspectionDetails saying where and why when they want it opened up or checked further, highRiskAreas when they name a spot that needs access, and moisture or leaks in their own fields. When they did see workings, mud, galleries or damage there, it is INACTIVE (or ACTIVE with live termites), with their hedge kept in damageDescription.
 - activityLocation: where, in the inspector's terms: the element and the room or side ("skirting board, bedroom three, downstairs"; "rear bearer and joist above it, under the back room"; "gum tree in the backyard, about 15 m from the house"). Distances from the house and "not touching any building" belong here.
 - timberAffected: the timber members the evidence is in or on, named plainly and joined with ", " ("Bearer, Joist", "Skirting", "Door frame", "Roof timbers"). Use these names where they fit: Bearer, Joist, Floorboards, Stud, Top plate, Bottom plate, Skirting, Architrave, Door frame, Window frame, Roof timbers, Deck, Fence, Tree or stump. Null when the note names no timber (mud leads up a brick pier only, or a slab edge).
 - damageDescription: only what was seen (mud packing, hollow when tapped, galleries, timbers eaten out, frass, exit holes, bubbling paint), the element and the place, and the inspector's own hedges ("possible nest in the tree", "possibly past activity"). "No damage visible" is a fact: keep it. NEVER a severity or extent word (minor, moderate, severe, extensive, significant, extreme, major, heavy, bad): drop the word and keep the observation, even when the inspector says it. Never an activity grade ("high activity"). Never the inspector's opinion on whether the structure is or is not compromised, sound, safe or affected: drop it in every wording. Never a risk statement.
@@ -2747,6 +2747,10 @@ function startRecording() {
     let committedUpTo = -1;
     let lastFinalText = '';
     let lastFinalAt = 0;
+    // Words heard but not yet final. When the phone ends a session on its
+    // own mid-sentence they never come back as final, which lost a whole
+    // room in a field test, so onend keeps them before listening again.
+    let pendingInterim = '';
 
     recognition.onresult = (e) => {
       let interim = '', final = '', stopByVoice = false;
@@ -2775,6 +2779,7 @@ function startRecording() {
         else interim += e.results[i][0].transcript;
       }
       currentTranscript += final;
+      pendingInterim = interim;
       const box = document.getElementById('transcriptBox');
       box.textContent = currentTranscript + interim;
       box.classList.add('active');
@@ -2815,6 +2820,21 @@ function startRecording() {
     };
     recognition.onend = () => {
       if (!isRecording) return;
+      let kept = correctKnownMishearings(pendingInterim).trim();
+      pendingInterim = '';
+      if (kept) {
+        const stopAt = kept.search(VOICE_STOP_RE);
+        if (stopAt >= 0) kept = kept.slice(0, stopAt).trim();
+        if (kept) currentTranscript += kept + ' ';
+        document.getElementById('transcriptBox').textContent = currentTranscript;
+        if (stopAt >= 0) {
+          stopRecording();
+          playTone(440, 200, 0.2);
+          setTimeout(() => { if (!isRecording && currentTranscript.trim()) processTranscript(); }, 2100);
+          return;
+        }
+        scheduleAutoFill();
+      }
       quickEnds = Date.now() - startedAt < 1500 ? quickEnds + 1 : 0;
       if (quickEnds >= 5) { showToast('Recording stopped: the microphone kept dropping out', 'error'); stopRecording(); return; }
       try { listen(); } catch (e) { stopRecording(); }

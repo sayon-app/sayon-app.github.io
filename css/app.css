@@ -3207,7 +3207,6 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 }
 .finding-activity-chip.ACTIVE   { background: rgba(192,57,43,0.15); color: var(--risk); }
 .finding-activity-chip.INACTIVE { background: rgba(255,182,72,0.15); color: var(--yellow-text); }
-.finding-activity-chip.SUSPECTED { background: rgba(255,182,72,0.15); color: var(--yellow-text); }
 .finding-activity-chip.NONE     { background: rgba(var(--green-rgb),0.12); color: var(--green); }
 .finding-activity-chip.unset    { background: var(--surface3); color: var(--text3); }
 

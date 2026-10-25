@@ -21,7 +21,7 @@ Read this before you touch voice capture, transcript cleanup, `SYSTEM_PROMPT` or
 | 1134–1137 | AREA STATUS |
 | 1139–1143 | BORERS AND WOOD DECAY |
 | 1145–1150 | EXISTING SYSTEM VERIFICATION |
-| 1152–1158 | CRITICAL: termiteActivity states (ACTIVE, INACTIVE, SUSPECTED, NONE), plus the species-naming rule |
+| 1152–1158 | CRITICAL: termiteActivity has three states, plus the species-naming rule |
 | 1160–1164 | CRITICAL: no severity words in damageDescription; structuralConcern means a referral |
 | 1166–1172 | Handling real-world speech (self-corrections, implicit findings, hedging, mixed topics, filler, negations) |
 | 1174–1197 | VOICE-DICTATION HOMOPHONE ERRORS (20 "→" patterns plus a brand-slot rule) |

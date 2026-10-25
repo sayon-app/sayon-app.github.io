@@ -76,7 +76,6 @@ body.dark-screen {
 }
 body.dark-screen.high-contrast { --border: #5B6B7C; --border2: #7A8C9E; --text2: #D4DEE7; --text3: #B4C2CF; }
 body.dark-screen .choice-panel { box-shadow: inset 0 0 0 1px var(--border2); }
-body.dark-screen .findings-gate.unset { box-shadow: inset 0 0 0 2px var(--tone-warn); }
 body.dark-screen .risk-high   { background: rgba(255,90,79,0.16);  color: #FF8A80; border-color: rgba(255,90,79,0.5); }
 body.dark-screen .risk-medium { background: rgba(255,176,0,0.14);  color: #FFC53D; border-color: rgba(255,176,0,0.5); }
 body.dark-screen .risk-low    { background: rgba(94,234,212,0.14); color: #5EEAD4; border-color: rgba(94,234,212,0.5); }
@@ -1622,6 +1621,24 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   pointer-events: auto;
 }
 
+/* Pocket lock: while recording, the page behind the voice popover can't be
+   scrolled or tapped, so a phone in a pocket doesn't change the report. */
+.pocket-shield {
+  position: fixed; inset: 0; z-index: 172;
+  background: rgba(0,0,0,0.35);
+  touch-action: none; overscroll-behavior: contain;
+  display: flex; justify-content: center; align-items: flex-start;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
+}
+.pocket-shield[hidden] { display: none; }
+.pocket-shield span {
+  background: var(--surface); color: var(--text2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+}
+body.pocket-lock { overflow: hidden; }
+body.pocket-lock .voice-popover-close { visibility: hidden; }
+body.pocket-lock .voice-btn { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .voice-popover-header {
   display: flex;
   align-items: center;
@@ -3014,7 +3031,6 @@ body.large-touch .select-cards .choice-card { min-height: 72px; }
 /* Findings gating question: termite activity, which every finding must
    answer. Taller cards, and an amber frame until it's answered. */
 .findings-gate { margin: 8px 6px 0; padding: 8px; }
-.findings-gate.unset { box-shadow: inset 0 0 0 3px var(--tone-warn); }
 .findings-gate .field-label {
   color: var(--act-ink);
   font-size: 14px;
@@ -3238,6 +3254,18 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 .system-verify .borer-card .section-fields { padding: 14px 16px; }
 .borer-findings .findings-add-btn { margin: 10px 0 0; width: 100%; }
 .borer-findings .findings-add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* "Nothing found" shortcut at the top of Findings and Conducive Conditions. */
+.nothing-found-btn {
+  display: flex; align-items: center; gap: 12px;
+  width: calc(100% - 32px); margin: 14px 16px 0; padding: 12px 16px; min-height: 56px;
+  background: rgba(var(--accent-rgb), 0.08); border: 1.5px solid rgba(var(--accent-rgb), 0.45); border-radius: 12px;
+  color: var(--accent2); font-family: 'Inter', sans-serif; text-align: left; cursor: pointer;
+}
+.nothing-found-btn[hidden] { display: none; }
+.nothing-found-btn svg { flex: none; }
+.nothing-found-btn strong { display: block; font-size: 15px; font-weight: 700; }
+.nothing-found-btn small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text2); }
+.nothing-found-btn:active { transform: scale(0.99); }
 /* Tap chips under a text field (timber affected, borer type): one row
    that scrolls sideways, so the card stays short. */
 .obs-items.pick-chips { padding: 8px 0 2px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
@@ -3477,7 +3505,6 @@ body.ai-busy:has(#app[style*="flex"]) .ai-busy-bar { display: block; }
   100% { transform: translateX(290%); }
 }
 
-.voice-privacy-hint { font-size: 12px; color: var(--text3); line-height: 1.5; margin: 6px 2px 0; }
 
 .profile-menu-wrap { position: relative; }
 .profile-btn {
@@ -3789,67 +3816,7 @@ body.dark-screen .area-status-btn.status-na { background: rgba(147,163,179,0.2);
   border-color: rgba(var(--green-rgb),0.35);
   color: var(--green);
 }
-.hf-toggle-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  /* Solid, so the description reads against the popover's dark gradient. */
-  background: var(--surface);
-  border: 1px solid rgba(var(--accent-rgb), 0.15);
-  border-radius: 10px;
-  margin-bottom: 2px;
-}
-.hf-toggle-info {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-  color: var(--accent2);
-}
-.hf-toggle-info svg { flex-shrink: 0; margin-top: 1px; }
-.hf-toggle-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text);
-  margin-bottom: 3px;
-}
-.hf-toggle-desc {
-  font-size: 11px;
-  color: var(--text2);
-  line-height: 1.5;
-}
-.hf-toggle-desc strong { color: var(--accent2); }
 
-.hf-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--surface2);
-  border-radius: 8px;
-  font-size: 12px;
-  color: var(--text2);
-  font-weight: 500;
-}
-.hf-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text3);
-  flex-shrink: 0;
-  transition: background 0.3s;
-}
-.hf-status-dot.listening { background: var(--accent2); animation: hfPulse 1.5s ease-in-out infinite; }
-.hf-status-dot.active    { background: var(--risk);   animation: hfPulse 0.8s ease-in-out infinite; }
-.hf-status-dot.processing{ background: var(--yellow); animation: hfPulse 0.5s ease-in-out infinite; }
-.hf-status-dot.speaking  { background: var(--blue);   animation: hfPulse 1s ease-in-out infinite; }
-
-@keyframes hfPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.5; transform: scale(0.8); }
-}
 /* ── SPECIES INTELLIGENCE PANEL ── */
 
 .species-confirm {
@@ -4160,7 +4127,6 @@ button:focus-visible,
   transition: opacity 0.2s, border-width 0.2s;
 }
 body[data-voice] .voice-hud { opacity: 1; }
-body[data-voice="armed"] .voice-hud { border-width: 3px; opacity: 0.6; }
 body[data-voice="listening"] .voice-hud,
 body[data-voice="thinking"] .voice-hud {
   border-width: 10px;
@@ -4555,9 +4521,6 @@ body:not(.dark-screen) .voice-popover-header {
 body:not(.dark-screen) .voice-popover-title { font-size: 15px; letter-spacing: -0.2px; color: rgb(var(--glow-ink)); }
 body:not(.dark-screen) #voicePopoverTitleText { color: var(--text); }
 body:not(.dark-screen) .voice-popover-close { border-radius: 50%; border-color: transparent; background: rgba(var(--glow),0.08); color: var(--text2); }
-body:not(.dark-screen) .hf-toggle-row { border: 0; border-radius: 14px; background: rgba(var(--glow),0.07); padding: 11px 12px; margin: 0; }
-body:not(.dark-screen) .hf-toggle-info { color: rgb(var(--glow-ink)); }
-body:not(.dark-screen) .hf-toggle-desc strong { color: rgb(var(--glow-ink)); }
 body:not(.dark-screen) .toggle-switch.on { background: linear-gradient(180deg, #2DD4BF, #0D9488); }
 body:not(.dark-screen) .toggle-switch.on::after { background: #FFFFFF; box-shadow: 0 1px 4px rgba(0,0,0,0.25); }
 
@@ -4600,7 +4563,6 @@ body:not(.dark-screen) .transcript-box {
 }
 body:not(.dark-screen) .transcript-box.active { color: var(--text); background: #FFFFFF; border-color: rgba(var(--glow),0.55); }
 body:not(.dark-screen) .transcript-box:focus { outline: none; background: #FFFFFF; border-color: rgb(var(--glow)); box-shadow: 0 0 0 3px rgba(var(--glow),0.16), 0 0 18px rgba(var(--glow),0.18); }
-body:not(.dark-screen) .voice-privacy-hint { font-size: 11.5px; text-align: center; margin: 0 6px; }
 
 body:not(.dark-screen) .extract-btn {
   min-height: 52px;

@@ -2209,7 +2209,7 @@ function resetVoicePopoverToDefault() {
 // native @capacitor-community/speech-recognition plugin behind the same event-driven
 // shape the rest of this file already uses (continuous/interimResults/lang props,
 // start()/stop()/abort() methods, onresult/onerror/onend callbacks), so the existing
-// startRecording() and hfStartListening() code below works unchanged on both platforms.
+// startRecording() code below works unchanged on both platforms.
 class NativeSpeechRecognition {
   constructor() {
     this.continuous = true;
@@ -2259,7 +2259,7 @@ class NativeSpeechRecognition {
     // so the app works regardless of which language packs happen to be
     // installed rather than failing outright. Once we find a locale that
     // actually initializes on this device, remember it for next time so
-    // hands-free mode (which restarts a session every ~1.2s pause) isn't
+    // recording (which opens a new session after each pause) isn't
     // repeatedly retrying locales already known to fail here.
     const ENGLISH_LOCALE_FALLBACKS = ['en-AU', 'en-GB', 'en-US', 'en-NZ', 'en-CA', 'en-IE', 'en-ZA', 'en-IN'];
     const langsToTry = NativeSpeechRecognition._workingLang
@@ -2324,6 +2324,16 @@ function getSpeechRecognitionCtor() {
 
 // ── VOICE ─────────────────────────────────────────────────────────────────
 function toggleRecording() {
+  // A short tap while recording is a pocket brush, not a stop (see the
+  // pocket lock). Keyboard and switch access send no press, so they stop.
+  const held = Date.now() - voiceBtnDownAt;
+  const pressed = voiceBtnDownAt > 0;
+  voiceBtnDownAt = 0;
+  if (isRecording && pressed && held < STOP_HOLD_MS) {
+    onVoiceBtnUp();
+    showToast('Hold Stop for a moment to end the recording', 'info');
+    return;
+  }
   isRecording ? stopRecording() : startRecording();
 }
 
@@ -2705,7 +2715,7 @@ function dismissServerTranscript() {
 function startRecording() {
   const SR = getSpeechRecognitionCtor();
   if (!SR) { showToast('Speech recognition not supported — tap the transcript box to type instead', 'error'); return; }
-  track('dictation_started', { hands_free: false });
+  track('dictation_started');
 
   lowConfidenceFlagged = false;
   const warnEl0 = document.getElementById('lowConfidenceWarning');
@@ -2713,78 +2723,108 @@ function startRecording() {
   dismissCleanupSuggestion();
   dismissServerTranscript();
   recordingStartText = currentTranscript;
+  autoFilledThisRecording = false;
 
-  recognition = new SR();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = 'en-AU';
+  // Browsers end a speech session on their own after a quiet stretch or a
+  // minute or so of talk. While the inspector still has recording on, open a
+  // new session straight away so the phone keeps listening room to room,
+  // even when nobody is speaking into it. stopRecording() replaces onend, so
+  // a deliberate stop never restarts. A session that keeps dying at once
+  // (mic taken by another app) stops after a few tries instead of looping.
+  let quickEnds = 0;
+  const listen = () => {
+    const startedAt = Date.now();
+    recognition = new SR();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-AU';
 
-  // Safari re-delivers results it has already finalised (the same index
-  // comes back as final again, or the same phrase arrives as a fresh final
-  // result a moment later), which doubled phrases like "Wall construction
-  // Wall construction". Commit each result index once, and drop a final
-  // chunk that exactly repeats the one just committed.
-  let committedUpTo = -1;
-  let lastFinalText = '';
-  let lastFinalAt = 0;
+    // Safari re-delivers results it has already finalised (the same index
+    // comes back as final again, or the same phrase arrives as a fresh final
+    // result a moment later), which doubled phrases like "Wall construction
+    // Wall construction". Commit each result index once, and drop a final
+    // chunk that exactly repeats the one just committed.
+    let committedUpTo = -1;
+    let lastFinalText = '';
+    let lastFinalAt = 0;
 
-  recognition.onresult = (e) => {
-    let interim = '', final = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      if (e.results[i].isFinal) {
-        if (i <= committedUpTo) continue;
-        committedUpTo = i;
-        const rawChunk = e.results[i][0].transcript.trim();
-        const now = Date.now();
-        if (rawChunk.toLowerCase() === lastFinalText && now - lastFinalAt < 3000) continue;
-        lastFinalText = rawChunk.toLowerCase();
-        lastFinalAt = now;
-        let finalChunk = e.results[i][0].transcript;
-        // Some platforms never populate confidence (comes back as exactly
-        // 0 or undefined) - treat that as "unknown", not "low", so this
-        // doesn't false-flag every result on devices that don't support it.
-        const conf = e.results[i][0].confidence;
-        if (typeof conf === 'number' && conf > 0 && conf < 0.6) {
-          lowConfidenceFlagged = true;
+    recognition.onresult = (e) => {
+      let interim = '', final = '', stopByVoice = false;
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          if (i <= committedUpTo) continue;
+          committedUpTo = i;
+          const rawChunk = e.results[i][0].transcript.trim();
+          const now = Date.now();
+          if (rawChunk.toLowerCase() === lastFinalText && now - lastFinalAt < 3000) continue;
+          lastFinalText = rawChunk.toLowerCase();
+          lastFinalAt = now;
+          let finalChunk = e.results[i][0].transcript;
+          // Some platforms never populate confidence (comes back as exactly
+          // 0 or undefined) - treat that as "unknown", not "low", so this
+          // doesn't false-flag every result on devices that don't support it.
+          const conf = e.results[i][0].confidence;
+          if (typeof conf === 'number' && conf > 0 && conf < 0.6) {
+            lowConfidenceFlagged = true;
+          }
+          finalChunk = correctKnownMishearings(finalChunk);
+          const stopAt = finalChunk.search(VOICE_STOP_RE);
+          if (stopAt >= 0) { finalChunk = finalChunk.slice(0, stopAt); stopByVoice = true; }
+          if (finalChunk.trim()) final += finalChunk.trim() + ' ';
         }
-        finalChunk = correctKnownMishearings(finalChunk);
-        final += finalChunk + ' ';
+        else interim += e.results[i][0].transcript;
       }
-      else interim += e.results[i][0].transcript;
-    }
-    currentTranscript += final;
-    const box = document.getElementById('transcriptBox');
-    box.textContent = currentTranscript + interim;
-    box.classList.add('active');
-    const warnEl = document.getElementById('lowConfidenceWarning');
-    if (warnEl) warnEl.classList.toggle('show', lowConfidenceFlagged);
-  };
-
-  recognition.onerror = (e) => {
-    // FIX: this used to silently discard the error entirely, so when
-    // recognition failed or produced garbage there was no way to tell
-    // whether it was a network drop, a mic/permission problem, no speech
-    // detected, or something else — every failure looked identical from
-    // the outside. Surface the actual reason (console + toast) so a bad
-    // field test can actually be diagnosed instead of guessed at.
-    const reason = (e && e.error) ? e.error : 'unknown';
-    console.warn('Speech recognition error:', reason);
-    const messages = {
-      'network': 'No signal for voice recording. Tap the box and use your keyboard\'s mic to dictate instead — the note will be saved and filled in when you\'re back online.',
-      'no-speech': 'No speech detected — recording stopped.',
-      'audio-capture': 'Microphone not available — check mic permission and that no other app is using it.',
-      'not-allowed': 'Microphone permission denied — enable it in your browser/device settings.',
-      'service-not-allowed': 'Speech service not allowed — check your browser/device permissions.',
-      'language-not-supported': 'This device doesn\'t support en-AU speech recognition.',
+      currentTranscript += final;
+      const box = document.getElementById('transcriptBox');
+      box.textContent = currentTranscript + interim;
+      box.classList.add('active');
+      const warnEl = document.getElementById('lowConfidenceWarning');
+      if (warnEl) warnEl.classList.toggle('show', lowConfidenceFlagged);
+      if (stopByVoice) {
+        // "Stop Sayon": stop, then fill in the rest once the last phrase is in.
+        stopRecording();
+        playTone(440, 200, 0.2);
+        setTimeout(() => { if (!isRecording && currentTranscript.trim()) processTranscript(); }, 2100);
+      } else if (final) scheduleAutoFill();
     };
-    showToast(messages[reason] || `Speech recognition stopped (${reason})`, 'error');
-    stopRecording();
+
+    recognition.onerror = (e) => {
+      // FIX: this used to silently discard the error entirely, so when
+      // recognition failed or produced garbage there was no way to tell
+      // whether it was a network drop, a mic/permission problem, no speech
+      // detected, or something else — every failure looked identical from
+      // the outside. Surface the actual reason (console + toast) so a bad
+      // field test can actually be diagnosed instead of guessed at.
+      const reason = (e && e.error) ? e.error : 'unknown';
+      console.warn('Speech recognition error:', reason);
+      // A quiet stretch (moving between rooms, phone in a pocket) is not a
+      // reason to stop: onend opens a fresh session and keeps listening.
+      if (reason === 'no-speech' || reason === 'aborted') return;
+      const messages = {
+        'network': 'No signal for voice recording. Tap the box and use your keyboard\'s mic to dictate instead — the note will be saved and filled in when you\'re back online.',
+        'audio-capture': 'Microphone not available — check mic permission and that no other app is using it.',
+        'not-allowed': 'Microphone permission denied — enable it in your browser/device settings.',
+        'service-not-allowed': 'Speech service not allowed — check your browser/device permissions.',
+        'language-not-supported': 'This device doesn\'t support en-AU speech recognition.',
+      };
+      showToast(messages[reason] || `Speech recognition stopped (${reason})`, 'error');
+      stopRecording();
+    };
+    recognition.onend = () => {
+      if (!isRecording) return;
+      quickEnds = Date.now() - startedAt < 1500 ? quickEnds + 1 : 0;
+      if (quickEnds >= 5) { showToast('Recording stopped: the microphone kept dropping out', 'error'); stopRecording(); return; }
+      try { listen(); } catch (e) { stopRecording(); }
+    };
+    recognition.start();
   };
-  recognition.start();
+  listen();
+  holdScreenAwake();
+  setPocketLock(true);
   isRecording = true;
   updateVoiceHud();
   document.getElementById('voiceBtn').classList.add('recording');
-  document.getElementById('voiceBtnText').textContent = 'Recording… Tap to Stop';
+  document.getElementById('voiceBtnText').textContent = 'Recording… Hold to Stop';
   document.getElementById('waveform').classList.add('show');
   document.getElementById('extractBtn').disabled = true;
 
@@ -2808,7 +2848,47 @@ function waitForRecognitionEnd(rec) {
   });
 }
 
+// Pocket lock: while recording, a shield under the voice popover takes
+// every touch, so the page behind can't be scrolled or tapped from a pocket,
+// the transcript box can't be typed into and the popover's close button is
+// hidden. Stop needs a press of about half a second (or "Stop Sayon"), so a
+// brush against the screen doesn't end the recording.
+const STOP_HOLD_MS = 500;
+let voiceBtnDownAt = 0;
+function onVoiceBtnDown() {
+  voiceBtnDownAt = Date.now();
+  if (isRecording) document.getElementById('voiceBtnText').textContent = 'Keep holding to stop…';
+}
+function onVoiceBtnUp() {
+  if (isRecording) document.getElementById('voiceBtnText').textContent = 'Recording… Hold to Stop';
+}
+function setPocketLock(on) {
+  const shield = document.getElementById('pocketShield');
+  if (shield) shield.hidden = !on;
+  document.body.classList.toggle('pocket-lock', on);
+  const box = document.getElementById('transcriptBox');
+  if (box) box.setAttribute('contenteditable', on ? 'false' : 'true');
+  if (on && document.activeElement && document.activeElement.blur) document.activeElement.blur();
+}
+document.getElementById('pocketShield')?.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+// The screen stays on while recording: a phone that locks itself in a
+// pocket stops hearing, because the browser drops the mic.
+let screenWakeLock = null;
+async function holdScreenAwake() {
+  try { if (navigator.wakeLock && !screenWakeLock) { screenWakeLock = await navigator.wakeLock.request('screen'); screenWakeLock.addEventListener('release', () => { screenWakeLock = null; }); } } catch (e) {}
+}
+function releaseScreenAwake() {
+  try { if (screenWakeLock) screenWakeLock.release(); } catch (e) {}
+  screenWakeLock = null;
+}
+// The lock is let go whenever the app is hidden, so take it again on return.
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && isRecording) holdScreenAwake(); });
+
 function stopRecording() {
+  releaseScreenAwake();
+  setPocketLock(false);
+  clearTimeout(autoFillTimer);
   const recognitionEnded = waitForRecognitionEnd(recognition);
   if (recognition) recognition.stop();
   isRecording = false;
@@ -2829,7 +2909,9 @@ function stopRecording() {
   // is taken only after the last phrase has landed - taken earlier, that
   // late phrase made the transcript "changed" and the suggestion was
   // silently dropped.
-  if (audioCaptureEnabled && !audioCaptureFailedThisSession) {
+  // Skipped after an auto-fill: the recording's audio covers notes already
+  // filled in, and offering it as a replacement would fill them twice.
+  if (audioCaptureEnabled && !audioCaptureFailedThisSession && !autoFilledThisRecording) {
     const before = recordingStartText;
     Promise.all([stopAudioCapture(), recognitionEnded]).then(([blob]) => {
       if (isRecording) return;
@@ -2887,48 +2969,43 @@ function usePrompt(el) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// HANDS-FREE MODE
+// VOICE AUTO-FILL
 // ══════════════════════════════════════════════════════════════════════════
-let handsFreeMode    = false;
-let hfRecognition    = null;
-let hfAwake          = false;
-let hfSilenceTimer   = null;
-let hfSessionText    = '';
-let hfExtracting     = false;    // true while Claude API call is in flight
-let hfLastFinalText  = '';       // the duplicate guard in hfStartListening; kept
-let hfLastFinalAt    = 0;        // across restarts, which come after every pause
+// One voice button, no separate hands-free mode. While recording is on,
+// each pause fills the report from what was said since the last fill, so a
+// phone left recording in a shirt pocket fills the report room by room.
+// Recording carries on while the AI reads the note; anything said meanwhile
+// waits for the next pause. Saying "stop Sayon" ends the recording and
+// fills in the rest. Stopped with a tap, the rest waits in the box for
+// Fill report, so it can be checked first.
+const AUTO_FILL_PAUSE_MS = 6000;
+const AUTO_FILL_MIN_WORDS = 6;
+const VOICE_STOP_RE = /\b(?:stop|done|pause)\s+(?:sayon|say on|saying|sayin|zion|sion)\b|\bstop listening\b/i;
+let autoFillTimer = null;
+let autoFillRunning = false;
+let autoFilledThisRecording = false;
 
-const HF_WAKE_WORDS  = [
-  // Correct
-  'hey sayon','hi sayon','okay sayon','ok sayon','sayon',
-  // Common misrecognitions of "Sayon"
-  'hey say on','hi say on','okay say on','ok say on',
-  'hey sayin','hi sayin','hey saying','hi saying',
-  'hey zion','hi zion','hey sion','hi sion',
-  'hey saigon','hi saigon','hey siam','hi siam',
-];
-const HF_STOP_WORDS  = ['stop sayon','pause sayon','stop listening','done sayon'];
-const HF_SILENCE_MS  = 2200;
+function scheduleAutoFill() {
+  clearTimeout(autoFillTimer);
+  autoFillTimer = setTimeout(autoFillFromPause, AUTO_FILL_PAUSE_MS);
+}
 
-const HF_SECTION_KEYWORDS = {
-  property:        ['property','property details','structure type','building details','property section'],
-  obstructions:    ['areas inspected','obstructions','obstruction'],
-  restrictions:    ['access section','areas not inspected','unable to inspect','hindered','hindered access','restrictions','restriction','restricted access','restricted areas','high risk','invasive'],
-  findings:        ['findings','finding','termite activity','termites','species','timber pest'],
-  conducive:       ['conducive','conducive conditions','moisture','water leak','timber to soil'],
-  recommendations: ['recommendations','recommendation','treatment','susceptibility','risk level'],
-  photos:          ['photos','photo section'],
-  signoff:         ['sign off','signoff','signature'],
-};
+async function autoFillFromPause() {
+  if (!isRecording) return;
+  if (autoFillRunning || document.body.classList.contains('ai-busy')) { scheduleAutoFill(); return; }
+  if (currentTranscript.trim().split(/\s+/).length < AUTO_FILL_MIN_WORDS) return;
+  autoFillRunning = true;
+  autoFilledThisRecording = true;
+  try {
+    const filled = await processTranscript({ whileRecording: true });
+    if (filled) playTone(660, 100, 0.25);
+  } finally {
+    autoFillRunning = false;
+  }
+}
 
-const HF_SECTION_NAMES = {
-  property:'about the property', obstructions:'areas inspected', restrictions:'areas unable to be inspected',
-  findings:'findings', conducive:'conducive conditions', recommendations:'recommendations',
-  photos:'photos', signoff:'sign off',
-};
-
-// ── Soft audio tone (replaces TTS for wake response — avoids mic conflict) ──
-function hfPlayTone(freq = 880, duration = 120, vol = 0.3) {
+// ── Soft audio tone: a beep the inspector hears with the phone in a pocket ──
+function playTone(freq = 880, duration = 120, vol = 0.3) {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const osc = ctx.createOscillator();
@@ -2943,330 +3020,21 @@ function hfPlayTone(freq = 880, duration = 120, vol = 0.3) {
   } catch(e) {}
 }
 
-// ── TTS — only used AFTER extraction, never during listening ────────────
-function korvaSpeak(text, onDone) {
-  if (!window.speechSynthesis) { onDone && onDone(); return; }
-  window.speechSynthesis.cancel();
-  const utt = new SpeechSynthesisUtterance(text);
-  utt.lang = 'en-AU'; utt.rate = 1.15; utt.pitch = 1.0;
-  const voices = window.speechSynthesis.getVoices();
-  const v = voices.find(v => v.lang.startsWith('en-AU')) || voices.find(v => v.lang.startsWith('en-'));
-  if (v) utt.voice = v;
-  utt.onend  = () => { onDone && onDone(); };
-  utt.onerror = () => { onDone && onDone(); };
-  window.speechSynthesis.speak(utt);
-}
-
-// ── Status display ───────────────────────────────────────────────────────
-function hfSetStatus(state, text) {
-  const dot = document.getElementById('hfStatusDot');
-  const txt = document.getElementById('hfStatusText');
-  if (dot) dot.className = 'hf-status-dot ' + (state || '');
-  if (txt) txt.textContent = text;
-  hfHudState = state || '';
-  updateVoiceHud();
-}
-
 // ── VOICE HUD ─────────────────────────────────────────────────────────────
 // A border round the whole screen, so the inspector can tell from the
 // corner of their eye what the app is doing without reading anything:
-//   armed     hands-free is on, waiting for "Hey Sayon": thin, steady
 //   listening the mic is taking a note: thick, slow pulse
 //   thinking  the AI is filling the report: thick, fast pulse
-// Read from the existing state (isRecording, the hands-free status, the
-// AI busy flag); nothing here changes how voice or extraction work.
-let hfHudState = '';
+// Read from the existing state (isRecording, the AI busy flag); nothing
+// here changes how voice or extraction work.
 function updateVoiceHud() {
   let state = '';
-  if (isRecording || hfHudState === 'active') state = 'listening';
-  else if (hfHudState === 'processing' || document.body.classList.contains('ai-busy')) state = 'thinking';
-  else if (hfHudState === 'listening') state = 'armed';
+  if (isRecording) state = 'listening';
+  else if (document.body.classList.contains('ai-busy')) state = 'thinking';
   if (state) document.body.dataset.voice = state;
   else delete document.body.dataset.voice;
 }
 
-// ── Section routing ──────────────────────────────────────────────────────
-function hfDetectSection(text) {
-  for (const [section, keywords] of Object.entries(HF_SECTION_KEYWORDS)) {
-    if (keywords.some(kw => text.includes(kw))) return section;
-  }
-  return null;
-}
-
-function getCurrentSectionId() {
-  const visible = document.querySelector('.report-section:not([style*="display: none"])');
-  return visible ? visible.id.replace('section-', '') : null;
-}
-
-// ── Core: single persistent recognition session ──────────────────────────
-function hfStartListening() {
-  if (!handsFreeMode) return;
-  const SR = getSpeechRecognitionCtor();
-  if (!SR) {
-    showToast('Speech recognition not supported on this browser', 'error');
-    handsFreeMode = false; hfUpdateUI(); return;
-  }
-
-  // Clean up any existing session first
-  if (hfRecognition) {
-    try { hfRecognition.onend = null; hfRecognition.abort(); } catch(e) {}
-    hfRecognition = null;
-  }
-
-  const rec = new SR();
-  rec.continuous      = true;
-  rec.interimResults  = true;
-  rec.lang            = 'en-AU';
-  rec.maxAlternatives = 1;
-  hfRecognition = rec;
-
-  let interimBuffer = '';
-  let hfWatchdog     = null; // native-only: forces a "final" on a speech pause (see below)
-  let lastInterim    = '';
-  // Same guard as dictation (startRecording): Safari re-delivers results it
-  // has already finalised, so commit each result index once and drop a
-  // final that exactly repeats the one just committed.
-  let committedUpTo  = -1;
-
-  rec.onresult = (e) => {
-    if (hfExtracting) return; // ignore input while Claude is processing
-
-    let interim = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const result = e.results[i];
-      const text   = result[0].transcript.toLowerCase().trim();
-
-      if (result.isFinal) {
-        interimBuffer = '';
-        clearTimeout(hfWatchdog);
-        lastInterim = '';
-        if (i <= committedUpTo) continue;
-        committedUpTo = i;
-        const now = Date.now();
-        if (text === hfLastFinalText && now - hfLastFinalAt < 3000) continue;
-        hfLastFinalText = text;
-        hfLastFinalAt = now;
-
-        // ── Stop words ──
-        if (HF_STOP_WORDS.some(w => text.includes(w))) {
-          hfDeactivate(true);
-          return;
-        }
-
-        if (!hfAwake) {
-          // ── Wake word detection ──
-          if (HF_WAKE_WORDS.some(w => text.includes(w))) {
-            hfAwake = true;
-            hfSessionText = '';
-            // Strip wake word from any trailing content
-            let afterWake = result[0].transcript;
-            HF_WAKE_WORDS.forEach(w => {
-              afterWake = afterWake.replace(new RegExp(w, 'gi'), '').trim();
-            });
-            // Two-tone confirmation beep
-            hfPlayTone(660, 80, 0.25);
-            setTimeout(() => hfPlayTone(880, 100, 0.25), 110);
-            hfSetStatus('active', 'Listening — speak your details…');
-            document.getElementById('waveform').classList.add('show');
-            if (afterWake.length > 3) {
-              hfSessionText = correctKnownMishearings(afterWake) + ' ';
-              hfResetSilenceTimer();
-            }
-          }
-          return; // not awake yet — ignore all other speech
-        }
-
-        // ── Section navigation ──
-        const detectedSection = hfDetectSection(text);
-        if (detectedSection) {
-          showSection(detectedSection);
-          // Strip the section keyword from the session text to avoid confusing the AI
-          let stripped = result[0].transcript;
-          Object.values(HF_SECTION_KEYWORDS).flat().forEach(kw => {
-            stripped = stripped.replace(new RegExp(kw, 'gi'), '').trim();
-          });
-          if (stripped.length > 3) {
-            hfSessionText += correctKnownMishearings(stripped) + ' ';
-          }
-        } else {
-          hfSessionText += correctKnownMishearings(result[0].transcript) + ' ';
-        }
-
-        // Update live transcript
-        hfUpdateTranscriptDisplay();
-        hfResetSilenceTimer();
-
-      } else {
-        // Interim — show live preview. On native (Capacitor) platforms the
-        // recognizer only ever emits ONE final, right when we call
-        // rec.stop() — unlike the browser's Web Speech API, which fires a
-        // fresh "final" every time you pause. Without that, "Hey Sayon"
-        // (and everything said after it) would sit forever as an interim
-        // preview and never actually commit or trigger extraction. This
-        // watchdog recreates that pause-based segmentation ourselves: if
-        // the live transcript stops growing for a beat, stop the session
-        // (which yields a final) and let onend restart a fresh one.
-        interim = result[0].transcript;
-        if (interim !== lastInterim) {
-          lastInterim = interim;
-          clearTimeout(hfWatchdog);
-          hfWatchdog = setTimeout(() => { try { rec.stop(); } catch(e) {} }, 1200);
-        }
-      }
-    }
-
-    // Show interim text live
-    if (hfAwake && interim) {
-      const box = document.getElementById('transcriptBox');
-      if (box) box.textContent = (hfSessionText + interim).trim();
-    }
-  };
-
-  rec.onerror = (e) => {
-    if (e.error === 'no-speech') return; // expected — ignore
-    if (e.error === 'not-allowed') {
-      showToast('Microphone permission denied — enable in browser settings', 'error');
-      handsFreeMode = false; hfUpdateUI(); return;
-    }
-    // For other errors, restart after a short delay
-    if (handsFreeMode) setTimeout(() => hfStartListening(), 500);
-  };
-
-  rec.onend = () => {
-    // Auto-restart unless we intentionally stopped or are extracting
-    if (handsFreeMode && !hfExtracting) {
-      setTimeout(() => hfStartListening(), 250);
-    }
-  };
-
-  hfSetStatus('listening', 'Listening for "Hey Sayon"…');
-  try { rec.start(); } catch(e) {
-    setTimeout(() => hfStartListening(), 500);
-  }
-}
-
-function hfResetSilenceTimer() {
-  clearTimeout(hfSilenceTimer);
-  if (hfSessionText.trim().length > 10) {
-    hfSilenceTimer = setTimeout(() => hfAutoExtract(), HF_SILENCE_MS);
-  }
-}
-
-function hfUpdateTranscriptDisplay() {
-  const box = document.getElementById('transcriptBox');
-  if (box) {
-    box.textContent = hfSessionText.trim();
-    box.classList.toggle('active', !!hfSessionText.trim());
-  }
-}
-
-// ── Auto-extract on silence ──────────────────────────────────────────────
-async function hfAutoExtract() {
-  const text = hfSessionText.trim();
-  if (!text || text.length < 8 || hfExtracting) return;
-
-  hfExtracting   = true;
-  hfSessionText  = '';
-  hfAwake        = false; // reset — require "Hey Sayon" again after each extract
-  clearTimeout(hfSilenceTimer);
-  document.getElementById('waveform').classList.remove('show');
-  hfSetStatus('processing', 'Extracting with AI…');
-
-  // Single low beep to signal extraction starting
-  hfPlayTone(440, 100, 0.2);
-
-  currentTranscript = text;
-  document.getElementById('extractBtn').disabled = false;
-
-  try {
-    await processTranscript();
-    await new Promise(r => setTimeout(r, 500));
-
-    // Check for auto-advance
-    const sectionOrder = ['property','obstructions','restrictions','findings','conducive','recommendations','photos','signoff'];    const currentSection = getCurrentSectionId();
-    const cfg = currentSection && SECTIONS[currentSection];
-    let advanced = false;
-
-    if (cfg) {
-      const filled = cfg.fields.filter(k => reportData[k] !== undefined && reportData[k] !== null).length;
-      const idx = sectionOrder.indexOf(currentSection);
-      if (filled >= cfg.total && idx >= 0 && idx < sectionOrder.length - 1) {
-        const nextSection = sectionOrder[idx + 1];
-        showSection(nextSection);
-        advanced = true;
-        hfSetStatus('listening', 'Listening for "Hey Sayon"…');
-        // Double beep = section complete, advanced
-        hfPlayTone(660, 80, 0.25);
-        setTimeout(() => hfPlayTone(880, 120, 0.3), 110);
-        korvaSpeak(`Got it. Moving to ${HF_SECTION_NAMES[nextSection]}.`);
-      }
-    }
-
-    if (!advanced) {
-      // Single confirmation beep = fields filled, same section
-      hfPlayTone(660, 100, 0.25);
-      hfSetStatus('listening', 'Listening for "Hey Sayon"…');
-    }
-
-  } catch(e) {
-    hfSetStatus('listening', 'Listening for "Hey Sayon"…');
-  } finally {
-    hfExtracting = false;
-  }
-}
-
-// ── Toggle ───────────────────────────────────────────────────────────────
-function toggleHandsFreeMode() {
-  handsFreeMode = !handsFreeMode;
-  hfUpdateUI();
-  if (handsFreeMode) {
-    hfAwake = false; hfSessionText = ''; hfExtracting = false;
-    track('dictation_started', { hands_free: true });
-    const popover = document.getElementById('voicePopover');
-    const fab = document.getElementById('micFab');
-    if (!popover.classList.contains('open')) {
-      popover.classList.add('open'); fab.classList.add('open');
-      showTestModeBadge();
-    }
-    hfStartListening();
-  } else {
-    hfDeactivate(false);
-    window.speechSynthesis && window.speechSynthesis.cancel();
-  }
-}
-
-function hfDeactivate(sayGoodbye = false) {
-  clearTimeout(hfSilenceTimer);
-  hfAwake = false; hfExtracting = false; hfSessionText = '';
-  if (hfRecognition) {
-    try { hfRecognition.onend = null; hfRecognition.abort(); } catch(e) {}
-    hfRecognition = null;
-  }
-  document.getElementById('waveform').classList.remove('show');
-  hfSetStatus('', 'Hands-free off');
-  if (sayGoodbye) {
-    handsFreeMode = false;
-    hfUpdateUI();
-    hfPlayTone(440, 200, 0.2);
-  }
-}
-
-function hfUpdateUI() {
-  const toggle = document.getElementById('handsFreeToggle');
-  const status = document.getElementById('hfStatus');
-  const fab    = document.getElementById('micFab');
-  if (toggle) toggle.classList.toggle('on', handsFreeMode);
-  if (status) status.style.display = handsFreeMode ? 'flex' : 'none';
-  const voiceBtn = document.getElementById('voiceBtn');
-  if (voiceBtn) voiceBtn.style.opacity = handsFreeMode ? '0.4' : '1';
-  // Show HF active state on the FAB
-  if (fab) {
-    fab.title = handsFreeMode ? 'Hands-free ON — say "Hey Sayon"' : 'Tap to speak';
-    fab.style.boxShadow = handsFreeMode
-      ? '0 0 0 3px rgba(var(--accent-rgb),0.4), 0 8px 24px rgba(var(--accent-rgb),0.3)'
-      : '';
-  }
-}
 let pendingSpeciesMatch = null; // holds the confirmed species match to apply
 
 function triggerSpeciesIntelligence(rawSpeciesValue) {
@@ -3579,8 +3347,13 @@ function extractionProblem(err) {
   return `The AI couldn't read it (${reason})`;
 }
 
-async function processTranscript() {
-  if (!currentTranscript.trim()) return;
+// whileRecording: an auto-fill from a pause (VOICE AUTO-FILL). It reads the
+// note as it stood when it started; words spoken during the AI call stay in
+// the box for the next fill, and the voice popover and the after-Extract
+// sheet stay out of the way. Returns true when the report was filled.
+async function processTranscript({ whileRecording = false } = {}) {
+  const note = currentTranscript;
+  if (!note.trim()) return false;
   setAI('thinking', 'Filling in the report from your note...');
   document.getElementById('extractBtn').disabled = true;
   const before = extractSnapshot();
@@ -3592,16 +3365,16 @@ async function processTranscript() {
     // joins the queue behind them and the queue is run, so an older note
     // can never land on top of a newer one and overwrite it.
     if (getPendingNotes().length && navigator.onLine) {
-      if (!queuePendingNote(currentTranscript)) {
+      if (!queuePendingNote(note)) {
         setAI('ready', 'AI ready');
-        document.getElementById('extractBtn').disabled = false;
-        return;
+        if (!isRecording) document.getElementById('extractBtn').disabled = false;
+        return false;
       }
       extractSummaryOwned = true;
       try { await processPendingNotes(true); } finally { extractSummaryOwned = false; }
       extracted = !getPendingNotes().length;
     } else {
-      await populateFields(await requestExtraction(currentTranscript), currentTranscript);
+      await populateFields(await requestExtraction(note), note);
       extracted = true;
       pendingNotesProblem = null;
       setAI('ready', 'Data extracted');
@@ -3612,22 +3385,22 @@ async function processTranscript() {
     // time, so it stays in the box to be split up.
     if (err.tooLong || err.status === 413) {
       setAI('ready', 'AI ready');
-      document.getElementById('extractBtn').disabled = false;
+      if (!isRecording) document.getElementById('extractBtn').disabled = false;
       showToast('That note is too long for the AI in one go. Split it into shorter notes and extract each one', 'error');
-      return;
+      return false;
     }
     // Nothing is guessed from the note: it waits with any others until the
     // AI can read it. A problem of the note's own (an unreadable answer) is
     // written on the note, so the queue skips it instead of stopping.
     pendingNotesProblem = (err.noSignal || isNoteSpecificProblem(err)) ? null : extractionProblem(err);
-    if (!queuePendingNote(currentTranscript)) {
+    if (!queuePendingNote(note)) {
       setAI('ready', 'AI ready');
-      document.getElementById('extractBtn').disabled = false;
-      return;
+      if (!isRecording) document.getElementById('extractBtn').disabled = false;
+      return false;
     }
     if (isNoteSpecificProblem(err)) {
-      const note = getPendingNotes()[getPendingNotes().length - 1];
-      if (note) { note.problem = extractionProblem(err); saveDraft(); renderPendingNotes(); }
+      const waiting = getPendingNotes()[getPendingNotes().length - 1];
+      if (waiting) { waiting.problem = extractionProblem(err); saveDraft(); renderPendingNotes(); }
       setAI('ready', 'Note saved');
       showToast(`${extractionProblem(err)}. Your note is saved under Waiting notes.`, 'error');
     } else if (err.noSignal) {
@@ -3639,17 +3412,21 @@ async function processTranscript() {
     }
   }
 
-  if (window.innerWidth <= 768) toggleVoicePopover();
-  currentTranscript = '';
+  if (window.innerWidth <= 768 && !whileRecording) toggleVoicePopover();
+  currentTranscript = currentTranscript.startsWith(note) ? currentTranscript.slice(note.length).trimStart() : '';
   const box = document.getElementById('transcriptBox');
-  box.textContent = 'Tap the mic and start speaking, or tap here to type instead.';
-  box.classList.remove('active');
+  box.textContent = currentTranscript || 'Tap the mic and start speaking, or tap here to type instead.';
+  box.classList.toggle('active', !!currentTranscript);
   lowConfidenceFlagged = false;
   const warnElDone = document.getElementById('lowConfidenceWarning');
   if (warnElDone) warnElDone.classList.remove('show');
   dismissCleanupSuggestion();
   dismissServerTranscript();
-  if (extracted) showExtractSummary(before);
+  if (extracted && whileRecording) {
+    const n = countExtractFilled(before);
+    if (n) showToast(`Filled ${n} field${n !== 1 ? 's' : ''}. Still listening`, 'info');
+  } else if (extracted) showExtractSummary(before);
+  return extracted;
 }
 
 // ── WAITING NOTES ───────────────────────────────────────────────────────
@@ -4666,9 +4443,9 @@ function findingCardHTML(finding, index, total) {
         ${showDetails ? `
         <div class="findings-details" style="display:block">
           <div class="section-fields">
-            <div class="field field-wide"><div class="field-label">Location of Activity</div>${fv('activityLocation','text')}</div>
+            <div class="field field-wide"><div class="field-label">Location of Activity</div>${fv('activityLocation','text')}${pickChipsHTML(id, 'activityLocation', PLACES, finding.activityLocation)}</div>
             <div class="field field-wide"><div class="field-label">Timber Affected</div>${fv('timberAffected','text')}${pickChipsHTML(id, 'timberAffected', TIMBER_PARTS, finding.timberAffected)}</div>
-            <div class="field field-wide"><div class="field-label">Damage Description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${fv('damageDescription','text')}</div>
+            <div class="field field-wide"><div class="field-label">Damage Description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${fv('damageDescription','text')}${pickChipsHTML(id, 'damageDescription', TERMITE_SIGNS, finding.damageDescription)}</div>
             <div class="field"><div class="field-label">Species / Genus</div>${fv('species','specieslist')}</div>
             <div class="field choice-field"><div class="field-label">Termite Nest Found?</div>${fv('nestLocated','yesno')}</div>
             <div class="field choice-field"><div class="field-label">Refer to a Builder or Engineer?</div>${fv('structuralConcern','yesno')}</div>
@@ -4794,9 +4571,15 @@ function commitFindingEdit(findingId, key, value, deferRender) {
 // ── TIMBER AND BORER PICKS ───────────────────────────────────────────────
 // Tap chips under a text field: each adds its word to the field, or takes
 // it out again. The field stays free text, so the inspector can still type.
+const PLACES = ['Subfloor', 'Roof void', 'Kitchen', 'Bathroom', 'Laundry', 'Bedroom', 'Living room', 'Hallway', 'Garage', 'Front', 'Rear', 'Left side', 'Right side', 'Deck', 'Yard', 'Fence line'];
 const TIMBER_PARTS = ['Bearer', 'Joist', 'Floorboards', 'Stud', 'Top plate', 'Bottom plate', 'Skirting', 'Architrave', 'Door frame', 'Window frame', 'Roof timbers', 'Deck', 'Fence', 'Tree or stump'];
 const BORER_TYPES = ['Anobium (furniture beetle)', 'Lyctus (powderpost beetle)', 'Queensland pine beetle', 'European house borer', 'Not identified'];
+const TERMITE_SIGNS = ['Mud leads', 'Mud packing', 'Workings', 'Galleries', 'Hollow when tapped', 'Live termites', 'Timber damage', 'Bubbling paint'];
+const BORER_SIGNS = ['Exit holes', 'Frass', 'Tunnelling', 'Old dark holes', 'Fresh bright holes'];
 const PICK_SINGLE = new Set(['borerType']);
+// Description and location fields read as one phrase: a pick added after
+// the first starts lower case ("Mud leads, workings, hollow when tapped").
+const PICK_PHRASE = new Set(['damageDescription', 'description', 'activityLocation', 'location']);
 
 const splitPicks = v => String(v || '').split(/\s*,\s*/).filter(Boolean);
 
@@ -4811,8 +4594,93 @@ function togglePick(id, key, word) {
   let picks = splitPicks(finding[key]);
   const at = picks.findIndex(x => x.toLowerCase() === word.toLowerCase());
   if (at >= 0) picks.splice(at, 1);
-  else picks = PICK_SINGLE.has(key) ? [word] : [...picks, word];
+  else if (PICK_SINGLE.has(key)) picks = [word];
+  else picks = [...picks, PICK_PHRASE.has(key) && picks.length ? word.charAt(0).toLowerCase() + word.slice(1) : word];
   commitFindingEdit(id, key, picks.join(', '));
+}
+
+// ── NOTHING FOUND SHORTCUTS ──────────────────────────────────────────────
+// For a job typed or tapped instead of spoken: one tap fills every blank
+// question in a section with its clean answer, and the inspector changes
+// only what was different. Answered questions are never touched, questions
+// that depend on the build (slab edge, subfloor, weep holes) are only filled
+// once the floor and walls are known, and Undo puts the blanks back.
+const CONDUCIVE_CLEAN = { moistureReadings: 'NO', siteDrainage: 'ADEQUATE', timberSoil: 'NO', nonDurableTimber: 'NO', weepHoles: 'CLEAR', slabEdge: 'CLEAR', subfloorDrainage: 'ADEQUATE', subfloorVentilation: 'ADEQUATE', antCapping: 'INTACT' };
+
+function nothingFoundAnswers(section) {
+  if (section === 'findings') return { borerActivity: 'NONE', decayFound: 'NO', delignification: 'NO' };
+  const floor = String(reportData.floorType || '').toLowerCase();
+  const walls = String(reportData.wallConstruction || '').toLowerCase();
+  const fits = {
+    weepHoles: /brick|masonry|render/.test(walls),
+    slabEdge: /slab/.test(floor),
+    subfloorDrainage: /timber|stump|suspended|pier/.test(floor),
+  };
+  fits.subfloorVentilation = fits.antCapping = fits.subfloorDrainage;
+  return Object.fromEntries(Object.entries(CONDUCIVE_CLEAN).filter(([k]) => fits[k] !== false));
+}
+
+const termitesUnanswered = () => !(reportData.findings || []).some(f => f && findingHasData(f));
+
+function nothingFoundBlanks(section) {
+  const blanks = Object.keys(nothingFoundAnswers(section)).filter(k => isBlankValue(reportData[k]) && document.getElementById('f-' + k));
+  if (section === 'findings' && termitesUnanswered()) blanks.unshift('termites');
+  return blanks;
+}
+
+function markNothingFound(section) {
+  const answers = nothingFoundAnswers(section);
+  const blanks = nothingFoundBlanks(section);
+  if (!blanks.length) return;
+  // What Undo restores: the filled keys and anything their answers clear.
+  const keys = [...Object.keys(answers), 'waterLeaks', 'leakLocation'];
+  const before = Object.fromEntries(keys.map(k => [k, reportData[k]]));
+  const beforeFindings = JSON.stringify(reportData.findings || null);
+  blanks.forEach(key => {
+    if (key === 'termites') commitFindingEdit(getFindings()[0].id, 'termiteActivity', 'NONE');
+    else commitEdit(document.getElementById('f-' + key), key, answers[key]);
+  });
+  const left = [];
+  if (section === 'conducive') {
+    if (!reportData.floorType) left.push('slab edge and subfloor (set the floor type first)');
+    if (!reportData.wallConstruction) left.push('weep holes (set the walls first)');
+  }
+  showToast(`Filled ${blanks.length} clean answer${blanks.length === 1 ? '' : 's'}${left.length ? `. Left blank: ${left.join('; ')}` : ''}`, 'success', { label: 'Undo', run: () => {
+    keys.forEach(key => {
+      const el = document.getElementById('f-' + key);
+      if (isBlankValue(before[key])) {
+        delete reportData[key];
+        if (el) { el.classList.remove('filled'); el.textContent = '—'; getFieldLabel(el)?.querySelector('.edited-dot')?.remove(); }
+      } else {
+        reportData[key] = before[key];
+        if (el) renderField(el, key, before[key]);
+      }
+    });
+    const waterWrap = document.getElementById('waterLeakWrap');
+    if (waterWrap) waterWrap.style.display = reportData.moistureReadings === 'YES' ? '' : 'none';
+    reportData.findings = JSON.parse(beforeFindings) || undefined;
+    renderFindingsUI();
+    updateProgress();
+    checkFindingsGate();
+    saveDraft();
+  } });
+}
+
+// Each button shows only while its section has a blank it can fill, and
+// says "else" or "other" once something has been recorded there.
+function syncNothingFoundButtons() {
+  ['findings', 'conducive'].forEach(section => {
+    const btn = document.getElementById('nothingFound-' + section);
+    if (!btn) return;
+    btn.hidden = !nothingFoundBlanks(section).length;
+    const somethingFound = section === 'findings'
+      ? (reportData.findings || []).some(f => f && ['ACTIVE', 'INACTIVE'].includes(f.termiteActivity)) || borersFound() || reportData.decayFound === 'YES' || reportData.delignification === 'YES'
+      : reportData.waterLeaks === 'YES' || Object.entries(CONDUCIVE_CLEAN).some(([k, clean]) => !isBlankValue(reportData[k]) && ![clean, 'N/A'].includes(reportData[k]) && !(k === 'weepHoles' && reportData[k] === 'NONE'));
+    const title = btn.querySelector('strong');
+    if (title) title.textContent = section === 'findings'
+      ? (somethingFound ? 'Nothing else found' : 'No timber pests found')
+      : (somethingFound ? 'No other conducive conditions' : 'No conducive conditions');
+  });
 }
 
 // ── BORER FINDINGS ───────────────────────────────────────────────────────
@@ -4907,10 +4775,10 @@ function borerCardHTML(b, index) {
         </div>
         <div class="findings-details" style="display:block">
         <div class="section-fields">
-          <div class="field field-wide"><div class="field-label">Location</div>${fv('location')}</div>
+          <div class="field field-wide"><div class="field-label">Location</div>${fv('location')}${pickChipsHTML(id, 'location', PLACES, b.location)}</div>
           <div class="field field-wide"><div class="field-label">Timber Affected</div>${fv('timberAffected')}${pickChipsHTML(id, 'timberAffected', TIMBER_PARTS, b.timberAffected)}</div>
           <div class="field field-wide"><div class="field-label">Borer Type</div>${fv('borerType')}${pickChipsHTML(id, 'borerType', BORER_TYPES, b.borerType)}</div>
-          <div class="field field-wide"><div class="field-label">What Was Seen <span class="field-hint">Exit holes, frass, tunnelling. No severity opinion.</span></div>${fv('description')}</div>
+          <div class="field field-wide"><div class="field-label">What Was Seen <span class="field-hint">Exit holes, frass, tunnelling. No severity opinion.</span></div>${fv('description')}${pickChipsHTML(id, 'description', BORER_SIGNS, b.description)}</div>
           <div class="field choice-field"><div class="field-label">Refer to a Builder or Engineer?</div><div class="choice-panel${b.structuralConcern ? '' : ' unset'}" role="radiogroup">${choiceCardsHTML('finding', `structuralConcern-${id}`, b.structuralConcern, `data-finding="${id}" data-fkey="structuralConcern"`)}</div></div>
           <div class="field field-wide finding-photos"><div class="field-label">Photos of this finding</div>${spotPhotosHTML(findingPhotoSection(id))}</div>
         </div>
@@ -5708,6 +5576,7 @@ function updateProgress() {
     const label = document.getElementById('progressRingLabel');
     if (label) label.style.display = locked ? '' : 'none';
   }
+  syncNothingFoundButtons();
 }
 
 // ── SIGNATURE PADS ──────────────────────────────────────────────────────
@@ -5858,13 +5727,16 @@ Please arrange safe access to all areas on the day. Any area we can't get into w
 6. The report
 You will receive a written report after the inspection. It is for your use only and must not be relied on by anyone else without our written consent.
 
-7. Fee
+7. Voice notes
+The inspector may dictate notes into a phone app as they go, and the phone may pick up conversation nearby. What it hears is turned into text to write your report. The audio is not kept.
+
+8. Fee
 {fee}
 
-8. Special requests
+9. Special requests
 {notes}
 
-9. Your rights
+10. Your rights
 Nothing in this agreement limits your rights under the Australian Consumer Law.
 
 By signing, you confirm you have read and agree to this agreement before the inspection starts. You also agree to sign it electronically and to receive the report by email.`;

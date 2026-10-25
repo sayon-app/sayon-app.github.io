@@ -1976,7 +1976,6 @@ function openApp(appName) {
     initSignaturePads();
     installReportLockGuard();
     buildChoiceCards();
-    buildReportPicks();
     buildSelectCards();
     enhanceFieldsWithNotes();
     renderSavedList();
@@ -4611,55 +4610,13 @@ const BORER_SIGNS = ['Exit holes', 'Frass', 'Tunnelling', 'Old dark holes', 'Fre
 const PICK_SINGLE = new Set(['borerType']);
 // Description and location fields read as one phrase: a pick added after
 // the first starts lower case ("Mud leads, workings, hollow when tapped").
-const PICK_PHRASE = new Set(['damageDescription', 'description', 'activityLocation', 'location', 'previousTreatmentDetails']);
-// Tap chips under report-wide text fields, the same as on finding cards.
-const REPORT_PICKS = {
-  previousTreatmentDetails: ['Drill and inject soil treatment', 'Plugged drill holes', 'Bait stations', 'Monitoring stations', 'Dusting residue', 'Reticulation system', 'Physical barrier', 'Treatment notice in meter box'],
-};
+const PICK_PHRASE = new Set(['damageDescription', 'description', 'activityLocation', 'location']);
 
 const splitPicks = v => String(v || '').split(/\s*,\s*/).filter(Boolean);
 
 function pickChipsHTML(id, key, options, value) {
   const have = splitPicks(value).map(x => x.toLowerCase());
   return `<div class="obs-items pick-chips">${options.map(o => `<button type="button" class="obs-item-btn${have.includes(o.toLowerCase()) ? ' selected' : ''}" aria-pressed="${have.includes(o.toLowerCase())}" onclick="togglePick('${id}','${key}',this.textContent)">${escapeHtml(o)}</button>`).join('')}</div>`;
-}
-
-function buildReportPicks() {
-  Object.entries(REPORT_PICKS).forEach(([key, options]) => {
-    const el = document.getElementById('f-' + key);
-    if (!el || document.getElementById('picks-' + key)) return;
-    const box = document.createElement('div');
-    box.id = 'picks-' + key;
-    box.className = 'obs-items pick-chips';
-    box.innerHTML = options.map(o => `<button type="button" class="obs-item-btn" aria-pressed="false" onclick="toggleReportPick('${key}',this.textContent)">${escapeHtml(o)}</button>`).join('');
-    el.insertAdjacentElement('afterend', box);
-    syncReportPicks(key);
-    new MutationObserver(() => syncReportPicks(key)).observe(el, { childList: true, characterData: true, subtree: true });
-  });
-}
-
-function syncReportPicks(key) {
-  const have = splitPicks(reportData[key]).map(x => x.toLowerCase());
-  document.querySelectorAll(`#picks-${key} button`).forEach(b => {
-    const on = have.includes(b.textContent.toLowerCase());
-    b.classList.toggle('selected', on);
-    b.setAttribute('aria-pressed', on);
-  });
-}
-
-function toggleReportPick(key, word) {
-  const el = document.getElementById('f-' + key);
-  if (!el) return;
-  let picks = splitPicks(reportData[key]);
-  const at = picks.findIndex(x => x.toLowerCase() === word.toLowerCase());
-  if (at >= 0) picks.splice(at, 1);
-  else picks = [...picks, PICK_PHRASE.has(key) && picks.length ? word.charAt(0).toLowerCase() + word.slice(1) : word];
-  if (picks.length) { const v = picks.join(', '); commitEdit(el, key, v.charAt(0).toUpperCase() + v.slice(1)); return; }
-  reportData[key] = null;
-  el.classList.remove('filled');
-  el.textContent = '—';
-  updateProgress();
-  saveDraft();
 }
 
 function togglePick(id, key, word) {
@@ -5161,6 +5118,8 @@ function wireInlineTextEdit(input, onSave, onCancel, onBlur) {
   input.addEventListener('blur', () => finish(onBlur || onSave, input.value));
 }
 
+// The last choice in a list that opens a typing box instead of saving.
+const OTHER_TYPE_IT = 'Other (type it)';
 function startEdit(el, key, type) {
   if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
   if (el.classList.contains('editing')) return;
@@ -5344,6 +5303,42 @@ function startEdit(el, key, type) {
       'Combination System — Physical + Chemical',
       'System Present — Type Unidentified',
     ],
+    // "What and where" boxes: pick the usual answer, or type your own.
+    highrisk: [
+      'Subfloor',
+      'Roof void',
+      'Wall cavities',
+      'Behind stored goods',
+      'Under floor coverings',
+      'Behind fixed cabinetry',
+      'Concealed slab edge',
+      'Wet areas (bathroom, laundry, kitchen)',
+      'Garage',
+      'Outbuildings',
+      OTHER_TYPE_IT,
+    ],
+    prevtreatment: [
+      'Drill and inject soil treatment',
+      'Plugged drill holes',
+      'Bait stations',
+      'Monitoring stations',
+      'Dusting residue',
+      'Reticulation system',
+      'Physical barrier',
+      'Treatment notice in meter box',
+      OTHER_TYPE_IT,
+    ],
+    nondurable: [
+      'Timber retaining wall',
+      'Landscaping sleepers',
+      'Fence posts in soil',
+      'Timber stumps',
+      'Deck or pergola posts',
+      'Garden edging',
+      'Untreated pine framing',
+      'Firewood stacked against the house',
+      OTHER_TYPE_IT,
+    ],
     weatherconditions: [
       'Fine and dry',
       'Overcast',
@@ -5398,8 +5393,12 @@ function startEdit(el, key, type) {
     const opts = cur && !OPTIONS[type].includes(cur) ? [cur, ...OPTIONS[type]] : OPTIONS[type];
     input.innerHTML = (cur ? '' : '<option value="" selected>Choose…</option>') +
       opts.map(o => `<option value="${escapeHtml(o)}" ${cur===o?'selected':''}>${escapeHtml(o)}</option>`).join('');
-    input.addEventListener('change', () => commitEdit(el, key, input.value));
-    input.addEventListener('blur',   () => commitEdit(el, key, input.value));
+    let switched = false;
+    input.addEventListener('change', () => {
+      if (input.value === OTHER_TYPE_IT) { switched = true; el.classList.remove('editing'); startEdit(el, key, 'text'); return; }
+      commitEdit(el, key, input.value);
+    });
+    input.addEventListener('blur', () => { if (!switched && el.classList.contains('editing')) commitEdit(el, key, input.value); });
   } else {
     input = document.createElement('input');
     input.type = 'text';
@@ -5550,7 +5549,7 @@ function cancelEdit(el, key) {
 function commitActive() {
   if (activeEditEl && activeEditEl.classList.contains('editing')) {
     const input = activeEditEl.querySelector('input, select');
-    if (input && input.value.trim()) {
+    if (input && input.value.trim() && input.value !== OTHER_TYPE_IT) {
       const key = activeEditEl.id.replace('f-', '');
       commitEdit(activeEditEl, key, input.value);
     } else if (input) {

@@ -1639,7 +1639,7 @@ FIELDS (every one null unless the note gives it):
 "structureType":string,"height":string,"wallConstruction":string,"roofType":string,"floorType":string,"facadeDirection":string,"constructionEra":"Pre-1920s"|"1920s-1940s"|"1945-1965"|"1965-1985"|"1985-2003"|"Post-2003","occupancyStatus":string,"weatherConditions":string,"temperature":string,"humidity":string,"rainLast24h":string,
 "existingSystem":string,"existingSystemOther":string,"durableNoticePresent":"YES"|"NO","hardLandscaping":"YES"|"NO","zone25mmVisible":"YES"|"NO","softLandscaping":"YES"|"NO","zone75mmVisible":"YES"|"NO","antCapSoldered":"YES"|"NO"|"N/A",
 "areaStatus":{"interior"|"exterior"|"subfloor"|"roofvoid"|"outbuildings"|"site"|"fences"|"retainingwalls"|"landscapingtimbers":"INSPECTED"|"PARTIAL"|"NOT"|"NA"},"areaResult":{same area keys:"CLEAR"|"FOUND"},"obstructions":string,"restrictedAccess":string,"noAccessAreas":string,"highRiskAreas":string,"hinderedAreas":string,"hinderedAreasDetail":string,
-"findings":[{"termiteActivity":"ACTIVE"|"INACTIVE"|"NONE","species":string,"damageDescription":string,"activityLocation":string,"timberAffected":string,"nestLocated":"YES"|"NO","structuralConcern":"YES"|"NO"}],
+"findings":[{"termiteActivity":"ACTIVE"|"INACTIVE"|"SUSPECTED"|"NONE","species":string,"damageDescription":string,"activityLocation":string,"timberAffected":string,"nestLocated":"YES"|"NO","structuralConcern":"YES"|"NO"}],
 "borerActivity":"ACTIVE"|"INACTIVE"|"NONE","borerFindings":[{"borerActivity":"ACTIVE"|"INACTIVE","borerType":string,"location":string,"timberAffected":string,"description":string,"structuralConcern":"YES"|"NO"}],"decayFound":"YES"|"NO","decayDetails":string,"delignification":"YES"|"NO","delignificationDetails":string,"previousTreatment":"YES"|"NO","previousTreatmentDetails":string,
 "moistureReadings":"YES"|"NO","waterLeaks":"YES"|"NO","leakLocation":string,"moistureMeterReadings":[{"location":string,"reading":string}],"timberSoil":"YES"|"NO","slabEdge":"CLEAR"|"OBSTRUCTED","weepHoles":"CLEAR"|"BRIDGED"|"NONE","siteDrainage":"ADEQUATE"|"POOR","subfloorDrainage":"ADEQUATE"|"POOR","antCapping":"INTACT"|"GAPS"|"NONE","antCappingDetails":string,"subfloorVentilation":"ADEQUATE"|"POOR","nonDurableTimber":"YES"|"NO","nonDurableTimberDetails":string,
 "riskLevel":"LOW"|"MEDIUM"|"HIGH","treatmentRecommended":"YES"|"NO","treatmentType":string,"inspectionFrequency":string,"invasiveInspection":"YES"|"NO","invasiveInspectionDetails":string,"otherRecommendations":string}
@@ -1686,8 +1686,8 @@ HINDERED AND RESTRICTED ACCESS: five fields, each with one meaning. The report s
 
 TERMITE FINDINGS (findings is always an array; it holds termites only):
 - One entry per distinct place where live termites or termite evidence was found. A new entry when the location, the status or the species changes ("and over near the...", "separately", "also"). Never merge two places into one entry, and never put a finding's details in another finding.
-- termiteActivity: "ACTIVE" only when live termites were seen ("live termites", "active termites", "workers moving", "live ones in the tree"). "INACTIVE" when workings, mud leads, mudding, damage, galleries or exit holes were found but no live termites ("old workings", "nothing alive", "past activity", "doesn't seem active now"). When species, damage or a location is described without a clear live sighting, it is INACTIVE, never ACTIVE. "NONE": use ONLY when the note states that the whole property was clear of termites and evidence and reports nothing anywhere; then species, damageDescription, activityLocation, nestLocated and structuralConcern are all null. A clear remark about one area ("no termite activity in the roof void", "nothing in the subfloor") never creates a NONE entry: when the note has real findings elsewhere, record only those, and when it has no findings and is about one area, return an empty array.
-- Suspected activity: when the inspector suspects termites somewhere but can't confirm them ("could be activity in the wall but I'm not sure", damp skirting they want opened up), it is still its own findings entry: termiteActivity null, activityLocation where, and damageDescription what they saw, starting "Suspected, not confirmed:". Never drop it, and never merge it into another finding.
+- termiteActivity: "ACTIVE" only when live termites were seen ("live termites", "active termites", "workers moving", "live ones in the tree"). "INACTIVE" when workings, mud leads, mudding, damage, galleries or exit holes were found but no live termites ("old workings", "nothing alive", "past activity", "doesn't seem active now"). When species, damage or a location is described without a clear live sighting, it is INACTIVE, never ACTIVE (unless it is only suspected, below). "NONE": use ONLY when the note states that the whole property was clear of termites and evidence and reports nothing anywhere; then species, damageDescription, activityLocation, nestLocated and structuralConcern are all null. A clear remark about one area ("no termite activity in the roof void", "nothing in the subfloor") never creates a NONE entry: when the note has real findings elsewhere, record only those, and when it has no findings and is about one area, return an empty array.
+- Suspected: when the inspector suspects something at a spot but it isn't confirmed (possible termites in a wall, a possible hidden leak, possible decay behind a skirting, timber that is damp or hollow when tapped that they want opened up), it is its own findings entry: termiteActivity "SUSPECTED", activityLocation where, and damageDescription what is suspected first, then what they saw, in their words ("Possible termite activity in the wall; skirting very wet and hollow when tapped"; "Possible leak behind the shower; tiles loose and skirting damp"). Timber that is only hollow, damp or reading high moisture, with no workings, mud or live termites seen, is SUSPECTED, never INACTIVE. Never drop it, and never merge it into another finding. A leak, decay or moisture reading also still goes in its own fields as usual.
 - activityLocation: where, in the inspector's terms: the element and the room or side ("skirting board, bedroom three, downstairs"; "rear bearer and joist above it, under the back room"; "gum tree in the backyard, about 15 m from the house"). Distances from the house and "not touching any building" belong here.
 - timberAffected: the timber members the evidence is in or on, named plainly and joined with ", " ("Bearer, Joist", "Skirting", "Door frame", "Roof timbers"). Use these names where they fit: Bearer, Joist, Floorboards, Stud, Top plate, Bottom plate, Skirting, Architrave, Door frame, Window frame, Roof timbers, Deck, Fence, Tree or stump. Null when the note names no timber (mud leads up a brick pier only, or a slab edge).
 - damageDescription: only what was seen (mud packing, hollow when tapped, galleries, timbers eaten out, frass, exit holes, bubbling paint), the element and the place, and the inspector's own hedges ("possible nest in the tree", "possibly past activity"). "No damage visible" is a fact: keep it. NEVER a severity or extent word (minor, moderate, severe, extensive, significant, extreme, major, heavy, bad): drop the word and keep the observation, even when the inspector says it. Never an activity grade ("high activity"). Never the inspector's opinion on whether the structure is or is not compromised, sound, safe or affected: drop it in every wording. Never a risk statement.
@@ -2747,6 +2747,10 @@ function startRecording() {
     let committedUpTo = -1;
     let lastFinalText = '';
     let lastFinalAt = 0;
+    // Words heard but not yet final. When the phone ends a session on its
+    // own mid-sentence they never come back as final, which lost a whole
+    // room in a field test, so onend keeps them before listening again.
+    let pendingInterim = '';
 
     recognition.onresult = (e) => {
       let interim = '', final = '', stopByVoice = false;
@@ -2775,6 +2779,7 @@ function startRecording() {
         else interim += e.results[i][0].transcript;
       }
       currentTranscript += final;
+      pendingInterim = interim;
       const box = document.getElementById('transcriptBox');
       box.textContent = currentTranscript + interim;
       box.classList.add('active');
@@ -2815,6 +2820,21 @@ function startRecording() {
     };
     recognition.onend = () => {
       if (!isRecording) return;
+      let kept = correctKnownMishearings(pendingInterim).trim();
+      pendingInterim = '';
+      if (kept) {
+        const stopAt = kept.search(VOICE_STOP_RE);
+        if (stopAt >= 0) kept = kept.slice(0, stopAt).trim();
+        if (kept) currentTranscript += kept + ' ';
+        document.getElementById('transcriptBox').textContent = currentTranscript;
+        if (stopAt >= 0) {
+          stopRecording();
+          playTone(440, 200, 0.2);
+          setTimeout(() => { if (!isRecording && currentTranscript.trim()) processTranscript(); }, 2100);
+          return;
+        }
+        scheduleAutoFill();
+      }
       quickEnds = Date.now() - startedAt < 1500 ? quickEnds + 1 : 0;
       if (quickEnds >= 5) { showToast('Recording stopped: the microphone kept dropping out', 'error'); stopRecording(); return; }
       try { listen(); } catch (e) { stopRecording(); }
@@ -3935,7 +3955,11 @@ const APPEND_TEXT_KEYS = new Set(['hinderedAreas', 'hinderedAreasDetail', 'noAcc
 // Free-text fields where "None", "Nil" or "N/A" means nothing to record.
 const NIL_TEXT_KEYS = new Set(['hinderedAreas', 'hinderedAreasDetail', 'noAccessAreas', 'highRiskAreas', 'borerDetails', 'decayDetails', 'delignificationDetails', 'nonDurableTimberDetails', 'previousTreatmentDetails', 'leakLocation', 'treatmentType', 'existingSystemOther']);
 const isNilText = v => /^\s*(nil|none|no|n\/a|na|not applicable|nothing|not stated|not mentioned|unknown)\s*[.!]?\s*$/i.test(String(v));
-const hasRealFinding = list => list.some(f => f.termiteActivity === 'ACTIVE' || f.termiteActivity === 'INACTIVE');
+// A finding that records something: live termites, old evidence, or a
+// suspicion the inspector couldn't confirm. NONE and blank cards don't.
+const FOUND_ACTIVITY = ['ACTIVE', 'INACTIVE', 'SUSPECTED'];
+const isRealFinding = f => !!f && FOUND_ACTIVITY.includes(f.termiteActivity);
+const hasRealFinding = list => list.some(isRealFinding);
 const findingHasData = f => !!(f.termiteActivity || f.species || f.damageDescription || f.activityLocation || f.timberAffected || f.nestLocated || f.structuralConcern);
 // The words that identify a place or an observation, for telling whether a
 // later note is only repeating an earlier one ("kitchen skirting board"
@@ -3964,7 +3988,8 @@ function sameFindingPlace(a, b) {
 // filled. Returns whether anything changed.
 function mergeFindingInto(have, f) {
   let changed = false;
-  if (f.termiteActivity && (!have.termiteActivity || (f.termiteActivity === 'ACTIVE' && have.termiteActivity === 'INACTIVE'))) { have.termiteActivity = f.termiteActivity; changed = true; }
+  const rank = ['SUSPECTED', 'INACTIVE', 'ACTIVE'];
+  if (f.termiteActivity && (!have.termiteActivity || rank.indexOf(f.termiteActivity) > rank.indexOf(have.termiteActivity) && rank.indexOf(have.termiteActivity) >= 0)) { have.termiteActivity = f.termiteActivity; changed = true; }
   if (keyWords(f.activityLocation).length > keyWords(have.activityLocation).length && repeatsPlace(f.activityLocation, have.activityLocation)) { have.activityLocation = f.activityLocation; changed = true; }
   ['species', 'timberAffected', 'damageDescription', 'nestLocated', 'structuralConcern'].forEach(k => { if (!have[k] && f[k]) { have[k] = f[k]; changed = true; } });
   return changed;
@@ -3999,7 +4024,7 @@ function populateFields(data, transcript) {
   if (data.findings && Array.isArray(data.findings) && data.findings.length > 0) {
     let incoming = data.findings.filter(f => f && typeof f === 'object').map(f => ({
       id: genFindingId(),
-      termiteActivity: f.termiteActivity || null,
+      termiteActivity: f.termiteActivity || (isSuspectedText(f.damageDescription) ? 'SUSPECTED' : null),
       species: f.species || null,
       damageDescription: f.damageDescription || null,
       activityLocation: f.activityLocation || null,
@@ -4016,7 +4041,7 @@ function populateFields(data, transcript) {
     // anywhere": it is dropped when a real finding exists on either side,
     // and a real finding replaces an earlier NONE card.
     const existing = getFindings();
-    const existingReal = existing.filter(f => f.termiteActivity === 'ACTIVE' || f.termiteActivity === 'INACTIVE');
+    const existingReal = existing.filter(isRealFinding);
     if (hasRealFinding(incoming) || existingReal.length) incoming = incoming.filter(f => f.termiteActivity !== 'NONE');
     const kept = hasRealFinding(incoming) ? existing.filter(f => f.termiteActivity !== 'NONE' && findingHasData(f)) : existing.filter(findingHasData);
     // A note that only mentions a finding again (a recommendation to treat
@@ -4195,10 +4220,14 @@ function genFindingId() {
   return 'f_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
 }
 
+const isSuspectedText = t => /^\s*suspected\b/i.test(t || '');
 function getFindings() {
   if (!reportData.findings || !Array.isArray(reportData.findings) || reportData.findings.length === 0) {
     reportData.findings = [{ id: genFindingId(), termiteActivity: null }];
   }
+  // Reports from before SUSPECTED existed wrote a suspicion as a blank
+  // status with the description starting "Suspected".
+  reportData.findings.forEach(f => { if (f && !f.termiteActivity && isSuspectedText(f.damageDescription)) f.termiteActivity = 'SUSPECTED'; });
   return reportData.findings;
 }
 
@@ -4253,7 +4282,7 @@ function setFindingField(id, key, val) {
 // MutationObserver redraws the cards from reportData whenever it changes.
 // Tone colours the picked card: bad = red, warn = amber, good = green.
 const CHOICE_SETS = {
-  activity:  [['ACTIVE', 'bad', 'Live termites seen'], ['INACTIVE', 'warn', 'Evidence, none live'], ['NONE', 'good', 'Nothing found']],
+  activity:  [['ACTIVE', 'bad', 'Live termites seen'], ['INACTIVE', 'warn', 'Evidence, none live'], ['SUSPECTED', 'warn', 'Possible, not confirmed'], ['NONE', 'good', 'Nothing found']],
   borer:     [['ACTIVE', 'bad', 'Fresh frass or holes'], ['INACTIVE', 'warn', 'Old holes only'], ['NONE', 'good', 'None seen']],
   borerCard: [['ACTIVE', 'bad', 'Fresh frass or holes'], ['INACTIVE', 'warn', 'Old holes only']],
   yesno:     [['YES', 'bad'], ['NO', 'good'], ['N/A', 'neutral']],
@@ -4426,6 +4455,7 @@ function findingCardHTML(finding, index, total) {
   const act = finding.termiteActivity;
   const chipClass = act ? act : 'unset';
   const showDetails = act === 'ACTIVE' || act === 'INACTIVE';
+  const showSuspected = act === 'SUSPECTED';
   const showNone = act === 'NONE';
   const label = total === 1 ? 'Primary Finding' : `Finding ${index + 1}`;
 
@@ -4464,6 +4494,15 @@ function findingCardHTML(finding, index, total) {
           </div>
           ${act === 'INACTIVE' ? `<div class="inactive-reminder" style="display:flex"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg><span>Inactive workings can mean termites have temporarily abandoned the area, not that the risk is gone. Continued, regular inspections remain essential.</span></div>` : ''}
           ${finding.structuralConcern === 'YES' ? `<div class="warn-note note-info" style="margin:0 0 10px"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Referral recorded. The PDF recommends a licensed builder or engineer assess this damage.</div>` : ''}
+        </div>` : ''}
+        ${showSuspected ? `
+        <div class="findings-details" style="display:block">
+          <div class="section-fields">
+            <div class="field field-wide"><div class="field-label">Location</div>${fv('activityLocation','text')}${pickChipsHTML(id, 'activityLocation', PLACES, finding.activityLocation)}</div>
+            <div class="field field-wide"><div class="field-label">What's suspected <span class="field-hint">What you think it is, then what you saw.</span></div>${fv('damageDescription','text')}${pickChipsHTML(id, 'damageDescription', SUSPECT_SIGNS, finding.damageDescription)}</div>
+            <div class="field field-wide"><div class="field-label">Timber affected</div>${fv('timberAffected','text')}${pickChipsHTML(id, 'timberAffected', TIMBER_PARTS, finding.timberAffected)}</div>
+            <div class="field field-wide finding-photos"><div class="field-label">Photos of this finding</div>${spotPhotosHTML(findingPhotoSection(id))}</div>
+          </div>
         </div>` : ''}
         ${showNone ? `<div class="findings-none" style="display:flex;margin:8px 0 6px"><span class="findings-none-icon"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg></span><span>No activity or evidence found at this location.</span></div>` : ''}
       </div>
@@ -4586,6 +4625,7 @@ const PLACES = ['Subfloor', 'Roof void', 'Kitchen', 'Bathroom', 'Laundry', 'Bedr
 const TIMBER_PARTS = ['Bearer', 'Joist', 'Floorboards', 'Stud', 'Top plate', 'Bottom plate', 'Skirting', 'Architrave', 'Door frame', 'Window frame', 'Roof timbers', 'Deck', 'Fence', 'Tree or stump'];
 const BORER_TYPES = ['Anobium (furniture beetle)', 'Lyctus (powderpost beetle)', 'Queensland pine beetle', 'European house borer', 'Not identified'];
 const TERMITE_SIGNS = ['Mud leads', 'Mud packing', 'Workings', 'Galleries', 'Hollow when tapped', 'Live termites', 'Timber damage', 'Bubbling paint'];
+const SUSPECT_SIGNS = ['Possible termites', 'Possible leak', 'Possible decay', 'Hollow when tapped', 'Damp timber', 'High moisture reading', 'Bubbling paint'];
 const BORER_SIGNS = ['Exit holes', 'Frass', 'Tunnelling', 'Old dark holes', 'Fresh bright holes'];
 const PICK_SINGLE = new Set(['borerType']);
 // Description and location fields read as one phrase: a pick added after
@@ -4685,7 +4725,7 @@ function syncNothingFoundButtons() {
     if (!btn) return;
     btn.hidden = !nothingFoundBlanks(section).length;
     const somethingFound = section === 'findings'
-      ? (reportData.findings || []).some(f => f && ['ACTIVE', 'INACTIVE'].includes(f.termiteActivity)) || borersFound() || reportData.decayFound === 'YES' || reportData.delignification === 'YES'
+      ? (reportData.findings || []).some(isRealFinding) || borersFound() || reportData.decayFound === 'YES' || reportData.delignification === 'YES'
       : reportData.waterLeaks === 'YES' || Object.entries(CONDUCIVE_CLEAN).some(([k, clean]) => !isBlankValue(reportData[k]) && ![clean, 'N/A'].includes(reportData[k]) && !(k === 'weepHoles' && reportData[k] === 'NONE'));
     const title = btn.querySelector('strong');
     if (title) title.textContent = section === 'findings'
@@ -4860,9 +4900,7 @@ function mergeBorerExtraction(values) {
 // areas logged, but high risk areas hasn't been filled — prompt the tech
 function checkHighRiskPrompt() {
   const findings = getFindings();
-  const hasActivity = findings.some(f =>
-    f.termiteActivity === 'ACTIVE' || f.termiteActivity === 'INACTIVE'
-  );
+  const hasActivity = findings.some(isRealFinding);
   const hasObstructions = areasNotFullyInspected().length > 0;
   const hasHighRisk = !!(reportData.highRiskAreas && reportData.highRiskAreas.trim() &&
     !reportData.highRiskAreas.includes('N/A'));
@@ -9408,6 +9446,7 @@ function reportSummary() {
   const fs = (reportData.findings || []).filter(f => f && f.termiteActivity);
   const live = fs.filter(f => f.termiteActivity === 'ACTIVE');
   const evidence = fs.filter(f => f.termiteActivity === 'INACTIVE');
+  const suspected = fs.filter(f => f.termiteActivity === 'SUSPECTED');
   // Damage counts wherever it was found, including alongside live termites.
   const damaged = fs.filter(f => f.termiteActivity === 'INACTIVE' || (f.termiteActivity === 'ACTIVE' && !isBlankValue(f.damageDescription)));
   const structural = fs.some(f => f.structuralConcern === 'YES') || shownBorerFindings().some(b => b.structuralConcern === 'YES');
@@ -9432,6 +9471,7 @@ function reportSummary() {
   const basis = [];
   if (live.length) basis.push('live termites');
   else if (evidence.length) basis.push('old termite activity');
+  else if (suspected.length) basis.push('suspected, not confirmed');
   else if (fs.length) basis.push('no termites seen');
   if (fs.some(f => f.nestLocated === 'YES')) basis.push('nest found');
   if (structural) basis.push('builder referral');
@@ -9461,6 +9501,8 @@ function reportSummary() {
       ['Live termites found?', live.length ? 'YES' : fs.length ? 'NO' : NR, live.length ? 'bad' : fs.length ? 'good' : 'none', REPORT_PARTS.findings, places(live)],
       ['Termite nest found?', withNest.length ? 'YES' : nestNo ? 'NO' : NR, withNest.length ? 'bad' : nestNo ? 'good' : 'none', REPORT_PARTS.findings, places(withNest)],
       ['Termite workings or damage found?', damaged.length ? 'YES' : fs.length ? 'NO' : NR, damaged.length ? 'warn' : fs.length ? 'good' : 'none', REPORT_PARTS.findings, places(damaged)],
+      ...(suspected.length ? [['Anything suspected but not confirmed?', 'YES', 'warn', REPORT_PARTS.findings,
+        places(suspected)]] : []),
       ['Borers found?', { ACTIVE: 'ACTIVE', INACTIVE: 'OLD DAMAGE', NONE: 'NO' }[reportData.borerActivity] || NR,
         { ACTIVE: 'bad', INACTIVE: 'warn', NONE: 'good' }[reportData.borerActivity] || 'none', REPORT_PARTS.findings, shownBorerFindings().map(b => b.location || borerLine(b)).filter(Boolean).join('; ')],
       ['Wood decay (rot) found?', { YES: 'YES', NO: 'NO' }[reportData.decayFound] || NR,
@@ -11043,6 +11085,21 @@ async function buildReportPdf() {
 
   function findingCard(f, idx) {
     const activity = (f.termiteActivity || '').toUpperCase();
+    if (activity === 'SUSPECTED') {
+      pestCard({
+        heading: `FINDING ${idx + 1}`,
+        status: 'SUSPECTED — NOT CONFIRMED',
+        tone: 'warn',
+        fields: [
+          ['Location', f.activityLocation],
+          ['What is suspected and what was seen', f.damageDescription],
+          ['Timber affected', f.timberAffected],
+        ],
+        referral: f.structuralConcern === 'YES',
+        photosId: f.id,
+      });
+      return;
+    }
     const nest = f.nestLocated === 'YES' ? ['YES', C.danger] : f.nestLocated ? ['NO', C.safe] : ['NOT RECORDED', C.inkMuted];
     pestCard({
       heading: `TERMITE FINDING ${idx + 1}`,

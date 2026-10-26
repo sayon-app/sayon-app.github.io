@@ -525,26 +525,37 @@ function renderQuoteEditor() {
   ['qPaymentTerms', 'qExclusions', 'qNotes'].forEach(id => fitQuoteText(document.getElementById(id)));
 }
 
-// The job the quote is for, and where it's up to: price it, send it, the
-// client's answer, then the treatment.
+// Where the quote is up to, for the pill in the header.
+function quoteStatusPill(q) {
+  const a = quoteAnswerState(q);
+  if (a && a.stale) return ['Needs a new answer', 'warn'];
+  if (a && a.status === 'accepted') return q.treatment ? ['Treated', 'good'] : ['Accepted', 'good'];
+  if (a) return ['Declined', 'bad'];
+  if (!q.sentAt) return ['Draft', 'draft'];
+  if (q.sentHash !== quoteContentHash(q)) return ['Changed since sent', 'warn'];
+  return [`Sent ${new Date(q.sentAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`, 'wait'];
+}
+
+// The header: who the quote is for, then where. Tapping the name opens the
+// client details to change them.
 function renderQuoteHead() {
   const q = quoteState;
   const el = document.getElementById('quoteHead');
   if (!q || !el) return;
-  const a = quoteAnswerState(q);
-  const sentNow = !!q.sentAt && q.sentHash === quoteContentHash(q);
-  const answered = a && !a.stale;
-  const steps = [
-    ['Price it', sentNow || answered ? 'done' : 'now'],
-    ['Send', sentNow || answered ? 'done' : q.sentAt ? 'warn' : 'todo'],
-    ['Client\'s answer', answered ? (a.status === 'accepted' ? 'done' : 'bad') : sentNow ? 'now' : 'todo'],
-    ['Treatment', q.treatment ? 'done' : answered && a.status === 'accepted' ? 'now' : answered ? 'skip' : 'todo'],
-  ];
-  if (steps[1][1] === 'warn') steps[0][1] = 'now';
-  const meta = [q.client, q.number].filter(Boolean).map(escapeHtml).join(' · ');
-  el.innerHTML = `<div class="quote-head-addr">${escapeHtml(q.address || 'No address yet')}</div>
-    ${meta ? `<div class="quote-head-meta">${meta}</div>` : ''}
-    <ol class="quote-steps">${steps.map(([label, state]) => `<li class="${state}"><span class="quote-step-dot"></span>${label}</li>`).join('')}</ol>`;
+  const [pill, tone] = quoteStatusPill(q);
+  const name = (q.client || '').trim();
+  el.innerHTML = `<div class="quote-hero-top">
+      <span class="quote-hero-kicker">Quote${q.number ? ' · ' + escapeHtml(q.number) : ''}</span>
+      <span class="quote-hero-pill ${tone}">${escapeHtml(pill)}</span>
+    </div>
+    <button type="button" class="quote-hero-name${name ? '' : ' empty'}" onclick="openQuoteDetails()">${name ? escapeHtml(name) : 'Add the client\'s name'}</button>
+    <div class="quote-hero-addr"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg><span>${escapeHtml(q.address || 'No address yet')}</span></div>`;
+}
+
+function openQuoteDetails() {
+  const fold = document.getElementById('quoteDetailsFold');
+  fold.open = true;
+  fold.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // The one-line summaries on the folded sections.
@@ -845,6 +856,8 @@ function quoteAnswerSummary(q) {
   return { short: 'Quote declined', text: `Quote declined on ${formatAnswerDate(a.date)}${a.note ? ` · ${a.note}` : ''}`, tone: 'bad' };
 }
 
+// The job's progress, at the foot of the quote: priced, sent, the client's
+// answer and the treatment, each with where it's up to and what to do next.
 function renderQuoteAnswer() {
   const el = document.getElementById('quoteAnswer');
   const q = quoteState;
@@ -854,37 +867,67 @@ function renderQuoteAnswer() {
   el.style.display = '';
   const a = quoteAnswerState(q);
   const esc = escapeHtml;
-  let body;
-  if (!a && !q.sentAt) {
-    // Not sent yet: the bar's Send is the next step. An answer given
-    // another way (on the spot, by phone) can still be recorded.
-    el.classList.add('quiet');
-    el.innerHTML = `<span>Client already answered?</span>
-      <button class="quote-text-btn" onclick="openQuoteAnswer('accepted')">Accepted</button>
-      <button class="quote-text-btn" onclick="openQuoteAnswer('declined')">Declined</button>`;
-    return;
-  }
-  el.classList.remove('quiet');
+  const sentNow = !!q.sentAt && q.sentHash === quoteContentHash(q);
+  const answered = a && !a.stale;
+  const n = q.items.length;
+  const starting = q.items.filter(isStartingPrice).length;
+
+  const priced = {
+    title: 'Priced', state: sentNow || answered ? 'done' : 'now',
+    text: `${n} line${n === 1 ? '' : 's'} · ${formatAUD(quoteTotals(q).total)}${q.gst !== false ? ' inc GST' : ''}`
+      + (starting ? ` · ${starting} starting price${starting === 1 ? '' : 's'} to check` : ''),
+  };
+  const sent = !q.sentAt
+    ? { title: 'Sent to the client', state: answered ? 'skip' : 'todo', text: answered ? 'They answered before it was sent.' : 'Not sent yet. Send it from the bar below.' }
+    : sentNow || answered ? { title: 'Sent to the client', state: 'done', text: `Sent ${esc(formatIssueDate(q.sentAt))}.` }
+    : { title: 'Sent to the client', state: 'warn', text: `Sent ${esc(formatIssueDate(q.sentAt))}. You've changed the quote since, so send the new version.` };
+
+  let answer;
   if (!a) {
-    const changed = q.sentHash !== quoteContentHash(q);
-    body = `<div class="quote-answer-status wait">Sent ${esc(formatIssueDate(q.sentAt))}. ${changed
-      ? 'You\'ve changed the quote since, so send the new version.' : 'Waiting on the client.'}</div>
-      <div class="quote-answer-btns">
-        <button class="quote-btn primary" onclick="openQuoteAnswer('accepted')">Accepted</button>
-        <button class="quote-btn" onclick="openQuoteAnswer('declined')">Declined</button>
-      </div>`;
+    answer = {
+      title: 'Client\'s answer', state: sentNow ? 'now' : 'todo',
+      text: q.sentAt ? 'Waiting on the client. Record their answer when it comes.' : 'Already answered on the spot or by phone? Record it here.',
+      extra: q.sentAt
+        ? `<div class="quote-answer-btns">
+            <button class="quote-btn primary" onclick="openQuoteAnswer('accepted')">Accepted</button>
+            <button class="quote-btn" onclick="openQuoteAnswer('declined')">Declined</button>
+          </div>`
+        : `<div class="qp-links">
+            <button class="quote-text-btn" onclick="openQuoteAnswer('accepted')">Accepted</button>
+            <button class="quote-text-btn" onclick="openQuoteAnswer('declined')">Declined</button>
+          </div>`,
+    };
   } else {
     const how = a.status === 'accepted' ? (QUOTE_ANSWER_METHODS[a.method] || '') : '';
-    body = `<div class="quote-answer-status ${a.status === 'accepted' ? 'good' : 'bad'}">
-        <strong>${a.status === 'accepted' ? 'Accepted' : 'Declined'}</strong> by ${esc(a.by)} on ${esc(formatAnswerDate(a.date))}${how ? ` · ${esc(how)}` : ''}
-      </div>
-      ${a.note ? `<div class="quote-answer-note">${esc(a.note)}</div>` : ''}
-      ${isSignatureImage(a.signature) ? `<img class="quote-answer-sig" src="${a.signature}" alt="Client signature">` : ''}
-      ${a.stale ? '<div class="quote-answer-warn">The quote has changed since then. Send the new version and record the client\'s answer again.</div>' : ''}
-      ${a.status === 'accepted' && !a.stale ? renderTreatmentBlock(q) : ''}
-      <button class="quote-link-btn" onclick="clearQuoteAnswer()">${a.stale ? 'Record a new answer' : 'Change answer'}</button>`;
+    answer = {
+      title: 'Client\'s answer', state: a.stale ? 'warn' : a.status === 'accepted' ? 'done' : 'bad',
+      text: `<strong>${a.status === 'accepted' ? 'Accepted' : 'Declined'}</strong> by ${esc(a.by)} on ${esc(formatAnswerDate(a.date))}${how ? ` · ${esc(how)}` : ''}`,
+      extra: `${a.note ? `<div class="quote-answer-note">${esc(a.note)}</div>` : ''}
+        ${isSignatureImage(a.signature) ? `<img class="quote-answer-sig" src="${a.signature}" alt="Client signature">` : ''}
+        ${a.stale ? '<div class="quote-answer-warn">The quote has changed since then. Send the new version and record the client\'s answer again.</div>' : ''}
+        <button class="quote-text-btn" onclick="clearQuoteAnswer()">${a.stale ? 'Record a new answer' : 'Change answer'}</button>`,
+    };
   }
-  el.innerHTML = `<div class="quote-card-title">Client's answer</div>${body}`;
+
+  const treatment = answered && a.status === 'accepted'
+    ? { title: 'Treatment', state: q.treatment ? 'done' : 'now',
+        text: q.treatment ? `Certificate ${q.certificateSentAt ? 'sent ' + esc(formatIssueDate(q.certificateSentAt)) : 'not sent yet'}.` : 'Record it once the work is done.',
+        extra: renderTreatmentBlock(q) }
+    : answered ? { title: 'Treatment', state: 'skip', text: 'Not needed. The quote was declined.' }
+    : { title: 'Treatment', state: 'todo', text: 'After the client accepts.' };
+
+  const steps = [priced, sent, answer, treatment];
+  const done = steps.filter(st => st.state === 'done').length;
+  const tick = '<svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+  el.innerHTML = `<div class="quote-card-head"><div class="quote-card-title">Progress</div><div class="quote-card-count">${done} of 4 done</div></div>
+    <ol class="qp">${steps.map((st, i) => `<li class="qp-step ${st.state}">
+        <span class="qp-dot">${st.state === 'done' ? tick : i + 1}</span>
+        <div class="qp-body">
+          <div class="qp-title">${st.title}</div>
+          <div class="qp-text">${st.text}</div>
+          ${st.extra || ''}
+        </div>
+      </li>`).join('')}</ol>`;
 }
 
 // The bar's Send button says what sending does now.
@@ -1084,7 +1127,7 @@ function installQuoteLockGuard() {
   quoteLockGuardInstalled = true;
   const editor = document.getElementById('quoteEditor');
   const stop = e => {
-    if (!isQuoteLocked() || e.target.closest('#quotePdfBtn, #quoteEmailBtn, #quoteAnswer, .qi-row, .qi-done, summary')) return;
+    if (!isQuoteLocked() || e.target.closest('#quotePdfBtn, #quoteEmailBtn, #quoteAnswer, .qi-row, .qi-done, .quote-hero-name, summary')) return;
     if (e.type === 'touchstart') return;
     e.preventDefault();
     e.stopPropagation();

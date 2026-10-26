@@ -5236,8 +5236,7 @@ function renderCompass() {
   const btn = document.getElementById('compassMain');
   btn.classList.toggle('locked', compassLocked != null);
   btn.disabled = !has && !compassFailed;
-  const text = compassLocked != null ? `${label} locked. Tap to unlock`
-    : has ? `${label}. Tap to lock` : compassFailed ? 'Choose from list' : 'Finding north…';
+  const text = has ? label : compassFailed ? 'Choose from list' : 'Finding north…';
   if (btn.textContent !== text) btn.textContent = text;
   document.getElementById('compassRose').style.transform = `rotate(${has ? -compassDial : 0}deg)`;
   document.getElementById('compassConfirmBtn').hidden = compassLocked == null;

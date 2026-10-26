@@ -9680,12 +9680,6 @@ function closeDashboard() {
   document.getElementById('dashboardOverlay').classList.remove('open');
 }
 
-function parseFeeToNumber(feeStr) {
-  if (!feeStr) return 0;
-  const n = parseFloat(String(feeStr).replace(/[^0-9.]/g, ''));
-  return isNaN(n) ? 0 : n;
-}
-
 // Which list the dashboard shows: 'todo' | 'waiting' | 'done' | 'all'.
 let dashboardTab = 'todo';
 let dashboardJobs = [];
@@ -9790,31 +9784,13 @@ function renderDashboard() {
   const sent = jobs.filter(j => j.sent);
   const won = jobs.filter(j => j.accepted);
   const sum = (list) => list.reduce((n, j) => n + j.total, 0);
-  const fees = reports.reduce((n, r) => n + parseFeeToNumber(jobFeeOf(r.reportData)), 0);
   const money = (n) => `$${n.toLocaleString('en-AU', { maximumFractionDigits: 0 })}`;
 
   body.innerHTML = `
-    <div class="dashboard-stat-grid">
-      <div class="dashboard-stat-card">
-        <div class="dashboard-stat-value">${jobs.filter(j => j.time >= monthStart).length}</div>
-        <div class="dashboard-stat-label">Jobs this month</div>
-        <div class="dashboard-stat-sub">${jobs.length} in total</div>
-      </div>
-      <div class="dashboard-stat-card">
-        <div class="dashboard-stat-value">${sent.length}</div>
-        <div class="dashboard-stat-label">Quotes sent</div>
-        <div class="dashboard-stat-sub">${money(sum(sent))} quoted</div>
-      </div>
-      <div class="dashboard-stat-card">
-        <div class="dashboard-stat-value">${won.length}</div>
-        <div class="dashboard-stat-label">Quotes accepted</div>
-        <div class="dashboard-stat-sub">${money(sum(won))} won</div>
-      </div>
-      <div class="dashboard-stat-card">
-        <div class="dashboard-stat-value">${money(fees)}</div>
-        <div class="dashboard-stat-label">Inspection fees</div>
-        <div class="dashboard-stat-sub">From job details</div>
-      </div>
+    <div class="dashboard-summary">
+      <div><b>${jobs.filter(j => j.time >= monthStart).length}</b><span>Jobs this month</span></div>
+      <div><b>${money(sum(sent))}</b><span>Quoted · ${sent.length}</span></div>
+      <div><b>${money(sum(won))}</b><span>Won · ${won.length}</span></div>
     </div>
     <input class="job-input dashboard-search" id="dashboardSearch" type="search" placeholder="Search by address or client" autocomplete="off" oninput="renderDashboardJobs()">
     <div id="dashboardJobs"></div>
@@ -9845,22 +9821,22 @@ function renderDashboardJobs() {
     </div>
     <div class="dashboard-jobs">
       ${shown.length ? shown.map(j => `
-        <div class="dashboard-job ${j.group}">
+        <div class="dashboard-job">
           <button type="button" class="dashboard-job-main" onclick="openDashboardJob('${j.r.id}', 'report')">
             <span class="dashboard-job-top">
               <span class="dashboard-job-addr">${escapeHtml(j.r.address || 'No address')}</span>
               ${j.total ? `<span class="dashboard-job-total">${formatAUD(j.total)}</span>` : ''}
             </span>
-            <span class="dashboard-job-meta">${fmtDate(j.time)}${j.r.client ? ' · ' + escapeHtml(j.r.client) : ''}</span>
-            <span class="dashboard-steps">
-              ${j.steps.map(s => `<span class="dashboard-step ${s.state}">${s.label}</span>`).join('')}
+            <span class="dashboard-job-meta">${j.r.client ? escapeHtml(j.r.client) + ' · ' : ''}${fmtDate(j.time)}</span>
+            <span class="dashboard-steps" aria-label="${j.steps.map(s => `${s.label}: ${s.state === 'done' ? 'done' : s.state === 'bad' ? 'declined' : s.state === 'now' ? 'next' : 'not yet'}`).join(', ')}">
+              ${j.steps.map(s => `<i class="${s.state}"></i>`).join('')}
             </span>
-            <span class="dashboard-job-note">${escapeHtml(j.note)}</span>
           </button>
-          ${j.next || j.total ? `<span class="dashboard-job-actions">
-            ${j.total && (!j.next || j.next.to === 'report') ? `<button type="button" class="dashboard-job-next quiet" onclick="openDashboardJob('${j.r.id}', 'quote')">View quote</button>` : ''}
-            ${j.next ? `<button type="button" class="dashboard-job-next" onclick="openDashboardJob('${j.r.id}', '${j.next.to}')">${j.next.label}</button>` : ''}
-          </span>` : ''}
+          <div class="dashboard-job-foot">
+            <span class="dashboard-job-note">${escapeHtml(j.note)}</span>
+            ${j.next ? `<button type="button" class="dashboard-job-next${j.group === 'waiting' ? ' quiet' : ''}" onclick="openDashboardJob('${j.r.id}', '${j.next.to}')">${j.next.label}</button>`
+              : j.total ? `<button type="button" class="dashboard-job-next quiet" onclick="openDashboardJob('${j.r.id}', 'quote')">View quote</button>` : ''}
+          </div>
         </div>`).join('') : `<div class="saved-empty">${empty}</div>`}
     </div>
   `;

@@ -9753,16 +9753,20 @@ function dashboardJob(r, quotes) {
   };
 }
 
+const DASHBOARD_TABS = [['todo', 'Needs you'], ['waiting', 'With client'], ['done', 'Done'], ['all', 'All']];
+
 function setDashboardTab(tab) {
   dashboardTab = tab;
   const search = document.getElementById('dashboardSearch');
   if (search) search.value = '';
-  renderDashboardJobs();
+  renderDashboardJobs(true);
 }
 
 function renderDashboard() {
   const body = document.getElementById('dashboardBody');
   if (!body) return;
+  const date = document.getElementById('dashboardDate');
+  if (date) date.textContent = new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
   const reports = getSavedReports();
 
   if (reports.length === 0) {
@@ -9778,19 +9782,11 @@ function renderDashboard() {
   }
 
   const quotes = getSavedQuotes();
-  const jobs = dashboardJobs = reports.map(r => dashboardJob(r, quotes)).sort((a, b) => b.time - a.time);
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const sent = jobs.filter(j => j.sent);
-  const won = jobs.filter(j => j.accepted);
-  const sum = (list) => list.reduce((n, j) => n + j.total, 0);
-  const money = (n) => `$${n.toLocaleString('en-AU', { maximumFractionDigits: 0 })}`;
-
+  dashboardJobs = reports.map(r => dashboardJob(r, quotes)).sort((a, b) => b.time - a.time);
   body.innerHTML = `
-    <div class="dashboard-summary">
-      <div><b>${jobs.filter(j => j.time >= monthStart).length}</b><span>Jobs this month</span></div>
-      <div><b>${money(sum(sent))}</b><span>Quoted · ${sent.length}</span></div>
-      <div><b>${money(sum(won))}</b><span>Won · ${won.length}</span></div>
+    <div class="dashboard-tabs" id="dashboardTabs" role="tablist">
+      <span class="dashboard-tab-glide" aria-hidden="true"></span>
+      ${DASHBOARD_TABS.map(([key, label]) => `<button type="button" role="tab" class="dashboard-tab" data-tab="${key}" onclick="setDashboardTab('${key}')">${label}<span></span></button>`).join('')}
     </div>
     <input class="job-input dashboard-search" id="dashboardSearch" type="search" placeholder="Search by address or client" autocomplete="off" oninput="renderDashboardJobs()">
     <div id="dashboardJobs"></div>
@@ -9798,9 +9794,10 @@ function renderDashboard() {
   renderDashboardJobs();
 }
 
-// The tabs and the job cards, redrawn on their own so typing in the
-// search box keeps the keyboard up.
-function renderDashboardJobs() {
+// The tabs' counts and highlight, and the job cards. Redrawn on their own
+// so typing in the search box keeps the keyboard up and the highlight
+// slides between tabs. fade: the cards fade in (on a tab change).
+function renderDashboardJobs(fade) {
   const wrap = document.getElementById('dashboardJobs');
   if (!wrap) return;
   const counts = { todo: 0, waiting: 0, done: 0, all: dashboardJobs.length };
@@ -9810,16 +9807,25 @@ function renderDashboardJobs() {
   const shown = dashboardJobs.filter(j => query
     ? [j.r.address, j.r.client, j.r.jobSuburb, j.r.jobPostcode].filter(Boolean).join(' ').toLowerCase().includes(query)
     : dashboardTab === 'all' || j.group === dashboardTab);
-  const tabs = [['todo', 'To do'], ['waiting', 'Waiting'], ['done', 'Done'], ['all', 'All']];
   const empty = query ? `No jobs match "${escapeHtml(searchEl.value.trim())}".`
-    : { todo: 'Nothing to do. Every job is waiting on the client or done.', waiting: 'No quotes waiting on a client.', done: 'No finished jobs yet.', all: '' }[dashboardTab];
+    : { todo: 'Nothing needs you. Every job is with the client or done.', waiting: 'No quotes waiting on a client.', done: 'No finished jobs yet.', all: '' }[dashboardTab];
   const fmtDate = (ts) => new Date(ts).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
 
+  const tabs = document.getElementById('dashboardTabs');
+  if (tabs) {
+    tabs.classList.toggle('searching', !!query);
+    tabs.querySelectorAll('.dashboard-tab').forEach(btn => {
+      const on = btn.dataset.tab === dashboardTab;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-selected', on);
+      btn.querySelector('span').textContent = counts[btn.dataset.tab];
+    });
+    const i = DASHBOARD_TABS.findIndex(([key]) => key === dashboardTab);
+    tabs.querySelector('.dashboard-tab-glide').style.transform = `translateX(${i * 100}%)`;
+  }
+
   wrap.innerHTML = `
-    <div class="dashboard-tabs${query ? ' searching' : ''}" role="tablist">
-      ${tabs.map(([key, label]) => `<button type="button" role="tab" class="dashboard-tab${key === dashboardTab ? ' active' : ''}" aria-selected="${key === dashboardTab}" onclick="setDashboardTab('${key}')">${label}<span>${counts[key]}</span></button>`).join('')}
-    </div>
-    <div class="dashboard-jobs">
+    <div class="dashboard-jobs${fade ? ' fade-in' : ''}">
       ${shown.length ? shown.map(j => `
         <div class="dashboard-job">
           <button type="button" class="dashboard-job-main" onclick="openDashboardJob('${j.r.id}', 'report')">

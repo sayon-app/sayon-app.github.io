@@ -3291,17 +3291,28 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
   overflow: hidden;
 }
 .dashboard-overlay.open .dashboard-panel { transform: translateY(0); }
+/* A big title with today's date above it. Content keeps to a readable
+   column on wide screens, like the menu. */
 .dashboard-panel-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 16px 16px 0;
+  gap: 12px;
+  padding: 22px max(16px, calc(50% - 340px)) 16px;
   flex-shrink: 0;
 }
+.dashboard-head { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.dashboard-head-date {
+  font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--accent2);
+}
 .dashboard-panel-title {
+  margin: 0;
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 16px;
+  font-size: 30px;
+  line-height: 1.1;
   font-weight: 800;
+  letter-spacing: -0.5px;
   color: var(--text);
 }
 .dashboard-panel-close {
@@ -3317,47 +3328,44 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
   justify-content: center;
 }
 .dashboard-panel-close:hover { border-color: var(--accent); color: var(--accent2); }
-.dashboard-panel-subtitle {
-  font-size: 10.5px;
-  color: var(--text3);
-  padding: 4px 16px 12px;
-  flex-shrink: 0;
-}
 .dashboard-panel-body {
   overflow-y: auto;
-  padding: 0 16px 20px;
+  padding: 0 max(16px, calc(50% - 340px)) 20px;
 }
 
-/* Jobs: three totals in one strip, then search, tabs and one quiet card
-   per job: address and quote total, a thin report → quote → answer →
-   treated bar, where it's up to and the one next step. */
-.dashboard-summary {
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  margin-bottom: 14px; padding: 12px 0;
-  background: var(--surface2); border: 1px solid var(--border); border-radius: 12px;
-}
-.dashboard-summary div { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0 6px; }
-.dashboard-summary div + div { border-left: 1px solid var(--border); }
-.dashboard-summary b {
-  font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 800;
-  color: var(--text); font-variant-numeric: tabular-nums;
-}
-.dashboard-summary span { font-size: 11px; color: var(--text3); text-align: center; }
+/* Jobs: tabs with a highlight that slides between them, search, then one
+   quiet card per job: address and quote total, a thin report → quote →
+   answer → treated bar, where it's up to and the one next step. */
 .dashboard-search { width: 100%; margin-bottom: 10px; }
 .dashboard-tabs {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
-  padding: 3px; margin-bottom: 12px;
-  background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+  position: relative;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  padding: 3px; margin-bottom: 10px;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 12px;
 }
+.dashboard-tab-glide {
+  position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 4);
+  border-radius: 9px; background: var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s;
+}
+.dashboard-tabs.searching .dashboard-tab-glide { opacity: 0; }
 .dashboard-tab {
-  min-height: 40px; border: 0; border-radius: 8px; background: none;
-  font: inherit; font-size: 12.5px; font-weight: 700; color: var(--text2); cursor: pointer;
-  display: flex; align-items: center; justify-content: center; gap: 5px;
+  position: relative; z-index: 1;
+  min-height: 44px; padding: 0 2px; border: 0; background: none;
+  font: inherit; font-size: 12.5px; font-weight: 700; line-height: 1.15; color: var(--text2); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  transition: color 0.2s;
 }
-.dashboard-tab span { font-size: 11px; font-weight: 600; color: var(--text3); }
-.dashboard-tab.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+.dashboard-tab span { font-size: 11px; font-weight: 600; color: var(--text3); font-variant-numeric: tabular-nums; }
+.dashboard-tab.active { color: var(--text); }
 .dashboard-tab.active span { color: var(--accent2); }
-.dashboard-tabs.searching .dashboard-tab.active { background: none; box-shadow: none; color: var(--text2); }
+.dashboard-tabs.searching .dashboard-tab.active { color: var(--text2); }
+.dashboard-jobs.fade-in { animation: dashboardFade 0.22s ease-out; }
+@keyframes dashboardFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-tab-glide { transition: none; }
+  .dashboard-jobs.fade-in { animation: none; }
+}
 .dashboard-jobs { display: flex; flex-direction: column; gap: 8px; }
 .dashboard-job { border: 1px solid var(--border); border-radius: 12px; background: var(--surface2); }
 .dashboard-job-main {

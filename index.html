@@ -634,17 +634,16 @@
   <!-- DASHBOARD OVERLAY — placed at #app level, not inside .body, so it
        is never clipped by .body/.main-panel's overflow:hidden -->
   <div class="dashboard-overlay" id="dashboardOverlay">
-    <div class="dashboard-panel">
+    <div class="dashboard-panel" role="dialog" aria-modal="true" aria-labelledby="dashboardTitle">
       <div class="dashboard-panel-header">
-        <div class="dashboard-head">
-          <span class="dashboard-head-date" id="dashboardDate"></span>
-          <h2 class="dashboard-panel-title">Dashboard</h2>
-        </div>
-        <button class="dashboard-panel-close" onclick="closeDashboard()" aria-label="Close">
-          <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
+        <button type="button" class="dash-back" onclick="closeDashboard()">
+          <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Report
         </button>
       </div>
       <div class="dashboard-panel-body" id="dashboardBody"></div>
+    </div>
+    <div class="dash-detail" id="dashboardDetail" onclick="if (event.target === this) closeDashboardDetail()">
+      <div class="dash-detail-sheet" id="dashboardDetailSheet" role="dialog" aria-modal="true"></div>
     </div>
   </div>
 

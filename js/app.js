@@ -9667,22 +9667,27 @@ function resetReportState() {
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────
-// Every saved job with its report, quote, the client's answer and the
-// treatment, sorted into what needs doing, what waits on the client and done.
+// A page of every saved job, sorted into what needs the inspector, what
+// waits on the client and what's done. Tapping a job opens its timeline
+// (report, quote, the client's answer, treatment) and its next step.
 function openDashboard() {
   document.getElementById('dashboardOverlay').classList.add('open');
   dashboardTab = 'todo';
+  const search = document.getElementById('dashboardSearch');
+  if (search) search.value = '';
   renderDashboard();
   if (dashboardJobs.length && !dashboardJobs.some(j => j.group === 'todo')) setDashboardTab('all');
 }
 
 function closeDashboard() {
+  closeDashboardDetail();
   document.getElementById('dashboardOverlay').classList.remove('open');
 }
 
 // Which list the dashboard shows: 'todo' | 'waiting' | 'done' | 'all'.
 let dashboardTab = 'todo';
 let dashboardJobs = [];
+const DASHBOARD_TABS = [['todo', 'Needs you'], ['waiting', 'With client'], ['done', 'Done'], ['all', 'All']];
 
 // The day a job belongs to: its inspection date, else when it was saved.
 function dashboardJobTime(r) {
@@ -9692,68 +9697,79 @@ function dashboardJobTime(r) {
   return isNaN(t) ? r.savedAt : t;
 }
 
-// Where a job is up to, from the report through its quote and the client's
-// answer to the treatment. group: 'todo' (the inspector's move), 'waiting'
-// (on the client) or 'done'. next: the one button that moves it along.
+const dashDate = (ts) => new Date(ts).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+const dashDay = (iso) => { const t = new Date(iso + 'T00:00:00'); return isNaN(t) ? (iso || '') : dashDate(t); };
+
+// Where a job is up to. group: 'todo' (the inspector's move), 'waiting'
+// (on the client) or 'done'. status: a few words for the list. next: the
+// one button that moves the job along. steps: the job's timeline.
 function dashboardJob(r, quotes) {
   const d = r.reportData || {};
   const q = quotes[r.id] || r.quote || null;
   const hasQuote = quoteHasItems(q);
   const a = hasQuote ? quoteAnswerState(q) : null;
   const reportDone = !!(d.issue || d.sent);
-  const fmt = (ts) => new Date(ts).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
-  const fmtDay = (iso) => { const t = new Date(iso + 'T00:00:00'); return isNaN(t) ? (iso || '') : fmt(t); };
-  let group, note, next = null;
+  const needsQuote = d.treatmentRecommended === 'YES';
+  const total = hasQuote ? quoteTotals(q).total : 0;
+  let group, status, next = null;
   if (!reportDone) {
-    group = 'todo';
-    note = savedReportStatus(r).tone === 'ready' ? 'Report ready to send' : 'Report not finished';
+    group = 'todo'; status = 'Finish the report';
     next = { label: 'Open report', to: 'report' };
   } else if (!hasQuote) {
-    const needsQuote = d.treatmentRecommended === 'YES';
     group = needsQuote ? 'todo' : 'done';
-    note = needsQuote ? 'Treatment recommended, no quote yet' : 'Report sent, no quote needed';
+    status = needsQuote ? 'Write the quote' : 'No quote needed';
     if (needsQuote) next = { label: 'Write quote', to: 'quote' };
   } else if (!a) {
     group = q.sentAt ? 'waiting' : 'todo';
-    note = q.sentAt ? `Quote sent ${fmt(q.sentAt)}, waiting on the client` : 'Quote written, not sent';
-    next = { label: q.sentAt ? 'Record answer' : 'Send quote', to: 'quote' };
+    status = q.sentAt ? `Quote sent ${dashDate(q.sentAt)}` : 'Send the quote';
+    next = { label: q.sentAt ? 'Record their answer' : 'Send quote', to: 'quote' };
   } else if (a.stale) {
-    group = 'todo';
-    note = 'Quote changed after the client answered';
+    group = 'todo'; status = 'Quote changed, get a new answer';
     next = { label: 'Open quote', to: 'quote' };
   } else if (a.status !== 'accepted') {
-    group = 'done';
-    note = `Quote declined ${fmtDay(a.date)}`;
+    group = 'done'; status = 'Quote declined';
   } else if (!q.treatment) {
-    group = 'todo';
-    note = `Client said yes ${fmtDay(a.date)}`;
+    group = 'todo'; status = 'Record the treatment';
     next = { label: 'Record treatment', to: 'treatment' };
   } else if (!q.certificateSentAt) {
-    group = 'todo';
-    note = `Treated ${fmtDay(q.treatment.date)}, certificate not sent`;
+    group = 'todo'; status = 'Send the certificate';
     next = { label: 'Send certificate', to: 'quote' };
   } else {
-    group = 'done';
-    note = `Treated ${fmtDay(q.treatment.date)}, certificate sent`;
+    group = 'done'; status = 'Treated';
   }
+
   const answered = a && !a.stale;
+  const sentOn = d.issue ? d.issue.completedAt : d.sent ? d.sent.at : null;
   const steps = [
-    { label: 'Report', state: reportDone ? 'done' : 'todo' },
-    { label: 'Quote', state: hasQuote && q.sentAt ? 'done' : 'todo' },
-    { label: 'Answer', state: answered ? (a.status === 'accepted' ? 'done' : 'bad') : 'todo' },
-    { label: 'Treated', state: q && q.treatment ? 'done' : 'todo' },
+    { label: 'Report', state: reportDone ? 'done' : 'todo',
+      text: d.issue ? `Completed${sentOn ? ' ' + dashDate(sentOn) : ''}` : d.sent ? `Sent ${dashDate(d.sent.at)}`
+        : savedReportStatus(r).tone === 'ready' ? 'Ready to send' : 'In progress' },
+    { label: 'Quote', state: hasQuote && q.sentAt ? 'done' : !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
+      text: hasQuote ? `${formatAUD(total).replace(/\.00$/, '')} · ${q.sentAt ? 'sent ' + dashDate(q.sentAt) : 'not sent yet'}`
+        : reportDone && !needsQuote ? 'Not needed' : 'Not written yet' },
+    { label: 'Client\'s answer', state: answered ? (a.status === 'accepted' ? 'done' : 'bad') : !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
+      text: !a ? (hasQuote && q.sentAt ? 'Waiting on the client' : 'Not yet')
+        : a.stale ? 'The quote changed after they answered'
+        : a.status === 'accepted' ? `Accepted${a.by ? ' by ' + a.by : ''} ${dashDay(a.date)}`
+        : `Declined ${dashDay(a.date)}${a.note ? ' · ' + a.note : ''}` },
+    { label: 'Treatment', state: q && q.treatment ? 'done' : answered && a.status !== 'accepted' || !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
+      text: q && q.treatment ? `Done ${dashDay(q.treatment.date)} · certificate ${q.certificateSentAt ? 'sent' : 'not sent'}` : 'Not recorded yet' },
   ];
+  steps.forEach(s => { if (s.state === 'skip') s.text = 'Not needed'; });
   if (group !== 'done') { const s = steps.find(s => s.state === 'todo'); if (s) s.state = 'now'; }
-  return {
-    r, q, group, note, next, steps,
-    total: hasQuote ? quoteTotals(q).total : 0,
-    sent: hasQuote && !!q.sentAt,
-    accepted: !!(answered && a.status === 'accepted'),
-    time: dashboardJobTime(r),
-  };
+  return { r, q, group, status, next, steps, total, time: dashboardJobTime(r) };
 }
 
-const DASHBOARD_TABS = [['todo', 'Needs you'], ['waiting', 'With client'], ['done', 'Done'], ['all', 'All']];
+// A ring of four arcs, one per step, filled as the job moves along.
+function dashboardRing(steps, group) {
+  const C = 2 * Math.PI * 15, seg = C / 4, gap = 3.2;
+  const arcs = steps.map((s, i) => `<circle cx="18" cy="18" r="15" class="${s.state}" stroke-dasharray="${(seg - gap).toFixed(2)} ${(C - seg + gap).toFixed(2)}" stroke-dashoffset="${(-(i * seg) - gap / 2).toFixed(2)}"/>`).join('');
+  const done = steps.filter(s => s.state === 'done').length;
+  const mid = group === 'done' && done === 4
+    ? '<path d="m12.5 18.5 3.5 3.5 7-8" class="tick"/>'
+    : `<text x="18" y="18" dy="0.35em" text-anchor="middle">${done}/4</text>`;
+  return `<svg class="dash-ring" width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><g transform="rotate(-90 18 18)">${arcs}</g>${mid}</svg>`;
+}
 
 function setDashboardTab(tab) {
   dashboardTab = tab;
@@ -9765,38 +9781,42 @@ function setDashboardTab(tab) {
 function renderDashboard() {
   const body = document.getElementById('dashboardBody');
   if (!body) return;
-  const date = document.getElementById('dashboardDate');
-  if (date) date.textContent = new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
-  const reports = getSavedReports();
-
-  if (reports.length === 0) {
-    dashboardJobs = [];
-    const hasDraft = !!document.getElementById('jobAddress')?.value.trim();
-    body.innerHTML = `<div class="empty-state">
-        <p>No saved jobs yet. Each job you save shows up here with its report, quote and treatment.</p>
-        ${hasDraft
-          ? '<button class="job-action-btn save" onclick="saveCurrentReport(); renderDashboard()">Save this report</button>'
-          : '<button class="job-action-btn" onclick="closeDashboard()">Back to the report</button>'}
-      </div>`;
-    return;
-  }
-
   const quotes = getSavedQuotes();
-  dashboardJobs = reports.map(r => dashboardJob(r, quotes)).sort((a, b) => b.time - a.time);
+  dashboardJobs = getSavedReports().map(r => dashboardJob(r, quotes)).sort((a, b) => b.time - a.time);
+  const need = dashboardJobs.filter(j => j.group === 'todo').length;
+  const today = new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
+  const lead = !dashboardJobs.length ? 'Your jobs will show up here once you save a report.'
+    : need ? `<b>${need} job${need === 1 ? '' : 's'}</b> need${need === 1 ? 's' : ''} you today.`
+    : 'You\'re all caught up.';
+
   body.innerHTML = `
-    <div class="dashboard-tabs" id="dashboardTabs" role="tablist">
-      <span class="dashboard-tab-glide" aria-hidden="true"></span>
-      ${DASHBOARD_TABS.map(([key, label]) => `<button type="button" role="tab" class="dashboard-tab" data-tab="${key}" onclick="setDashboardTab('${key}')">${label}<span></span></button>`).join('')}
+    <div class="dash-hero">
+      <span class="dash-hero-date">${today}</span>
+      <h2 class="dash-hero-title" id="dashboardTitle">Dashboard</h2>
+      <p class="dash-hero-lead">${lead}</p>
     </div>
-    <input class="job-input dashboard-search" id="dashboardSearch" type="search" placeholder="Search by address or client" autocomplete="off" oninput="renderDashboardJobs()">
-    <div id="dashboardJobs"></div>
+    ${dashboardJobs.length ? `
+    <div class="dash-tabs" id="dashboardTabs" role="tablist">
+      ${DASHBOARD_TABS.map(([key, label]) => `<button type="button" role="tab" class="dash-tab" data-tab="${key}" onclick="setDashboardTab('${key}')">${label} <span></span></button>`).join('')}
+      <span class="dash-tab-line" aria-hidden="true"></span>
+    </div>
+    <label class="dash-search">
+      <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="dashboardSearch" type="search" placeholder="Search address or client" autocomplete="off" oninput="renderDashboardJobs()" aria-label="Search jobs">
+    </label>
+    <div id="dashboardJobs"></div>` : `
+    <div class="dash-empty">
+      ${document.getElementById('jobAddress')?.value.trim()
+        ? '<button class="job-action-btn save" onclick="saveCurrentReport(); renderDashboard()">Save this report</button>'
+        : '<button class="job-action-btn" onclick="closeDashboard()">Back to the report</button>'}
+    </div>`}
   `;
   renderDashboardJobs();
 }
 
-// The tabs' counts and highlight, and the job cards. Redrawn on their own
-// so typing in the search box keeps the keyboard up and the highlight
-// slides between tabs. fade: the cards fade in (on a tab change).
+// The tab counts and underline, and the job list. Redrawn on their own so
+// typing in the search box keeps the keyboard up and the underline slides.
+// fade: the list fades in (on a tab change).
 function renderDashboardJobs(fade) {
   const wrap = document.getElementById('dashboardJobs');
   if (!wrap) return;
@@ -9807,45 +9827,79 @@ function renderDashboardJobs(fade) {
   const shown = dashboardJobs.filter(j => query
     ? [j.r.address, j.r.client, j.r.jobSuburb, j.r.jobPostcode].filter(Boolean).join(' ').toLowerCase().includes(query)
     : dashboardTab === 'all' || j.group === dashboardTab);
-  const empty = query ? `No jobs match "${escapeHtml(searchEl.value.trim())}".`
-    : { todo: 'Nothing needs you. Every job is with the client or done.', waiting: 'No quotes waiting on a client.', done: 'No finished jobs yet.', all: '' }[dashboardTab];
-  const fmtDate = (ts) => new Date(ts).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
 
   const tabs = document.getElementById('dashboardTabs');
   if (tabs) {
     tabs.classList.toggle('searching', !!query);
-    tabs.querySelectorAll('.dashboard-tab').forEach(btn => {
+    tabs.querySelectorAll('.dash-tab').forEach(btn => {
       const on = btn.dataset.tab === dashboardTab;
       btn.classList.toggle('active', on);
       btn.setAttribute('aria-selected', on);
       btn.querySelector('span').textContent = counts[btn.dataset.tab];
     });
     const i = DASHBOARD_TABS.findIndex(([key]) => key === dashboardTab);
-    tabs.querySelector('.dashboard-tab-glide').style.transform = `translateX(${i * 100}%)`;
+    tabs.querySelector('.dash-tab-line').style.transform = `translateX(${i * 100}%)`;
   }
 
-  wrap.innerHTML = `
-    <div class="dashboard-jobs${fade ? ' fade-in' : ''}">
-      ${shown.length ? shown.map(j => `
-        <div class="dashboard-job">
-          <button type="button" class="dashboard-job-main" onclick="openDashboardJob('${j.r.id}', 'report')">
-            <span class="dashboard-job-top">
-              <span class="dashboard-job-addr">${escapeHtml(j.r.address || 'No address')}</span>
-              ${j.total ? `<span class="dashboard-job-total">${formatAUD(j.total)}</span>` : ''}
-            </span>
-            <span class="dashboard-job-meta">${j.r.client ? escapeHtml(j.r.client) + ' · ' : ''}${fmtDate(j.time)}</span>
-            <span class="dashboard-steps" aria-label="${j.steps.map(s => `${s.label}: ${s.state === 'done' ? 'done' : s.state === 'bad' ? 'declined' : s.state === 'now' ? 'next' : 'not yet'}`).join(', ')}">
-              ${j.steps.map(s => `<i class="${s.state}"></i>`).join('')}
-            </span>
-          </button>
-          <div class="dashboard-job-foot">
-            <span class="dashboard-job-note">${escapeHtml(j.note)}</span>
-            ${j.next ? `<button type="button" class="dashboard-job-next${j.group === 'waiting' ? ' quiet' : ''}" onclick="openDashboardJob('${j.r.id}', '${j.next.to}')">${j.next.label}</button>`
-              : j.total ? `<button type="button" class="dashboard-job-next quiet" onclick="openDashboardJob('${j.r.id}', 'quote')">View quote</button>` : ''}
-          </div>
-        </div>`).join('') : `<div class="saved-empty">${empty}</div>`}
+  const empty = query ? `No jobs match "${escapeHtml(searchEl.value.trim())}".`
+    : { todo: 'Nothing needs you right now.', waiting: 'No quotes are waiting on a client.', done: 'No finished jobs yet.', all: '' }[dashboardTab];
+  wrap.innerHTML = shown.length ? `
+    <div class="dash-list${fade ? ' fade-in' : ''}">
+      ${shown.map(j => `
+        <button type="button" class="dash-row ${j.group}" onclick="openDashboardDetail('${j.r.id}')">
+          ${dashboardRing(j.steps, j.group)}
+          <span class="dash-row-text">
+            <span class="dash-row-addr">${escapeHtml(j.r.address || 'No address')}</span>
+            <span class="dash-row-sub"><span class="dash-row-status">${escapeHtml(j.status)}</span>${j.r.client ? ' · ' + escapeHtml(j.r.client) : ''}</span>
+          </span>
+          <span class="dash-row-end">
+            <span class="dash-row-total">${j.total ? formatAUD(j.total).replace(/\.00$/, '') : ''}</span>
+            <span class="dash-row-date">${dashDate(j.time)}</span>
+          </span>
+          <svg class="icon dash-row-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+        </button>`).join('')}
+    </div>` : `<p class="dash-none${fade ? ' fade-in' : ''}">${empty}</p>`;
+}
+
+// One job's timeline and its next step, in a sheet over the list.
+function openDashboardDetail(id) {
+  const j = dashboardJobs.find(x => x.r.id === id);
+  const sheet = document.getElementById('dashboardDetailSheet');
+  if (!j || !sheet) return;
+  const meta = [j.r.client, dashDate(j.time)].filter(Boolean).map(escapeHtml).join(' · ');
+  sheet.innerHTML = `
+    <div class="dash-detail-grab" aria-hidden="true"></div>
+    <div class="dash-detail-head">
+      <div>
+        <h3 class="dash-detail-addr">${escapeHtml(j.r.address || 'No address')}</h3>
+        <div class="dash-detail-meta">${meta}</div>
+      </div>
+      <button type="button" class="dash-detail-close" onclick="closeDashboardDetail()" aria-label="Close">
+        <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <ol class="dash-timeline">
+      ${j.steps.map(s => `
+        <li class="${s.state}">
+          <span class="dash-timeline-dot" aria-hidden="true"></span>
+          <span class="dash-timeline-label">${s.label}</span>
+          <span class="dash-timeline-text">${escapeHtml(s.text)}</span>
+        </li>`).join('')}
+    </ol>
+    <div class="dash-detail-actions">
+      ${j.next ? `<button type="button" class="dash-detail-primary" onclick="openDashboardJob('${j.r.id}', '${j.next.to}')">${j.next.label}</button>` : ''}
+      <div class="dash-detail-links">
+        ${j.next && j.next.to === 'report' ? '' : `<button type="button" onclick="openDashboardJob('${j.r.id}', 'report')">Open report</button>`}
+        ${j.total && !(j.next && j.next.to === 'quote') ? `<button type="button" onclick="openDashboardJob('${j.r.id}', 'quote')">Open quote</button>` : ''}
+      </div>
     </div>
   `;
+  document.getElementById('dashboardDetail').classList.add('open');
+}
+
+function closeDashboardDetail() {
+  const el = document.getElementById('dashboardDetail');
+  if (el) el.classList.remove('open');
 }
 
 // Opens a job from the dashboard: its report, its quote, or straight into

@@ -4562,9 +4562,9 @@ function findingCardHTML(finding, index, total) {
         ${showDetails ? `
         <div class="findings-details" style="display:block">
           <div class="section-fields">
-            <div class="field field-wide"><div class="field-label">Location of Activity</div>${fv('activityLocation','text')}${pickChipsHTML(id, 'activityLocation', PLACES, finding.activityLocation)}</div>
-            <div class="field field-wide"><div class="field-label">Timber Affected</div>${fv('timberAffected','text')}${pickChipsHTML(id, 'timberAffected', TIMBER_PARTS, finding.timberAffected)}</div>
-            <div class="field field-wide"><div class="field-label">Damage Description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${fv('damageDescription','text')}${pickChipsHTML(id, 'damageDescription', TERMITE_SIGNS, finding.damageDescription)}</div>
+            <div class="field field-wide"><div class="field-label">Location of Activity</div>${fv('activityLocation','text')}${pickListHTML(id, 'activityLocation', PLACES, finding.activityLocation)}</div>
+            <div class="field field-wide"><div class="field-label">Timber Affected</div>${fv('timberAffected','text')}${pickListHTML(id, 'timberAffected', TIMBER_PARTS, finding.timberAffected)}</div>
+            <div class="field field-wide"><div class="field-label">Damage Description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${fv('damageDescription','text')}${pickListHTML(id, 'damageDescription', TERMITE_SIGNS, finding.damageDescription)}</div>
             <div class="field"><div class="field-label">Species / Genus</div>${fv('species','specieslist')}</div>
             <div class="field choice-field"><div class="field-label">Termite Nest Found?</div>${fv('nestLocated','yesno')}</div>
             <div class="field choice-field"><div class="field-label">Refer to a Builder or Engineer?</div>${fv('structuralConcern','yesno')}</div>
@@ -4688,8 +4688,9 @@ function commitFindingEdit(findingId, key, value, deferRender) {
 }
 
 // ── TIMBER AND BORER PICKS ───────────────────────────────────────────────
-// Tap chips under a text field: each adds its word to the field, or takes
-// it out again. The field stays free text, so the inspector can still type.
+// A drop-down under a text field: picking an answer adds it to the field,
+// picking a ticked one takes it out again. The field stays free text, so
+// the inspector can still type.
 const PLACES = ['Subfloor', 'Roof void', 'Kitchen', 'Bathroom', 'Laundry', 'Bedroom', 'Living room', 'Hallway', 'Garage', 'Front', 'Rear', 'Left side', 'Right side', 'Deck', 'Yard', 'Fence line'];
 const TIMBER_PARTS = ['Bearer', 'Joist', 'Floorboards', 'Stud', 'Top plate', 'Bottom plate', 'Skirting', 'Architrave', 'Door frame', 'Window frame', 'Roof timbers', 'Deck', 'Fence', 'Tree or stump'];
 const BORER_TYPES = ['Anobium (furniture beetle)', 'Lyctus (powderpost beetle)', 'Queensland pine beetle', 'European house borer', 'Not identified'];
@@ -4702,9 +4703,13 @@ const PICK_PHRASE = new Set(['damageDescription', 'description', 'activityLocati
 
 const splitPicks = v => String(v || '').split(/\s*,\s*/).filter(Boolean);
 
-function pickChipsHTML(id, key, options, value) {
+function pickListHTML(id, key, options, value) {
   const have = splitPicks(value).map(x => x.toLowerCase());
-  return `<div class="obs-items pick-chips">${options.map(o => `<button type="button" class="obs-item-btn${have.includes(o.toLowerCase()) ? ' selected' : ''}" aria-pressed="${have.includes(o.toLowerCase())}" onclick="togglePick('${id}','${key}',this.textContent)">${escapeHtml(o)}</button>`).join('')}</div>`;
+  const prompt = PICK_SINGLE.has(key) ? 'Choose from list' : 'Add from list';
+  return `<select class="job-input pick-list" aria-label="${prompt}" onchange="if (this.value) togglePick('${id}','${key}',this.value); this.value = ''">
+    <option value="">${prompt}…</option>
+    ${options.map(o => `<option value="${escapeHtml(o)}">${have.includes(o.toLowerCase()) ? '✓ ' : ''}${escapeHtml(o)}</option>`).join('')}
+  </select>`;
 }
 
 function togglePick(id, key, word) {
@@ -4894,10 +4899,10 @@ function borerCardHTML(b, index) {
         </div>
         <div class="findings-details" style="display:block">
         <div class="section-fields">
-          <div class="field field-wide"><div class="field-label">Location</div>${fv('location')}${pickChipsHTML(id, 'location', PLACES, b.location)}</div>
-          <div class="field field-wide"><div class="field-label">Timber Affected</div>${fv('timberAffected')}${pickChipsHTML(id, 'timberAffected', TIMBER_PARTS, b.timberAffected)}</div>
-          <div class="field field-wide"><div class="field-label">Borer Type</div>${fv('borerType')}${pickChipsHTML(id, 'borerType', BORER_TYPES, b.borerType)}</div>
-          <div class="field field-wide"><div class="field-label">What Was Seen <span class="field-hint">Exit holes, frass, tunnelling. No severity opinion.</span></div>${fv('description')}${pickChipsHTML(id, 'description', BORER_SIGNS, b.description)}</div>
+          <div class="field field-wide"><div class="field-label">Location</div>${fv('location')}${pickListHTML(id, 'location', PLACES, b.location)}</div>
+          <div class="field field-wide"><div class="field-label">Timber Affected</div>${fv('timberAffected')}${pickListHTML(id, 'timberAffected', TIMBER_PARTS, b.timberAffected)}</div>
+          <div class="field field-wide"><div class="field-label">Borer Type</div>${fv('borerType')}${pickListHTML(id, 'borerType', BORER_TYPES, b.borerType)}</div>
+          <div class="field field-wide"><div class="field-label">What Was Seen <span class="field-hint">Exit holes, frass, tunnelling. No severity opinion.</span></div>${fv('description')}${pickListHTML(id, 'description', BORER_SIGNS, b.description)}</div>
           <div class="field choice-field"><div class="field-label">Refer to a Builder or Engineer?</div><div class="choice-panel${b.structuralConcern ? '' : ' unset'}" role="radiogroup">${choiceCardsHTML('finding', `structuralConcern-${id}`, b.structuralConcern, `data-finding="${id}" data-fkey="structuralConcern"`)}</div></div>
           <div class="field field-wide finding-photos"><div class="field-label">Photos of this finding</div>${spotPhotosHTML(findingPhotoSection(id))}</div>
         </div>

@@ -1104,6 +1104,8 @@ header {
 .sidebar:not(.on-page) .drawer-scroll .job-panel > :not(.panel-label),
 .sidebar:not(.on-page) .drawer-scroll .saved-panel > :not(.panel-label) { display: none; }
 .sidebar.on-page .drawer-scroll > :not(.menu-page-active) { display: none; }
+/* A page opened from elsewhere (Billing, from the account button) has no row in the list. */
+.sidebar:not(.on-page) .menu-row-hidden { display: none; }
 .sidebar.on-page .menu-page-active > .panel-label { display: none; }
 .sidebar.on-page .menu-page-active { background: transparent; border: none; border-radius: 0; overflow: visible; }
 .sidebar.on-page .menu-page-active > .job-panel-body { padding: 4px 2px 16px; }

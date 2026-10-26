@@ -3465,6 +3465,50 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 }
 .dash-detail-links:empty { display: none; }
 
+/* A step's preview inside the sheet. */
+.dash-peek-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -4px 0 12px; }
+.dash-peek-back, .dash-peek-full {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px;
+  border-radius: 99px; font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+}
+.dash-peek-back { margin-left: -8px; border: none; background: none; color: var(--accent2); }
+.dash-peek-full { border: 1px solid var(--border); background: var(--surface2); color: var(--text); }
+.dash-peek-kicker { font-size: 12.5px; color: var(--text3); }
+.dash-peek-title { margin: 2px 0 0; font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 800; letter-spacing: -0.3px; color: var(--text); }
+.dash-peek-status { margin-top: 4px; font-size: 13.5px; font-weight: 600; color: var(--text2); }
+.dash-peek-status.done { color: var(--accent2); }
+.dash-peek-status.now { color: var(--accent2); }
+.dash-peek-status.bad { color: var(--risk); }
+.dash-peek-body { margin: 16px 0 20px; padding: 14px; border-radius: 14px; background: var(--surface2); border: 1px solid var(--border); }
+.dash-peek-rows { display: grid; grid-template-columns: minmax(92px, auto) 1fr; gap: 8px 14px; margin: 0; font-size: 13.5px; }
+.dash-peek-rows dt { color: var(--text3); }
+.dash-peek-rows dd { margin: 0; color: var(--text); font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
+.dash-peek-sub { margin: 14px 0 8px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 11px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text3); }
+.dash-peek-none { margin: 0; font-size: 13.5px; color: var(--text3); }
+.dash-peek-warn { margin: 10px 0 0; font-size: 13px; font-weight: 600; color: var(--yellow-text); }
+.dash-peek-num { margin-bottom: 8px; font-size: 12.5px; color: var(--text3); }
+.dash-peek-lines { list-style: none; margin: 0 0 12px; padding: 0 0 10px; border-bottom: 1px solid var(--border); }
+.dash-peek-lines li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 13.5px; color: var(--text); }
+.dash-peek-lines strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dash-peek-totals { margin: 0; padding: 0; border: none; }
+.dash-peek-totals li { color: var(--text2); }
+.dash-peek-totals li.grand { color: var(--text); font-size: 15px; font-weight: 700; }
+.dash-peek-sig { display: block; margin-top: 12px; max-width: 200px; max-height: 70px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+
+/* Wide screens: the sheet sits at the side, so the job list stays in view. */
+@media (min-width: 900px) {
+  .dash-detail { left: auto; width: 440px; justify-content: flex-end; align-items: stretch; background: none; }
+  .dashboard-panel { transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), margin-right 0.32s cubic-bezier(0.22, 1, 0.36, 1); }
+  .dashboard-overlay:has(.dash-detail.open) .dashboard-panel { margin-right: 440px; }
+  .dash-detail-sheet {
+    max-width: 440px; max-height: none; height: 100%;
+    border-radius: 0; padding: 24px 24px 24px;
+    box-shadow: -10px 0 40px rgba(0,0,0,0.25);
+    transform: translateX(100%);
+  }
+  .dash-detail-grab { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dashboard-panel, .dash-tab-line, .dash-detail-sheet { transition: none; }
   .dash-list.fade-in, .dash-none.fade-in { animation: none; }

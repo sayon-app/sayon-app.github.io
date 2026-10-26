@@ -598,7 +598,7 @@ function renderQuoteHead() {
     <button type="button" class="quote-hero-name${name ? '' : ' empty'}" onclick="openQuoteDetails()">${name ? escapeHtml(name) : 'Add the client\'s name'}</button>
     <div class="quote-hero-addr"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg><span>${escapeHtml(q.address || 'No address yet')}</span></div>
     ${problem ? `<button type="button" class="quote-hero-problem" onclick="openQuoteDetails('qProblem')">
-      <span class="quote-hero-problem-label">Inspection findings</span>
+      <span class="quote-hero-problem-label">Reason for treatment</span>
       <span class="quote-hero-problem-text">${escapeHtml(problem)}</span>
     </button>` : ''}`;
 }
@@ -1420,7 +1420,7 @@ function buildQuotePDF(q) {
     doc.setFillColor(...C.accentLight); doc.roundedRect(M, y, CW, h, 2, 2, 'F');
     doc.setFillColor(...C.accent); doc.rect(M, y, 1.4, h, 'F');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...C.accentDark);
-    pdfTracked(doc, 'INSPECTION FINDINGS', M + 6, y + 6, { cs: 0.5 });
+    pdfTracked(doc, 'REASON FOR TREATMENT', M + 6, y + 6, { cs: 0.5 });
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...C.ink);
     doc.text(lines, M + 6, y + 11.5);
     y += h + 7;

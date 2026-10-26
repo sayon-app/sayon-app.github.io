@@ -9770,6 +9770,8 @@ function dashboardJob(r, quotes) {
       text: q && q.treatment ? `Done ${dashDay(q.treatment.date)} · certificate ${q.certificateSentAt ? 'sent' : 'not sent'}` : 'Not recorded yet' },
   ];
   steps.forEach(s => { if (s.state === 'skip') s.text = 'Not needed'; });
+  // Report and Quote just say whether they're done; the preview has the detail.
+  steps.slice(0, 2).forEach(s => { if (s.state !== 'skip') s.text = s.state === 'done' ? 'Completed' : 'Not completed'; });
   if (group !== 'done') { const s = steps.find(s => s.state === 'todo'); if (s) s.state = 'now'; }
   return { r, q, group, status, next, steps, total, time: dashboardJobTime(r) };
 }

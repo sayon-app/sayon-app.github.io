@@ -3453,6 +3453,10 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
   font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
 }
 .dashboard-job.waiting .dashboard-job-next { background: none; color: var(--text2); }
+.dashboard-job-actions { display: flex; border-top: 1px solid var(--border); }
+.dashboard-job-actions .dashboard-job-next { border-top: 0; flex: 1; }
+.dashboard-job-actions .dashboard-job-next + .dashboard-job-next { border-left: 1px solid var(--border); }
+.dashboard-job-next.quiet { background: none; color: var(--text2); }
 
 .asb-banner {
   display: flex;

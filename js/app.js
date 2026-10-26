@@ -9857,7 +9857,10 @@ function renderDashboardJobs() {
             </span>
             <span class="dashboard-job-note">${escapeHtml(j.note)}</span>
           </button>
-          ${j.next ? `<button type="button" class="dashboard-job-next" onclick="openDashboardJob('${j.r.id}', '${j.next.to}')">${j.next.label}</button>` : ''}
+          ${j.next || j.total ? `<span class="dashboard-job-actions">
+            ${j.total && (!j.next || j.next.to === 'report') ? `<button type="button" class="dashboard-job-next quiet" onclick="openDashboardJob('${j.r.id}', 'quote')">View quote</button>` : ''}
+            ${j.next ? `<button type="button" class="dashboard-job-next" onclick="openDashboardJob('${j.r.id}', '${j.next.to}')">${j.next.label}</button>` : ''}
+          </span>` : ''}
         </div>`).join('') : `<div class="saved-empty">${empty}</div>`}
     </div>
   `;

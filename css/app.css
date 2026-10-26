@@ -3259,9 +3259,8 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 .nothing-found-btn:active { transform: scale(0.99); }
 /* Tap chips under a text field (timber affected, borer type): one row
    that scrolls sideways, so the card stays short. */
-.obs-items.pick-chips { padding: 8px 0 2px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-.obs-items.pick-chips::-webkit-scrollbar { display: none; }
-.pick-chips .obs-item-btn { flex: none; white-space: nowrap; }
+/* The pick list under a finding's text field: a quiet drop-down. */
+#reportBody .job-input.pick-list { width: 100%; margin-top: 8px; min-height: 44px; color: var(--text2); cursor: pointer; }
 
 /* ── DASHBOARD ── */
 /* DASHBOARD — a page of its own over the report: a big title and one line

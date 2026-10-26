@@ -627,9 +627,9 @@
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
             Your business
           </button>
-          <button class="profile-dropdown-item" onclick="openSettingsFromProfile()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            Settings
+          <button class="profile-dropdown-item" onclick="openBillingFromProfile()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            Billing
           </button>
           <button class="profile-dropdown-item profile-signout" onclick="signOutFromProfile()">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -729,7 +729,7 @@
           </div>
 
 
-          <div class="drawer-subhead">Booking &amp; payment</div>
+          <div class="drawer-subhead">Booking</div>
 
           <!-- Job tracking -->
           <div class="job-row">
@@ -738,8 +738,8 @@
               <input class="job-input" id="jobOrderId" placeholder="e.g. JOB-0042" oninput="saveJobInfo()">
             </div>
             <div class="job-field">
-              <div class="job-field-label">Invoice No.</div>
-              <input class="job-input" id="jobInvoiceNo" placeholder="e.g. INV-1024" oninput="saveJobInfo()">
+              <div class="job-field-label">Fee (inc. GST)</div>
+              <input class="job-input" id="jobFee" inputmode="decimal" placeholder="$440.00" oninput="addDollarSign(this);saveJobInfo()">
             </div>
           </div>
           <div class="job-field">
@@ -765,38 +765,6 @@
               <div class="job-field-label">Inspection Time</div>
               <input class="job-input" id="jobInspectionTime" type="time" oninput="saveJobInfo()">
             </div>
-          </div>
-          <div class="job-row">
-            <div class="job-field">
-              <div class="job-field-label">Referral Source</div>
-              <select class="job-input job-select" id="jobReferral" onchange="saveJobInfo()">
-                <option value="">Select…</option>
-                <option>Real estate agent</option>
-                <option>Returning client</option>
-                <option>Client referral</option>
-                <option>Online booking</option>
-                <option>Phone enquiry</option>
-                <option>Solicitor / conveyancer</option>
-                <option>Insurance company</option>
-                <option>Other</option>
-              </select>
-            </div>
-            <div class="job-field">
-              <div class="job-field-label">Fee (inc. GST)</div>
-              <input class="job-input" id="jobFee" inputmode="decimal" placeholder="$440.00" oninput="addDollarSign(this);saveJobInfo()">
-            </div>
-          </div>
-          <div class="job-field">
-            <div class="job-field-label">Payment Status</div>
-            <select class="job-input job-select" id="jobPaymentStatus" onchange="saveJobInfo()">
-              <option value="">Select…</option>
-              <option>Unpaid</option>
-              <option>Paid — card</option>
-              <option>Paid — cash</option>
-              <option>Paid — EFT</option>
-              <option>Invoice sent</option>
-              <option>Account — 30 days</option>
-            </select>
           </div>
           <div class="job-field">
             <div class="job-field-label">Internal Notes</div>
@@ -848,10 +816,10 @@
         </button>
       </div>
 
-      <div class="drawer-group-label">Account</div>
 
-      <!-- Billing -->
-      <div class="saved-panel settings-panel" id="billingPanel">
+      <!-- Billing: opened from the account (initials) button, so it has no
+           row in the menu list -->
+      <div class="saved-panel settings-panel menu-row-hidden" id="billingPanel">
         <button class="panel-label panel-label-toggle" onclick="openMenuPage('billingPanel')" id="billingPanelToggle">
           <span class="panel-icon"><svg class="icon " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
           <span class="panel-title">Billing</span>
@@ -975,15 +943,6 @@
             </div>
             <button class="job-action-btn settings-primary-btn" onclick="exportAllData()">
               <svg class="icon " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Download
-            </button>
-          </div>
-          <div class="settings-row">
-            <div class="settings-row-text">
-              <div class="settings-row-title">Clear All Saved Reports</div>
-              <div class="settings-row-desc">Permanently deletes every saved report from this device. Cannot be undone.</div>
-            </div>
-            <button class="job-action-btn settings-danger-btn" onclick="clearAllSavedReports()">
-              <svg class="icon " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Clear
             </button>
           </div>
           <div class="settings-row">

@@ -9667,10 +9667,13 @@ function resetReportState() {
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────
-// Totals and recent jobs from the reports saved on this device.
+// Every saved job with its report, quote, the client's answer and the
+// treatment, sorted into what needs doing, what waits on the client and done.
 function openDashboard() {
   document.getElementById('dashboardOverlay').classList.add('open');
+  dashboardTab = 'todo';
   renderDashboard();
+  if (dashboardJobs.length && !dashboardJobs.some(j => j.group === 'todo')) setDashboardTab('all');
 }
 
 function closeDashboard() {
@@ -9683,15 +9686,96 @@ function parseFeeToNumber(feeStr) {
   return isNaN(n) ? 0 : n;
 }
 
+// Which list the dashboard shows: 'todo' | 'waiting' | 'done' | 'all'.
+let dashboardTab = 'todo';
+let dashboardJobs = [];
+
+// The day a job belongs to: its inspection date, else when it was saved.
+function dashboardJobTime(r) {
+  const d = r.reportData || {};
+  const iso = d.jobInspectionDate || (d.agreement && d.agreement.inspectionDate);
+  const t = iso ? new Date(iso + 'T00:00:00').getTime() : NaN;
+  return isNaN(t) ? r.savedAt : t;
+}
+
+// Where a job is up to, from the report through its quote and the client's
+// answer to the treatment. group: 'todo' (the inspector's move), 'waiting'
+// (on the client) or 'done'. next: the one button that moves it along.
+function dashboardJob(r, quotes) {
+  const d = r.reportData || {};
+  const q = quotes[r.id] || r.quote || null;
+  const hasQuote = quoteHasItems(q);
+  const a = hasQuote ? quoteAnswerState(q) : null;
+  const reportDone = !!(d.issue || d.sent);
+  const fmt = (ts) => new Date(ts).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  const fmtDay = (iso) => { const t = new Date(iso + 'T00:00:00'); return isNaN(t) ? (iso || '') : fmt(t); };
+  let group, note, next = null;
+  if (!reportDone) {
+    group = 'todo';
+    note = savedReportStatus(r).tone === 'ready' ? 'Report ready to send' : 'Report not finished';
+    next = { label: 'Open report', to: 'report' };
+  } else if (!hasQuote) {
+    const needsQuote = d.treatmentRecommended === 'YES';
+    group = needsQuote ? 'todo' : 'done';
+    note = needsQuote ? 'Treatment recommended, no quote yet' : 'Report sent, no quote needed';
+    if (needsQuote) next = { label: 'Write quote', to: 'quote' };
+  } else if (!a) {
+    group = q.sentAt ? 'waiting' : 'todo';
+    note = q.sentAt ? `Quote sent ${fmt(q.sentAt)}, waiting on the client` : 'Quote written, not sent';
+    next = { label: q.sentAt ? 'Record answer' : 'Send quote', to: 'quote' };
+  } else if (a.stale) {
+    group = 'todo';
+    note = 'Quote changed after the client answered';
+    next = { label: 'Open quote', to: 'quote' };
+  } else if (a.status !== 'accepted') {
+    group = 'done';
+    note = `Quote declined ${fmtDay(a.date)}`;
+  } else if (!q.treatment) {
+    group = 'todo';
+    note = `Client said yes ${fmtDay(a.date)}`;
+    next = { label: 'Record treatment', to: 'treatment' };
+  } else if (!q.certificateSentAt) {
+    group = 'todo';
+    note = `Treated ${fmtDay(q.treatment.date)}, certificate not sent`;
+    next = { label: 'Send certificate', to: 'quote' };
+  } else {
+    group = 'done';
+    note = `Treated ${fmtDay(q.treatment.date)}, certificate sent`;
+  }
+  const answered = a && !a.stale;
+  const steps = [
+    { label: 'Report', state: reportDone ? 'done' : 'todo' },
+    { label: 'Quote', state: hasQuote && q.sentAt ? 'done' : 'todo' },
+    { label: 'Answer', state: answered ? (a.status === 'accepted' ? 'done' : 'bad') : 'todo' },
+    { label: 'Treated', state: q && q.treatment ? 'done' : 'todo' },
+  ];
+  if (group !== 'done') { const s = steps.find(s => s.state === 'todo'); if (s) s.state = 'now'; }
+  return {
+    r, q, group, note, next, steps,
+    total: hasQuote ? quoteTotals(q).total : 0,
+    sent: hasQuote && !!q.sentAt,
+    accepted: !!(answered && a.status === 'accepted'),
+    time: dashboardJobTime(r),
+  };
+}
+
+function setDashboardTab(tab) {
+  dashboardTab = tab;
+  const search = document.getElementById('dashboardSearch');
+  if (search) search.value = '';
+  renderDashboardJobs();
+}
+
 function renderDashboard() {
   const body = document.getElementById('dashboardBody');
   if (!body) return;
   const reports = getSavedReports();
 
   if (reports.length === 0) {
+    dashboardJobs = [];
     const hasDraft = !!document.getElementById('jobAddress')?.value.trim();
     body.innerHTML = `<div class="empty-state">
-        <p>No saved reports yet. Each report you save shows up here with its progress and status.</p>
+        <p>No saved jobs yet. Each job you save shows up here with its report, quote and treatment.</p>
         ${hasDraft
           ? '<button class="job-action-btn save" onclick="saveCurrentReport(); renderDashboard()">Save this report</button>'
           : '<button class="job-action-btn" onclick="closeDashboard()">Back to the report</button>'}
@@ -9699,84 +9783,93 @@ function renderDashboard() {
     return;
   }
 
-  const now = Date.now();
-  const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
-  const thisWeek = reports.filter(r => now - r.savedAt <= oneWeekMs);
-
-  const totalJobs = reports.length;
-  const jobsThisWeek = thisWeek.length;
-  const completedJobs = reports.filter(r => r.reportData && r.reportData.issue && !r.reportData.amending).length;
-  const totalRevenue = reports.reduce((sum, r) => sum + parseFeeToNumber(jobFeeOf(r.reportData)), 0);
-
-  const sorted = [...reports].sort((a, b) => b.savedAt - a.savedAt).slice(0, 8);
-  const awaitingTreatment = jobsAwaitingTreatment(reports);
-
-  const fmtDate = (ts) => new Date(ts).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
-  const fmtMoney = (n) => n > 0 ? `$${n.toLocaleString('en-AU', { maximumFractionDigits: 0 })}` : '—';
+  const quotes = getSavedQuotes();
+  const jobs = dashboardJobs = reports.map(r => dashboardJob(r, quotes)).sort((a, b) => b.time - a.time);
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const sent = jobs.filter(j => j.sent);
+  const won = jobs.filter(j => j.accepted);
+  const sum = (list) => list.reduce((n, j) => n + j.total, 0);
+  const fees = reports.reduce((n, r) => n + parseFeeToNumber(jobFeeOf(r.reportData)), 0);
+  const money = (n) => `$${n.toLocaleString('en-AU', { maximumFractionDigits: 0 })}`;
 
   body.innerHTML = `
     <div class="dashboard-stat-grid">
       <div class="dashboard-stat-card">
-        <div class="dashboard-stat-value">${totalJobs}</div>
-        <div class="dashboard-stat-label">Total Jobs</div>
+        <div class="dashboard-stat-value">${jobs.filter(j => j.time >= monthStart).length}</div>
+        <div class="dashboard-stat-label">Jobs this month</div>
+        <div class="dashboard-stat-sub">${jobs.length} in total</div>
       </div>
       <div class="dashboard-stat-card">
-        <div class="dashboard-stat-value">${jobsThisWeek}</div>
-        <div class="dashboard-stat-label">This Week</div>
+        <div class="dashboard-stat-value">${sent.length}</div>
+        <div class="dashboard-stat-label">Quotes sent</div>
+        <div class="dashboard-stat-sub">${money(sum(sent))} quoted</div>
       </div>
       <div class="dashboard-stat-card">
-        <div class="dashboard-stat-value">${completedJobs}</div>
-        <div class="dashboard-stat-label">Completed</div>
+        <div class="dashboard-stat-value">${won.length}</div>
+        <div class="dashboard-stat-label">Quotes accepted</div>
+        <div class="dashboard-stat-sub">${money(sum(won))} won</div>
       </div>
       <div class="dashboard-stat-card">
-        <div class="dashboard-stat-value">${fmtMoney(totalRevenue)}</div>
-        <div class="dashboard-stat-label">Recorded Fees</div>
+        <div class="dashboard-stat-value">${money(fees)}</div>
+        <div class="dashboard-stat-label">Inspection fees</div>
+        <div class="dashboard-stat-sub">From job details</div>
       </div>
     </div>
-    ${awaitingTreatment.length ? `
-    <div class="dashboard-section-label">Waiting on treatment</div>
-    <div>
-      ${awaitingTreatment.map(({ r, answer }) => `
-        <button type="button" class="dashboard-recent-item dashboard-recent-btn" onclick="recordTreatmentFromDashboard('${r.id}')">
-          <div>
-            <div class="dashboard-recent-addr">${escapeHtml(r.address || 'No address')}</div>
-            <div class="dashboard-recent-meta">Client said yes ${escapeHtml(formatAnswerDate(answer.date))}${r.client ? ' · ' + escapeHtml(r.client) : ''}</div>
-          </div>
-          <div class="dashboard-recent-completion">Record it</div>
-        </button>
-      `).join('')}
-    </div>` : ''}
-    <div class="dashboard-section-label">Recent Jobs</div>
-    <div>
-      ${sorted.map(r => `
-        <div class="dashboard-recent-item">
-          <div>
-            <div class="dashboard-recent-addr">${escapeHtml(r.address || 'No address')}</div>
-            <div class="dashboard-recent-meta">${fmtDate(r.savedAt)}${r.client ? ' · ' + escapeHtml(r.client) : ''}</div>
-          </div>
-          <div class="dashboard-recent-completion">${savedReportStatus(r).label}</div>
-        </div>
-      `).join('')}
+    <input class="job-input dashboard-search" id="dashboardSearch" type="search" placeholder="Search by address or client" autocomplete="off" oninput="renderDashboardJobs()">
+    <div id="dashboardJobs"></div>
+  `;
+  renderDashboardJobs();
+}
+
+// The tabs and the job cards, redrawn on their own so typing in the
+// search box keeps the keyboard up.
+function renderDashboardJobs() {
+  const wrap = document.getElementById('dashboardJobs');
+  if (!wrap) return;
+  const counts = { todo: 0, waiting: 0, done: 0, all: dashboardJobs.length };
+  dashboardJobs.forEach(j => counts[j.group]++);
+  const searchEl = document.getElementById('dashboardSearch');
+  const query = searchEl ? searchEl.value.trim().toLowerCase() : '';
+  const shown = dashboardJobs.filter(j => query
+    ? [j.r.address, j.r.client, j.r.jobSuburb, j.r.jobPostcode].filter(Boolean).join(' ').toLowerCase().includes(query)
+    : dashboardTab === 'all' || j.group === dashboardTab);
+  const tabs = [['todo', 'To do'], ['waiting', 'Waiting'], ['done', 'Done'], ['all', 'All']];
+  const empty = query ? `No jobs match "${escapeHtml(searchEl.value.trim())}".`
+    : { todo: 'Nothing to do. Every job is waiting on the client or done.', waiting: 'No quotes waiting on a client.', done: 'No finished jobs yet.', all: '' }[dashboardTab];
+  const fmtDate = (ts) => new Date(ts).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+
+  wrap.innerHTML = `
+    <div class="dashboard-tabs${query ? ' searching' : ''}" role="tablist">
+      ${tabs.map(([key, label]) => `<button type="button" role="tab" class="dashboard-tab${key === dashboardTab ? ' active' : ''}" aria-selected="${key === dashboardTab}" onclick="setDashboardTab('${key}')">${label}<span>${counts[key]}</span></button>`).join('')}
+    </div>
+    <div class="dashboard-jobs">
+      ${shown.length ? shown.map(j => `
+        <div class="dashboard-job ${j.group}">
+          <button type="button" class="dashboard-job-main" onclick="openDashboardJob('${j.r.id}', 'report')">
+            <span class="dashboard-job-top">
+              <span class="dashboard-job-addr">${escapeHtml(j.r.address || 'No address')}</span>
+              ${j.total ? `<span class="dashboard-job-total">${formatAUD(j.total)}</span>` : ''}
+            </span>
+            <span class="dashboard-job-meta">${fmtDate(j.time)}${j.r.client ? ' · ' + escapeHtml(j.r.client) : ''}</span>
+            <span class="dashboard-steps">
+              ${j.steps.map(s => `<span class="dashboard-step ${s.state}">${s.label}</span>`).join('')}
+            </span>
+            <span class="dashboard-job-note">${escapeHtml(j.note)}</span>
+          </button>
+          ${j.next ? `<button type="button" class="dashboard-job-next" onclick="openDashboardJob('${j.r.id}', '${j.next.to}')">${j.next.label}</button>` : ''}
+        </div>`).join('') : `<div class="saved-empty">${empty}</div>`}
     </div>
   `;
 }
 
-// Jobs whose client said yes to the quote but whose treatment isn't
-// recorded yet, oldest yes first, so nothing waits forgotten.
-function jobsAwaitingTreatment(reports) {
-  const quotes = getSavedQuotes();
-  return reports.map(r => {
-    const q = quotes[r.id] || r.quote;
-    const answer = q && quoteHasItems(q) && !q.treatment ? quoteAnswerState(q) : null;
-    return answer && answer.status === 'accepted' && !answer.stale ? { r, answer } : null;
-  }).filter(Boolean).sort((a, b) => String(a.answer.date).localeCompare(String(b.answer.date)));
-}
-
-function recordTreatmentFromDashboard(id) {
+// Opens a job from the dashboard: its report, its quote, or straight into
+// recording the treatment.
+function openDashboardJob(id, to) {
   closeDashboard();
   loadReport(id);
-  openQuote('app', id);
-  openTreatmentRecord();
+  if (to === 'quote' || to === 'treatment') openQuote('app', id);
+  if (to === 'treatment') openTreatmentRecord();
 }
 
 const SAVED_EMPTY_HTML = `<div class="empty-state">

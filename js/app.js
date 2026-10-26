@@ -4481,11 +4481,10 @@ document.addEventListener('change', e => {
 // fires its 'change', so onInspectionTypeChange(), updateJob() and
 // saveJobInfo() run as before. Code that sets a select directly ends in
 // updateJob(), saveJobInfo(), loadJobInfo() or clearJobInfo(), and those
-// call syncAllSelectCards() to redraw. Long lists (referral) stay dropdowns.
+// call syncAllSelectCards() to redraw. Long lists stay dropdowns.
 const SELECT_CARDS = {
   jobState:          { cols: 4 },
   jobInspectionType: { cols: 2 },
-  jobPaymentStatus:  { cols: 2 },
 };
 
 function buildSelectCards() {
@@ -7256,9 +7255,10 @@ function migrateLegacySavedReports() {
 
 // ── JOB INFO ─────────────────────────────────────────────────────────────
 // Per-report job tracking fields — saved into reportData and draft.
-const JOB_INFO_FIELDS = ['jobOrderId','jobInvoiceNo','jobInspectionType','jobInspectionDate','jobInspectionTime',
-                          'jobReferral','jobFee','jobPaymentStatus','jobClientPhone',
-                          'jobClientEmail','jobNotes'];
+// Invoice no., referral source and payment status were dropped from the
+// screen (nothing printed or used them); older reports keep their values.
+const JOB_INFO_FIELDS = ['jobOrderId','jobInspectionType','jobInspectionDate','jobInspectionTime',
+                          'jobFee','jobClientPhone','jobClientEmail','jobNotes'];
 
 function saveJobInfo() {
   JOB_INFO_FIELDS.forEach(id => {
@@ -8360,9 +8360,9 @@ function closeProfileMenu() {
   if (dd) dd.classList.remove('open');
   document.removeEventListener('click', handleProfileMenuOutsideClick);
 }
-function openSettingsFromProfile() {
+function openBillingFromProfile() {
   closeProfileMenu();
-  openMenuPage('settingsPanel');
+  openMenuPage('billingPanel');
 }
 function signOutFromProfile() {
   closeProfileMenu();
@@ -9190,21 +9190,6 @@ function deleteReport(id, event) {
     renderSavedList();
     showToast('Report restored', 'success');
   } });
-}
-
-function clearAllSavedReports() {
-  const reports = getSavedReports();
-  if (reports.length === 0) {
-    showToast('No saved reports to clear', 'info');
-    return;
-  }
-  if (!confirm(`Delete all ${reports.length} saved report${reports.length === 1 ? '' : 's'} from this device? This cannot be undone.`)) {
-    return;
-  }
-  setSavedReports([]);
-  currentReportId = null;
-  renderSavedList();
-  showToast('All saved reports cleared', 'success');
 }
 
 // ══════════════════════════════════════════════════════════════════════════

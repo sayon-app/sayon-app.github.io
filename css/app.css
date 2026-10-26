@@ -4581,3 +4581,34 @@ body:not(.dark-screen) .issue-banner .issue-primary {
   box-shadow: 0 4px 14px rgba(var(--glow),0.35), inset 0 1px 0 rgba(255,255,255,0.35);
 }
 body:not(.dark-screen) .next-section-btn:hover { background: linear-gradient(180deg, #5EEAD4 0%, #14B8A6 50%, #0D9488 100%); border-color: transparent; }
+
+/* ── COMPASS (Orientation) ── */
+.compass-body { align-items: center; text-align: center; }
+.compass-dial { position: relative; width: min(72vw, 280px); aspect-ratio: 1; margin: 14px auto 4px; }
+.compass-pointer {
+  position: absolute; top: -10px; left: 50%; transform: translateX(-50%); z-index: 1;
+  width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent;
+  border-top: 16px solid var(--accent);
+}
+.compass-rose { width: 100%; height: 100%; transition: transform 0.15s linear; }
+.compass-ring { fill: var(--bg); stroke: var(--border); stroke-width: 3; }
+.compass-ticks line { stroke: var(--text2); stroke-width: 2; stroke-linecap: round; }
+.compass-rose text { text-anchor: middle; font-family: 'Inter', sans-serif; font-weight: 700; fill: var(--text); }
+.compass-n { font-size: 26px; fill: #dc2626 !important; }
+.compass-l { font-size: 20px; }
+.compass-s { font-size: 12px; fill: var(--text2) !important; font-weight: 600; }
+.compass-reading { font-size: 32px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; }
+.compass-north { font-size: 12px; color: var(--text2); }
+.compass-note { font-size: 13px; line-height: 1.45; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; max-width: 360px; }
+.compass-body .extract-btn { max-width: 360px; margin-top: 8px; padding: 14px; font-size: 15px; }
+.compass-picks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; max-width: 360px; margin-top: 10px; }
+.compass-pick {
+  min-height: 44px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--text);
+  font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.compass-pick.on { border-color: var(--accent); background: rgba(var(--glow),0.14); color: var(--accent2); }
+.compass-pick:active { transform: scale(0.97); }
+.compass-clear { grid-column: 1 / -1; min-height: 40px; border: 0; background: none; color: var(--text2); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .compass-rose { transition: none; } }
+body.reduce-motion .compass-rose { transition: none; }

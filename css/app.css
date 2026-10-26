@@ -3259,8 +3259,14 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 .nothing-found-btn:active { transform: scale(0.99); }
 /* Tap chips under a text field (timber affected, borer type): one row
    that scrolls sideways, so the card stays short. */
-/* The pick list under a finding's text field: a quiet drop-down. */
-#reportBody .job-input.pick-list { width: 100%; margin-top: 8px; min-height: 44px; color: var(--text2); cursor: pointer; }
+/* A finding field that is its own drop-down: the native list lies over
+   the box, invisible, so a tap anywhere on it opens the picker. */
+.field-val.pick-field { position: relative; padding-right: 36px; cursor: pointer; }
+.field-val.pick-field::after {
+  content: ''; position: absolute; right: 14px; top: 50%; width: 8px; height: 8px; margin-top: -6px;
+  border-right: 2px solid var(--text3); border-bottom: 2px solid var(--text3); transform: rotate(45deg);
+}
+.pick-field-list { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
 
 /* ── DASHBOARD ── */
 /* DASHBOARD — a page of its own over the report: a big title and one line

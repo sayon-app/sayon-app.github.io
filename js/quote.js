@@ -71,12 +71,18 @@ function getSavedQuotes() {
 }
 
 // The quote for a report, or null. The unsaved draft's quote is keyed
-// 'draft', which every new unsaved report shares, so it only counts when
-// it was made for the same address.
+// 'draft'. It is dropped when a new report starts (forgetDraftQuote), so it
+// belongs to the open draft. It only fails to match when it was made for a
+// different address: one made before the report had an address still
+// counts once the address is typed, and so does one whose address was
+// typed into the quote itself.
 function quoteForReport(key, address) {
   const q = getSavedQuotes()[key];
   if (!q) return null;
-  if (key === 'draft' && (q.address || '') !== (address || '')) return null;
+  if (key === 'draft') {
+    const madeFor = q.sourceAddress != null ? q.sourceAddress : (q.address || '');
+    if (madeFor && madeFor !== (address || '')) return null;
+  }
   return q;
 }
 
@@ -87,7 +93,15 @@ function adoptDraftQuote(id, address) {
   if (!q) return;
   const all = readJSON(quotesStorageKey(), {});
   delete all.draft;
-  all[id] = Object.assign({}, q, { reportKey: id });
+  all[id] = Object.assign({}, q, { reportKey: id, sourceAddress: address || '' });
+  try { localStorage.setItem(quotesStorageKey(), JSON.stringify(all)); } catch (e) {}
+}
+
+// The unsaved report was thrown away, so its draft quote goes with it.
+function forgetDraftQuote() {
+  const all = readJSON(quotesStorageKey(), {});
+  if (!all.draft) return;
+  delete all.draft;
   try { localStorage.setItem(quotesStorageKey(), JSON.stringify(all)); } catch (e) {}
 }
 
@@ -400,8 +414,10 @@ function createQuoteFromSource(src) {
     clientPhone: rd.jobClientPhone || '',
     clientEmail: rd.jobClientEmail || '',
     address: src.address,
+    // The report's address when the quote was made (see quoteForReport).
+    sourceAddress: src.address || '',
     inspector: src.inspector,
-    inspectionDate: src.date || null,
+    inspectionDate: rd.jobInspectionDate || (rd.agreement && rd.agreement.inspectionDate) || src.date || null,
     validDays: 30,
     gst: defaultQuoteGst(),
     items: buildQuoteItemsFromReport(rd),
@@ -609,15 +625,23 @@ function fitQuoteText(el) {
   el.style.height = el.scrollHeight + 2 + 'px';
 }
 
+// Money is worked out in whole cents, so the lines shown add up to the
+// subtotal shown. (The tiny nudge stops 1.005 rounding down to 1.00.)
+function toCents(v) { return Math.round(v * 100 + Math.sign(v) * 1e-6); }
+
+// A stored signature only ever comes from the signing pad, but a synced or
+// imported copy could hold anything, so only a picture is shown.
+function isSignatureImage(v) { return typeof v === 'string' && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v); }
+
 function lineTotal(it) {
   const qty = parseFloat(it.qty), price = parseFloat(it.price);
-  return (isFinite(qty) ? qty : 0) * (isFinite(price) ? price : 0);
+  return toCents((isFinite(qty) ? qty : 0) * (isFinite(price) ? price : 0)) / 100;
 }
 
 function quoteTotals(q) {
-  const subtotal = q.items.reduce((sum, it) => sum + lineTotal(it), 0);
-  const gst = q.gst !== false ? Math.round(subtotal * 10) / 100 : 0;
-  return { subtotal, gst, total: subtotal + gst };
+  const subCents = q.items.reduce((sum, it) => sum + toCents(lineTotal(it)), 0);
+  const gstCents = q.gst !== false ? Math.round(subCents / 10) : 0;
+  return { subtotal: subCents / 100, gst: gstCents / 100, total: (subCents + gstCents) / 100 };
 }
 
 function renderQuoteTotals() {
@@ -749,7 +773,7 @@ function renderQuoteAnswer() {
         <strong>${a.status === 'accepted' ? 'Accepted' : 'Declined'}</strong> by ${esc(a.by)} on ${esc(formatAnswerDate(a.date))}${how ? ` · ${esc(how)}` : ''}
       </div>
       ${a.note ? `<div class="quote-answer-note">${esc(a.note)}</div>` : ''}
-      ${a.signature ? `<img class="quote-answer-sig" src="${a.signature}" alt="Client signature">` : ''}
+      ${isSignatureImage(a.signature) ? `<img class="quote-answer-sig" src="${a.signature}" alt="Client signature">` : ''}
       ${a.stale ? '<div class="quote-answer-warn">The quote has changed since then. Send the new version and record the client\'s answer again.</div>' : ''}
       ${a.status === 'accepted' && !a.stale ? renderTreatmentBlock(q) : ''}
       <button class="quote-link-btn" onclick="clearQuoteAnswer()">${a.stale ? 'Record a new answer' : 'Change answer'}</button>`;
@@ -817,6 +841,7 @@ function saveQuoteAnswer() {
     answer.signature = quoteAnswerPad.canvas.toDataURL('image/png');
   }
   q.answer = answer;
+  stampQuoteIssued(q);
   clearTimeout(quoteSaveTimer);
   persistQuote();
   storeQuoteOnReport(q, true);
@@ -889,12 +914,26 @@ function quoteContentHash(q) {
   const content = Object.assign({}, q);
   // 'booking' and 'invoice' are left over from features that were removed;
   // older quotes may still carry them, and they never counted as content.
-  ['updatedAt', 'createdAt', 'sentAt', 'sentHash', 'certificateSentAt', 'reportKey', 'answer', 'booking', 'treatment', 'invoice'].forEach(k => delete content[k]);
+  ['updatedAt', 'createdAt', 'sentAt', 'sentHash', 'certificateSentAt', 'reportKey', 'answer', 'booking', 'treatment', 'invoice',
+    'sourceAddress', 'issuedAt', 'issuedHash'].forEach(k => delete content[k]);
   return sha256Hex(stableJson(content));
+}
+// The day this version of the quote was first given to the client. The PDF
+// dates the quote and works out VALID UNTIL from it, so sending it again
+// doesn't move either date. Changing the quote starts a new version.
+function stampQuoteIssued(q) {
+  const hash = quoteContentHash(q);
+  if (q.issuedAt && q.issuedHash === hash) return;
+  q.issuedAt = Date.now();
+  q.issuedHash = hash;
+}
+function quoteIssuedAt(q) {
+  return q.issuedAt && q.issuedHash === quoteContentHash(q) ? q.issuedAt : Date.now();
 }
 function markQuoteSent(q) {
   q.sentAt = Date.now();
   q.sentHash = quoteContentHash(q);
+  stampQuoteIssued(q);
   storeSentQuote(q);
 }
 function markCertificateSent(q) {
@@ -906,7 +945,7 @@ function markCertificateSent(q) {
 // takes the same times.
 function storeSentQuote(q) {
   if (quoteState && quoteState !== q && quoteState.reportKey === q.reportKey) {
-    ['sentAt', 'sentHash', 'certificateSentAt'].forEach(k => { if (q[k]) quoteState[k] = q[k]; });
+    ['sentAt', 'sentHash', 'certificateSentAt', 'issuedAt', 'issuedHash'].forEach(k => { if (q[k]) quoteState[k] = q[k]; });
   }
   const all = readJSON(quotesStorageKey(), {});
   all[q.reportKey] = q;
@@ -1132,9 +1171,10 @@ function buildQuotePDF(q) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = 210, M = 15, CW = W - M * 2, BOTTOM = 276;
   const fmtDate = d => new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
-  const today = fmtDate(Date.now());
+  const issued = quoteIssuedAt(q);
+  const today = fmtDate(issued);
   const validDays = parseInt(q.validDays, 10) || 30;
-  const validUntil = fmtDate(Date.now() + validDays * 86400000);
+  const validUntil = fmtDate(issued + validDays * 86400000);
   const company = getCompanyDetails();
   const totals = quoteTotals(q);
   let y = 0;
@@ -1151,7 +1191,7 @@ function buildQuotePDF(q) {
     ['QUOTE NO.', q.number],
     ['DATE', today],
     ['VALID UNTIL', validUntil],
-    ['REPORT DATE', q.inspectionDate ? fmtDate(q.inspectionDate) : ''],
+    ['INSPECTION DATE', q.inspectionDate ? fmtDate(q.inspectionDate) : ''],
     ['INSPECTOR', q.inspector],
   ] });
 
@@ -1161,18 +1201,24 @@ function buildQuotePDF(q) {
   const totalRows = [[q.gst !== false ? 'Subtotal (ex GST)' : 'Subtotal', totals.subtotal]];
   if (q.gst !== false) totalRows.push(['GST (10%)', totals.gst]);
   const boxH = pdfTotalsBoxHeight(totalRows);
-  ensure(boxH + 6);
-  y += 5;
-  drawPdfTotalsBox(doc, y, totalRows, [q.gst !== false ? 'TOTAL (inc GST)' : 'TOTAL', totals.total]);
   const boxW = PDF_TOTALS_BOX_W;
   const terms = (q.paymentTerms || '').trim();
-  if (terms) {
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+  const termLines = terms ? doc.splitTextToSize(terms, CW - boxW - 10) : [];
+  // Every line of the terms prints (bank details often run to six lines);
+  // long terms run on below the totals box.
+  const TERM_LINE_H = 3.6;
+  const blockH = Math.max(boxH, termLines.length ? 11 + termLines.length * TERM_LINE_H : 0);
+  ensure(blockH + 6);
+  y += 5;
+  drawPdfTotalsBox(doc, y, totalRows, [q.gst !== false ? 'TOTAL (inc GST)' : 'TOTAL', totals.total]);
+  if (termLines.length) {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
     doc.text('PAYMENT TERMS', M, y + 6.5);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...C.ink);
-    doc.text(doc.splitTextToSize(terms, CW - boxW - 10).slice(0, 5), M, y + 11);
+    termLines.forEach((line, i) => doc.text(line, M, y + 11 + i * TERM_LINE_H));
   }
-  y += boxH + 4;
+  y += blockH + 4;
 
   // ── 2. EXCLUSIONS ──
   let sectionNum = 2;
@@ -1227,8 +1273,8 @@ function buildQuotePDF(q) {
   valueOnLine(accepted && accepted.by, M);
   drawPdfSignature(doc, { x: M, y, w: colW, caption: 'Client name' });
   drawPdfSignature(doc, { x: M + colW + 8, y, w: colW, caption: 'Client signature',
-    image: accepted && accepted.signature,
-    note: accepted && !accepted.signature ? `Accepted ${QUOTE_ANSWER_METHODS[accepted.method] || ''}`.trim() : '' });
+    image: accepted && isSignatureImage(accepted.signature) ? accepted.signature : null,
+    note: accepted && !isSignatureImage(accepted.signature) ? `Accepted ${QUOTE_ANSWER_METHODS[accepted.method] || ''}`.trim() : '' });
   valueOnLine(accepted && formatLongDate(accepted.date), M + (colW + 8) * 2);
   drawPdfSignature(doc, { x: M + (colW + 8) * 2, y, w: colW, caption: 'Date' });
   y += 8;

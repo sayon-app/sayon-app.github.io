@@ -9896,7 +9896,7 @@ function openDashboardDetail(id) {
       ${j.steps.map(s => `
         <li class="${s.state}">
           <span class="dash-timeline-dot" aria-hidden="true"></span>
-          <button type="button" class="dash-timeline-btn" onclick="openDashboardJob('${j.r.id}', '${s.to}')">
+          <button type="button" class="dash-timeline-btn" onclick="openDashboardPeek('${j.r.id}', '${s.to}')">
             <span class="dash-timeline-label">${s.label}</span>
             <span class="dash-timeline-text">${escapeHtml(s.text)}</span>
             <svg class="icon dash-timeline-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
@@ -9908,6 +9908,94 @@ function openDashboardDetail(id) {
     </div>
   `;
   document.getElementById('dashboardDetail').classList.add('open');
+}
+
+// A step opens as a small preview over the dashboard: what that section
+// holds, read-only, with a button to open it full screen. On a wide screen
+// the sheet sits at the side, so the job list stays in view.
+const DASH_PEEK_TITLES = { report: 'Report', quote: 'Quote', answer: 'Client\'s answer', treatment: 'Treatment' };
+const DASH_PEEK_OPEN = { report: 'Open the report', quote: 'Open the quote', answer: 'Open the quote', treatment: 'Open the treatment record' };
+
+function openDashboardPeek(id, to) {
+  const j = dashboardJobs.find(x => x.r.id === id);
+  const sheet = document.getElementById('dashboardDetailSheet');
+  if (!j || !sheet) return;
+  const step = j.steps.find(s => s.to === to);
+  const expand = '<svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/></svg>';
+  sheet.innerHTML = `
+    <div class="dash-detail-grab" aria-hidden="true"></div>
+    <div class="dash-peek-bar">
+      <button type="button" class="dash-peek-back" onclick="openDashboardDetail('${id}')">
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Job
+      </button>
+      <button type="button" class="dash-peek-full" onclick="openDashboardJob('${id}', '${to}')" aria-label="Full screen">${expand}Full screen</button>
+    </div>
+    <div class="dash-peek-kicker">${escapeHtml(j.r.address || 'No address')}</div>
+    <h3 class="dash-peek-title">${DASH_PEEK_TITLES[to]}</h3>
+    ${step ? `<div class="dash-peek-status ${step.state}">${escapeHtml(step.text)}</div>` : ''}
+    <div class="dash-peek-body">${dashboardPeekBody(j, to)}</div>
+    <div class="dash-detail-actions">
+      <button type="button" class="dash-detail-primary" onclick="openDashboardJob('${id}', '${to}')">${DASH_PEEK_OPEN[to]}</button>
+    </div>`;
+  sheet.scrollTop = 0;
+  document.getElementById('dashboardDetail').classList.add('open');
+}
+
+function dashPeekRows(rows) {
+  const shown = rows.filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== '');
+  return shown.length ? `<dl class="dash-peek-rows">${shown.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}</dl>` : '';
+}
+
+function dashboardPeekBody(j, to) {
+  const d = j.r.reportData || {};
+  const q = j.q;
+  const none = (t) => `<p class="dash-peek-none">${escapeHtml(t)}</p>`;
+  if (to === 'report') {
+    const findings = (Array.isArray(d.findings) ? d.findings : []).filter(f => f && f.termiteActivity);
+    const borers = (Array.isArray(d.borerFindings) ? d.borerFindings : []).filter(f => f && f.borerActivity);
+    const ag = d.agreement;
+    const list = [
+      ...findings.map((f, i) => [`Termites ${i + 1}`, [f.termiteActivity, f.activityLocation].filter(Boolean).join(' · ')]),
+      ...borers.map((f, i) => [`Borers ${i + 1}`, [f.borerActivity, f.location].filter(Boolean).join(' · ')]),
+    ];
+    if (d.decayFound === 'YES') list.push(['Wood decay', d.decayWhere || 'Found']);
+    return dashPeekRows([
+      ['Inspection', d.inspectionType],
+      ['Filled in', `${j.r.completion || 0}%`],
+      ['Agreement', ag ? `Signed by ${ag.signerName || 'the client'}` : 'Not signed yet'],
+      ['Treatment', d.treatmentRecommended === 'YES' ? (d.treatmentType || 'Recommended') : d.treatmentRecommended === 'NO' ? 'Not recommended' : ''],
+    ]) + (list.length ? `<div class="dash-peek-sub">Findings</div>${dashPeekRows(list)}`
+      : `<div class="dash-peek-sub">Findings</div>${none('No termite or borer findings recorded.')}`);
+  }
+  if (!quoteHasItems(q)) return none(to === 'quote' ? 'No quote written yet.' : 'There\'s no quote for this job yet.');
+  if (to === 'quote') {
+    const t = quoteTotals(q);
+    return `${q.number ? `<div class="dash-peek-num">Quote ${escapeHtml(q.number)}</div>` : ''}
+      <ul class="dash-peek-lines">${q.items.map(it => `<li><span>${escapeHtml(it.desc || 'Line')}</span><strong>${formatAUD(lineTotal(it))}</strong></li>`).join('')}</ul>
+      <ul class="dash-peek-lines dash-peek-totals">${q.gst !== false ? `<li><span>GST</span><strong>${formatAUD(t.gst)}</strong></li>` : ''}<li class="grand"><span>Total</span><strong>${formatAUD(t.total)}</strong></li></ul>`;
+  }
+  if (to === 'answer') {
+    const a = quoteAnswerState(q);
+    if (!a) return none(q.sentAt ? 'Waiting on the client.' : 'The quote hasn\'t been sent yet.');
+    return dashPeekRows([
+      ['Answer', a.status === 'accepted' ? 'Accepted' : 'Declined'],
+      ['By', a.by], ['Date', formatAnswerDate(a.date)],
+      ['How', a.status === 'accepted' ? (QUOTE_ANSWER_METHODS[a.method] || '') : ''],
+      ['Note', a.note],
+    ]) + (isSignatureImage(a.signature) ? `<img class="dash-peek-sig" src="${a.signature}" alt="Client signature">` : '')
+      + (a.stale ? '<p class="dash-peek-warn">The quote changed after they answered.</p>' : '');
+  }
+  const t = q.treatment;
+  if (!t) return none('No treatment recorded yet.');
+  return dashPeekRows([
+    ['Date', formatAnswerDate(t.date)],
+    ['Technician', t.technician],
+    ['Pest', t.pest],
+    ['Work', Object.keys(t.methods || {}).map(k => (TREATMENT_METHODS[k] || {}).label || k).join(', ')],
+    ['Products', (t.products || []).map(p => p.name).filter(Boolean).join(', ')],
+    ['Areas', t.areas],
+    ['Certificate', q.certificateSentAt ? `Sent ${dashDate(q.certificateSentAt)}` : 'Not sent yet'],
+  ]);
 }
 
 function closeDashboardDetail() {

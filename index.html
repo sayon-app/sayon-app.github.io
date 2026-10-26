@@ -358,48 +358,35 @@
   </div>
 </div>
 
-<!-- BOTTOM TABS: the app's main places, along the bottom where a thumb
-     reaches, as most phone apps do. Shown with the report and the quote.
+<!-- BOTTOM TABS: the app's main places in the order a job runs (the
+     dashboard, the report, the mic for it, the quote, then the menu), along
+     the bottom where a thumb reaches. Shown with the report and the quote.
      The tab for the screen on show is lit by css (see .tabbar). -->
 <nav class="tabbar" id="tabBar" aria-label="Main">
   <div class="tabbar-inner">
-    <button class="tab" data-tab="jobs" onclick="tabGo('jobs')">
-      <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span class="tabbar-label">Jobs</span>
+    <button class="tab" data-tab="dashboard" onclick="tabGo('dashboard')">
+      <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span class="tabbar-label">Dashboard</span>
     </button>
     <button class="tab" data-tab="report" onclick="tabGo('report')">
       <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6a1 1 0 0 1 1 1v2H8V4a1 1 0 0 1 1-1z"/><path d="M16 5h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/><path d="M8 12h8"/><path d="M8 16h5"/></svg><span class="tabbar-label">Report</span>
     </button>
+    <div class="mic-dock" id="micDock">
+      <button class="mic-fab" id="micFab" onclick="tabMic()" aria-label="Speak">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:relative; z-index:1;">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </button>
+      <span class="mic-badge" id="pendingNotesBadge" style="display:none" title="Notes waiting to be filled in"></span>
+    </div>
     <button class="tab" data-tab="quote" onclick="tabGo('quote')">
       <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/></svg><span class="tabbar-label">Quote</span>
     </button>
     <button class="tab" data-tab="menu" onclick="tabGo('menu')">
       <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg><span class="tabbar-label">Menu</span>
     </button>
-    <div class="profile-menu-wrap tab-account" id="profileMenuWrap">
-      <button class="tab" id="profileBtn" data-tab="account" onclick="toggleProfileMenu()" aria-label="Account">
-        <span class="tab-avatar" id="profileInitials">?</span><span class="tabbar-label">Account</span>
-      </button>
-      <div class="profile-dropdown" id="profileDropdown">
-        <div class="profile-dropdown-name" id="profileName">—</div>
-        <div class="profile-dropdown-email" id="profileEmail">—</div>
-        <div class="profile-dropdown-business" id="profileBusinessRow" style="display:none">
-          <span id="profileBusinessName"></span>
-        </div>
-        <div class="profile-dropdown-divider"></div>
-        <button class="profile-dropdown-item" id="profileYourBusiness" onclick="openBusinessFromProfile()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
-          Your business
-        </button>
-        <button class="profile-dropdown-item" onclick="openBillingFromProfile()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-          Billing
-        </button>
-        <button class="profile-dropdown-item profile-signout" onclick="signOutFromProfile()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          Sign Out
-        </button>
-      </div>
-    </div>
   </div>
 </nav>
 
@@ -689,6 +676,23 @@
 
       <div class="drawer-scroll">
 
+      <!-- Account: who's signed in, their business, billing and sign out -->
+      <div class="menu-account" id="profileMenuWrap">
+        <div class="menu-account-who">
+          <span class="menu-account-avatar" id="profileInitials">?</span>
+          <div class="menu-account-text">
+            <div class="profile-dropdown-name" id="profileName">—</div>
+            <div class="profile-dropdown-email" id="profileEmail">—</div>
+            <div class="profile-dropdown-business" id="profileBusinessRow" style="display:none"><span id="profileBusinessName"></span></div>
+          </div>
+        </div>
+        <div class="menu-account-actions">
+          <button class="profile-dropdown-item" id="profileYourBusiness" onclick="openBusinessFromProfile()">Your business</button>
+          <button class="profile-dropdown-item" onclick="openBillingFromProfile()">Billing</button>
+          <button class="profile-dropdown-item profile-signout" onclick="signOutFromProfile()">Sign out</button>
+        </div>
+      </div>
+
       <div class="drawer-group-label">This job</div>
 
       <!-- Job details -->
@@ -809,10 +813,9 @@
           </div>
       </div>
 
-      <div class="drawer-group-label">Jobs</div>
-
-      <!-- Saved Reports -->
-      <div class="saved-panel" id="savedPanel">
+      <!-- Saved reports: the dashboard lists the jobs now, so it has no row
+           in the menu list -->
+      <div class="saved-panel menu-row-hidden" id="savedPanel">
         <button class="panel-label panel-label-toggle" onclick="openMenuPage('savedPanel')" id="savedPanelToggle">
           <span class="panel-icon"><svg class="icon " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></svg></span>
           <span class="panel-title">Saved reports</span>
@@ -825,13 +828,6 @@
         </div>
       </div>
 
-      <div class="job-panel menu-link">
-        <button class="panel-label panel-label-toggle" onclick="openDashboardFromMenu()">
-          <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg></span>
-          <span class="panel-title">Dashboard</span>
-          <svg class="icon panel-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-        </button>
-      </div>
 
 
       <!-- Billing: opened from the account (initials) button, so it has no
@@ -1588,20 +1584,6 @@
       </div><!-- /reportBody -->
     </div><!-- /mainPanel -->
 
-  <!-- FLOATING MIC BUTTON, bottom-center, fixed. Sibling of main-panel
-       not nested inside it since overflow:hidden on main-panel clips
-       fixed descendants in this app. -->
-  <div class="mic-dock" id="micDock">
-    <button class="mic-fab" id="micFab" onclick="toggleVoicePopover()">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:relative; z-index:1;">
-        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-        <line x1="12" y1="19" x2="12" y2="23"/>
-        <line x1="8" y1="23" x2="16" y2="23"/>
-      </svg>
-    </button>
-    <span class="mic-badge" id="pendingNotesBadge" style="display:none" title="Notes waiting to be filled in"></span>
-  </div>
   <!-- POCKET LOCK: covers the page while recording, under the voice popover -->
   <div class="pocket-shield" id="pocketShield" hidden><span>Screen locked while recording. Hold Stop to unlock.</span></div>
   <!-- VOICE POPOVER -->

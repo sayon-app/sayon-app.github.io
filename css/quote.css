@@ -252,7 +252,6 @@ body:not(.dark-screen) .quote-card-head {
 }
 .qi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .qi-desc { font-size: 14.5px; font-weight: 600; color: var(--text); line-height: 1.3; }
-.qi-sub { font-size: 12.5px; color: var(--text3); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qi-end { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
 .qi-price { font: 700 14.5px 'Inter', sans-serif; color: var(--text); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .qi-tag { font-size: 10.5px; font-weight: 700; color: #8a5a00; background: #fff4dc; border-radius: 5px; padding: 2px 6px; white-space: nowrap; }
@@ -260,7 +259,6 @@ body:not(.dark-screen) .quote-card-head {
 .qi.open .qi-chev { transform: rotate(180deg); }
 .qi-edit { display: none; flex-direction: column; gap: 10px; padding: 2px 2px 14px; }
 .qi.open .qi-edit { display: flex; }
-.qi.open .qi-sub { white-space: normal; }
 .qi-edit .quote-item-desc, .qi-edit .quote-item-detail { resize: none; overflow: hidden; line-height: 1.4; min-height: 44px; font-family: inherit; }
 .qi-edit .quote-item-desc { font-weight: 600; }
 .quote-item-nums { display: grid; grid-template-columns: 0.8fr 1fr 1.4fr; gap: 8px; }
@@ -374,3 +372,19 @@ body:not(.dark-screen) .quote-card-title { color: var(--text); }
 .qp-links .quote-text-btn, .qp-body > .quote-text-btn { padding: 6px 0; min-height: 36px; align-self: flex-start; }
 .qp-body .quote-answer-btns { margin-top: 2px; }
 .qp-body .quote-step-btn { margin-top: 2px; }
+
+/* What the quote fixes, under the address. Tapping it opens it to change. */
+.quote-hero-problem {
+  display: flex; flex-direction: column; gap: 4px; width: 100%;
+  margin-top: 14px; padding: 11px 14px; text-align: left; cursor: pointer;
+  border: 1px solid rgba(94,234,212,0.22); border-left: 3px solid #2DD4BF; border-radius: 12px;
+  background: linear-gradient(135deg, rgba(45,212,191,0.14), rgba(45,212,191,0.03));
+}
+.quote-hero-problem-label { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #5EEAD4; }
+.quote-hero-problem-text { font-size: 14.5px; line-height: 1.45; color: var(--on-ink); }
+
+/* The folded work row carries the total. */
+.quote-work-total { flex-shrink: 0; font: 700 17px 'Space Grotesk', sans-serif; color: var(--accent2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.quote-work-fold[open] > summary { border-bottom: 1px solid var(--border); margin-bottom: 2px; }
+.quote-work-fold[open] .quote-work-total { visibility: hidden; }
+.qi-row { min-height: 52px; }

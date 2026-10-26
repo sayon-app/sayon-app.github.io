@@ -1066,7 +1066,7 @@ async function handleSpotPhotoFiles(input) {
 }
 
 function removeSpotPhoto(id, section) {
-  removeSectionPhoto(id, section);
+  removeSectionPhoto(id, section, () => refreshSpotPhotos(section));
   refreshSpotPhotos(section);
 }
 
@@ -1211,7 +1211,6 @@ const SPECIES_DB = {
       'TWO soldier castes — key distinguishing feature:',
       'Major soldiers: 5–7.5mm, bulbous head, large mandibles',
       'Minor soldiers: 3–5.5mm, narrower head, slender mandibles — appear first in developing colony',
-      'Presence of major soldiers = mature, well-established colony with high damage potential',
       'Characteristic "plastering" earthen workings — fragile plaster-like deposits covering their galleries',
       'White cigar-shaped body, pale to dark brown head on both castes'
     ],
@@ -1265,7 +1264,7 @@ const SPECIES_DB = {
     behaviour: [
       'VERY SKITTISH — colony will relocate if disturbed',
       'Multiple nest sites make full elimination difficult',
-      'Major soldiers indicate established, high-risk colony'
+      'Major soldiers indicate an established colony'
     ],
     conduciveConditions: ['Tree stumps', 'Subfloor moisture', 'Timber-soil contact'],
     treatmentOptions: [
@@ -1320,7 +1319,7 @@ const SPECIES_DB = {
       'Look for arboreal nest in nearby trees — check ironbark, stringybark, tallowwood within 100m',
       'Note whether nest has soil contact via trunk galleries',
       'Document the dark mud covering on attacked timber — photograph it',
-      'Note if attack is on decayed vs sound timber — indicates severity of risk to structure',
+      'Note whether the attack is on decayed or sound timber',
       'Check whether galleries run from tree trunk down to ground and into structure'
     ]
   },
@@ -1391,21 +1390,21 @@ const SPECIES_DB = {
       'Can ringbark living trees by boring up into the trunk',
       'Agricultural pest of major significance — vegetable farming abandoned in parts of northern Australia',
       'Given irrigation and favourable conditions, colonies can reach millions rapidly',
-      'Can destroy a building or its contents faster than any other termite species'
+      'Attacks building timbers and contents as well as living trees'
     ],
     conduciveConditions: ['Irrigation', 'Stored timber', 'Any organic material', 'Warm tropical conditions'],
     treatmentOptions: [
-      { product: 'Specialist Treatment Required', type: 'Specialist', notes: 'Standard bait systems are ineffective against M. darwiniensis. Consult specialist — chemical treatment with registered termiticide, often requiring extensive soil treatment. Colony can reach millions — urgent action required.', toxicity: 'Varies' }
+      { product: 'Specialist Treatment Required', type: 'Specialist', notes: 'Consult a specialist experienced with M. darwiniensis. Check each product label: not every bait or termiticide is registered for this species.', toxicity: 'Varies' }
     ],
     specialFlags: [
-      { type: 'danger', icon: '🚨', text: 'SPECIALIST TREATMENT REQUIRED — Mastotermes darwiniensis is the most destructive termite species in Australia. Standard bait systems are NOT effective. Immediate specialist intervention required. Under favourable conditions, colonies can destroy a structure within months.' },
+      { type: 'danger', icon: '🚨', text: 'SPECIALIST TREATMENT — Treatment for Mastotermes darwiniensis should be planned by a specialist experienced with this species. Check each product label, as not every bait or termiticide is registered for it. Refer any timber damage to a builder or engineer.' },
       { type: 'info', icon: 'ℹ', text: 'LOCATION CHECK — M. darwiniensis is confined to northern Australia (north of Tropic of Capricorn). If found in southern states, confirm identification — possible misidentification or transported specimen.' }
     ],
     fieldNotePrompts: [
       'Confirm property location is north of Tropic of Capricorn — species distribution limited',
       'Document all materials affected — M. darwiniensis attacks a wide range of organic materials, not just timber',
       'Assess colony size — colonies under favourable conditions can be enormous',
-      'Urgent referral to specialist recommended — standard treatments not effective'
+      'Refer treatment to a specialist experienced with M. darwiniensis'
     ]
   },
 
@@ -1593,15 +1592,14 @@ const SPECIES_ALIASES = {
 function lookupSpecies(raw) {
   if (!raw) return null;
   const key = raw.trim().toLowerCase().replace(/\.$/, '');
-  const canonical = SPECIES_ALIASES[key] || SPECIES_ALIASES[key.split(' ').slice(0,2).join(' ')];
+  const words = key.split(/\s+/);
+  const canonical = SPECIES_ALIASES[key] || SPECIES_ALIASES[words.slice(0,2).join(' ')];
   if (canonical && SPECIES_DB[canonical]) return { name: canonical, data: SPECIES_DB[canonical] };
-  // Try partial match on genus
-  for (const [alias, name] of Object.entries(SPECIES_ALIASES)) {
-    if (key.startsWith(alias.split(' ')[0]) && SPECIES_DB[name]) {
-      return { name, data: SPECIES_DB[name] };
-    }
-  }
-  return null;
+  // A species the guide doesn't cover gets its genus card when the guide has
+  // one, and otherwise nothing. Never another species' card: Cryptotermes
+  // primus is native, and must not get C. brevis's notifiable-pest warning.
+  const genus = Object.keys(SPECIES_DB).find(n => !n.includes(' ') && n.toLowerCase() === words[0]);
+  return genus ? { name: genus, data: SPECIES_DB[genus] } : null;
 }
 
 const SECTIONS = {
@@ -1668,7 +1666,7 @@ AREAS INSPECTED (areaStatus): one key per area the note actually covers; leave o
 - An area named only in a recommendation, a conducive condition or a finding ("pull the soil back from the garage", "soil against the fence") gets no status unless the inspector says they looked at it.
 - "Everything was accessible" or "full access everywhere" sets every area mentioned in the note to INSPECTED; it never adds areas the note does not mention.
 - A later note re-covering an area ("got into the back of the subfloor now, all clear") simply states that area's new status.
-- areaResult: what was found in each area the note covers, same keys. "FOUND" when the note records termites or termite evidence (including suspected), borers, wood decay or chemical delignification in that area: workings in a fence post is fences FOUND, a skirting board in a bedroom is interior FOUND, a bearer under the house is subfloor FOUND, a tree in the yard is site FOUND, a sleeper is landscapingtimbers FOUND. "CLEAR" only when the inspector says that area had nothing ("fences all good, no activity", "roof void clear", "no termites or borers in the subfloor"), or says the whole property was clear, which makes every area the note covers CLEAR. A clear remark about one room or part ("no activity in the bathroom") is not the whole area: leave that area out unless they say the rest was clear too. Walking an area without saying what was found gives no areaResult. Moisture, leaks and other conducive conditions are not timber pest evidence.
+- areaResult: what was found in each area the note covers, same keys. "FOUND" when the note records termites or termite evidence (live termites, workings, mud, galleries or damage: what makes a findings entry), borers, wood decay or chemical delignification in that area: workings in a fence post is fences FOUND, a skirting board in a bedroom is interior FOUND, a bearer under the house is subfloor FOUND, a tree in the yard is site FOUND, a sleeper is landscapingtimbers FOUND. "CLEAR" only when the inspector says that area had nothing ("fences all good, no activity", "roof void clear", "no termites or borers in the subfloor"), or says the whole property was clear, which makes every area the note covers CLEAR. A clear remark about one room or part ("no activity in the bathroom") is not the whole area: leave that area out unless they say the rest was clear too. Walking an area without saying what was found gives no areaResult. Moisture, leaks and other conducive conditions are not timber pest evidence. A suspicion with nothing seen (see "Suspected only" below) is not FOUND either.
 
 HINDERED AND RESTRICTED ACCESS: five fields, each with one meaning. The report sorts every access limit into two kinds. HINDERED access is a temporary obstruction at the time of the inspection: furniture, stored goods, floor coverings, insulation, vegetation, a manhole blocked by stored items, or low clearance in the subfloor or roof void. RESTRICTED access is a permanent restriction or locked entry: a locked room, a subfloor with no access hatch, a manhole sealed or screwed shut, a roof with no void, a part beyond safe height, or a yard the inspector could not safely enter because of a dog or other animal.
 - obstructions: which areas were not fully inspected and roughly where, e.g. "Subfloor: back section behind stored items. Roof void: outer edges and corners". Only PARTIAL or NOT areas appear here. Null when nothing was in the way.
@@ -1824,7 +1822,8 @@ let updateReloadPending = false;
 
 function appIsBusy() {
   const el = document.activeElement;
-  return isRecording || !!(el && el.matches('input, textarea, select, [contenteditable="true"]'));
+  return isRecording || document.body.classList.contains('ai-busy')
+    || !!(el && el.matches('input, textarea, select, [contenteditable="true"]'));
 }
 
 function reloadForUpdate() {
@@ -2995,6 +2994,7 @@ function onTranscriptEdited(el) {
   el.classList.toggle('active', hasText);
   const extractBtn = document.getElementById('extractBtn');
   if (extractBtn) extractBtn.disabled = !hasText;
+  saveDraft();
 }
 
 function usePrompt(el) {
@@ -3407,12 +3407,55 @@ function extractionProblem(err) {
 // note as it stood when it started; words spoken during the AI call stay in
 // the box for the next fill, and the voice popover and the after-Extract
 // sheet stay out of the way. Returns true when the report was filled.
-async function processTranscript({ whileRecording = false } = {}) {
+// A note sent from one job whose answer came back after another job was
+// opened. It goes back to its own job as a waiting note, which fills in
+// when that job is next opened. A job never saved stays in the box.
+function noteForEarlierJob(target, note) {
+  const id = savedIdFor.get(target);
+  const reports = getSavedReports();
+  const entry = id && reports.find(r => r.id === id);
+  setAI('ready', 'AI ready');
+  if (!isRecording) document.getElementById('extractBtn').disabled = false;
+  if (!entry) {
+    showToast('You changed job while that note was filling in, so it is still in the box', 'info');
+    return;
+  }
+  const notes = Array.isArray(entry.reportData.pendingNotes) ? entry.reportData.pendingNotes : [];
+  entry.reportData.pendingNotes = [...notes, { id: 'note_' + Date.now().toString(36), text: note.trim(), at: Date.now() }];
+  entry.savedAt = Date.now();
+  if (!setSavedReports(reports)) return;
+  supabaseSave(entry, true);
+  currentTranscript = currentTranscript.startsWith(note) ? currentTranscript.slice(note.length).trimStart() : '';
+  saveDraft();
+  const box = document.getElementById('transcriptBox');
+  box.textContent = currentTranscript || 'Tap the mic and start speaking, or tap here to type instead.';
+  box.classList.toggle('active', !!currentTranscript);
+  showToast(`That note will fill in ${entry.address || 'the last job'} next time you open it`, 'info');
+}
+
+let fillRunning = false, fillAgain = false;
+async function processTranscript(opts) {
+  // One fill at a time, so the same words are never sent twice. A fill
+  // asked for meanwhile runs after, on whatever words are left.
+  if (fillRunning) { fillAgain = true; return false; }
+  fillRunning = true;
+  try { return await runFill(opts); }
+  finally {
+    fillRunning = false;
+    if (fillAgain) {
+      fillAgain = false;
+      if (!isRecording && currentTranscript.trim()) setTimeout(() => processTranscript(), 0);
+    }
+  }
+}
+
+async function runFill({ whileRecording = false } = {}) {
   const note = currentTranscript;
   if (!note.trim()) return false;
   setAI('thinking', 'Filling in the report from your note...');
   document.getElementById('extractBtn').disabled = true;
   const before = extractSnapshot();
+  const fillTarget = reportData;
   let extracted = false;
 
   try {
@@ -3430,7 +3473,9 @@ async function processTranscript({ whileRecording = false } = {}) {
       try { await processPendingNotes(true); } finally { extractSummaryOwned = false; }
       extracted = !getPendingNotes().length;
     } else {
-      await populateFields(await requestExtraction(note), note);
+      const data = await requestExtraction(note);
+      if (reportData !== fillTarget) { noteForEarlierJob(fillTarget, note); return false; }
+      await populateFields(data, note);
       extracted = true;
       pendingNotesProblem = null;
       setAI('ready', 'Data extracted');
@@ -3449,6 +3494,7 @@ async function processTranscript({ whileRecording = false } = {}) {
     // AI can read it. A problem of the note's own (an unreadable answer) is
     // written on the note, so the queue skips it instead of stopping.
     pendingNotesProblem = (err.noSignal || isNoteSpecificProblem(err)) ? null : extractionProblem(err);
+    if (reportData !== fillTarget) { noteForEarlierJob(fillTarget, note); return false; }
     if (!queuePendingNote(note)) {
       setAI('ready', 'AI ready');
       if (!isRecording) document.getElementById('extractBtn').disabled = false;
@@ -3468,8 +3514,11 @@ async function processTranscript({ whileRecording = false } = {}) {
     }
   }
 
-  if (window.innerWidth <= 768 && !whileRecording) toggleVoicePopover();
+  // On a phone the popover closes to show the filled report, unless the
+  // inspector is already dictating again or has closed it themselves.
+  if (window.innerWidth <= 768 && !whileRecording && !isRecording && document.getElementById('voicePopover').classList.contains('open')) toggleVoicePopover();
   currentTranscript = currentTranscript.startsWith(note) ? currentTranscript.slice(note.length).trimStart() : '';
+  saveDraft();
   const box = document.getElementById('transcriptBox');
   box.textContent = currentTranscript || 'Tap the mic and start speaking, or tap here to type instead.';
   box.classList.toggle('active', !!currentTranscript);
@@ -4039,6 +4088,9 @@ function noteTextKey(transcript) {
 // Resolves once the staggered field writes are done, so a caller can save.
 function populateFields(data, transcript) {
   if (!data || typeof data !== 'object') return Promise.resolve();
+  // Each field lands a moment after the last. If another job is opened in
+  // the meantime, the rest stop rather than land in that job.
+  const target = reportData;
   const noteKey = transcript ? noteTextKey(transcript) : null;
   // Handle findings array from AI extraction
   if (data.findings && Array.isArray(data.findings) && data.findings.length > 0) {
@@ -4185,6 +4237,7 @@ function populateFields(data, transcript) {
   entries.forEach(([key, rawVal], i) => {
     const el = document.getElementById('f-' + key);
     setTimeout(() => {
+      if (reportData !== target) return;
       let val = typeof rawVal === 'string' ? rawVal.trim() : String(rawVal);
       if (key === 'hinderedAreas' && !val) {
         // "Nothing was in the way": No, unless an area says otherwise.
@@ -4222,6 +4275,7 @@ function populateFields(data, transcript) {
 
   return new Promise(resolve => {
     setTimeout(() => {
+      if (reportData !== target) { resolve(); return; }
       autoReveal(data);
       saveDraft();
       ensureTreatmentForLiveTermites();
@@ -5597,11 +5651,25 @@ function commitEdit(el, key, value) {
   el.innerHTML = ''; // clear input + actions bar before re-rendering
 
   if (!value || !value.trim()) {
-    // Nothing to save — restore previous value or show placeholder
+    // An emptied field is cleared, with Undo in case it was a slip.
     const prev = reportData[key];
-    if (prev) renderField(el, key, prev);
-    else { el.classList.remove('filled'); el.textContent = '—'; }
+    el.classList.remove('filled'); el.textContent = '—';
     activeEditEl = null;
+    if (isBlankValue(prev)) return;
+    reportData[key] = null;
+    updateProgress();
+    checkAsbestosFlag();
+    checkSystemVerify();
+    saveDraft();
+    showToast('Cleared', 'info', { label: 'Undo', run: () => {
+      if (!isBlankValue(reportData[key])) return;
+      reportData[key] = prev;
+      renderField(el, key, prev);
+      updateProgress();
+      checkAsbestosFlag();
+      checkSystemVerify();
+      saveDraft();
+    } });
     return;
   }
 
@@ -5762,7 +5830,10 @@ function createSignaturePad(canvas, placeholder, onSigned) {
   ctx.lineJoin = 'round';
   ctx.strokeStyle = SIGNATURE_INK;
 
-  let drawing = false, lastX = 0, lastY = 0;
+  // A pad counts as signed only once a real stroke is drawn, so a stray
+  // tap never saves a blank signature.
+  const MIN_INK = 24; // canvas px of line across all strokes
+  let drawing = false, lastX = 0, lastY = 0, ink = 0, strokeInk = 0;
   const pad = { canvas, ctx, empty: true };
 
   function posFromEvent(e) {
@@ -5774,20 +5845,24 @@ function createSignaturePad(canvas, placeholder, onSigned) {
   }
   function start(e) {
     e.preventDefault();
-    drawing = true; pad.empty = false;
+    drawing = true; strokeInk = 0;
     const p = posFromEvent(e); lastX = p.x; lastY = p.y;
-    if (placeholder) placeholder.style.display = 'none';
   }
   function move(e) {
     if (!drawing) return;
     e.preventDefault();
     const p = posFromEvent(e);
     ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke();
+    const d = Math.hypot(p.x - lastX, p.y - lastY);
+    ink += d; strokeInk += d;
+    if (placeholder && d) placeholder.style.display = 'none';
     lastX = p.x; lastY = p.y;
   }
   function end() {
     if (!drawing) return;
     drawing = false;
+    if (ink < MIN_INK || !strokeInk) return;
+    pad.empty = false;
     if (onSigned) onSigned();
   }
   canvas.addEventListener('mousedown', start);
@@ -5797,10 +5872,11 @@ function createSignaturePad(canvas, placeholder, onSigned) {
   canvas.addEventListener('touchstart', start, { passive: false });
   canvas.addEventListener('touchmove', move, { passive: false });
   canvas.addEventListener('touchend', end);
+  canvas.addEventListener('touchcancel', end);
 
   pad.clear = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    pad.empty = true;
+    pad.empty = true; ink = 0;
     if (placeholder) placeholder.style.display = 'flex';
   };
   pad.show = (dataUrl) => {
@@ -5809,7 +5885,7 @@ function createSignaturePad(canvas, placeholder, onSigned) {
     const img = new Image();
     img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     img.src = dataUrl;
-    pad.empty = false;
+    pad.empty = false; ink = MIN_INK;
     if (placeholder) placeholder.style.display = 'none';
   };
   return pad;
@@ -6243,19 +6319,34 @@ function photoDb() {
     photoDbPromise = new Promise((resolve, reject) => {
       const req = indexedDB.open('korvus-photos', 1);
       req.onupgradeneeded = () => req.result.createObjectStore('photos');
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        const db = req.result;
+        // iPhone can close the store while the app sleeps; the next use reopens it.
+        db.onclose = () => { photoDbPromise = null; };
+        db.onversionchange = () => { db.close(); photoDbPromise = null; };
+        resolve(db);
+      };
       req.onerror = () => { photoDbPromise = null; reject(req.error); };
     });
   }
   return photoDbPromise;
 }
 
-function photoStoreRequest(mode, fn) {
+function photoStoreRequest(mode, fn, retried) {
   return photoDb().then(db => new Promise((resolve, reject) => {
-    const tx = db.transaction('photos', mode);
+    let tx;
+    try { tx = db.transaction('photos', mode); }
+    catch (e) {
+      // A connection the phone closed throws here: reopen and try once more.
+      photoDbPromise = null;
+      if (!retried) { photoStoreRequest(mode, fn, true).then(resolve, reject); return; }
+      reject(e); return;
+    }
     const req = fn(tx.objectStore('photos'));
     tx.oncomplete = () => resolve(req.result);
     tx.onerror = () => reject(tx.error);
+    // A full phone aborts the write instead of failing it.
+    tx.onabort = () => reject(tx.error || new Error('Photo storage write was stopped'));
   }));
 }
 const putPhotoBlob    = (id, blob) => photoStoreRequest('readwrite', st => st.put(blob, id));
@@ -6554,8 +6645,10 @@ async function handleSectionPhotoFiles(fileList, section) {
   if (!files.length) return;
 
   const limit = sectionPhotoLimit(section);
-  if (limit === 1 && getSectionPhotos(section).length) reportData.photosBySection[section] = [];
-  const existing = getSectionPhotos(section);
+  // A one-photo box (the cover) swaps its photo only once the new one is
+  // stored, so a file that fails leaves the old photo in place.
+  const replacing = limit === 1 && getSectionPhotos(section).length > 0;
+  const existing = replacing ? [] : getSectionPhotos(section);
   const remaining = limit - existing.length;
   if (remaining <= 0) { showToast(`Photo limit reached for this section (${limit})`, 'error'); return; }
   const toProcess = files.slice(0, remaining);
@@ -6569,6 +6662,7 @@ async function handleSectionPhotoFiles(fileList, section) {
       existing.push({ id, width, height, caption: '' });
     } catch(e) { showToast('Could not process photo', 'error'); }
   }
+  if (replacing && existing.length) reportData.photosBySection[section] = existing;
   renderSectionPhotoGrid(section);
   updateProgress();
   saveDraft();
@@ -6600,12 +6694,29 @@ function pickPhotoSource(kind) {
   input.click();
 }
 
-function removeSectionPhoto(id, section) {
-  if (!reportData.photosBySection?.[section]) return;
-  reportData.photosBySection[section] = reportData.photosBySection[section].filter(p => p.id !== id);
+// Removing a photo offers Undo, which puts it back where it was.
+function removeSectionPhoto(id, section, refresh) {
+  const list = reportData.photosBySection?.[section];
+  if (!list) return;
+  const index = list.findIndex(p => p.id === id);
+  if (index < 0) return;
+  const photo = list[index];
+  const target = reportData;
+  reportData.photosBySection[section] = list.filter(p => p.id !== id);
   renderSectionPhotoGrid(section);
   updateProgress();
   saveDraft();
+  showToast('Photo removed', 'info', { label: 'Undo', run: () => {
+    if (reportData !== target) return;
+    const now = (reportData.photosBySection = reportData.photosBySection || {})[section] || [];
+    if (now.some(p => p.id === id)) return;
+    now.splice(Math.min(index, now.length), 0, photo);
+    reportData.photosBySection[section] = now;
+    renderSectionPhotoGrid(section);
+    if (refresh) refresh();
+    updateProgress();
+    saveDraft();
+  } });
 }
 
 function updateSectionPhotoCaption(id, section, value) {
@@ -6689,11 +6800,25 @@ async function handlePhotoFiles(fileList) {
 
 function removePhoto(id) {
   if (!reportData.photos) return;
+  const index = reportData.photos.findIndex(p => p.id === id);
+  if (index < 0) return;
+  const photo = reportData.photos[index];
+  const target = reportData;
   reportData.photos = reportData.photos.filter(p => p.id !== id);
   if (reportData.photos.length === 0) delete reportData.photos;
   renderPhotoGrid();
   updateProgress();
   saveDraft();
+  showToast('Photo removed', 'info', { label: 'Undo', run: () => {
+    if (reportData !== target) return;
+    const now = reportData.photos || [];
+    if (now.some(p => p.id === id)) return;
+    now.splice(Math.min(index, now.length), 0, photo);
+    reportData.photos = now;
+    renderPhotoGrid();
+    updateProgress();
+    saveDraft();
+  } });
 }
 
 function updatePhotoCaption(id, value) {
@@ -7813,6 +7938,7 @@ async function forgotPassword() {
 // backup can't finish (no signal), the inspector chooses whether to wait.
 async function signOut() {
   if (authSession) {
+    saveOpenReportNow();
     const reports = getSavedReports();
     let failed = 0;
     if (reports.length) showToast('Backing up your reports before signing out…', 'info');
@@ -8326,17 +8452,44 @@ function getDeviceId() {
 
 // ── SUPABASE REPORT SYNC (now auth-aware) ────────────────────────────────
 // Returns true once the report is in the account. quiet: no error toast.
-async function supabaseSave(entry, quiet) {
+// Saves of one report go to the account one at a time, in order. Otherwise
+// an autosave could check the account copy while this phone's previous save
+// was still on its way, and take this phone's own save for another device's.
+const reportSaveChains = new Map();
+function supabaseSave(entry, quiet) {
+  const prev = reportSaveChains.get(entry.id) || Promise.resolve();
+  const run = prev.catch(() => {}).then(() => supabaseSaveNow(entry, quiet));
+  reportSaveChains.set(entry.id, run);
+  run.finally(() => { if (reportSaveChains.get(entry.id) === run) reportSaveChains.delete(entry.id); });
+  return run;
+}
+
+async function supabaseSaveNow(entry, quiet) {
   if (!authSession) return false; // only sync when authenticated
+  // Only the version stored on this phone goes up. When it has changed since
+  // (a newer save, which goes up next, or the other device's copy taken in),
+  // or the report was deleted, this older one is skipped.
+  const stored = getSavedReports().find(r => r.id === entry.id);
+  if (!stored || stored.savedAt !== entry.savedAt) return true;
   // Photos go to Storage, not into the row. Record their cloud paths on
   // the saved copy (and the open draft, which shares the photo objects).
   if (await uploadPendingPhotos(entry.reportData)) {
     const reports = getSavedReports();
     const i = reports.findIndex(r => r.id === entry.id);
-    if (i >= 0) { reports[i] = entry; setSavedReports(reports); }
+    if (i >= 0 && reports[i].savedAt === entry.savedAt) { reports[i] = entry; setSavedReports(reports); }
     if (currentReportId === entry.id) saveDraft();
   }
+  // Saved again on this phone while the photos went up: that save goes next.
+  if ((getSavedReports().find(r => r.id === entry.id) || {}).savedAt !== entry.savedAt) return true;
   try {
+    // Another device may have saved this report since this phone last
+    // synced it. Then the account copy wins and this phone's version is
+    // kept beside it, so neither is lost.
+    const cloudAt = await cloudSavedAtOf(entry.id);
+    const base = Math.max(cloudBaseOf(entry), cloudBaseOf(stored));
+    if (cloudAt && cloudAt > base && cloudAt !== entry.savedAt) {
+      return keepBothCopies(entry);
+    }
     const row = {
       device_id:   getDeviceId(),
       user_id:     authUser?.id || null,
@@ -8382,6 +8535,7 @@ async function supabaseSave(entry, quiet) {
       updateSyncStatus('cloud_error');
       return false;
     }
+    markCloudSaved(entry.id, entry.savedAt);
     return true;
   } catch(e) {
     console.warn('Supabase sync error:', e.message);
@@ -8418,13 +8572,14 @@ async function migrateLocalReportsToCloud() {
 }
 
 async function supabaseDelete(reportId) {
-  if (!authSession) return;
+  if (!authSession) return false;
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/reports?report_id=eq.${encodeURIComponent(reportId)}`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/reports?report_id=eq.${encodeURIComponent(reportId)}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
-  } catch(e) { console.warn('Supabase delete error:', e.message); }
+    return res.ok;
+  } catch(e) { console.warn('Supabase delete error:', e.message); return false; }
 }
 
 async function supabaseLoadAll() {
@@ -8442,19 +8597,107 @@ async function supabaseLoadAll() {
   } catch(e) { console.warn('Supabase load error:', e.message); return null; }
 }
 
+// ── SYNC BETWEEN DEVICES ──────────────────────────────────────────────────
+// Each saved report remembers the account copy it was built on
+// (cloudSavedAt). Reports saved before this existed fall back to their own
+// savedAt, the last time this phone saved them.
+function cloudBaseOf(entry) {
+  return entry.cloudSavedAt != null ? entry.cloudSavedAt : (entry.savedAt || 0);
+}
+function hasUnsyncedChanges(entry) {
+  return entry.cloudSavedAt != null && (entry.savedAt || 0) > entry.cloudSavedAt;
+}
+// The account now holds this phone's save from savedAt. A later save on
+// this phone was built on it, so it becomes that one's base too.
+function markCloudSaved(id, savedAt) {
+  const reports = getSavedReports();
+  const r = reports.find(x => x.id === id);
+  if (!r || (r.cloudSavedAt != null && r.cloudSavedAt >= savedAt) || (r.savedAt || 0) < savedAt) return;
+  r.cloudSavedAt = savedAt;
+  setSavedReports(reports);
+}
+async function cloudSavedAtOf(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/reports?report_id=eq.${encodeURIComponent(id)}&select=saved_at`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error('saved_at check ' + res.status);
+  const rows = await res.json();
+  return rows.length ? Date.parse(rows[0].saved_at) : 0;
+}
+async function cloudReportOf(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/reports?report_id=eq.${encodeURIComponent(id)}&select=data`, { headers: getAuthHeaders() });
+  if (!res.ok) return null;
+  const rows = await res.json();
+  return rows.length ? rows[0].data : null;
+}
+function sameReportContent(a, b) {
+  return JSON.stringify([a.reportData, a.quote || null, a.client, a.address]) === JSON.stringify([b.reportData, b.quote || null, b.client, b.address]);
+}
+
+// The account's newer copy takes the report's place. This phone's version,
+// if it differs, is saved as a separate report marked "copy from this phone".
+async function keepBothCopies(local) {
+  const cloud = await cloudReportOf(local.id);
+  if (!cloud) return false;
+  const reports = getSavedReports();
+  const i = reports.findIndex(r => r.id === local.id);
+  const fresh = Object.assign({}, cloud, { cloudSavedAt: cloud.savedAt });
+  if (i >= 0) reports[i] = fresh; else reports.unshift(fresh);
+  let copy = null;
+  if (!sameReportContent(local, cloud)) {
+    copy = Object.assign({}, local, { id: 'report_' + Date.now(), cloudSavedAt: 0, conflictCopy: true, savedAt: Date.now() });
+    if (copy.quote) copy.quote = Object.assign({}, copy.quote, { reportKey: copy.id });
+    reports.unshift(copy);
+  }
+  if (!setSavedReports(reports)) return false;
+  // The quote list keeps its own copy of each quote, newest wins. This
+  // phone's quote goes with this phone's copy; the report takes the other
+  // device's quote.
+  if (typeof quotesStorageKey === 'function') {
+    try {
+      const quotes = JSON.parse(localStorage.getItem(quotesStorageKey()) || '{}');
+      if (copy && copy.quote) quotes[copy.id] = copy.quote;
+      if (cloud.quote) quotes[local.id] = cloud.quote; else delete quotes[local.id];
+      localStorage.setItem(quotesStorageKey(), JSON.stringify(quotes));
+    } catch (e) {}
+  }
+  if (currentReportId === local.id) loadReport(local.id, true);
+  renderSavedList();
+  showToast(copy
+    ? "This report was changed on another device. That version is open now; this phone's version is saved beside it as a copy."
+    : 'Updated this report with the newer copy from your other device', 'info');
+  return copy ? supabaseSave(copy, true) : true;
+}
+
 async function supabaseSyncOnOpen() {
   if (!authSession) return;
-  const cloudReports = await supabaseLoadAll();
-  if (!cloudReports || cloudReports.length === 0) return;
+  await flushPendingDeletes();
+  const deleting = new Set(getPendingDeletes().map(d => d.id));
+  const cloudReports = (await supabaseLoadAll() || []).filter(c => c && !deleting.has(c.id));
+  if (cloudReports.length === 0) return;
   const local = getSavedReports();
-  const localIds = new Set(local.map(r => r.id));
-  const newFromCloud = cloudReports.filter(r => !localIds.has(r.id));
-  if (newFromCloud.length > 0) {
-    const merged = [...newFromCloud, ...local].sort((a,b) => (b.savedAt||0) - (a.savedAt||0));
-    setSavedReports(merged);
-    renderSavedList();
-    showToast(`Restored ${newFromCloud.length} report${newFromCloud.length > 1 ? 's' : ''} from cloud`, 'info');
+  const byId = new Map(local.map(r => [r.id, r]));
+  const newFromCloud = [], newer = [], clashes = [];
+  cloudReports.forEach(c => {
+    if (!c || !c.id) return;
+    const mine = byId.get(c.id);
+    if (!mine) newFromCloud.push(Object.assign({}, c, { cloudSavedAt: c.savedAt }));
+    else if ((c.savedAt || 0) > cloudBaseOf(mine) && (c.savedAt || 0) !== mine.savedAt) {
+      (hasUnsyncedChanges(mine) ? clashes : newer).push(c);
+    }
+  });
+  newer.forEach(c => byId.set(c.id, Object.assign({}, c, { cloudSavedAt: c.savedAt })));
+  if (newFromCloud.length || newer.length) {
+    const merged = [...newFromCloud, ...byId.values()].sort((a,b) => (b.savedAt||0) - (a.savedAt||0));
+    if (setSavedReports(merged)) {
+      const open = newer.find(c => c.id === currentReportId);
+      if (open && reportSig() === lastReportSig) loadReport(open.id, true);
+      renderSavedList();
+      const parts = [];
+      if (newFromCloud.length) parts.push(`restored ${newFromCloud.length} report${newFromCloud.length > 1 ? 's' : ''}`);
+      if (newer.length) parts.push(`updated ${newer.length} with newer changes`);
+      showToast(`From your account: ${parts.join(', ')}`, 'info');
+    }
   }
+  for (const c of clashes) await keepBothCopies(byId.get(c.id));
 }
 
 // saveDraft() is called on nearly every keystroke and on every signature
@@ -8485,6 +8728,9 @@ function flushDraftSave() {
       reportData: { ...reportData },
       fieldNotes: { ...fieldNotes },
       currentReportId,
+      // Words dictated but not filled in yet, so a reload (an app update,
+      // or the phone closing the app) doesn't lose them.
+      transcript: currentTranscript || '',
       savedAt: Date.now(),
     };
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
@@ -8554,7 +8800,7 @@ window.addEventListener('offline', () => updateSyncStatus());
 document.addEventListener('visibilitychange', async () => {
   if (document.hidden) {
     flushDraftSave();
-    if (updateReloadPending) location.reload();
+    if (updateReloadPending && !document.body.classList.contains('ai-busy')) location.reload();
     return;
   }
   // An app left open for days never navigates, so ask for a new version here.
@@ -8571,6 +8817,14 @@ function loadDraft() {
     const raw = localStorage.getItem(DRAFT_KEY);
     if (!raw) return false;
     const draft = JSON.parse(raw);
+
+    if (draft.transcript && !currentTranscript) {
+      currentTranscript = draft.transcript;
+      const box = document.getElementById('transcriptBox');
+      if (box) { box.textContent = currentTranscript; box.classList.add('active'); }
+      const btn = document.getElementById('extractBtn');
+      if (btn) btn.disabled = false;
+    }
 
     // Don't restore empty drafts
     if (!draft.reportData || Object.keys(draft.reportData).length === 0) {
@@ -8729,6 +8983,17 @@ function isFieldFilled(key) {
 // opening a report or the save's own draft write doesn't save it again.
 const REPORT_AUTOSAVE_MS = 4000;
 let reportAutosaveTimer = null, lastReportSig = null;
+// Which saved report each open report object was saved as.
+const savedIdFor = new WeakMap();
+
+// The open report is otherwise saved a few seconds after the last change.
+// Opening another job, starting a new one or signing out saves it first,
+// so those last few seconds of work (and their photos) aren't dropped.
+function saveOpenReportNow() {
+  flushDraftSave();
+  if (reportAutosaveTimer) { clearTimeout(reportAutosaveTimer); reportAutosaveTimer = null; }
+  if (document.getElementById('jobAddress').value.trim() && reportSig() !== lastReportSig) saveCurrentReport(true);
+}
 function reportSig() {
   return JSON.stringify([JOB_SUMMARY_FIELDS.map(id => (document.getElementById(id) || {}).value || ''), reportData, fieldNotes]);
 }
@@ -8751,6 +9016,7 @@ function saveCurrentReport(quiet) {
 
   const reports = getSavedReports();
   const id = currentReportId || ('report_' + Date.now());
+  const prev = reports.find(r => r.id === id);
   // A quote started before the report was first saved moves to its new id.
   if (!currentReportId) adoptDraftQuote(id, getFullAddress());
 
@@ -8766,6 +9032,8 @@ function saveCurrentReport(quiet) {
     reportData: { ...reportData },
     fieldNotes: { ...fieldNotes },
     savedAt: Date.now(),
+    // The account copy this one was built on (see supabaseSave).
+    cloudSavedAt: prev ? cloudBaseOf(prev) : 0,
     completion: calculateCompletion(),
   };
   // The quote rides along in the saved report, so it syncs to the account
@@ -8782,6 +9050,7 @@ function saveCurrentReport(quiet) {
 
   if (setSavedReports(reports)) {
     currentReportId = id;
+    savedIdFor.set(reportData, id);
     lastReportSig = reportSig();
     if (!quiet) showToast('Report saved', 'success');
     renderSavedList();
@@ -8792,7 +9061,13 @@ function saveCurrentReport(quiet) {
   }
 }
 
-function loadReport(id) {
+function loadReport(id, quiet) {
+  if (id !== currentReportId) {
+    saveOpenReportNow();
+    // A report with no address yet is never saved, so it's dropped here,
+    // and so is the quote made for it.
+    if (!currentReportId && typeof forgetDraftQuote === 'function') forgetDraftQuote();
+  }
   const reports = getSavedReports();
   const entry = reports.find(r => r.id === id);
   if (!entry) return;
@@ -8814,6 +9089,7 @@ function loadReport(id) {
   upgradeRenamedChoices(reportData);
   fieldNotes = { ...(entry.fieldNotes || {}) };
   currentReportId = entry.id;
+  savedIdFor.set(reportData, entry.id);
   externalizePhotos(reportData).then(changed => { if (changed) saveDraft(); });
 
   // Re-render all fields
@@ -8848,29 +9124,72 @@ function loadReport(id) {
   lastReportSig = reportSig();
   saveDraft();
 
-  showToast(`Loaded: ${entry.address}`, 'info');
+  if (!quiet) showToast(`Loaded: ${entry.address}`, 'info');
   processPendingNotes();
   if (document.getElementById('sidebarPanel').classList.contains('open')) {
     toggleDrawer();
   }
 }
 
+// Deleting a job takes it off the phone at once and offers Undo. The
+// account copy and its photos go a few seconds later, once Undo has passed.
+// Deletes waiting for the account (no signal, or the app closed first) are
+// listed, so they're finished on the next open instead of coming back.
+const DELETE_UNDO_MS = 6500;
+const deleteTimers = {};
+function pendingDeletesKey() {
+  return (authUser && authUser.id) ? `korva_pending_deletes_${authUser.id}` : 'korva_pending_deletes';
+}
+function getPendingDeletes() {
+  try { const v = JSON.parse(localStorage.getItem(pendingDeletesKey()) || '[]'); return Array.isArray(v) ? v : []; }
+  catch (e) { return []; }
+}
+function setPendingDeletes(list) {
+  try { localStorage.setItem(pendingDeletesKey(), JSON.stringify(list)); } catch (e) {}
+}
+async function finishDelete(item) {
+  delete deleteTimers[item.id];
+  const keep = referencedPhotoIds();
+  const paths = (item.paths || []).filter((path, i) => !keep.has((item.photoIds || [])[i]));
+  if (paths.length) deleteCloudPhotos(paths);
+  if (!authSession || await supabaseDelete(item.id)) setPendingDeletes(getPendingDeletes().filter(d => d.id !== item.id));
+}
+async function flushPendingDeletes() {
+  for (const item of getPendingDeletes()) {
+    if (!deleteTimers[item.id]) await finishDelete(item);
+  }
+}
+
 function deleteReport(id, event) {
   if (event) event.stopPropagation();
   const all = getSavedReports();
-  const deleted = all.find(r => r.id === id);
-  const reports = all.filter(r => r.id !== id);
-  setSavedReports(reports);
-  // Remove its cloud photos unless the open draft still uses them. Device
-  // copies are tidied up the next time the app opens.
-  if (deleted) {
-    const keep = referencedPhotoIds();
-    deleteCloudPhotos(allReportPhotos(deleted.reportData).filter(p => p.path && !keep.has(p.id)).map(p => p.path));
-  }
-  if (currentReportId === id) currentReportId = null;
+  const index = all.findIndex(r => r.id === id);
+  const deleted = all[index];
+  if (!deleted) return;
+  // A finished job has gone to the client, so it's asked about first.
+  if (deleted.reportData && deleted.reportData.issue &&
+      !confirm(`Delete the finished report for ${deleted.address || 'this property'}? Its quote and photos go too.`)) return;
+  if (!setSavedReports(all.filter(r => r.id !== id))) return;
+  const wasOpen = currentReportId === id;
+  if (wasOpen) startBlankReport();
   renderSavedList();
-  showToast('Report deleted', 'info');
-  supabaseDelete(id); // background cloud delete — non-blocking
+
+  const photos = allReportPhotos(deleted.reportData).filter(p => p.path);
+  const item = { id, paths: photos.map(p => p.path), photoIds: photos.map(p => p.id) };
+  setPendingDeletes([...getPendingDeletes().filter(d => d.id !== id), item]);
+  deleteTimers[id] = setTimeout(() => finishDelete(item), DELETE_UNDO_MS);
+
+  showToast('Report deleted', 'info', { label: 'Undo', run: () => {
+    clearTimeout(deleteTimers[id]);
+    delete deleteTimers[id];
+    setPendingDeletes(getPendingDeletes().filter(d => d.id !== id));
+    const reports = getSavedReports();
+    if (!reports.some(r => r.id === id)) reports.splice(Math.min(index, reports.length), 0, deleted);
+    setSavedReports(reports);
+    if (wasOpen) loadReport(id, true);
+    renderSavedList();
+    showToast('Report restored', 'success');
+  } });
 }
 
 function clearAllSavedReports() {
@@ -8891,20 +9210,24 @@ function clearAllSavedReports() {
 // ══════════════════════════════════════════════════════════════════════════
 // DATA EXPORT / IMPORT
 // ══════════════════════════════════════════════════════════════════════════
+// Settings a backup carries. The sign-in, company details and the photo
+// store's bookkeeping stay out: the company comes back from the account,
+// and a backup must never hold a sign-in someone else could use.
+const BACKUP_PREF_KEYS = ['korva_a11y_textsize', 'korva_a11y_dark', 'korva_a11y_contrast', 'korva_a11y_touch',
+  'korva_a11y_motion', 'korva_a11y_colorvision', 'korva_audio_capture_enabled', 'korva_telemetry_off'];
+
 async function exportAllData() {
   try {
-    const data = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      // The telemetry id and its unsent events belong to this phone.
-      if (key && key.startsWith('korva_') && key !== TELEMETRY_ID_KEY && key !== TELEMETRY_QUEUE_KEY) {
-        data[key] = localStorage.getItem(key);
-      }
-    }
+    const reports = getSavedReports();
+    const prefs = {};
+    BACKUP_PREF_KEYS.forEach(key => {
+      const v = localStorage.getItem(key);
+      if (v !== null) prefs[key] = v;
+    });
 
     // Photos aren't in localStorage, so add each saved report's images.
     const photos = {};
-    for (const r of getSavedReports()) {
+    for (const r of reports) {
       for (const p of allReportPhotos(r.reportData)) {
         if (photos[p.id]) continue;
         const blob = await getPhotoImage(p);
@@ -8912,34 +9235,43 @@ async function exportAllData() {
       }
     }
 
-    const backup = {
-      app: 'SAYON',
-      exportedAt: new Date().toISOString(),
-      version: 1,
-      data,
-      photos,
-    };
+    const backup = { app: 'SAYON', exportedAt: new Date().toISOString(), version: 2, reports, prefs, photos };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    downloadBlob(blob, `sayon_backup_${todayIsoDate()}.json`);
 
-    const json = JSON.stringify(backup, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-
-    const date = todayIsoDate();
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sayon_backup_${date}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    const reportCount = getSavedReports().length;
-    showToast(`Downloaded a copy of ${reportCount} saved report${reportCount === 1 ? '' : 's'} and your settings`, 'success');
+    showToast(`Downloaded a copy of ${reports.length} saved report${reports.length === 1 ? '' : 's'} and your settings`, 'success');
   } catch (e) {
     console.error('Export failed', e);
     reportError(e, 'export');
     showToast("Couldn't download a copy. Try again", 'error');
   }
+}
+
+// The reports in a backup. Version 2 lists them; version 1 copied every
+// korva_ key, so its reports sit under whichever account's key it was made on.
+function backupReports(backup) {
+  if (Array.isArray(backup.reports)) return backup.reports;
+  const data = backup.data || {};
+  const found = [];
+  Object.keys(data).forEach(key => {
+    if (!/^(korva_saved_reports(_.+)?|termiteai_saved_reports)$/.test(key)) return;
+    try { const list = JSON.parse(data[key] || '[]'); if (Array.isArray(list)) found.push(...list); } catch (e) {}
+  });
+  return found;
+}
+
+// Adds a backup's reports to the phone's. Where both have the same report,
+// the newer copy is kept, so a restore never undoes later work.
+function mergeBackupReports(existing, incoming) {
+  const byId = new Map(existing.map(r => [r.id, r]));
+  let added = 0, updated = 0;
+  incoming.forEach(r => {
+    if (!r || !r.id || !r.reportData) return;
+    const mine = byId.get(r.id);
+    if (!mine) { byId.set(r.id, r); added++; }
+    else if ((r.savedAt || 0) > (mine.savedAt || 0)) { byId.set(r.id, r); updated++; }
+  });
+  return { reports: [...byId.values()], added, updated };
 }
 
 function importAllData(file) {
@@ -8955,61 +9287,43 @@ function importAllData(file) {
       return;
     }
 
-    if (!backup || typeof backup !== 'object' || !backup.data || !['SAYON','KORVUS'].includes(backup.app)) {
+    if (!backup || typeof backup !== 'object' || !(backup.data || backup.reports) || !['SAYON','KORVUS'].includes(backup.app)) {
       showToast('That doesn\'t look like a SAYON backup file', 'error');
       return;
     }
 
-    const incomingReports = (() => {
-      try {
-        return JSON.parse(backup.data['termiteai_saved_reports'] || '[]');
-      } catch (err) {
-        return [];
-      }
-    })();
-
-    const existingReports = getSavedReports();
-    const mode = existingReports.length > 0
-      ? confirm(
-          `This copy has ${incomingReports.length} report${incomingReports.length === 1 ? '' : 's'}.\n\n` +
-          `You currently have ${existingReports.length} saved on this device.\n\n` +
-          `OK adds the copy's reports to yours and keeps both. Cancel replaces yours with the copy.`
-        )
-      : true; // nothing to lose, just load it in
-
-    let finalReports;
-    if (mode === true && existingReports.length > 0) {
-      // Merge: keep existing + add incoming ones that don't already exist (by id)
-      const existingIds = new Set(existingReports.map(r => r.id));
-      const newOnes = incomingReports.filter(r => !existingIds.has(r.id));
-      finalReports = [...existingReports, ...newOnes];
-    } else if (existingReports.length === 0) {
-      finalReports = incomingReports;
-    } else {
-      // Replace
-      finalReports = incomingReports;
-    }
+    const incoming = backupReports(backup);
+    const existing = getSavedReports();
+    if (existing.length && !confirm(
+      `This copy has ${incoming.length} report${incoming.length === 1 ? '' : 's'}. ` +
+      `You have ${existing.length} on this phone.\n\n` +
+      `Add the copy's reports to yours? Nothing on this phone is removed, and where both have the same report the newer one is kept.`
+    )) return;
 
     try {
-      // Restore saved reports, and their photos into the device photo store
-      setSavedReports(finalReports);
+      const { reports, added, updated } = mergeBackupReports(existing, incoming);
+      if (!setSavedReports(reports)) return;
       Object.entries(backup.photos || {}).forEach(([id, dataUrl]) => {
         const blob = dataUrlToBlob(dataUrl);
         if (blob) putPhotoBlob(id, blob).catch(() => {});
       });
+      // Restored reports go to the account too, so they're on every device.
+      reports.filter(r => incoming.some(i => i && i.id === r.id && i.savedAt === r.savedAt)).forEach(r => supabaseSave(r));
 
-      // Restore preferences (accessibility, voice) but not the in-progress draft,
-      // to avoid overwriting work the user has open right now
-      Object.entries(backup.data).forEach(([key, value]) => {
-        if (key === 'korva_saved_reports' || key === 'korva_draft') return;
-        try { localStorage.setItem(key, value); } catch (err) {}
+      // Settings only, from the allow-list. Never the sign-in or the draft.
+      const prefs = backup.prefs || backup.data || {};
+      BACKUP_PREF_KEYS.forEach(key => {
+        if (typeof prefs[key] === 'string') { try { localStorage.setItem(key, prefs[key]); } catch (err) {} }
       });
 
       renderSavedList();
       restoreA11ySettings();
       restoreAudioCaptureSetting();
       restoreTelemetrySetting();
-      showToast(`Restored ${finalReports.length} report${finalReports.length === 1 ? '' : 's'} from the copy`, 'success');
+      const parts = [];
+      if (added) parts.push(`${added} added`);
+      if (updated) parts.push(`${updated} updated`);
+      showToast(parts.length ? `Restored from the copy: ${parts.join(', ')}` : 'Your reports were already up to date', 'success');
     } catch (err) {
       console.error('Import failed', err);
       reportError(err, 'import');
@@ -9122,9 +9436,17 @@ function lastInspectorDetails() {
 }
 
 function newReport() {
+  saveOpenReportNow();
   track('report_started');
+  startBlankReport();
+  showToast('New report started', 'info');
+}
+
+// Empties the screen for a new job. Doesn't save the one that was open.
+function startBlankReport() {
   // Before the reset, so the banners it redraws don't show the last job's
   // quote and certificate.
+  if (!currentReportId && typeof forgetDraftQuote === 'function') forgetDraftQuote();
   currentReportId = null;
   resetReportState();
   document.getElementById('jobAddress').value = '';
@@ -9138,8 +9460,8 @@ function newReport() {
   restoreLicenceField();
   updateJob();
   clearDraft();
+  lastReportSig = reportSig();
   showSection('property');
-  showToast('New report started', 'info');
 }
 
 function resetReportState() {
@@ -9342,7 +9664,7 @@ function renderSavedList() {
     const date = new Date(r.savedAt);
     const dateStr = date.toLocaleDateString('en-AU', { day:'numeric', month:'short' });
     const risk = r.reportData.riskLevel || 'none';
-    const addr = r.address || 'Untitled property';
+    const addr = (r.address || 'Untitled property') + (r.conflictCopy ? ' (copy from this phone)' : '');
     const pending = (r.reportData.pendingNotes || []).length;
     const status = savedReportStatus(r);
     const statusTag = `<span class="saved-item-status ${status.tone}">${status.label}</span>`;
@@ -9366,10 +9688,11 @@ function renderSavedList() {
   }).join('');
 }
 
+// Safe inside text and inside quoted attributes (value="…", src="…").
 function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // ── STATUS / TOAST ────────────────────────────────────────────────────────
@@ -9565,7 +9888,9 @@ function reportSummary() {
   const evidence = fs.filter(f => f.termiteActivity === 'INACTIVE');
   // Damage counts wherever it was found, including alongside live termites.
   const damaged = fs.filter(f => f.termiteActivity === 'INACTIVE' || (f.termiteActivity === 'ACTIVE' && !isBlankValue(f.damageDescription)));
-  const structural = fs.some(f => f.structuralConcern === 'YES') || shownBorerFindings().some(b => b.structuralConcern === 'YES');
+  const termiteReferral = fs.some(f => f.structuralConcern === 'YES');
+  const borerReferral = shownBorerFindings().some(b => b.structuralConcern === 'YES');
+  const structural = termiteReferral || borerReferral;
   const unanswered = findingsMissingReferral();
   const conducive = [];
   if (reportData.waterLeaks === 'YES') conducive.push(`water leak${reportData.leakLocation ? ` (${reportData.leakLocation})` : ''}`);
@@ -9648,7 +9973,10 @@ function reportSummary() {
   if (live.length || reportData.treatmentRecommended === 'YES') {
     next.push(`Termite treatment${reportData.treatmentType ? `: ${reportData.treatmentType}` : ` (see Section ${REPORT_PARTS.recommendations})`}.`);
   }
-  if (structural) next.push('Have a licensed builder or structural engineer assess the termite damage before any repairs.');
+  if (structural) {
+    const what = termiteReferral && borerReferral ? 'termite and borer damage' : termiteReferral ? 'termite damage' : 'borer damage';
+    next.push(`Have a licensed builder or structural engineer assess the ${what} before any repairs.`);
+  }
   if (reportData.borerActivity === 'ACTIVE') next.push('Treat the active borers and replace badly affected timbers.');
   if (reportData.decayFound === 'YES') next.push('Have a builder repair the decayed timbers, and fix the moisture that caused the decay.');
   if (reportData.delignification === 'YES') next.push('Have a builder check and replace the delignified timbers where needed.');

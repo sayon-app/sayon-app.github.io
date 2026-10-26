@@ -90,9 +90,34 @@ function inspectionFrequencyMonths(rd) {
   return words[m[1].toLowerCase()] || parseInt(m[1], 10) || 12;
 }
 
+// Months between later inspections, for the durable notice: the report's
+// "then every N months", or a plain "N months". Never more than 12.
+function ongoingInspectionMonths(rd) {
+  const words = { one: 1, two: 2, three: 3, four: 4, six: 6, twelve: 12 };
+  const text = String(rd.inspectionFrequency || '');
+  const every = [...text.matchAll(/every\s+(\d+|one|two|three|four|six|twelve)\s*months?/gi)].pop();
+  const plain = text.match(/^\s*(\d+|one|two|three|four|six|twelve)\s*months?\s*$/i);
+  const m = every || plain;
+  const n = m ? (words[m[1].toLowerCase()] || parseInt(m[1], 10)) : 12;
+  return n > 0 && n < 12 ? n : 12;
+}
+
+// The report a quote was made from, for the certificate.
+function treatmentReportFor(q) {
+  if (q.reportKey === (currentReportId || 'draft')) return reportData || {};
+  const r = getSavedReports().find(e => e.id === q.reportKey);
+  return (r && r.reportData) || {};
+}
+
+// Same day N months on, or the month's last day when it's shorter
+// (31 August + 6 months is 28 or 29 February, not 2 or 3 March).
 function addMonthsIso(iso, months) {
   const d = new Date(iso + 'T00:00:00');
+  const day = d.getDate();
+  d.setDate(1);
   d.setMonth(d.getMonth() + months);
+  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, last));
   return isoDate(d);
 }
 
@@ -403,7 +428,8 @@ function saveTreatmentRecord() {
     weather: v('trWeather'),
     equipment: v('trEquipment'),
     methods,
-    products: readTreatmentProducts().filter(p => p.name || p.active || p.amount),
+    // A row counts if anything was filled in, a batch number or label photo included.
+    products: readTreatmentProducts().filter(p => Object.values(p).some(Boolean)),
     areas: v('trAreas'),
     notTreated: v('trNotTreated'),
     sketch: treatmentSketchImage(),
@@ -624,12 +650,14 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   const BAITS = /exterra|sentricon|trelona|chlorfluazuron|noviflumuron|novaluron|bistrifluron|hexaflumuron/i;
   const chemicalApplied = Object.keys(t.methods || {}).some(k => k !== 'bait');
   const productLife = !chemicalApplied ? [] : products.filter(p => !BAITS.test(`${p.name || ''} ${p.active || ''}`)).map(p => `${p.name || p.active}${p.name && p.active ? ` (${p.active})` : ''}: ${p.life || 'see label'}`);
+  const every = ongoingInspectionMonths(treatmentReportFor(q));
+  const everyText = `at least every ${every} month${every === 1 ? '' : 's'}`;
   const installer = [company.name, [t.technician, t.licence ? `licence ${t.licence}` : ''].filter(Boolean).join(', ')].filter(Boolean).join('. ');
   const noticeCells = t.notice === 'none' ? [['Notice', 'No durable notice was placed at this treatment.']] : [
     ['System', methodNames.join('; ')],
     ['Date installed', formatLongDate(t.date)],
     ['Chemical life (label)', productLife.join('; ')],
-    ['Future inspections', t.nextInspection ? `First by ${formatLongDate(t.nextInspection)}, then at least every 12 months` : 'At least every 12 months'],
+    ['Future inspections', t.nextInspection ? `First by ${formatLongDate(t.nextInspection)}, then ${everyText}` : everyText.charAt(0).toUpperCase() + everyText.slice(1)],
     ['Installed by', installer],
     ['Notice', `${TREATMENT_NOTICE[t.notice]}${t.noticeWhere ? `: ${t.noticeWhere}` : ''}`],
   ].filter(([, v]) => v);

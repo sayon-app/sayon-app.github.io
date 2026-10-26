@@ -164,7 +164,8 @@ function persistQuote() {
     localStorage.setItem(quotesStorageKey(), JSON.stringify(all));
     storeQuoteOnReport(quoteState, false);
     setQuoteSaveState('Saved');
-    if (quoteState.answer) renderQuoteAnswer();
+    // A change after sending moves the steps and the Send button on.
+    renderQuoteAnswer();
   } catch (e) {
     setQuoteSaveState('Not saved');
     showToast('Could not save the quote — device storage may be full', 'error');
@@ -438,6 +439,7 @@ function openQuote(from, preferKey) {
   quoteSources = collectQuoteSources();
   renderQuoteSourceOptions(preferKey);
   onQuoteSourceChange();
+  document.querySelector('#quoteScreen .quote-scroll').scrollTop = 0;
   track('screen_viewed', { screen: 'quote' });
 }
 
@@ -470,7 +472,8 @@ function renderQuoteSourceOptions(preferKey) {
   const sel = document.getElementById('quoteSource');
   const hasSources = quoteSources.length > 0;
   document.getElementById('quoteEmpty').style.display = hasSources ? 'none' : 'flex';
-  sel.parentElement.style.display = hasSources ? '' : 'none';
+  const forJob = !!preferKey && quoteSources.some(s => s.key === preferKey);
+  sel.closest('.quote-source-pick').style.display = hasSources && !forJob ? '' : 'none';
   sel.innerHTML = quoteSources.map(s => {
     const date = s.date ? new Date(s.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : '';
     const text = [s.label, s.address || 'Untitled property', date].filter(Boolean).join(' · ');
@@ -488,35 +491,19 @@ function onQuoteSourceChange() {
   if (quoteState) { clearTimeout(quoteSaveTimer); persistQuote(); }
   const src = currentQuoteSource();
   const editor = document.getElementById('quoteEditor');
-  if (!src) { quoteState = null; editor.style.display = 'none'; return; }
+  const bar = document.getElementById('quoteBar');
+  quoteOpenItems.clear();
+  if (!src) { quoteState = null; editor.style.display = 'none'; bar.style.display = 'none'; return; }
   const saved = quoteForReport(src.key, src.address);
   quoteState = saved || createQuoteFromSource(src);
   if (!saved) persistQuote();
   else setQuoteSaveState('Saved');
-  renderQuoteSourceSummary(src);
   renderQuoteEditor();
   renderQuoteLock();
   editor.style.display = 'flex';
+  bar.style.display = '';
+  ['quoteDetailsFold', 'quoteTermsFold'].forEach(id => { document.getElementById(id).open = false; });
   editor.querySelectorAll('.quote-item-desc, .quote-item-detail, .quote-textarea').forEach(fitQuoteText);
-}
-
-function renderQuoteSourceSummary(src) {
-  const rd = src.reportData || {};
-  const findings = (Array.isArray(rd.findings) ? rd.findings : []).filter(f => f && f.termiteActivity);
-  const chips = [];
-  if (rd.riskLevel) chips.push([`${rd.riskLevel} risk`, rd.riskLevel.toLowerCase()]);
-  const active = findings.filter(f => f.termiteActivity === 'ACTIVE').length;
-  const inactive = findings.filter(f => f.termiteActivity === 'INACTIVE').length;
-  if (active) chips.push([`${active} active finding${active > 1 ? 's' : ''}`, 'high']);
-  if (inactive) chips.push([`${inactive} inactive finding${inactive > 1 ? 's' : ''}`, 'medium']);
-  if (rd.borerActivity === 'ACTIVE') chips.push(['Active borers', 'high']);
-  else if (rd.borerActivity === 'INACTIVE') chips.push(['Old borer damage', 'medium']);
-  if (rd.decayFound === 'YES') chips.push(['Wood decay', 'medium']);
-  if (rd.treatmentType) chips.push([rd.treatmentType, '']);
-  else if (rd.treatmentRecommended === 'YES') chips.push(['Treatment recommended', '']);
-  if (!chips.length) chips.push(['No findings or recommendations recorded yet', '']);
-  document.getElementById('quoteSourceSummary').innerHTML =
-    chips.map(([t, cls]) => `<span class="quote-chip ${cls}">${escapeHtml(t)}</span>`).join('');
 }
 
 function renderQuoteEditor() {
@@ -533,8 +520,45 @@ function renderQuoteEditor() {
   document.getElementById('qNotes').value = q.notes || '';
   renderQuoteItems();
   renderQuoteCompanyGaps();
+  renderQuoteFolds();
   renderQuoteAnswer();
   ['qPaymentTerms', 'qExclusions', 'qNotes'].forEach(id => fitQuoteText(document.getElementById(id)));
+}
+
+// The job the quote is for, and where it's up to: price it, send it, the
+// client's answer, then the treatment.
+function renderQuoteHead() {
+  const q = quoteState;
+  const el = document.getElementById('quoteHead');
+  if (!q || !el) return;
+  const a = quoteAnswerState(q);
+  const sentNow = !!q.sentAt && q.sentHash === quoteContentHash(q);
+  const answered = a && !a.stale;
+  const steps = [
+    ['Price it', sentNow || answered ? 'done' : 'now'],
+    ['Send', sentNow || answered ? 'done' : q.sentAt ? 'warn' : 'todo'],
+    ['Client\'s answer', answered ? (a.status === 'accepted' ? 'done' : 'bad') : sentNow ? 'now' : 'todo'],
+    ['Treatment', q.treatment ? 'done' : answered && a.status === 'accepted' ? 'now' : answered ? 'skip' : 'todo'],
+  ];
+  if (steps[1][1] === 'warn') steps[0][1] = 'now';
+  const meta = [q.client, q.number].filter(Boolean).map(escapeHtml).join(' · ');
+  el.innerHTML = `<div class="quote-head-addr">${escapeHtml(q.address || 'No address yet')}</div>
+    ${meta ? `<div class="quote-head-meta">${meta}</div>` : ''}
+    <ol class="quote-steps">${steps.map(([label, state]) => `<li class="${state}"><span class="quote-step-dot"></span>${label}</li>`).join('')}</ol>`;
+}
+
+// The one-line summaries on the folded sections.
+function renderQuoteFolds() {
+  const q = quoteState;
+  if (!q) return;
+  const email = (q.clientEmail || '').trim();
+  const det = [q.client || 'No client name', email || 'no email yet'];
+  const detSub = document.getElementById('quoteDetailsSub');
+  detSub.textContent = det.join(' · ');
+  detSub.classList.toggle('warn', !email);
+  const excl = (q.exclusions || '').split('\n').filter(l => l.trim()).length;
+  document.getElementById('quoteTermsSub').textContent =
+    [(q.paymentTerms || '').trim() ? 'Payment terms set' : 'No payment terms', `${excl} exclusion${excl === 1 ? '' : 's'}`].join(' · ');
 }
 
 // What's missing from the business details, which every quote's header shows.
@@ -582,38 +606,93 @@ function markQuotePriceSet(id) {
   const it = quoteState && quoteState.items.find(i => i.id === id);
   if (!it || it.priceSet) return;
   it.priceSet = true;
-  const row = document.querySelector(`.quote-item[data-id="${id}"] .quote-item-start`);
-  if (row) row.remove();
+  const tag = document.querySelector(`.qi[data-id="${id}"] .qi-tag`);
+  if (tag) tag.remove();
+  renderQuoteStartHint();
+}
+
+// Lines show as short rows: what, how many, and the price. A tap opens the
+// line to change it. Open lines stay open while the quote is redrawn.
+const quoteOpenItems = new Set();
+
+function quoteItemSub(it) {
+  const qty = parseFloat(it.qty);
+  const n = isFinite(qty) ? qty : 0;
+  const price = parseFloat(it.price);
+  const unit = pluralUnit(it.unit, n);
+  const each = n !== 1 && isFinite(price) ? ` × ${formatAUD(price).replace(/\.00$/, '')}` : '';
+  return [`${n}${unit ? ' ' + unit : ''}${each}`, (it.detail || '').trim()].filter(Boolean).join(' · ');
+}
+
+function quoteItemHTML(it) {
+  const open = quoteOpenItems.has(it.id);
+  const id = it.id;
+  return `<div class="qi${open ? ' open' : ''}" data-id="${id}">
+    <button type="button" class="qi-row" onclick="toggleQuoteItem('${id}')" aria-expanded="${open}">
+      <span class="qi-main">
+        <span class="qi-desc">${escapeHtml(it.desc || 'New line')}</span>
+        <span class="qi-sub">${escapeHtml(quoteItemSub(it))}</span>
+      </span>
+      <span class="qi-end">
+        <span class="qi-price" id="qiTotal_${id}">${formatAUD(lineTotal(it))}</span>
+        ${isStartingPrice(it) ? '<span class="qi-tag">Starting price</span>' : ''}
+      </span>
+      <svg class="icon qi-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <div class="qi-edit">
+      <label class="quote-field"><span>What</span><textarea class="quote-input quote-item-desc" rows="1" placeholder="e.g. Chemical soil treatment"
+        oninput="fitQuoteText(this); updateQuoteItem('${id}','desc',this.value)">${escapeHtml(it.desc)}</textarea></label>
+      <label class="quote-field"><span>Details (optional)</span><textarea class="quote-input quote-item-detail" rows="1" placeholder="e.g. Front porch post, left side"
+        oninput="fitQuoteText(this); updateQuoteItem('${id}','detail',this.value)">${escapeHtml(it.detail)}</textarea></label>
+      <div class="quote-item-nums">
+        <label class="quote-field"><span>Qty</span><input class="quote-input" type="number" min="0" step="any" inputmode="decimal" value="${escapeHtml(String(it.qty))}"
+          oninput="updateQuoteItem('${id}','qty',this.value)"></label>
+        <label class="quote-field"><span>Unit</span><input class="quote-input" value="${escapeHtml(it.unit)}"
+          oninput="updateQuoteItem('${id}','unit',this.value)"></label>
+        <label class="quote-field"><span>Price each, ex GST</span><input class="quote-input" type="number" min="0" step="any" inputmode="decimal" value="${escapeHtml(String(it.price))}"
+          oninput="markQuotePriceSet('${id}'); updateQuoteItem('${id}','price',this.value)" onchange="rememberQuotePrice('${it.key}', parseFloat(this.value))"></label>
+      </div>
+      ${it.source ? `<div class="quote-item-source">From the report: ${escapeHtml(it.source)}</div>` : ''}
+      <div class="qi-edit-btns">
+        <button type="button" class="quote-text-btn danger" onclick="removeQuoteItem('${id}')">Remove line</button>
+        <button type="button" class="quote-link-btn qi-done" onclick="toggleQuoteItem('${id}')">Done</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleQuoteItem(id) {
+  const row = document.querySelector(`.qi[data-id="${id}"]`);
+  if (!row) return;
+  const open = !quoteOpenItems.has(id);
+  if (open) quoteOpenItems.add(id); else quoteOpenItems.delete(id);
+  row.classList.toggle('open', open);
+  row.querySelector('.qi-row').setAttribute('aria-expanded', open);
+  if (open) row.querySelectorAll('.quote-item-desc, .quote-item-detail').forEach(fitQuoteText);
 }
 
 function renderQuoteItems() {
   renderQuoteSystemChoice();
   const wrap = document.getElementById('quoteItems');
   if (!quoteState.items.length) {
-    wrap.innerHTML = '<div class="quote-items-empty">No line items. The report has no findings or recommendations that call for work. Add a line to quote manually.</div>';
+    wrap.innerHTML = '<div class="quote-items-empty">No lines yet. The report has no findings or recommendations that call for work. Add a line to quote it yourself.</div>';
   } else {
-    wrap.innerHTML = quoteState.items.map(it => `
-      <div class="quote-item" data-id="${it.id}">
-        <textarea class="quote-input quote-item-desc" rows="1" placeholder="Description" aria-label="Description"
-          oninput="fitQuoteText(this); updateQuoteItem('${it.id}','desc',this.value)">${escapeHtml(it.desc)}</textarea>
-        <button class="quote-item-remove" onclick="removeQuoteItem('${it.id}')" aria-label="Remove line" title="Remove line">✕</button>
-        <textarea class="quote-input quote-item-detail" rows="1" placeholder="Details (optional)" aria-label="Details"
-          oninput="fitQuoteText(this); updateQuoteItem('${it.id}','detail',this.value)">${escapeHtml(it.detail)}</textarea>
-        <div class="quote-item-nums">
-          <label>Qty<input class="quote-input" type="number" min="0" step="any" inputmode="decimal" value="${it.qty}"
-            oninput="updateQuoteItem('${it.id}','qty',this.value)"></label>
-          <label>Unit<input class="quote-input" value="${escapeHtml(it.unit)}"
-            oninput="updateQuoteItem('${it.id}','unit',this.value)"></label>
-          <label>Unit price $<input class="quote-input" type="number" min="0" step="any" inputmode="decimal" value="${it.price}"
-            oninput="markQuotePriceSet('${it.id}'); updateQuoteItem('${it.id}','price',this.value)" onchange="rememberQuotePrice('${it.key}', parseFloat(this.value))"></label>
-          <div class="quote-item-total" id="qiTotal_${it.id}">${formatAUD(lineTotal(it))}</div>
-        </div>
-        ${isStartingPrice(it) ? '<div class="quote-item-start">Starting price</div>' : ''}
-        ${it.source ? `<div class="quote-item-source">From report · ${escapeHtml(it.source)}</div>` : ''}
-      </div>`).join('');
-    wrap.querySelectorAll('.quote-item-desc, .quote-item-detail').forEach(fitQuoteText);
+    wrap.innerHTML = quoteState.items.map(quoteItemHTML).join('');
+    wrap.querySelectorAll('.qi.open .quote-item-desc, .qi.open .quote-item-detail').forEach(fitQuoteText);
   }
+  const n = quoteState.items.length;
+  document.getElementById('quoteItemCount').textContent = n ? `${n} line${n === 1 ? '' : 's'}` : '';
+  renderQuoteStartHint();
   renderQuoteTotals();
+}
+
+// Explains the amber tag, only while a line still has one.
+function renderQuoteStartHint() {
+  const el = document.getElementById('quoteStartHint');
+  if (!el || !quoteState) return;
+  const any = quoteState.items.some(isStartingPrice);
+  el.style.display = any ? '' : 'none';
+  el.innerHTML = any ? '<b>Starting price</b> is a suggested rate. Tap a line to set your own, and new quotes start at your price.' : '';
 }
 
 // Grows a line's description box to fit its text, so long names wrap
@@ -650,6 +729,8 @@ function renderQuoteTotals() {
   document.getElementById('qSubtotal').textContent = formatAUD(t.subtotal);
   document.getElementById('qGstAmt').textContent = formatAUD(t.gst);
   document.getElementById('qTotal').textContent = formatAUD(t.total);
+  document.getElementById('quoteBarAmount').textContent = formatAUD(t.total);
+  document.getElementById('quoteBarLabel').textContent = quoteState.gst !== false ? 'Total inc GST' : 'Total';
 }
 
 // ── EDITING ─────────────────────────────────────────────────────────────────
@@ -670,6 +751,8 @@ function onQuoteFieldInput() {
   q.paymentTerms = document.getElementById('qPaymentTerms').value;
   q.notes = document.getElementById('qNotes').value;
   renderQuoteTotals();
+  renderQuoteFolds();
+  renderQuoteHead();
   scheduleQuoteSave();
 }
 
@@ -677,6 +760,11 @@ function updateQuoteItem(id, field, value) {
   const it = quoteState && quoteState.items.find(i => i.id === id);
   if (!it) return;
   it[field] = value;
+  const row = document.querySelector(`.qi[data-id="${id}"]`);
+  if (row) {
+    row.querySelector('.qi-desc').textContent = it.desc || 'New line';
+    row.querySelector('.qi-sub').textContent = quoteItemSub(it);
+  }
   if (field === 'qty' || field === 'price') {
     const cell = document.getElementById('qiTotal_' + id);
     if (cell) cell.textContent = formatAUD(lineTotal(it));
@@ -687,16 +775,19 @@ function updateQuoteItem(id, field, value) {
 
 function addQuoteItem() {
   if (!quoteState) return;
-  quoteState.items.push(newQuoteItem('custom'));
+  const it = newQuoteItem('custom');
+  quoteState.items.push(it);
+  quoteOpenItems.add(it.id);
   renderQuoteItems();
   scheduleQuoteSave();
-  const rows = document.querySelectorAll('#quoteItems .quote-item-desc');
-  if (rows.length) rows[rows.length - 1].focus();
+  const desc = document.querySelector(`.qi[data-id="${it.id}"] .quote-item-desc`);
+  if (desc) desc.focus();
 }
 
 function removeQuoteItem(id) {
   if (!quoteState) return;
   quoteState.items = quoteState.items.filter(i => i.id !== id);
+  quoteOpenItems.delete(id);
   renderQuoteItems();
   scheduleQuoteSave();
 }
@@ -709,8 +800,9 @@ function rebuildQuoteFromReport() {
   quoteState.systemChoice = newSystemChoice(src.reportData);
   quoteState.exclusions = buildQuoteExclusions(src.reportData).join('\n');
   document.getElementById('qExclusions').value = quoteState.exclusions;
-  renderQuoteSourceSummary(src);
+  quoteOpenItems.clear();
   renderQuoteItems();
+  renderQuoteFolds();
   scheduleQuoteSave();
   showToast('Line items rebuilt from the report', 'success');
 }
@@ -756,13 +848,27 @@ function quoteAnswerSummary(q) {
 function renderQuoteAnswer() {
   const el = document.getElementById('quoteAnswer');
   const q = quoteState;
+  renderQuoteHead();
+  renderQuoteSendLabel();
   if (!q || !quoteHasItems(q)) { el.style.display = 'none'; return; }
   el.style.display = '';
   const a = quoteAnswerState(q);
   const esc = escapeHtml;
   let body;
+  if (!a && !q.sentAt) {
+    // Not sent yet: the bar's Send is the next step. An answer given
+    // another way (on the spot, by phone) can still be recorded.
+    el.classList.add('quiet');
+    el.innerHTML = `<span>Client already answered?</span>
+      <button class="quote-text-btn" onclick="openQuoteAnswer('accepted')">Accepted</button>
+      <button class="quote-text-btn" onclick="openQuoteAnswer('declined')">Declined</button>`;
+    return;
+  }
+  el.classList.remove('quiet');
   if (!a) {
-    body = `<div class="quote-answer-status wait">${q.sentAt ? 'Waiting on the client.' : 'Send the quote, then record the client\'s answer here once you have it.'}</div>
+    const changed = q.sentHash !== quoteContentHash(q);
+    body = `<div class="quote-answer-status wait">Sent ${esc(formatIssueDate(q.sentAt))}. ${changed
+      ? 'You\'ve changed the quote since, so send the new version.' : 'Waiting on the client.'}</div>
       <div class="quote-answer-btns">
         <button class="quote-btn primary" onclick="openQuoteAnswer('accepted')">Accepted</button>
         <button class="quote-btn" onclick="openQuoteAnswer('declined')">Declined</button>
@@ -778,7 +884,15 @@ function renderQuoteAnswer() {
       ${a.status === 'accepted' && !a.stale ? renderTreatmentBlock(q) : ''}
       <button class="quote-link-btn" onclick="clearQuoteAnswer()">${a.stale ? 'Record a new answer' : 'Change answer'}</button>`;
   }
-  el.innerHTML = `${renderSentLines(treatmentSourceReport(), q)}<div class="quote-card-title">Client's answer</div>${body}`;
+  el.innerHTML = `<div class="quote-card-title">Client's answer</div>${body}`;
+}
+
+// The bar's Send button says what sending does now.
+function renderQuoteSendLabel() {
+  const el = document.getElementById('quoteSendLabel');
+  const q = quoteState;
+  if (!el || !q) return;
+  el.textContent = !q.sentAt ? 'Send to client' : q.sentHash === quoteContentHash(q) ? 'Send again' : 'Send new version';
 }
 
 let quoteAnswerPad = null;
@@ -970,7 +1084,7 @@ function installQuoteLockGuard() {
   quoteLockGuardInstalled = true;
   const editor = document.getElementById('quoteEditor');
   const stop = e => {
-    if (!isQuoteLocked() || e.target.closest('#quotePdfBtn, #quoteEmailBtn, #quoteAnswer')) return;
+    if (!isQuoteLocked() || e.target.closest('#quotePdfBtn, #quoteEmailBtn, #quoteAnswer, .qi-row, .qi-done, summary')) return;
     if (e.type === 'touchstart') return;
     e.preventDefault();
     e.stopPropagation();

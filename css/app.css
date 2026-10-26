@@ -4584,21 +4584,25 @@ body:not(.dark-screen) .next-section-btn:hover { background: linear-gradient(180
 
 /* ── COMPASS (Orientation) ── */
 .compass-body { align-items: center; text-align: center; }
-.compass-main {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  width: 100%; max-width: 360px; min-height: min(56vh, 340px); margin-top: 8px;
-  border: 3px solid transparent; border-radius: 20px;
-  background: linear-gradient(145deg, var(--accent2) 0%, var(--accent) 60%, var(--accent3) 100%);
-  box-shadow: inset 0 1px 1px rgba(255,255,255,0.3), inset 0 -3px 6px rgba(0,0,0,0.2), 0 8px 24px rgba(var(--glow),0.3);
-  color: #fff; font-family: 'Inter', sans-serif; cursor: pointer;
+.compass-dial { position: relative; width: min(72vw, 280px); aspect-ratio: 1; margin: 14px auto 4px; }
+.compass-pointer {
+  position: absolute; top: -10px; left: 50%; transform: translateX(-50%); z-index: 1;
+  width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent;
+  border-top: 16px solid var(--accent);
 }
-.compass-main:active { transform: scale(0.99); }
+.compass-rose { width: 100%; height: 100%; transition: transform 0.15s linear; }
+.compass-ring { fill: var(--bg); stroke: var(--border); stroke-width: 3; }
+.compass-ticks line { stroke: var(--text2); stroke-width: 2; stroke-linecap: round; }
+.compass-rose text { text-anchor: middle; font-family: 'Inter', sans-serif; font-weight: 700; fill: var(--text); }
+.compass-n { font-size: 26px; fill: #dc2626 !important; }
+.compass-l { font-size: 20px; }
+.compass-s { font-size: 12px; fill: var(--text2) !important; font-weight: 600; }
+.compass-reading { font-size: 32px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; }
+body .compass-body .compass-main.locked { background: var(--accent3); box-shadow: 0 0 0 3px var(--accent); text-shadow: none; }
 .compass-main:disabled { opacity: 0.6; cursor: default; }
-.compass-main.locked { background: var(--accent3); border-color: #fff; box-shadow: 0 0 0 3px var(--accent), 0 8px 24px rgba(var(--glow),0.3); }
-.compass-main-dir { font-size: 40px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.1; padding: 0 12px; }
-.compass-main-deg { font-size: 22px; font-weight: 600; opacity: 0.9; min-height: 1em; }
-.compass-main-hint { font-size: 14px; font-weight: 600; opacity: 0.85; margin-top: 10px; min-height: 1em; }
 .compass-north { font-size: 12px; color: var(--text2); min-height: 1em; }
 .compass-note { font-size: 13px; line-height: 1.45; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; max-width: 360px; }
 .compass-body .extract-btn { max-width: 360px; margin-top: 4px; padding: 16px; font-size: 17px; }
 .compass-body .extract-btn[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .compass-rose { transition: none; } }
+body.reduce-motion .compass-rose { transition: none; }

@@ -5096,9 +5096,11 @@ function checkSecondaryColonyFlag() {
 // A working compass for the Orientation field, so the inspector doesn't
 // leave the app for one. Tapping Orientation opens it. It reads the phone's
 // own compass (iPhone asks once, on the first tap) and turns magnetic north
-// into true north for the job's state. One big button shows the live
-// direction; tapping it locks the reading and brings up Confirm, which fills
-// Orientation. With no compass the button opens the usual list instead.
+// into true north for the job's state. The dial turns live and the green
+// button under it names the direction; tapping it locks the reading and
+// brings up Confirm, which fills Orientation. With no compass the button
+// opens the usual list instead.
+const COMPASS_POINTS_16 = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 const COMPASS_POINTS_8 = ['North', 'North-east', 'East', 'South-east', 'South', 'South-west', 'West', 'North-west'];
 // Rough magnetic declination by state (degrees east), enough to get the
 // 8-point answer right. Capital-city values; the far north of QLD and WA
@@ -5204,9 +5206,11 @@ function renderCompass() {
   const btn = document.getElementById('compassMain');
   btn.classList.toggle('locked', compassLocked != null);
   btn.disabled = !has && !compassFailed;
-  document.getElementById('compassDir').textContent = has ? compassPoint8(h) : compassFailed ? 'Choose from list' : 'Finding north…';
-  document.getElementById('compassDegrees').textContent = has ? `${Math.round(h) % 360}°` : '';
-  document.getElementById('compassHint').textContent = compassLocked != null ? 'Locked. Tap to unlock' : has ? 'Tap to lock' : '';
+  btn.textContent = compassLocked != null ? `${compassPoint8(h)} locked. Tap to unlock`
+    : has ? `${compassPoint8(h)}. Tap to lock` : compassFailed ? 'Choose from list' : 'Finding north…';
+  document.getElementById('compassRose').style.transform = `rotate(${has ? -h : 0}deg)`;
+  document.getElementById('compassPoint').textContent = has ? COMPASS_POINTS_16[Math.round(h / 22.5) % 16] : '';
+  document.getElementById('compassDegrees').textContent = has ? `${Math.round(h) % 360}°` : '--°';
   const dec = compassDeclination();
   document.getElementById('compassNorth').textContent = compassFailed ? '' : dec ? `True north (${dec.state})` : 'Magnetic north';
   document.getElementById('compassConfirmBtn').hidden = compassLocked == null;

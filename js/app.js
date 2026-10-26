@@ -5092,6 +5092,122 @@ function checkSecondaryColonyFlag() {
   banner.style.display = isAboveGroundLeak(reportData.leakLocation) ? 'flex' : 'none';
 }
 
+// ── COMPASS ─────────────────────────────────────────────────────────────
+// A working compass for the Orientation field, so the inspector doesn't
+// leave the app for one. It reads the phone's own compass (iPhone asks
+// once, on the first tap), turns magnetic north into true north for the
+// job's state, and "Use" fills Orientation with the nearest of its 8 answers.
+const COMPASS_POINTS_16 = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+const COMPASS_POINTS_8 = ['North', 'North-east', 'East', 'South-east', 'South', 'South-west', 'West', 'North-west'];
+// Rough magnetic declination by state (degrees east), enough to get the
+// 8-point answer right. Capital-city values; the far north of QLD and WA
+// differ by a few degrees.
+const STATE_DECLINATION = { NSW: 12.5, ACT: 12.5, VIC: 11.5, TAS: 14.5, QLD: 10, SA: 8, WA: 0, NT: 4 };
+let compassHeading = null;   // smoothed true heading, degrees clockwise from north
+let compassListening = null; // the event name being listened to
+let compassNoSignalTimer = null;
+
+function compassDeclination() {
+  const state = (document.getElementById('jobState') || {}).value || reportData.propertyState || '';
+  return STATE_DECLINATION[state] != null ? { deg: STATE_DECLINATION[state], state } : null;
+}
+
+function compassPoint8(h) { return COMPASS_POINTS_8[Math.round(h / 45) % 8]; }
+
+async function openCompass() {
+  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  compassHeading = null;
+  document.getElementById('compassOverlay').classList.add('open');
+  renderCompass();
+  // iPhone: the permission prompt has to come from this tap.
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try {
+      if (await DeviceOrientationEvent.requestPermission() !== 'granted') {
+        setCompassNote('SAYON needs motion access for the compass. Allow it in Settings › Safari › Motion & Orientation Access, then try again.');
+        return;
+      }
+    } catch (e) {
+      setCompassNote('Could not start the compass. Close this and tap Compass again.');
+      return;
+    }
+  }
+  startCompass();
+  track('compass_opened');
+}
+
+function startCompass() {
+  stopCompass();
+  compassListening = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
+  window.addEventListener(compassListening, onCompassReading);
+  setCompassNote('');
+  compassNoSignalTimer = setTimeout(() => {
+    if (compassHeading == null) setCompassNote('No compass reading from this device. Phones have one; most computers don\'t.');
+  }, 2500);
+}
+
+function stopCompass() {
+  if (compassListening) window.removeEventListener(compassListening, onCompassReading);
+  compassListening = null;
+  clearTimeout(compassNoSignalTimer);
+}
+
+function closeCompass() {
+  stopCompass();
+  document.getElementById('compassOverlay').classList.remove('open');
+}
+
+function onCompassReading(e) {
+  let magnetic = null;
+  if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) {
+    magnetic = e.webkitCompassHeading; // iPhone: already clockwise from north
+  } else if (e.absolute && typeof e.alpha === 'number') {
+    // Android: alpha turns anticlockwise; correct for a sideways screen.
+    const turn = (screen.orientation && screen.orientation.angle) || 0;
+    magnetic = (360 - e.alpha + turn) % 360;
+  }
+  if (magnetic == null) return;
+  const dec = compassDeclination();
+  const heading = (magnetic + (dec ? dec.deg : 0) + 360) % 360;
+  // Smooth the jitter, going the short way round past north.
+  if (compassHeading == null) compassHeading = heading;
+  else {
+    const diff = ((heading - compassHeading + 540) % 360) - 180;
+    compassHeading = (compassHeading + diff * 0.25 + 360) % 360;
+  }
+  const poor = typeof e.webkitCompassAccuracy === 'number' && (e.webkitCompassAccuracy < 0 || e.webkitCompassAccuracy > 25);
+  setCompassNote(poor ? 'Reading is rough. Move the phone in a figure 8 a few times, and away from cars and meter boxes.' : '');
+  renderCompass();
+}
+
+function setCompassNote(text) {
+  const note = document.getElementById('compassNote');
+  if (note) { note.textContent = text; note.hidden = !text; }
+}
+
+function renderCompass() {
+  const h = compassHeading;
+  const has = h != null;
+  document.getElementById('compassRose').style.transform = `rotate(${has ? -h : 0}deg)`;
+  document.getElementById('compassDegrees').textContent = has ? `${Math.round(h) % 360}°` : '--°';
+  document.getElementById('compassPoint').textContent = has ? COMPASS_POINTS_16[Math.round(h / 22.5) % 16] : '';
+  const dec = compassDeclination();
+  document.getElementById('compassNorth').textContent = dec
+    ? `True north, adjusted for ${dec.state}`
+    : 'Magnetic north. Set the job\'s state for true north.';
+  const btn = document.getElementById('compassUseBtn');
+  btn.disabled = !has;
+  btn.textContent = has ? `Use ${compassPoint8(h)} for Orientation` : 'Waiting for the compass…';
+}
+
+function useCompassHeading() {
+  if (compassHeading == null) return;
+  const el = document.getElementById('f-facadeDirection');
+  const value = compassPoint8(compassHeading);
+  closeCompass();
+  if (el) commitEdit(el, 'facadeDirection', value);
+  showToast(`Orientation set to ${value}`, 'success');
+}
+
 // ── MOISTURE METER READINGS ─────────────────────────────────────────────
 // reportData.moistureTable is a list of { id, location, reading } rows,
 // e.g. { location: 'Base of shower wall, bathroom', reading: '28%' }.

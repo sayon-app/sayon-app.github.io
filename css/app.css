@@ -3438,6 +3438,14 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 .dash-timeline li.now .dash-timeline-dot { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.16); }
 .dash-timeline li.bad .dash-timeline-dot { background: var(--risk); border-color: var(--risk); }
 .dash-timeline li.skip { opacity: 0.5; }
+.dash-timeline-btn {
+  position: relative; display: block; width: calc(100% + 8px); margin: -6px 0 -6px -8px; padding: 6px 34px 6px 8px;
+  border: none; border-radius: 10px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  min-height: 44px; box-sizing: border-box;
+}
+.dash-timeline-btn:hover, .dash-timeline-btn:focus-visible { background: rgba(var(--accent-rgb), 0.08); outline: none; }
+.dash-timeline-btn:active { background: rgba(var(--accent-rgb), 0.14); }
+.dash-timeline-chev { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: var(--text3); }
 .dash-timeline-label { display: block; font-size: 14px; font-weight: 700; color: var(--text); }
 .dash-timeline-text { display: block; margin-top: 2px; font-size: 13px; color: var(--text2); }
 .dash-timeline li.now .dash-timeline-label { color: var(--accent2); }

@@ -241,20 +241,6 @@ body:not(.dark-screen) .quote-card-head {
    that keeps the total and Send on screen. ── */
 .quote-source-pick { display: none; }
 
-.quote-head { padding: 4px 2px 6px; }
-.quote-head-addr { font: 700 21px/1.25 'Space Grotesk', sans-serif; letter-spacing: -0.3px; color: var(--text); }
-.quote-head-meta { margin-top: 3px; font-size: 13px; color: var(--text3); }
-.quote-steps { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.quote-steps li { position: relative; display: flex; flex-direction: column; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--text3); line-height: 1.25; }
-.quote-steps li::before { content: ''; display: block; height: 3px; border-radius: 3px; background: var(--border2); }
-.quote-step-dot { display: none; }
-.quote-steps li.done::before { background: var(--accent); }
-.quote-steps li.now::before { background: linear-gradient(90deg, var(--accent), rgba(var(--accent-rgb), 0.25)); }
-.quote-steps li.now { color: var(--text); }
-.quote-steps li.warn::before { background: #E0A100; }
-.quote-steps li.bad::before { background: var(--risk); }
-.quote-steps li.skip { opacity: 0.45; }
-
 .quote-card-count { font-size: 12px; color: var(--text3); font-weight: 600; }
 
 .qi { border-bottom: 1px solid var(--border); }
@@ -266,7 +252,6 @@ body:not(.dark-screen) .quote-card-head {
 }
 .qi-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .qi-desc { font-size: 14.5px; font-weight: 600; color: var(--text); line-height: 1.3; }
-.qi-sub { font-size: 12.5px; color: var(--text3); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qi-end { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
 .qi-price { font: 700 14.5px 'Inter', sans-serif; color: var(--text); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .qi-tag { font-size: 10.5px; font-weight: 700; color: #8a5a00; background: #fff4dc; border-radius: 5px; padding: 2px 6px; white-space: nowrap; }
@@ -274,7 +259,6 @@ body:not(.dark-screen) .quote-card-head {
 .qi.open .qi-chev { transform: rotate(180deg); }
 .qi-edit { display: none; flex-direction: column; gap: 10px; padding: 2px 2px 14px; }
 .qi.open .qi-edit { display: flex; }
-.qi.open .qi-sub { white-space: normal; }
 .qi-edit .quote-item-desc, .qi-edit .quote-item-detail { resize: none; overflow: hidden; line-height: 1.4; min-height: 44px; font-family: inherit; }
 .qi-edit .quote-item-desc { font-weight: 600; }
 .quote-item-nums { display: grid; grid-template-columns: 0.8fr 1fr 1.4fr; gap: 8px; }
@@ -306,11 +290,6 @@ body:not(.dark-screen) .quote-card-head {
 .quote-fold > :last-child { margin-bottom: 14px; }
 .quote-fold > .quote-field + .quote-field, .quote-fold > .quote-hint + .quote-field { margin-top: 12px; }
 
-.quote-answer.quiet {
-  flex-direction: row; flex-wrap: wrap; align-items: center; gap: 2px 14px;
-  padding: 4px 14px; font-size: 13px; color: var(--text2);
-}
-
 .quote-bar {
   flex-shrink: 0;
   display: flex; align-items: center; gap: 8px;
@@ -325,20 +304,87 @@ body:not(.dark-screen) .quote-card-head {
 .quote-bar .quote-btn { flex: none; height: 46px; padding: 0 14px; }
 .quote-bar-send { padding: 0 18px; }
 
-/* On the dark backdrop the header text is light. */
-body:not(.dark-screen) .quote-head-addr { color: var(--on-ink); }
-body:not(.dark-screen) .quote-head-meta,
-body:not(.dark-screen) .quote-steps li { color: var(--on-ink2); }
-body:not(.dark-screen) .quote-steps li.now { color: var(--on-ink); }
-body:not(.dark-screen) .quote-steps li::before { background: rgba(255,255,255,0.16); }
-body:not(.dark-screen) .quote-steps li.done::before { background: #2DD4BF; }
-body:not(.dark-screen) .quote-steps li.now::before { background: linear-gradient(90deg, #2DD4BF, rgba(45,212,191,0.25)); }
-body:not(.dark-screen) .quote-steps li.warn::before { background: #F0B429; }
-body:not(.dark-screen) .quote-steps li.bad::before { background: #FF6B5F; }
-body:not(.dark-screen) .quote-answer.quiet { background: transparent; box-shadow: none; color: var(--on-ink2); }
-body:not(.dark-screen) .quote-answer.quiet .quote-text-btn { color: #5EEAD4; }
 body:not(.dark-screen) .quote-bar { background: var(--ink); border-top-color: rgba(255,255,255,0.08); }
 body:not(.dark-screen) .quote-bar-label { color: var(--on-ink2); }
 body:not(.dark-screen) .quote-bar-amount { color: var(--on-ink); }
 body:not(.dark-screen) .quote-bar .quote-bar-pdf { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.16); color: var(--on-ink); }
 body:not(.dark-screen) .quote-fold > summary .quote-card-title { padding: 0; border: none; }
+
+/* ── Header: who it's for, big, then where, with a pill for where it's up to.
+   One type scale for the screen: 28 the client, 17 a section, 15 a line,
+   13 the detail under it. ── */
+.quote-head { padding: 8px 2px 10px; }
+.quote-hero-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.quote-hero-kicker { font-size: 11px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: #5EEAD4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quote-hero-pill {
+  flex-shrink: 0; padding: 5px 11px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+  background: rgba(255,255,255,0.1); color: var(--on-ink);
+}
+.quote-hero-pill.wait { background: rgba(94,234,212,0.14); color: #5EEAD4; }
+.quote-hero-pill.good { background: #2DD4BF; color: var(--ink); box-shadow: 0 0 18px rgba(45,212,191,0.45); }
+.quote-hero-pill.warn { background: rgba(240,180,41,0.18); color: #F7C948; }
+.quote-hero-pill.bad { background: rgba(255,107,95,0.18); color: #FF8A80; }
+.quote-hero-name {
+  display: block; margin: 10px 0 0; padding: 0; border: none; background: none; cursor: pointer; text-align: left;
+  font: 700 28px/1.15 'Space Grotesk', sans-serif; letter-spacing: -0.6px; color: var(--on-ink);
+}
+.quote-hero-name.empty { color: var(--on-ink2); font-size: 22px; text-decoration: underline dashed rgba(255,255,255,0.3); text-underline-offset: 6px; }
+.quote-hero-addr { display: flex; align-items: flex-start; gap: 6px; margin-top: 8px; font-size: 15px; line-height: 1.35; color: var(--on-ink2); }
+.quote-hero-addr .icon { flex-shrink: 0; margin-top: 2px; color: #5EEAD4; }
+
+/* Section titles, in place of the small caps. */
+.quote-card-title { font: 700 17px 'Space Grotesk', sans-serif; letter-spacing: -0.2px; text-transform: none; color: var(--text); }
+body:not(.dark-screen) .quote-card-title { color: var(--text); }
+.quote-card-count { font-size: 13px; }
+.qi-desc { font-size: 15px; }
+.qi-price { font-size: 15px; }
+
+/* ── Progress: the job's four steps down a line, at the foot. ── */
+.qp { list-style: none; margin: 4px 0 0; padding: 0; }
+.qp-step { position: relative; display: flex; gap: 12px; padding-bottom: 18px; }
+.qp-step:last-child { padding-bottom: 2px; }
+.qp-step::before {
+  content: ''; position: absolute; left: 13px; top: 30px; bottom: 2px; width: 2px;
+  border-radius: 2px; background: var(--border2);
+}
+.qp-step:last-child::before { display: none; }
+.qp-step.done::before { background: linear-gradient(rgb(var(--glow)), rgba(var(--glow), 0.35)); }
+.qp-dot {
+  flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font: 700 12px 'Inter', sans-serif; color: var(--text3);
+  background: var(--surface2); border: 2px solid var(--border2);
+}
+.qp-step.done .qp-dot { background: linear-gradient(145deg, #2DD4BF, var(--accent2)); border-color: transparent; color: #fff; }
+.qp-step.now .qp-dot { border-color: var(--accent); color: var(--accent2); background: #fff; box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.16); }
+.qp-step.warn .qp-dot { border-color: #E0A100; color: #8a5a00; background: #FFF6E0; }
+.qp-step.bad .qp-dot { border-color: var(--risk); color: var(--risk); background: #FDECEA; }
+.qp-step.skip { opacity: 0.5; }
+.qp-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding-top: 3px; }
+.qp-title { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.3; }
+.qp-step.todo .qp-title, .qp-step.skip .qp-title { color: var(--text2); }
+.qp-text { font-size: 13px; color: var(--text2); line-height: 1.45; margin-top: -4px; }
+.qp-step.done .qp-text strong { color: var(--green); }
+.qp-step.bad .qp-text strong { color: var(--risk); }
+.qp-step.warn .qp-text { color: var(--yellow-text); }
+.qp-links { display: flex; gap: 18px; margin-top: -4px; }
+.qp-links .quote-text-btn, .qp-body > .quote-text-btn { padding: 6px 0; min-height: 36px; align-self: flex-start; }
+.qp-body .quote-answer-btns { margin-top: 2px; }
+.qp-body .quote-step-btn { margin-top: 2px; }
+
+/* What the quote fixes, under the address. Tapping it opens it to change. */
+.quote-hero-problem {
+  display: flex; flex-direction: column; gap: 4px; width: 100%;
+  margin-top: 14px; padding: 11px 14px; text-align: left; cursor: pointer;
+  border: 1px solid rgba(94,234,212,0.22); border-left: 3px solid #2DD4BF; border-radius: 12px;
+  background: linear-gradient(135deg, rgba(45,212,191,0.14), rgba(45,212,191,0.03));
+}
+.quote-hero-problem-label { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #5EEAD4; }
+.quote-hero-problem-text { font-size: 14.5px; line-height: 1.45; color: var(--on-ink); }
+
+/* The folded work row carries the total. */
+.quote-work-total { flex-shrink: 0; font: 700 17px 'Space Grotesk', sans-serif; color: var(--accent2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.quote-work-fold[open] > summary { border-bottom: 1px solid var(--border); margin-bottom: 2px; }
+.quote-work-fold[open] .quote-work-total { visibility: hidden; }
+.qi-row { min-height: 52px; }

@@ -283,11 +283,13 @@
         <div class="quote-lock-note" id="quoteLockNote" style="display:none">This job is complete, so the quote is locked. Amend the job from its report to change it.</div>
         <div class="quote-company-gaps" id="quoteCompanyGaps" style="display:none"></div>
 
-        <div class="quote-card">
-          <div class="quote-card-head">
-            <div class="quote-card-title">Work to quote</div>
-            <div class="quote-card-count" id="quoteItemCount"></div>
-          </div>
+        <!-- The work, folded to one row with its total until it's opened. -->
+        <details class="quote-card quote-fold quote-work-fold" id="quoteWorkFold">
+          <summary>
+            <span class="quote-fold-text"><span class="quote-card-title">Work to quote</span><span class="quote-fold-sub" id="quoteItemCount"></span></span>
+            <span class="quote-work-total" id="quoteWorkTotal"></span>
+            <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
           <div id="quoteSystemChoice" class="quote-system-choice" style="display:none"></div>
           <div id="quoteItems"></div>
           <button class="quote-add-btn" onclick="addQuoteItem()">+ Add a line</button>
@@ -301,9 +303,9 @@
           </div>
           <div class="quote-hint" id="quoteStartHint"></div>
           <button class="quote-text-btn" onclick="rebuildQuoteFromReport()">Start the lines again from the report</button>
-        </div>
+        </details>
 
-        <details class="quote-card quote-fold" id="quoteDetailsFold">
+        <details class="quote-card quote-fold" id="quoteDetailsFold" ontoggle="this.querySelectorAll('.quote-textarea').forEach(fitQuoteText)">
           <summary>
             <span class="quote-fold-text"><span class="quote-card-title">Client and quote details</span><span class="quote-fold-sub" id="quoteDetailsSub"></span></span>
             <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
@@ -313,12 +315,13 @@
             <label class="quote-field"><span>Phone</span><input class="quote-input" id="qClientPhone" type="tel" inputmode="tel" onchange="tidyPhoneInput(this)" oninput="onQuoteFieldInput()"></label>
             <label class="quote-field wide"><span>Email</span><input class="quote-input" id="qClientEmail" type="email" oninput="onQuoteFieldInput()"></label>
             <label class="quote-field wide"><span>Property address</span><input class="quote-input" id="qAddress" oninput="onQuoteFieldInput()"></label>
+            <label class="quote-field wide"><span>What this quote fixes</span><textarea class="quote-input quote-textarea" id="qProblem" rows="2" placeholder="e.g. Live termites found (front porch post)" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea></label>
             <label class="quote-field"><span>Quote no.</span><input class="quote-input" id="qNumber" oninput="onQuoteFieldInput()"></label>
             <label class="quote-field"><span>Valid for (days)</span><input class="quote-input" id="qValidDays" type="number" min="1" inputmode="numeric" oninput="onQuoteFieldInput()"></label>
           </div>
         </details>
 
-        <details class="quote-card quote-fold" id="quoteTermsFold">
+        <details class="quote-card quote-fold" id="quoteTermsFold" ontoggle="this.querySelectorAll('.quote-textarea').forEach(fitQuoteText)">
           <summary>
             <span class="quote-fold-text"><span class="quote-card-title">Terms and exclusions</span><span class="quote-fold-sub" id="quoteTermsSub"></span></span>
             <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>

@@ -366,6 +366,47 @@ function buildQuoteItemsFromReport(rd, system) {
   return items;
 }
 
+// What the quote fixes, in a sentence or two for the client, from the
+// report's findings: live termites and where, past activity, live borers,
+// and the conditions that invite termites. Locations are as the inspector
+// wrote them. No risk rating and no verdict on the structure.
+function buildQuoteProblem(rd) {
+  rd = rd || {};
+  const lc = v => { v = (v || '').trim(); return /^[A-Z][a-z]/.test(v) ? v[0].toLowerCase() + v.slice(1) : v; };
+  const where = list => list.length ? ` (${list.join('; ')})` : '';
+  const findings = (Array.isArray(rd.findings) ? rd.findings : []).filter(f => f && f.termiteActivity);
+  const at = status => findings.filter(f => f.termiteActivity === status).map(f => lc(f.activityLocation)).filter(Boolean);
+  const out = [];
+  if (findings.some(f => f.termiteActivity === 'ACTIVE')) out.push(`Live termites found${where(at('ACTIVE'))}.`);
+  if (findings.some(f => f.termiteActivity === 'INACTIVE')) out.push(`Signs of past termite activity${where(at('INACTIVE'))}.`);
+  if (rd.borerActivity === 'ACTIVE') {
+    const live = (Array.isArray(rd.borerFindings) ? rd.borerFindings : []).filter(b => b && b.borerActivity === 'ACTIVE').map(b => lc(b.location)).filter(Boolean);
+    out.push(`Live borers found${where(live)}.`);
+  }
+  const conditions = [
+    rd.timberSoil === 'YES' && 'timber touching the soil',
+    rd.weepHoles === 'BRIDGED' && 'bridged weep holes',
+    rd.slabEdge === 'OBSTRUCTED' && 'a concealed slab edge',
+    rd.waterLeaks === 'YES' && 'moisture from a leak',
+  ].filter(Boolean);
+  if (conditions.length) {
+    const list = conditions.length < 2 ? conditions[0] : conditions.slice(0, -1).join(', ') + ' and ' + conditions[conditions.length - 1];
+    out.push(`Conditions that invite termites: ${list}.`);
+  }
+  if (!out.length && rd.treatmentRecommended === 'YES') out.push('The inspection report recommends a termite treatment.');
+  return out.join(' ');
+}
+
+// The quote's own wording once it has one, else fresh from the report.
+// Quotes made before this was added have none, and aren't given one until
+// it's edited, so a quote already sent doesn't read as changed.
+function quoteProblem(q) {
+  if (q && typeof q.problem === 'string') return q.problem;
+  const src = currentQuoteSource();
+  const rd = src && (src.key === (currentReportId || 'draft') ? reportData : src.reportData);
+  return buildQuoteProblem(rd);
+}
+
 function buildQuoteExclusions(rd) {
   rd = rd || {};
   const out = [];
@@ -421,6 +462,7 @@ function createQuoteFromSource(src) {
     inspectionDate: rd.jobInspectionDate || (rd.agreement && rd.agreement.inspectionDate) || src.date || null,
     validDays: 30,
     gst: defaultQuoteGst(),
+    problem: buildQuoteProblem(rd),
     items: buildQuoteItemsFromReport(rd),
     systemChoice: newSystemChoice(rd),
     exclusions: buildQuoteExclusions(rd).join('\n'),
@@ -503,6 +545,9 @@ function onQuoteSourceChange() {
   editor.style.display = 'flex';
   bar.style.display = '';
   ['quoteDetailsFold', 'quoteTermsFold'].forEach(id => { document.getElementById(id).open = false; });
+  // The work stays folded unless there's a system to pick or no lines yet.
+  const c = quoteState.systemChoice;
+  document.getElementById('quoteWorkFold').open = !quoteState.items.length || !!(c && !c.picked && c.options && c.options.length);
   editor.querySelectorAll('.quote-item-desc, .quote-item-detail, .quote-textarea').forEach(fitQuoteText);
 }
 
@@ -514,6 +559,7 @@ function renderQuoteEditor() {
   document.getElementById('qAddress').value = q.address || '';
   document.getElementById('qNumber').value = q.number || '';
   document.getElementById('qValidDays').value = q.validDays || '';
+  document.getElementById('qProblem').value = quoteProblem(q);
   document.getElementById('qGst').checked = q.gst !== false;
   document.getElementById('qExclusions').value = q.exclusions || '';
   document.getElementById('qPaymentTerms').value = q.paymentTerms || '';
@@ -522,7 +568,7 @@ function renderQuoteEditor() {
   renderQuoteCompanyGaps();
   renderQuoteFolds();
   renderQuoteAnswer();
-  ['qPaymentTerms', 'qExclusions', 'qNotes'].forEach(id => fitQuoteText(document.getElementById(id)));
+  ['qProblem', 'qPaymentTerms', 'qExclusions', 'qNotes'].forEach(id => fitQuoteText(document.getElementById(id)));
 }
 
 // Where the quote is up to, for the pill in the header.
@@ -544,18 +590,25 @@ function renderQuoteHead() {
   if (!q || !el) return;
   const [pill, tone] = quoteStatusPill(q);
   const name = (q.client || '').trim();
+  const problem = quoteProblem(q).trim();
   el.innerHTML = `<div class="quote-hero-top">
       <span class="quote-hero-kicker">Quote${q.number ? ' · ' + escapeHtml(q.number) : ''}</span>
       <span class="quote-hero-pill ${tone}">${escapeHtml(pill)}</span>
     </div>
     <button type="button" class="quote-hero-name${name ? '' : ' empty'}" onclick="openQuoteDetails()">${name ? escapeHtml(name) : 'Add the client\'s name'}</button>
-    <div class="quote-hero-addr"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg><span>${escapeHtml(q.address || 'No address yet')}</span></div>`;
+    <div class="quote-hero-addr"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg><span>${escapeHtml(q.address || 'No address yet')}</span></div>
+    ${problem ? `<button type="button" class="quote-hero-problem" onclick="openQuoteDetails('qProblem')">
+      <span class="quote-hero-problem-label">What this quote fixes</span>
+      <span class="quote-hero-problem-text">${escapeHtml(problem)}</span>
+    </button>` : ''}`;
 }
 
-function openQuoteDetails() {
+function openQuoteDetails(focusId) {
   const fold = document.getElementById('quoteDetailsFold');
   fold.open = true;
-  fold.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const target = focusId ? document.getElementById(focusId) : fold;
+  fitQuoteText(document.getElementById('qProblem'));
+  target.scrollIntoView({ behavior: 'smooth', block: focusId ? 'center' : 'start' });
 }
 
 // The one-line summaries on the folded sections.
@@ -622,18 +675,9 @@ function markQuotePriceSet(id) {
   renderQuoteStartHint();
 }
 
-// Lines show as short rows: what, how many, and the price. A tap opens the
+// Lines show as short rows: what, and the price. A tap opens the
 // line to change it. Open lines stay open while the quote is redrawn.
 const quoteOpenItems = new Set();
-
-function quoteItemSub(it) {
-  const qty = parseFloat(it.qty);
-  const n = isFinite(qty) ? qty : 0;
-  const price = parseFloat(it.price);
-  const unit = pluralUnit(it.unit, n);
-  const each = n !== 1 && isFinite(price) ? ` × ${formatAUD(price).replace(/\.00$/, '')}` : '';
-  return [`${n}${unit ? ' ' + unit : ''}${each}`, (it.detail || '').trim()].filter(Boolean).join(' · ');
-}
 
 function quoteItemHTML(it) {
   const open = quoteOpenItems.has(it.id);
@@ -642,7 +686,6 @@ function quoteItemHTML(it) {
     <button type="button" class="qi-row" onclick="toggleQuoteItem('${id}')" aria-expanded="${open}">
       <span class="qi-main">
         <span class="qi-desc">${escapeHtml(it.desc || 'New line')}</span>
-        <span class="qi-sub">${escapeHtml(quoteItemSub(it))}</span>
       </span>
       <span class="qi-end">
         <span class="qi-price" id="qiTotal_${id}">${formatAUD(lineTotal(it))}</span>
@@ -691,16 +734,27 @@ function renderQuoteItems() {
     wrap.innerHTML = quoteState.items.map(quoteItemHTML).join('');
     wrap.querySelectorAll('.qi.open .quote-item-desc, .qi.open .quote-item-detail').forEach(fitQuoteText);
   }
-  const n = quoteState.items.length;
-  document.getElementById('quoteItemCount').textContent = n ? `${n} line${n === 1 ? '' : 's'}` : '';
   renderQuoteStartHint();
   renderQuoteTotals();
+}
+
+// The folded work row: how many lines, any prices still to check, the total.
+function renderQuoteWorkSummary() {
+  const q = quoteState;
+  const sub = document.getElementById('quoteItemCount');
+  if (!q || !sub) return;
+  const n = q.items.length;
+  const starting = q.items.filter(isStartingPrice).length;
+  sub.textContent = !n ? 'No lines yet' : `${n} line${n === 1 ? '' : 's'}` + (starting ? ` · ${starting} price${starting === 1 ? '' : 's'} to check` : '');
+  sub.classList.toggle('warn', !n || starting > 0);
+  document.getElementById('quoteWorkTotal').textContent = n ? formatAUD(quoteTotals(q).total) : '';
 }
 
 // Explains the amber tag, only while a line still has one.
 function renderQuoteStartHint() {
   const el = document.getElementById('quoteStartHint');
   if (!el || !quoteState) return;
+  renderQuoteWorkSummary();
   const any = quoteState.items.some(isStartingPrice);
   el.style.display = any ? '' : 'none';
   el.innerHTML = any ? '<b>Starting price</b> is a suggested rate. Tap a line to set your own, and new quotes start at your price.' : '';
@@ -742,6 +796,7 @@ function renderQuoteTotals() {
   document.getElementById('qTotal').textContent = formatAUD(t.total);
   document.getElementById('quoteBarAmount').textContent = formatAUD(t.total);
   document.getElementById('quoteBarLabel').textContent = quoteState.gst !== false ? 'Total inc GST' : 'Total';
+  renderQuoteWorkSummary();
 }
 
 // ── EDITING ─────────────────────────────────────────────────────────────────
@@ -754,6 +809,8 @@ function onQuoteFieldInput() {
   q.address = document.getElementById('qAddress').value;
   q.number = document.getElementById('qNumber').value;
   q.validDays = parseInt(document.getElementById('qValidDays').value, 10) || '';
+  const problem = document.getElementById('qProblem').value;
+  if (problem !== quoteProblem(q)) q.problem = problem;
   if (q.gst !== document.getElementById('qGst').checked) {
     q.gst = document.getElementById('qGst').checked;
     rememberQuoteGst(q.gst);
@@ -774,7 +831,6 @@ function updateQuoteItem(id, field, value) {
   const row = document.querySelector(`.qi[data-id="${id}"]`);
   if (row) {
     row.querySelector('.qi-desc').textContent = it.desc || 'New line';
-    row.querySelector('.qi-sub').textContent = quoteItemSub(it);
   }
   if (field === 'qty' || field === 'price') {
     const cell = document.getElementById('qiTotal_' + id);
@@ -806,11 +862,13 @@ function removeQuoteItem(id) {
 function rebuildQuoteFromReport() {
   const src = currentQuoteSource();
   if (!src || !quoteState) return;
-  if (quoteState.items.length && !confirm('Replace the line items and exclusions with fresh ones from the report? Your edits to them will be lost.')) return;
+  if (quoteState.items.length && !confirm('Replace the line items, exclusions and the problem with fresh ones from the report? Your edits to them will be lost.')) return;
   quoteState.items = buildQuoteItemsFromReport(src.reportData);
   quoteState.systemChoice = newSystemChoice(src.reportData);
   quoteState.exclusions = buildQuoteExclusions(src.reportData).join('\n');
+  quoteState.problem = buildQuoteProblem(src.reportData);
   document.getElementById('qExclusions').value = quoteState.exclusions;
+  document.getElementById('qProblem').value = quoteState.problem;
   quoteOpenItems.clear();
   renderQuoteItems();
   renderQuoteFolds();
@@ -1127,7 +1185,7 @@ function installQuoteLockGuard() {
   quoteLockGuardInstalled = true;
   const editor = document.getElementById('quoteEditor');
   const stop = e => {
-    if (!isQuoteLocked() || e.target.closest('#quotePdfBtn, #quoteEmailBtn, #quoteAnswer, .qi-row, .qi-done, .quote-hero-name, summary')) return;
+    if (!isQuoteLocked() || e.target.closest('#quotePdfBtn, #quoteEmailBtn, #quoteAnswer, .qi-row, .qi-done, .quote-hero-name, .quote-hero-problem, summary')) return;
     if (e.type === 'touchstart') return;
     e.preventDefault();
     e.stopPropagation();
@@ -1351,6 +1409,22 @@ function buildQuotePDF(q) {
     ['INSPECTION DATE', q.inspectionDate ? fmtDate(q.inspectionDate) : ''],
     ['INSPECTOR', q.inspector],
   ] });
+
+  // What the quote fixes, so the scope below reads as the answer to it.
+  const problem = quoteProblem(q).trim();
+  if (problem) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+    const lines = doc.splitTextToSize(problem, CW - 12);
+    const h = 11 + lines.length * 4.6;
+    ensure(h + 6);
+    doc.setFillColor(...C.accentLight); doc.roundedRect(M, y, CW, h, 2, 2, 'F');
+    doc.setFillColor(...C.accent); doc.rect(M, y, 1.4, h, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...C.accentDark);
+    pdfTracked(doc, 'WHAT THIS QUOTE FIXES', M + 6, y + 6, { cs: 0.5 });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...C.ink);
+    doc.text(lines, M + 6, y + 11.5);
+    y += h + 7;
+  }
 
   // ── 1. SCOPE OF WORKS ──
   sectionTitle('SCOPE OF WORKS', 1);

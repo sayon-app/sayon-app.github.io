@@ -7063,7 +7063,7 @@ function toggleDrawer() {
   const isOpen = sidebar.classList.toggle('open');
   if (isOpen) showMenuPage(null);
   overlay.classList.toggle('open', isOpen);
-  btn.classList.toggle('open', isOpen);
+  if (btn) btn.classList.toggle('open', isOpen);
   if (dock) dock.classList.toggle('drawer-is-open', isOpen);
 }
 
@@ -7096,6 +7096,36 @@ function showMenuPage(panelId) {
 function openDashboardFromMenu() {
   toggleDrawer();
   openDashboard();
+}
+
+// ── BOTTOM TABS ──────────────────────────────────────────────────────────
+// Jobs, Report, Quote and Menu along the bottom (Account opens its own
+// menu). Each tab closes whatever is over the report, then opens its place.
+// Which tab is lit is css, read off the screens that are open.
+function tabGo(to) {
+  closeProfileMenu();
+  const isOpen = id => document.getElementById(id).classList.contains('open');
+  if (to === 'quote') {
+    if (isOpen('quoteScreen')) return;
+    if (isOpen('sidebarPanel')) toggleDrawer();
+    if (isOpen('dashboardOverlay')) closeDashboard();
+    openQuoteFromReport();
+    return;
+  }
+  if (isOpen('quoteScreen')) {
+    closeQuote();
+    // A quote opened from the start menu goes back there; the tabs go to the app.
+    if (document.getElementById('app').style.display !== 'flex') openApp('inspect');
+  }
+  if (to === 'menu') {
+    if (isOpen('dashboardOverlay')) closeDashboard();
+    if (isOpen('sidebarPanel')) showMenuPage(null); else toggleDrawer();
+    return;
+  }
+  if (isOpen('sidebarPanel')) toggleDrawer();
+  if (to === 'jobs') {
+    if (isOpen('dashboardOverlay')) closeDashboardDetail(); else openDashboard();
+  } else if (isOpen('dashboardOverlay')) closeDashboard();
 }
 
 function toggleVoicePopover() {

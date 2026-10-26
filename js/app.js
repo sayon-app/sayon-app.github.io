@@ -163,7 +163,6 @@ function closeBusinessForm() {
 }
 
 function openBusinessFromProfile() {
-  closeProfileMenu();
   openBusinessForm();
 }
 
@@ -7058,13 +7057,9 @@ function renderPhotoGrid() {
 function toggleDrawer() {
   const sidebar = document.getElementById('sidebarPanel');
   const overlay = document.getElementById('drawerOverlay');
-  const btn = document.getElementById('hamburgerBtn');
-  const dock = document.getElementById('micDock');
   const isOpen = sidebar.classList.toggle('open');
-  if (isOpen) showMenuPage(null);
+  if (isOpen) { showMenuPage(null); renderProfileMenu(); }
   overlay.classList.toggle('open', isOpen);
-  btn.classList.toggle('open', isOpen);
-  if (dock) dock.classList.toggle('drawer-is-open', isOpen);
 }
 
 // ── MENU ─────────────────────────────────────────────────────────────────
@@ -7093,9 +7088,48 @@ function showMenuPage(panelId) {
   if (panel) track('screen_viewed', { screen: 'menu_' + panelId });
 }
 
-function openDashboardFromMenu() {
-  toggleDrawer();
-  openDashboard();
+
+// ── BOTTOM TABS ──────────────────────────────────────────────────────────
+// Dashboard, Report, the mic, Quote and Menu along the bottom, in the order
+// a job runs. Each tab closes whatever is over the report, then opens its
+// place. Which tab is lit is css, read off the screens that are open.
+function tabGo(to) {
+  const isOpen = id => document.getElementById(id).classList.contains('open');
+  if (to !== 'report' && isOpen('voicePopover')) toggleVoicePopover();
+  if (to === 'quote') {
+    if (isOpen('quoteScreen')) return;
+    if (isOpen('sidebarPanel')) toggleDrawer();
+    if (isOpen('dashboardOverlay')) closeDashboard();
+    openQuoteFromReport();
+    return;
+  }
+  if (isOpen('quoteScreen')) {
+    closeQuote();
+    // A quote opened from the start menu goes back there; the tabs go to the app.
+    if (document.getElementById('app').style.display !== 'flex') openApp('inspect');
+  }
+  if (to === 'menu') {
+    if (isOpen('dashboardOverlay')) closeDashboard();
+    if (isOpen('sidebarPanel')) showMenuPage(null); else toggleDrawer();
+    return;
+  }
+  if (isOpen('sidebarPanel')) toggleDrawer();
+  if (to === 'dashboard') {
+    if (isOpen('dashboardOverlay')) closeDashboardDetail(); else openDashboard();
+  } else if (isOpen('dashboardOverlay')) closeDashboard();
+}
+
+// The mic is for the report: from anywhere else it goes to the report and
+// opens the voice panel there.
+function tabMic() {
+  const onReport = document.getElementById('app').style.display === 'flex'
+    && !['quoteScreen', 'sidebarPanel', 'dashboardOverlay'].some(id => document.getElementById(id).classList.contains('open'));
+  if (!onReport) {
+    tabGo('report');
+    if (!document.getElementById('voicePopover').classList.contains('open')) toggleVoicePopover();
+    return;
+  }
+  toggleVoicePopover();
 }
 
 function toggleVoicePopover() {
@@ -8530,33 +8564,10 @@ function renderProfileMenu() {
   const bizBtn = document.getElementById('profileYourBusiness');
   if (bizBtn) bizBtn.hidden = !canEditBusiness();
 }
-function toggleProfileMenu() {
-  const dd = document.getElementById('profileDropdown');
-  if (!dd) return;
-  const opening = !dd.classList.contains('open');
-  dd.classList.toggle('open', opening);
-  if (opening) {
-    renderProfileMenu();
-    setTimeout(() => document.addEventListener('click', handleProfileMenuOutsideClick), 0);
-  } else {
-    document.removeEventListener('click', handleProfileMenuOutsideClick);
-  }
-}
-function handleProfileMenuOutsideClick(e) {
-  const wrap = document.getElementById('profileMenuWrap');
-  if (wrap && !wrap.contains(e.target)) closeProfileMenu();
-}
-function closeProfileMenu() {
-  const dd = document.getElementById('profileDropdown');
-  if (dd) dd.classList.remove('open');
-  document.removeEventListener('click', handleProfileMenuOutsideClick);
-}
 function openBillingFromProfile() {
-  closeProfileMenu();
   openMenuPage('billingPanel');
 }
 function signOutFromProfile() {
-  closeProfileMenu();
   if (confirm('Sign out of SAYON?')) signOut();
 }
 
@@ -9366,6 +9377,7 @@ function deleteReport(id, event) {
   const wasOpen = currentReportId === id;
   if (wasOpen) startBlankReport();
   renderSavedList();
+  refreshDashboardIfOpen();
 
   const photos = allReportPhotos(deleted.reportData).filter(p => p.path);
   const item = { id, paths: photos.map(p => p.path), photoIds: photos.map(p => p.id) };
@@ -9381,7 +9393,41 @@ function deleteReport(id, event) {
     setSavedReports(reports);
     if (wasOpen) loadReport(id, true);
     renderSavedList();
+    refreshDashboardIfOpen();
     showToast('Report restored', 'success');
+  } });
+}
+
+// Every saved job goes the way one does in deleteReport: off the list now,
+// out of the account and photo store once the undo window closes.
+function deleteAllReports() {
+  const all = getSavedReports();
+  if (!all.length) { showToast('There are no saved jobs to delete', 'info'); return; }
+  const n = all.length === 1 ? '1 saved job' : `all ${all.length} saved jobs`;
+  if (!confirm(`Delete ${n}? Their reports, quotes and photos go from this phone and your account. Your account, business details and prices stay.`)) return;
+  if (!setSavedReports([])) return;
+  const wasOpen = all.some(r => r.id === currentReportId) ? currentReportId : null;
+  startBlankReport();
+  renderSavedList();
+  refreshDashboardIfOpen();
+
+  const items = all.map(r => {
+    const photos = allReportPhotos(r.reportData).filter(p => p.path);
+    return { id: r.id, paths: photos.map(p => p.path), photoIds: photos.map(p => p.id) };
+  });
+  const ids = new Set(items.map(i => i.id));
+  setPendingDeletes([...getPendingDeletes().filter(d => !ids.has(d.id)), ...items]);
+  items.forEach(item => { deleteTimers[item.id] = setTimeout(() => finishDelete(item), DELETE_UNDO_MS); });
+
+  showToast(all.length === 1 ? 'Job deleted' : `${all.length} jobs deleted`, 'info', { label: 'Undo', run: () => {
+    items.forEach(item => { clearTimeout(deleteTimers[item.id]); delete deleteTimers[item.id]; });
+    setPendingDeletes(getPendingDeletes().filter(d => !ids.has(d.id)));
+    const kept = getSavedReports();
+    setSavedReports([...all, ...kept.filter(r => !ids.has(r.id))]);
+    if (wasOpen) loadReport(wasOpen, true);
+    renderSavedList();
+    refreshDashboardIfOpen();
+    showToast('Jobs restored', 'success');
   } });
 }
 
@@ -9687,6 +9733,10 @@ function openDashboard() {
   if (dashboardJobs.length && !dashboardJobs.some(j => j.group === 'todo')) setDashboardTab('all');
 }
 
+function refreshDashboardIfOpen() {
+  if (document.getElementById('dashboardOverlay').classList.contains('open')) renderDashboard();
+}
+
 function closeDashboard() {
   closeDashboardDetail();
   document.getElementById('dashboardOverlay').classList.remove('open');
@@ -9907,6 +9957,7 @@ function openDashboardDetail(id) {
     </ol>
     <div class="dash-detail-actions">
       ${j.next ? `<button type="button" class="dash-detail-primary" onclick="openDashboardJob('${j.r.id}', '${j.next.to}')">${j.next.label}</button>` : ''}
+      <button type="button" class="dash-detail-delete" onclick="closeDashboardDetail(); deleteReport('${j.r.id}')">Delete this job</button>
     </div>
   `;
   document.getElementById('dashboardDetail').classList.add('open');

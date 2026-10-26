@@ -1064,7 +1064,7 @@
             <div class="field"><div class="field-label">Wall Construction</div><div class="field-val" id="f-wallConstruction" onclick="startEdit(this,'wallConstruction','wallconstruction')">—</div></div>
             <div class="field"><div class="field-label">Roof Type</div><div class="field-val" id="f-roofType" onclick="startEdit(this,'roofType','rooftype')">—</div></div>
             <div class="field"><div class="field-label">Floor Type</div><div class="field-val" id="f-floorType" onclick="startEdit(this,'floorType','floortype')">—</div></div>
-            <div class="field"><div class="field-label">Orientation</div><div class="field-val" id="f-facadeDirection" onclick="startEdit(this,'facadeDirection','facadedirection')">—</div></div>
+            <div class="field"><div class="field-label">Orientation</div><div class="field-val" id="f-facadeDirection" onclick="startEdit(this,'facadeDirection','facadedirection')">—</div><button type="button" class="field-tool-btn" onclick="openCompass()"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/></svg>Compass</button></div>
             <div class="field"><div class="field-label">Year / Period of Construction</div><div class="field-val" id="f-constructionEra" onclick="startEdit(this,'constructionEra','era')">—</div></div>
             <div class="field"><div class="field-label">Occupancy Status</div><div class="field-val" id="f-occupancyStatus" onclick="startEdit(this,'occupancyStatus','occupancystatus')">—</div></div>
             <div class="field"><div class="field-label">Weather Conditions</div><div class="field-val" id="f-weatherConditions" onclick="startEdit(this,'weatherConditions','weatherconditions')">—</div></div>
@@ -1698,6 +1698,39 @@
 </div>
 
 <!-- PRE-INSPECTION AGREEMENT SHEET -->
+<!-- COMPASS: opened from Orientation (see COMPASS in js/app.js) -->
+<div class="page-sheet-overlay" id="compassOverlay">
+  <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="compassTitle">
+    <div class="page-sheet-header">
+      <span class="page-sheet-title" id="compassTitle">Compass</span>
+      <button class="voice-popover-close" onclick="closeCompass()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+    </div>
+    <div class="page-sheet-body compass-body">
+      <div class="compass-how">Stand at the front door with your back to the house, facing the street. Hold the phone flat, top pointing away from you.</div>
+      <div class="compass-dial" aria-hidden="true">
+        <div class="compass-pointer"></div>
+        <svg class="compass-rose" id="compassRose" viewBox="0 0 200 200">
+          <circle cx="100" cy="100" r="96" class="compass-ring"/>
+          <g class="compass-ticks">
+            <line x1="100" y1="6" x2="100" y2="20"/><line x1="194" y1="100" x2="180" y2="100"/><line x1="100" y1="194" x2="100" y2="180"/><line x1="6" y1="100" x2="20" y2="100"/>
+            <line x1="166.5" y1="33.5" x2="159.4" y2="40.6"/><line x1="166.5" y1="166.5" x2="159.4" y2="159.4"/><line x1="33.5" y1="166.5" x2="40.6" y2="159.4"/><line x1="33.5" y1="33.5" x2="40.6" y2="40.6"/>
+          </g>
+          <text x="100" y="40" class="compass-n">N</text>
+          <text x="166" y="106" class="compass-l">E</text>
+          <text x="100" y="172" class="compass-l">S</text>
+          <text x="34" y="106" class="compass-l">W</text>
+          <text x="145" y="62" class="compass-s">NE</text><text x="145" y="148" class="compass-s">SE</text>
+          <text x="55" y="148" class="compass-s">SW</text><text x="55" y="62" class="compass-s">NW</text>
+        </svg>
+      </div>
+      <div class="compass-reading"><span id="compassPoint"></span> <span id="compassDegrees">--°</span></div>
+      <div class="compass-north" id="compassNorth"></div>
+      <div class="compass-note" id="compassNote" role="status" hidden></div>
+      <button class="extract-btn" id="compassUseBtn" onclick="useCompassHeading()" disabled>Waiting for the compass…</button>
+    </div>
+  </div>
+</div>
+
 <div class="page-sheet-overlay" id="agreementOverlay">
   <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="agreementTitle">
     <div class="page-sheet-header">

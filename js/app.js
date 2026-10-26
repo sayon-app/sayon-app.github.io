@@ -4562,9 +4562,9 @@ function findingCardHTML(finding, index, total) {
         ${showDetails ? `
         <div class="findings-details" style="display:block">
           <div class="section-fields">
-            <div class="field field-wide"><div class="field-label">Location of Activity</div>${fv('activityLocation','text')}${pickListHTML(id, 'activityLocation', PLACES, finding.activityLocation)}</div>
-            <div class="field field-wide"><div class="field-label">Timber Affected</div>${fv('timberAffected','text')}${pickListHTML(id, 'timberAffected', TIMBER_PARTS, finding.timberAffected)}</div>
-            <div class="field field-wide"><div class="field-label">Damage Description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${fv('damageDescription','text')}${pickListHTML(id, 'damageDescription', TERMITE_SIGNS, finding.damageDescription)}</div>
+            <div class="field field-wide"><div class="field-label">Location of Activity</div>${pickFieldHTML(id, 'activityLocation', PLACES, finding.activityLocation)}</div>
+            <div class="field field-wide"><div class="field-label">Timber Affected</div>${pickFieldHTML(id, 'timberAffected', TIMBER_PARTS, finding.timberAffected)}</div>
+            <div class="field field-wide"><div class="field-label">Damage Description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${pickFieldHTML(id, 'damageDescription', TERMITE_SIGNS, finding.damageDescription)}</div>
             <div class="field"><div class="field-label">Species / Genus</div>${fv('species','specieslist')}</div>
             <div class="field choice-field"><div class="field-label">Termite Nest Found?</div>${fv('nestLocated','yesno')}</div>
             <div class="field choice-field"><div class="field-label">Refer to a Builder or Engineer?</div>${fv('structuralConcern','yesno')}</div>
@@ -4615,7 +4615,7 @@ function startFindingEdit(findingId, key, type) {
   if (type === 'specieslist') {
     const cardEl = document.getElementById('finding-card-' + findingId);
     if (!cardEl) return;
-    const fieldEl = cardEl.querySelector(`[onclick*="startFindingEdit('${findingId}','${key}'"]`);
+    const fieldEl = cardEl.querySelector(`[onclick*="startFindingEdit('${findingId}','${key}'"], [data-edit="${findingId}:${key}"]`);
     if (!fieldEl) return;
     const cur = finding[key] || '';
     const options = SPECIES_LIST;
@@ -4636,7 +4636,7 @@ function startFindingEdit(findingId, key, type) {
   }
   const cardEl = document.getElementById('finding-card-' + findingId);
   if (!cardEl) return;
-  const fieldEl = cardEl.querySelector(`[onclick*="startFindingEdit('${findingId}','${key}'"]`);
+  const fieldEl = cardEl.querySelector(`[onclick*="startFindingEdit('${findingId}','${key}'"], [data-edit="${findingId}:${key}"]`);
   if (!fieldEl) return;
   const cur = finding[key] || '';
   const ta = document.createElement('input');
@@ -4655,7 +4655,7 @@ function startFindingEdit(findingId, key, type) {
     v => {
       if (!isThis()) return;
       if (ta.isConnected) {
-        fieldEl.textContent = v.trim() || '—';
+        (fieldEl.querySelector('.pick-field-text') || fieldEl).textContent = v.trim() || '—';
         fieldEl.classList.toggle('filled', !!v.trim());
         ta.replaceWith(fieldEl);
       }
@@ -4703,13 +4703,27 @@ const PICK_PHRASE = new Set(['damageDescription', 'description', 'activityLocati
 
 const splitPicks = v => String(v || '').split(/\s*,\s*/).filter(Boolean);
 
-function pickListHTML(id, key, options, value) {
+// The field itself is the drop-down: a native list laid over the box, so
+// a tap opens the phone's own picker. "Other (type it)" opens the box for
+// typing instead.
+function pickFieldHTML(id, key, options, value) {
   const have = splitPicks(value).map(x => x.toLowerCase());
-  const prompt = PICK_SINGLE.has(key) ? 'Choose from list' : 'Add from list';
-  return `<select class="job-input pick-list" aria-label="${prompt}" onchange="if (this.value) togglePick('${id}','${key}',this.value); this.value = ''">
-    <option value="">${prompt}…</option>
-    ${options.map(o => `<option value="${escapeHtml(o)}">${have.includes(o.toLowerCase()) ? '✓ ' : ''}${escapeHtml(o)}</option>`).join('')}
-  </select>`;
+  return `<div class="field-val pick-field${value ? ' filled' : ''}" data-edit="${id}:${key}">
+    <span class="pick-field-text">${value ? escapeHtml(value) : '—'}</span>
+    <select class="pick-field-list" aria-label="Choose from list" onchange="onPickField('${id}','${key}',this)">
+      <option value="">${PICK_SINGLE.has(key) ? 'Choose one' : 'Tap to add or remove'}</option>
+      ${options.map(o => `<option value="${escapeHtml(o)}">${have.includes(o.toLowerCase()) ? '✓ ' : ''}${escapeHtml(o)}</option>`).join('')}
+      <option value="${OTHER_TYPE_IT}">${OTHER_TYPE_IT}</option>
+    </select>
+  </div>`;
+}
+
+function onPickField(id, key, sel) {
+  const v = sel.value;
+  sel.value = '';
+  if (!v) return;
+  if (v === OTHER_TYPE_IT) startFindingEdit(id, key, 'text');
+  else togglePick(id, key, v);
 }
 
 function togglePick(id, key, word) {
@@ -4899,10 +4913,10 @@ function borerCardHTML(b, index) {
         </div>
         <div class="findings-details" style="display:block">
         <div class="section-fields">
-          <div class="field field-wide"><div class="field-label">Location</div>${fv('location')}${pickListHTML(id, 'location', PLACES, b.location)}</div>
-          <div class="field field-wide"><div class="field-label">Timber Affected</div>${fv('timberAffected')}${pickListHTML(id, 'timberAffected', TIMBER_PARTS, b.timberAffected)}</div>
-          <div class="field field-wide"><div class="field-label">Borer Type</div>${fv('borerType')}${pickListHTML(id, 'borerType', BORER_TYPES, b.borerType)}</div>
-          <div class="field field-wide"><div class="field-label">What Was Seen <span class="field-hint">Exit holes, frass, tunnelling. No severity opinion.</span></div>${fv('description')}${pickListHTML(id, 'description', BORER_SIGNS, b.description)}</div>
+          <div class="field field-wide"><div class="field-label">Location</div>${pickFieldHTML(id, 'location', PLACES, b.location)}</div>
+          <div class="field field-wide"><div class="field-label">Timber Affected</div>${pickFieldHTML(id, 'timberAffected', TIMBER_PARTS, b.timberAffected)}</div>
+          <div class="field field-wide"><div class="field-label">Borer Type</div>${pickFieldHTML(id, 'borerType', BORER_TYPES, b.borerType)}</div>
+          <div class="field field-wide"><div class="field-label">What Was Seen <span class="field-hint">Exit holes, frass, tunnelling. No severity opinion.</span></div>${pickFieldHTML(id, 'description', BORER_SIGNS, b.description)}</div>
           <div class="field choice-field"><div class="field-label">Refer to a Builder or Engineer?</div><div class="choice-panel${b.structuralConcern ? '' : ' unset'}" role="radiogroup">${choiceCardsHTML('finding', `structuralConcern-${id}`, b.structuralConcern, `data-finding="${id}" data-fkey="structuralConcern"`)}</div></div>
           <div class="field field-wide finding-photos"><div class="field-label">Photos of this finding</div>${spotPhotosHTML(findingPhotoSection(id))}</div>
         </div>

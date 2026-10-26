@@ -9754,19 +9754,19 @@ function dashboardJob(r, quotes) {
   const answered = a && !a.stale;
   const sentOn = d.issue ? d.issue.completedAt : d.sent ? d.sent.at : null;
   const steps = [
-    { label: 'Report', state: reportDone ? 'done' : 'todo',
+    { label: 'Report', to: 'report', state: reportDone ? 'done' : 'todo',
       text: d.issue ? `Completed${sentOn ? ' ' + dashDate(sentOn) : ''}` : d.sent ? `Sent ${dashDate(d.sent.at)}`
         : d.pdfAt ? `PDF made ${dashDate(d.pdfAt)}, not sent yet`
         : reportDone ? 'Ready to send' : 'In progress' },
-    { label: 'Quote', state: hasQuote && q.sentAt ? 'done' : !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
+    { label: 'Quote', to: 'quote', state: hasQuote && q.sentAt ? 'done' : !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
       text: hasQuote ? `${formatAUD(total).replace(/\.00$/, '')} · ${q.sentAt ? 'sent ' + dashDate(q.sentAt) : 'not sent yet'}`
         : reportDone && !needsQuote ? 'Not needed' : 'Not written yet' },
-    { label: 'Client\'s answer', state: answered ? (a.status === 'accepted' ? 'done' : 'bad') : !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
+    { label: 'Client\'s answer', to: 'answer', state: answered ? (a.status === 'accepted' ? 'done' : 'bad') : !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
       text: !a ? (hasQuote && q.sentAt ? 'Waiting on the client' : 'Not yet')
         : a.stale ? 'The quote changed after they answered'
         : a.status === 'accepted' ? `Accepted${a.by ? ' by ' + a.by : ''} ${dashDay(a.date)}`
         : `Declined ${dashDay(a.date)}${a.note ? ' · ' + a.note : ''}` },
-    { label: 'Treatment', state: q && q.treatment ? 'done' : answered && a.status !== 'accepted' || !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
+    { label: 'Treatment', to: 'treatment', state: q && q.treatment ? 'done' : answered && a.status !== 'accepted' || !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
       text: q && q.treatment ? `Done ${dashDay(q.treatment.date)} · certificate ${q.certificateSentAt ? 'sent' : 'not sent'}` : 'Not recorded yet' },
   ];
   steps.forEach(s => { if (s.state === 'skip') s.text = 'Not needed'; });
@@ -9896,16 +9896,15 @@ function openDashboardDetail(id) {
       ${j.steps.map(s => `
         <li class="${s.state}">
           <span class="dash-timeline-dot" aria-hidden="true"></span>
-          <span class="dash-timeline-label">${s.label}</span>
-          <span class="dash-timeline-text">${escapeHtml(s.text)}</span>
+          <button type="button" class="dash-timeline-btn" onclick="openDashboardJob('${j.r.id}', '${s.to}')">
+            <span class="dash-timeline-label">${s.label}</span>
+            <span class="dash-timeline-text">${escapeHtml(s.text)}</span>
+            <svg class="icon dash-timeline-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
         </li>`).join('')}
     </ol>
     <div class="dash-detail-actions">
       ${j.next ? `<button type="button" class="dash-detail-primary" onclick="openDashboardJob('${j.r.id}', '${j.next.to}')">${j.next.label}</button>` : ''}
-      <div class="dash-detail-links">
-        ${j.next && j.next.to === 'report' ? '' : `<button type="button" onclick="openDashboardJob('${j.r.id}', 'report')">Open report</button>`}
-        ${j.total && !(j.next && j.next.to === 'quote') ? `<button type="button" onclick="openDashboardJob('${j.r.id}', 'quote')">Open quote</button>` : ''}
-      </div>
     </div>
   `;
   document.getElementById('dashboardDetail').classList.add('open');
@@ -9918,11 +9917,18 @@ function closeDashboardDetail() {
 
 // Opens a job from the dashboard: its report, its quote, or straight into
 // recording the treatment.
+// Every step opens in any order: report, quote, the client's answer (the
+// quote, scrolled to it) or the treatment record.
 function openDashboardJob(id, to) {
   closeDashboard();
   loadReport(id);
-  if (to === 'quote' || to === 'treatment') openQuote('app', id);
+  if (to === 'report') return;
+  openQuote('app', id);
   if (to === 'treatment') openTreatmentRecord();
+  if (to === 'answer') {
+    const card = document.getElementById('quoteAnswer');
+    if (card && card.style.display !== 'none') card.scrollIntoView({ block: 'center' });
+  }
 }
 
 const SAVED_EMPTY_HTML = `<div class="empty-state">

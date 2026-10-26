@@ -9398,6 +9398,39 @@ function deleteReport(id, event) {
   } });
 }
 
+// Every saved job goes the way one does in deleteReport: off the list now,
+// out of the account and photo store once the undo window closes.
+function deleteAllReports() {
+  const all = getSavedReports();
+  if (!all.length) { showToast('There are no saved jobs to delete', 'info'); return; }
+  const n = all.length === 1 ? '1 saved job' : `all ${all.length} saved jobs`;
+  if (!confirm(`Delete ${n}? Their reports, quotes and photos go from this phone and your account. Your account, business details and prices stay.`)) return;
+  if (!setSavedReports([])) return;
+  const wasOpen = all.some(r => r.id === currentReportId) ? currentReportId : null;
+  startBlankReport();
+  renderSavedList();
+  refreshDashboardIfOpen();
+
+  const items = all.map(r => {
+    const photos = allReportPhotos(r.reportData).filter(p => p.path);
+    return { id: r.id, paths: photos.map(p => p.path), photoIds: photos.map(p => p.id) };
+  });
+  const ids = new Set(items.map(i => i.id));
+  setPendingDeletes([...getPendingDeletes().filter(d => !ids.has(d.id)), ...items]);
+  items.forEach(item => { deleteTimers[item.id] = setTimeout(() => finishDelete(item), DELETE_UNDO_MS); });
+
+  showToast(all.length === 1 ? 'Job deleted' : `${all.length} jobs deleted`, 'info', { label: 'Undo', run: () => {
+    items.forEach(item => { clearTimeout(deleteTimers[item.id]); delete deleteTimers[item.id]; });
+    setPendingDeletes(getPendingDeletes().filter(d => !ids.has(d.id)));
+    const kept = getSavedReports();
+    setSavedReports([...all, ...kept.filter(r => !ids.has(r.id))]);
+    if (wasOpen) loadReport(wasOpen, true);
+    renderSavedList();
+    refreshDashboardIfOpen();
+    showToast('Jobs restored', 'success');
+  } });
+}
+
 // ══════════════════════════════════════════════════════════════════════════
 // DATA EXPORT / IMPORT
 // ══════════════════════════════════════════════════════════════════════════

@@ -4790,3 +4790,7 @@ body:has(#quoteScreen.open) .toast { bottom: calc(var(--tabbar-h) + var(--mic-cl
   border: none; background: none; cursor: pointer;
   color: var(--risk); font: 600 13px 'Inter', sans-serif;
 }
+
+/* Generate PDF sits at the foot of the report's sign-off page; Send stays in the menu. */
+.signoff-pdf { padding: 4px 16px 30px; }
+.drawer-footer .share-btn { flex: 1; }

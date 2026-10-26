@@ -9391,7 +9391,7 @@ function deleteReport(id, event) {
 // Settings a backup carries. The sign-in, company details and the photo
 // store's bookkeeping stay out: the company comes back from the account,
 // and a backup must never hold a sign-in someone else could use.
-const BACKUP_PREF_KEYS = ['korva_a11y_textsize', 'korva_a11y_dark', 'korva_a11y_contrast', 'korva_a11y_touch',
+const BACKUP_PREF_KEYS = ['korva_a11y_textsize', 'korva_a11y_contrast', 'korva_a11y_touch',
   'korva_a11y_motion', 'korva_a11y_colorvision', 'korva_audio_capture_enabled', 'korva_telemetry_off'];
 
 async function exportAllData() {
@@ -9538,20 +9538,6 @@ function toggleA11y(className, btnId, storageKey) {
   try { localStorage.setItem(storageKey, on ? '1' : '0'); } catch (e) {}
 }
 
-// Dark screen: for subfloors, roof voids and night work. The header's moon
-// button and the Settings switch are the same switch.
-function toggleDarkScreen(on) {
-  if (typeof on !== 'boolean') on = !document.body.classList.contains('dark-screen');
-  document.body.classList.toggle('dark-screen', on);
-  const toggle = document.getElementById('toggleDarkScreen');
-  if (toggle) toggle.classList.toggle('on', on);
-  const btn = document.getElementById('darkScreenBtn');
-  if (btn) btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', on ? '#06090D' : '#D6E4EF');
-  try { localStorage.setItem('korva_a11y_dark', on ? '1' : '0'); } catch (e) {}
-}
-
 const COLOUR_VISION_ACCENTS = {
   protanopia:    { accent: '#4d8aff', accent2: '#7aa8ff', accent3: '#2f5fd6', rgb: '77,138,255' }, // blue — stays distinct from lime/amber for red-green deficiency
   deuteranopia:  { accent: '#4d8aff', accent2: '#7aa8ff', accent3: '#2f5fd6', rgb: '77,138,255' }, // blue — same reasoning, most common type
@@ -9578,7 +9564,6 @@ function restoreA11ySettings() {
     const textSize = localStorage.getItem('korva_a11y_textsize');
     if (textSize && textSize !== 'normal') setTextSize(textSize);
 
-    if (localStorage.getItem('korva_a11y_dark') === '1') toggleDarkScreen(true);
     if (localStorage.getItem('korva_a11y_contrast') === '1') {
       document.body.classList.add('high-contrast');
       document.getElementById('toggleHighContrast').classList.add('on');

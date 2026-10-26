@@ -4583,16 +4583,7 @@ body:not(.dark-screen) .issue-banner .issue-primary {
 body:not(.dark-screen) .next-section-btn:hover { background: linear-gradient(180deg, #5EEAD4 0%, #14B8A6 50%, #0D9488 100%); border-color: transparent; }
 
 /* ── COMPASS (Orientation) ── */
-.field-tool-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  margin-top: 8px; padding: 8px 12px; min-height: 36px;
-  border: 1px solid var(--border); border-radius: 8px;
-  background: var(--surface); color: var(--accent2);
-  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
-}
-.field-tool-btn:active { transform: scale(0.98); }
 .compass-body { align-items: center; text-align: center; }
-.compass-how { font-size: 13px; line-height: 1.5; color: var(--text2); max-width: 340px; }
 .compass-dial { position: relative; width: min(72vw, 280px); aspect-ratio: 1; margin: 14px auto 4px; }
 .compass-pointer {
   position: absolute; top: -10px; left: 50%; transform: translateX(-50%); z-index: 1;
@@ -4610,5 +4601,14 @@ body:not(.dark-screen) .next-section-btn:hover { background: linear-gradient(180
 .compass-north { font-size: 12px; color: var(--text2); }
 .compass-note { font-size: 13px; line-height: 1.45; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; max-width: 360px; }
 .compass-body .extract-btn { max-width: 360px; margin-top: 8px; padding: 14px; font-size: 15px; }
+.compass-picks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; max-width: 360px; margin-top: 10px; }
+.compass-pick {
+  min-height: 44px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--text);
+  font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.compass-pick.on { border-color: var(--accent); background: rgba(var(--glow),0.14); color: var(--accent2); }
+.compass-pick:active { transform: scale(0.97); }
+.compass-clear { grid-column: 1 / -1; min-height: 40px; border: 0; background: none; color: var(--text2); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .compass-rose { transition: none; } }
 body.reduce-motion .compass-rose { transition: none; }

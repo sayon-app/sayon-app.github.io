@@ -247,21 +247,8 @@
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
         </div>
       </button>
-      <button class="menu-tile live" onclick="openApp('quote')">
-        <div class="menu-tile-icon">
-          <svg class="icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg>
-        </div>
-        <div class="menu-tile-text">
-          <div class="menu-tile-name">Quote</div>
-          <div class="menu-tile-desc">Treatment quotes from inspection reports</div>
-        </div>
-        <div class="menu-tile-arrow">
-          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-        </div>
-      </button>
-      <!-- SAYON Report / Field tiles stay hidden until built — "Coming Soon"
-           placeholders on the very first screen made the product look
-           unfinished to a first-time visitor. Re-add when real. -->
+      <!-- One way in: every quote starts from an inspection, and each
+           job's quote is on its Dashboard card. -->
     </div>
 
     <div class="menu-footer">v1.0 · Australian pest &amp; timber pest field tools<br><a href="terms.html" target="_blank" rel="noopener">Terms of Service</a> · <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a></div>
@@ -647,15 +634,16 @@
   <!-- DASHBOARD OVERLAY — placed at #app level, not inside .body, so it
        is never clipped by .body/.main-panel's overflow:hidden -->
   <div class="dashboard-overlay" id="dashboardOverlay">
-    <div class="dashboard-panel">
+    <div class="dashboard-panel" role="dialog" aria-modal="true" aria-labelledby="dashboardTitle">
       <div class="dashboard-panel-header">
-        <span class="dashboard-panel-title">Dashboard</span>
-        <button class="dashboard-panel-close" onclick="closeDashboard()" aria-label="Close">
-          <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
+        <button type="button" class="dash-back" onclick="closeDashboard()">
+          <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Report
         </button>
       </div>
-      <div class="dashboard-panel-subtitle" id="dashboardSubtitle">Reports saved on this device — preview</div>
       <div class="dashboard-panel-body" id="dashboardBody"></div>
+    </div>
+    <div class="dash-detail" id="dashboardDetail" onclick="if (event.target === this) closeDashboardDetail()">
+      <div class="dash-detail-sheet" id="dashboardDetailSheet" role="dialog" aria-modal="true"></div>
     </div>
   </div>
 
@@ -977,9 +965,6 @@
       <div class="drawer-footer">
         <button class="generate-btn" id="generateBtn" onclick="generateReport()" disabled>
           <svg class="icon " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Generate PDF
-        </button>
-        <button class="share-btn" id="quoteFromReportBtn" onclick="openQuoteFromReport()" title="Build a treatment quote from this report">
-          <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>Quote
         </button>
         <button class="share-btn" id="shareBtn" onclick="openSendReview()" disabled title="Check the report, then email it (and the quote) to the client">
           <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>Send

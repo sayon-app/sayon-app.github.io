@@ -9253,8 +9253,10 @@ function saveCurrentReport(quiet) {
 }
 
 function loadReport(id, quiet) {
+  // Saved first even when reopening the same job: what was done in the last
+  // few seconds (a signed agreement) would otherwise be lost on the reload.
+  saveOpenReportNow();
   if (id !== currentReportId) {
-    saveOpenReportNow();
     // A report with no address yet is never saved, so it's dropped here,
     // and so is the quote made for it.
     if (!currentReportId && typeof forgetDraftQuote === 'function') forgetDraftQuote();
@@ -9690,6 +9692,8 @@ function resetReportState() {
 // waits on the client and what's done. Tapping a job opens its timeline
 // (report, quote, the client's answer, treatment) and its next step.
 function openDashboard() {
+  // The dashboard reads saved jobs, so the open one is saved first.
+  saveOpenReportNow();
   document.getElementById('dashboardOverlay').classList.add('open');
   dashboardTab = 'todo';
   const search = document.getElementById('dashboardSearch');
@@ -9727,17 +9731,22 @@ function dashboardJob(r, quotes) {
   const q = quotes[r.id] || r.quote || null;
   const hasQuote = quoteHasItems(q);
   const a = hasQuote ? quoteAnswerState(q) : null;
-  const reportDone = !!(d.issue || d.sent);
+  // Ready: every required field filled, or a PDF made. Done: completed or sent.
+  const reportSent = !!(d.issue || d.sent);
+  const reportDone = reportSent || !!d.pdfAt || (r.completion || 0) >= 100;
   const needsQuote = d.treatmentRecommended === 'YES';
   const total = hasQuote ? quoteTotals(q).total : 0;
   let group, status, next = null;
   if (!reportDone) {
     group = 'todo'; status = 'Finish the report';
     next = { label: 'Open report', to: 'report' };
+  } else if (!hasQuote && needsQuote) {
+    group = 'todo'; status = 'Write the quote';
+    next = { label: 'Move to quote', to: 'quote' };
   } else if (!hasQuote) {
-    group = needsQuote ? 'todo' : 'done';
-    status = needsQuote ? 'Write the quote' : 'No quote needed';
-    if (needsQuote) next = { label: 'Write quote', to: 'quote' };
+    group = reportSent ? 'done' : 'todo';
+    status = reportSent ? 'No quote needed' : 'Send the report';
+    if (!reportSent) next = { label: 'Open report', to: 'report' };
   } else if (!a) {
     group = q.sentAt ? 'waiting' : 'todo';
     status = q.sentAt ? `Quote sent ${dashDate(q.sentAt)}` : 'Send the quote';
@@ -9762,7 +9771,8 @@ function dashboardJob(r, quotes) {
   const steps = [
     { label: 'Report', state: reportDone ? 'done' : 'todo',
       text: d.issue ? `Completed${sentOn ? ' ' + dashDate(sentOn) : ''}` : d.sent ? `Sent ${dashDate(d.sent.at)}`
-        : savedReportStatus(r).tone === 'ready' ? 'Ready to send' : 'In progress' },
+        : d.pdfAt ? `PDF made ${dashDate(d.pdfAt)}, not sent yet`
+        : reportDone ? 'Ready to send' : 'In progress' },
     { label: 'Quote', state: hasQuote && q.sentAt ? 'done' : !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
       text: hasQuote ? `${formatAUD(total).replace(/\.00$/, '')} · ${q.sentAt ? 'sent ' + dashDate(q.sentAt) : 'not sent yet'}`
         : reportDone && !needsQuote ? 'Not needed' : 'Not written yet' },
@@ -12306,6 +12316,9 @@ async function buildReportPdf() {
 
 async function _buildAndDownloadPDF() {
   const { blob, fname } = await buildReportPdf();
+  // The dashboard counts a report with a PDF made as ready for its quote.
+  reportData.pdfAt = Date.now();
+  saveOpenReportNow();
   await deliverPdfBlob(blob, fname, {
     title: reportKindTitle(),
     text: `${reportKindTitle()} — ${getFullAddress() || 'Property'}`,

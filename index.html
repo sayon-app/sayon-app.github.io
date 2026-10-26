@@ -266,10 +266,11 @@
   </div>
   <div class="quote-scroll">
     <div class="quote-shell">
-      <div class="quote-card">
+      <!-- Which report the quote is for. Quotes open from a job, so this
+           only shows when there's no job to go on. -->
+      <div class="quote-card quote-source-pick">
         <label class="quote-label" for="quoteSource">Inspection report</label>
         <select id="quoteSource" class="quote-input" onchange="onQuoteSourceChange()"></select>
-        <div class="quote-source-summary" id="quoteSourceSummary"></div>
       </div>
 
       <div class="quote-empty" id="quoteEmpty" style="display:none">
@@ -278,10 +279,35 @@
       </div>
 
       <div id="quoteEditor" style="display:none">
+        <div class="quote-head" id="quoteHead"></div>
         <div class="quote-lock-note" id="quoteLockNote" style="display:none">This job is complete, so the quote is locked. Amend the job from its report to change it.</div>
         <div class="quote-company-gaps" id="quoteCompanyGaps" style="display:none"></div>
+
         <div class="quote-card">
-          <div class="quote-card-title">Customer</div>
+          <div class="quote-card-head">
+            <div class="quote-card-title">Work to quote</div>
+            <div class="quote-card-count" id="quoteItemCount"></div>
+          </div>
+          <div id="quoteSystemChoice" class="quote-system-choice" style="display:none"></div>
+          <div id="quoteItems"></div>
+          <button class="quote-add-btn" onclick="addQuoteItem()">+ Add a line</button>
+          <div class="quote-totals">
+            <div class="quote-total-row"><span id="qSubtotalLabel">Subtotal (ex GST)</span><span id="qSubtotal">$0.00</span></div>
+            <div class="quote-total-row">
+              <label class="quote-gst-toggle"><input type="checkbox" id="qGst" onchange="onQuoteFieldInput()"> Add GST (10%)</label>
+              <span id="qGstAmt">$0.00</span>
+            </div>
+            <div class="quote-total-row grand"><span>Total</span><span id="qTotal">$0.00</span></div>
+          </div>
+          <div class="quote-hint" id="quoteStartHint"></div>
+          <button class="quote-text-btn" onclick="rebuildQuoteFromReport()">Start the lines again from the report</button>
+        </div>
+
+        <details class="quote-card quote-fold" id="quoteDetailsFold">
+          <summary>
+            <span class="quote-fold-text"><span class="quote-card-title">Client and quote details</span><span class="quote-fold-sub" id="quoteDetailsSub"></span></span>
+            <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
           <div class="quote-grid">
             <label class="quote-field"><span>Client</span><input class="quote-input" id="qClient" oninput="onQuoteFieldInput()"></label>
             <label class="quote-field"><span>Phone</span><input class="quote-input" id="qClientPhone" type="tel" inputmode="tel" onchange="tidyPhoneInput(this)" oninput="onQuoteFieldInput()"></label>
@@ -290,53 +316,42 @@
             <label class="quote-field"><span>Quote no.</span><input class="quote-input" id="qNumber" oninput="onQuoteFieldInput()"></label>
             <label class="quote-field"><span>Valid for (days)</span><input class="quote-input" id="qValidDays" type="number" min="1" inputmode="numeric" oninput="onQuoteFieldInput()"></label>
           </div>
-        </div>
+        </details>
 
-        <div class="quote-card">
-          <div class="quote-card-head">
-            <div class="quote-card-title">Line items</div>
-            <div class="quote-card-actions">
-              <button class="quote-link-btn" onclick="rebuildQuoteFromReport()">Rebuild from report</button>
-            </div>
-          </div>
-          <div id="quoteSystemChoice" class="quote-system-choice" style="display:none"></div>
-          <div id="quoteItems"></div>
-          <button class="quote-add-btn" onclick="addQuoteItem()">+ Add line</button>
-          <div class="quote-hint">Prices are before GST. Lines marked <b>Starting price</b> use a suggested rate until you set your own. After that, each line starts at the rate you last quoted for it.</div>
-        </div>
-
-        <div class="quote-card quote-totals">
-          <div class="quote-total-row"><span id="qSubtotalLabel">Subtotal (ex GST)</span><span id="qSubtotal">$0.00</span></div>
-          <div class="quote-total-row">
-            <label class="quote-gst-toggle"><input type="checkbox" id="qGst" onchange="onQuoteFieldInput()"> Add GST (10%)</label>
-            <span id="qGstAmt">$0.00</span>
-          </div>
-          <div class="quote-total-row grand"><span>Total</span><span id="qTotal">$0.00</span></div>
-          <label class="quote-field quote-terms-field"><span>Payment terms</span>
-            <textarea class="quote-input quote-textarea" id="qPaymentTerms" rows="3" placeholder="e.g. 50% deposit to book, balance on completion" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea>
+        <details class="quote-card quote-fold" id="quoteTermsFold">
+          <summary>
+            <span class="quote-fold-text"><span class="quote-card-title">Terms and exclusions</span><span class="quote-fold-sub" id="quoteTermsSub"></span></span>
+            <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <label class="quote-field"><span>Payment terms</span>
+            <textarea class="quote-input quote-textarea" id="qPaymentTerms" rows="2" placeholder="e.g. 50% deposit to book, balance on completion" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea>
           </label>
-        </div>
-
-        <div class="quote-card">
-          <label class="quote-card-title" for="qExclusions">Exclusions &amp; work by others</label>
-          <div class="quote-hint" style="margin:2px 0 8px">One per line. Pre-filled from builder referrals, moisture sources and inaccessible areas in the report.</div>
-          <textarea class="quote-input quote-textarea" id="qExclusions" rows="5" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea>
-          <label class="quote-card-title" for="qNotes" style="margin-top:14px;display:block">Terms &amp; notes</label>
-          <textarea class="quote-input quote-textarea" id="qNotes" rows="4" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea>
-        </div>
+          <label class="quote-field"><span>Exclusions and work by others, one per line</span>
+            <textarea class="quote-input quote-textarea" id="qExclusions" rows="5" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea>
+          </label>
+          <div class="quote-hint" style="margin-top:-4px">Filled in from builder referrals, moisture sources and areas the report couldn't reach.</div>
+          <label class="quote-field"><span>Terms and notes</span>
+            <textarea class="quote-input quote-textarea" id="qNotes" rows="4" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea>
+          </label>
+        </details>
 
         <div class="quote-card quote-answer" id="quoteAnswer" style="display:none"></div>
-
-        <div class="quote-actions">
-          <button class="quote-btn" id="quoteEmailBtn" onclick="emailQuoteToClient()">
-            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>Email to client
-          </button>
-          <button class="quote-btn primary" id="quotePdfBtn" onclick="exportQuotePDF()">
-            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Export quote PDF
-          </button>
-        </div>
       </div>
     </div>
+  </div>
+
+  <!-- Always on screen: the total and the two ways out of the quote. -->
+  <div class="quote-bar" id="quoteBar" style="display:none">
+    <div class="quote-bar-total">
+      <span class="quote-bar-label" id="quoteBarLabel">Total</span>
+      <span class="quote-bar-amount" id="quoteBarAmount">$0.00</span>
+    </div>
+    <button class="quote-btn quote-bar-pdf" id="quotePdfBtn" onclick="exportQuotePDF()" aria-label="Quote PDF" title="Quote PDF">
+      <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>PDF
+    </button>
+    <button class="quote-btn primary quote-bar-send" id="quoteEmailBtn" onclick="emailQuoteToClient()">
+      <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg><span id="quoteSendLabel">Send to client</span>
+    </button>
   </div>
 </div>
 

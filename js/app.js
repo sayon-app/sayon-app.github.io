@@ -5094,9 +5094,11 @@ function checkSecondaryColonyFlag() {
 
 // ── COMPASS ─────────────────────────────────────────────────────────────
 // A working compass for the Orientation field, so the inspector doesn't
-// leave the app for one. It reads the phone's own compass (iPhone asks
-// once, on the first tap), turns magnetic north into true north for the
-// job's state, and "Use" fills Orientation with the nearest of its 8 answers.
+// leave the app for one. Tapping Orientation opens it. It reads the phone's
+// own compass (iPhone asks once, on the first tap), turns magnetic north
+// into true north for the job's state, and "Use" fills Orientation with the
+// nearest of its 8 answers. The 8 answers sit underneath as buttons too, for
+// when the compass can't be used.
 const COMPASS_POINTS_16 = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 const COMPASS_POINTS_8 = ['North', 'North-east', 'East', 'South-east', 'South', 'South-west', 'West', 'North-west'];
 // Rough magnetic declination by state (degrees east), enough to get the
@@ -5116,18 +5118,21 @@ function compassPoint8(h) { return COMPASS_POINTS_8[Math.round(h / 45) % 8]; }
 
 async function openCompass() {
   if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  commitActive();
   compassHeading = null;
   document.getElementById('compassOverlay').classList.add('open');
   renderCompass();
+  renderCompassPicks();
   // iPhone: the permission prompt has to come from this tap.
   if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
     try {
       if (await DeviceOrientationEvent.requestPermission() !== 'granted') {
-        setCompassNote('SAYON needs motion access for the compass. Allow it in Settings › Safari › Motion & Orientation Access, then try again.');
+        setCompassNote('Compass blocked. Allow Motion & Orientation Access in Settings › Safari, or choose below.');
+        document.getElementById('compassUseBtn').textContent = 'No compass reading';
         return;
       }
     } catch (e) {
-      setCompassNote('Could not start the compass. Close this and tap Compass again.');
+      setCompassNote('Compass didn\'t start. Choose below.');
       return;
     }
   }
@@ -5141,7 +5146,10 @@ function startCompass() {
   window.addEventListener(compassListening, onCompassReading);
   setCompassNote('');
   compassNoSignalTimer = setTimeout(() => {
-    if (compassHeading == null) setCompassNote('No compass reading from this device. Phones have one; most computers don\'t.');
+    if (compassHeading == null) {
+      setCompassNote('No compass on this device. Choose below.');
+      document.getElementById('compassUseBtn').textContent = 'No compass reading';
+    }
   }, 2500);
 }
 
@@ -5175,7 +5183,7 @@ function onCompassReading(e) {
     compassHeading = (compassHeading + diff * 0.25 + 360) % 360;
   }
   const poor = typeof e.webkitCompassAccuracy === 'number' && (e.webkitCompassAccuracy < 0 || e.webkitCompassAccuracy > 25);
-  setCompassNote(poor ? 'Reading is rough. Move the phone in a figure 8 a few times, and away from cars and meter boxes.' : '');
+  setCompassNote(poor ? 'Rough reading. Move the phone in a figure 8.' : '');
   renderCompass();
 }
 
@@ -5192,20 +5200,29 @@ function renderCompass() {
   document.getElementById('compassPoint').textContent = has ? COMPASS_POINTS_16[Math.round(h / 22.5) % 16] : '';
   const dec = compassDeclination();
   document.getElementById('compassNorth').textContent = dec
-    ? `True north, adjusted for ${dec.state}`
-    : 'Magnetic north. Set the job\'s state for true north.';
+    ? `True north (${dec.state})`
+    : 'Magnetic north';
   const btn = document.getElementById('compassUseBtn');
   btn.disabled = !has;
   btn.textContent = has ? `Use ${compassPoint8(h)} for Orientation` : 'Waiting for the compass…';
 }
 
-function useCompassHeading() {
-  if (compassHeading == null) return;
+function renderCompassPicks() {
+  const cur = reportData.facadeDirection || '';
+  document.getElementById('compassPicks').innerHTML =
+    COMPASS_POINTS_8.map((p, i) => `<button type="button" class="compass-pick${p === cur ? ' on' : ''}" aria-label="${p}" aria-pressed="${p === cur}" onclick="setOrientation('${p}')">${COMPASS_POINTS_16[i * 2]}</button>`).join('') +
+    (cur ? '<button type="button" class="compass-clear" onclick="setOrientation(\'\')">Clear</button>' : '');
+}
+
+function setOrientation(value) {
   const el = document.getElementById('f-facadeDirection');
-  const value = compassPoint8(compassHeading);
   closeCompass();
   if (el) commitEdit(el, 'facadeDirection', value);
-  showToast(`Orientation set to ${value}`, 'success');
+  if (value) showToast(`Orientation set to ${value}`, 'success');
+}
+
+function useCompassHeading() {
+  if (compassHeading != null) setOrientation(compassPoint8(compassHeading));
 }
 
 // ── MOISTURE METER READINGS ─────────────────────────────────────────────

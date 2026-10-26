@@ -1064,7 +1064,7 @@
             <div class="field"><div class="field-label">Wall Construction</div><div class="field-val" id="f-wallConstruction" onclick="startEdit(this,'wallConstruction','wallconstruction')">—</div></div>
             <div class="field"><div class="field-label">Roof Type</div><div class="field-val" id="f-roofType" onclick="startEdit(this,'roofType','rooftype')">—</div></div>
             <div class="field"><div class="field-label">Floor Type</div><div class="field-val" id="f-floorType" onclick="startEdit(this,'floorType','floortype')">—</div></div>
-            <div class="field"><div class="field-label">Orientation</div><div class="field-val" id="f-facadeDirection" onclick="startEdit(this,'facadeDirection','facadedirection')">—</div><button type="button" class="field-tool-btn" onclick="openCompass()"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/></svg>Compass</button></div>
+            <div class="field"><div class="field-label">Orientation</div><div class="field-val" id="f-facadeDirection" onclick="openCompass()">—</div></div>
             <div class="field"><div class="field-label">Year / Period of Construction</div><div class="field-val" id="f-constructionEra" onclick="startEdit(this,'constructionEra','era')">—</div></div>
             <div class="field"><div class="field-label">Occupancy Status</div><div class="field-val" id="f-occupancyStatus" onclick="startEdit(this,'occupancyStatus','occupancystatus')">—</div></div>
             <div class="field"><div class="field-label">Weather Conditions</div><div class="field-val" id="f-weatherConditions" onclick="startEdit(this,'weatherConditions','weatherconditions')">—</div></div>
@@ -1706,7 +1706,6 @@
       <button class="voice-popover-close" onclick="closeCompass()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
     </div>
     <div class="page-sheet-body compass-body">
-      <div class="compass-how">Stand at the front door with your back to the house, facing the street. Hold the phone flat, top pointing away from you.</div>
       <div class="compass-dial" aria-hidden="true">
         <div class="compass-pointer"></div>
         <svg class="compass-rose" id="compassRose" viewBox="0 0 200 200">
@@ -1727,6 +1726,7 @@
       <div class="compass-north" id="compassNorth"></div>
       <div class="compass-note" id="compassNote" role="status" hidden></div>
       <button class="extract-btn" id="compassUseBtn" onclick="useCompassHeading()" disabled>Waiting for the compass…</button>
+      <div class="compass-picks" id="compassPicks"></div>
     </div>
   </div>
 </div>

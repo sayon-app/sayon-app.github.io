@@ -161,9 +161,16 @@ function draftTreatment(q) {
     noticeWhere: 'Meter box',
     cautions: TREATMENT_DEFAULT_CAUTIONS,
     nextInspection: addMonthsIso(date, inspectionFrequencyMonths(rd)),
-    warranty: '',
+    warranty: treatmentWarrantyFromQuote(q),
     notes: '',
   };
+}
+
+// The free service period the quote's plan offered, as the record's terms.
+function treatmentWarrantyFromQuote(q) {
+  const service = ((q.plan && q.plan.service) || '').trim();
+  if (!service || /^none$/i.test(service)) return '';
+  return `${service} free service period, while the recommended timber pest inspections are carried out.`;
 }
 
 const TREATMENT_DEFAULT_CAUTIONS = 'Keep people and pets away from treated areas until the treatment has dried. ' +

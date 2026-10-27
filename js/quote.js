@@ -434,6 +434,179 @@ function buildQuoteExclusions(rd) {
   return out;
 }
 
+// ── TREATMENT PLAN ──
+// How the job will go, in plain words for the client: what we do, what we
+// ask them to do, how long it takes, the free service period and the
+// inspections after. q.plan = { we, owner, time, service, inspections },
+// with we and owner one step per line. It starts from the report, which the
+// voice notes fill, so the inspector only checks it. Quotes made before the
+// plan was added have none until the inspector adds one, so a quote already
+// sent doesn't change.
+const QUOTE_PLAN_TIMES = ['1 to 2 hours', 'Half a day', '1 day', '2 days'];
+const QUOTE_PLAN_SERVICE = ['None', '12 months', '24 months', '36 months', '60 months'];
+
+function buildPlanWe(rd, system) {
+  rd = rd || {};
+  const lc = v => { v = (v || '').trim(); return /^[A-Z][a-z]/.test(v) ? v[0].toLowerCase() + v.slice(1) : v; };
+  const findings = (Array.isArray(rd.findings) ? rd.findings : []).filter(f => f && f.termiteActivity === 'ACTIVE');
+  const places = findings.map(f => lc(f.activityLocation)).filter(Boolean);
+  const type = (rd.treatmentType || '').trim();
+  const wants = rd.treatmentRecommended === 'YES' || (type && rd.treatmentRecommended !== 'NO') || findings.length > 0;
+  const choices = treatmentChoices(type);
+  const kind = system || (choices.length ? '' : classifyTreatment(type));
+  const out = [];
+  if (findings.length) out.push(`Treat the live termites${places.length ? ` (${places.join('; ')})` : ''} to control the colony.`);
+  if (wants) {
+    if (kind === 'bait') out.push('Install bait stations around the building and check them regularly while termites are feeding, then keep monitoring.');
+    else if (kind === 'barrier') out.push('Treat the soil around the building to form a continuous treated zone.');
+    else if (kind === 'system') out.push(`Top up the existing termite management system${rd.existingSystem ? ` (${rd.existingSystem})` : ''}.`);
+    else if (kind) out.push('Install a termite management system.');
+  }
+  if (rd.borerActivity === 'ACTIVE') out.push('Treat the timbers with live borers.');
+  if (rd.timberSoil === 'YES') out.push('Remove the timber touching the soil.');
+  if (rd.weepHoles === 'BRIDGED') out.push('Clear the bridged weep holes.');
+  if (rd.slabEdge === 'OBSTRUCTED') out.push('Expose the concealed slab edge so it can be inspected.');
+  if (wants && kind) out.push('Fit a durable notice in the meter box showing what was used and when.');
+  return out.join('\n');
+}
+
+// The owner's part: upkeep that keeps the treatment working. Repairs by a
+// plumber or builder are in the exclusions, so they aren't repeated here.
+function buildPlanOwner(rd) {
+  rd = rd || {};
+  const type = (rd.treatmentType || '').trim();
+  const treated = rd.treatmentRecommended === 'YES' || (type && rd.treatmentRecommended !== 'NO') ||
+    (rd.findings || []).some(f => f && f.termiteActivity === 'ACTIVE');
+  const out = [];
+  if (rd.siteDrainage === 'POOR' || rd.subfloorDrainage === 'POOR') {
+    out.push(`Improve the drainage so water runs away from the building${rd.subfloorDrainage === 'POOR' ? ' and out of the subfloor' : ''}.`);
+  }
+  if (rd.subfloorVentilation === 'POOR') out.push('Improve the subfloor ventilation so it stays dry.');
+  if (rd.timberSoil === 'YES') out.push('Keep timber, firewood and stored goods off the soil and away from the walls.');
+  if (rd.weepHoles === 'BRIDGED') out.push('Keep garden beds, mulch and paving below the weep holes.');
+  if (rd.slabEdge === 'OBSTRUCTED' || rd.zone25mmVisible === 'NO' || rd.zone75mmVisible === 'NO') {
+    out.push('Keep the slab edge clear and visible all the way around.');
+  }
+  if (treated) out.push('Leave the treated areas and any stations undisturbed, and tell us before any building or landscaping work near them.');
+  return out.join('\n');
+}
+
+function buildPlanInspections(rd) {
+  const f = ((rd && rd.inspectionFrequency) || '').trim();
+  if (!f) return '';
+  const every = f.replace(/\s*\((annual|yearly)\)/i, '');
+  return /^every\b/i.test(every) ? every : `Every ${every}`;
+}
+
+function buildQuotePlan(rd, system) {
+  return { we: buildPlanWe(rd, system), owner: buildPlanOwner(rd), time: '', service: '', inspections: buildPlanInspections(rd) };
+}
+
+function quotePlanReport() {
+  const src = currentQuoteSource();
+  return src ? (src.key === (currentReportId || 'draft') ? reportData : src.reportData) : null;
+}
+
+// One line for the folded row: what's set, and what's still to choose.
+function quotePlanSummary(q) {
+  const p = q && q.plan;
+  if (!p) return ['No plan yet', true];
+  const steps = (p.we || '').split('\n').filter(l => l.trim()).length + (p.owner || '').split('\n').filter(l => l.trim()).length;
+  const bits = [`${steps} step${steps === 1 ? '' : 's'}`];
+  bits.push(p.time ? p.time : 'job time not set');
+  bits.push(p.service ? (p.service === 'None' ? 'no service period' : `${p.service} service`) : 'service period not set');
+  return [bits.join(' · '), !p.time || !p.service];
+}
+
+function quotePlanChipsHTML(field, options, value) {
+  const custom = value && !options.includes(value);
+  return options.map(o => `<button type="button" class="qp-chip${o === value ? ' on' : ''}" onclick="setQuotePlanChoice('${field}', ${escapeHtml(JSON.stringify(o))})">${escapeHtml(o)}</button>`).join('') +
+    `<button type="button" class="qp-chip${custom ? ' on' : ''}" onclick="typeQuotePlanChoice('${field}')">${custom ? escapeHtml(value) : 'Type it'}</button>`;
+}
+
+function renderQuotePlan() {
+  const q = quoteState;
+  const body = document.getElementById('quotePlanBody');
+  if (!q || !body) return;
+  const [sub, warn] = quotePlanSummary(q);
+  const subEl = document.getElementById('quotePlanSub');
+  subEl.textContent = sub;
+  subEl.classList.toggle('warn', warn);
+  const p = q.plan;
+  if (!p) {
+    body.innerHTML = `<div class="quote-hint" style="margin-top:0">Set out how the job will go: what you'll do, what the owner should do, how long it takes and the free service period. It starts from the report.</div>
+      <button class="quote-btn" style="margin-top:10px" onclick="addQuotePlan()">Add a plan from the report</button>`;
+    return;
+  }
+  body.innerHTML = `
+    <label class="quote-field"><span>What we'll do, one step per line</span>
+      <textarea class="quote-input quote-textarea" id="qPlanWe" rows="3" oninput="fitQuoteText(this); onQuotePlanInput()">${escapeHtml(p.we || '')}</textarea>
+    </label>
+    <label class="quote-field"><span>What we ask the owner to do, one per line</span>
+      <textarea class="quote-input quote-textarea" id="qPlanOwner" rows="3" placeholder="e.g. Keep garden beds below the weep holes" oninput="fitQuoteText(this); onQuotePlanInput()">${escapeHtml(p.owner || '')}</textarea>
+    </label>
+    <div class="quote-field"><span>Time on site</span><div class="qp-chips">${quotePlanChipsHTML('time', QUOTE_PLAN_TIMES, p.time)}</div></div>
+    <div class="quote-field"><span>Free service period</span><div class="qp-chips">${quotePlanChipsHTML('service', QUOTE_PLAN_SERVICE, p.service)}</div></div>
+    ${p.service && p.service !== 'None' ? '<div class="quote-hint" style="margin-top:6px">The quote says it only holds while the recommended inspections are kept up and the owner does their part.</div>' : ''}
+    <label class="quote-field"><span>Timber pest inspections after</span>
+      <input class="quote-input" id="qPlanInspections" placeholder="e.g. Every 12 months" value="${escapeHtml(p.inspections || '')}" oninput="onQuotePlanInput()">
+    </label>
+    <button class="quote-text-btn" onclick="rebuildQuotePlan()">Start the plan again from the report</button>`;
+  body.querySelectorAll('.quote-textarea').forEach(fitQuoteText);
+}
+
+function addQuotePlan() {
+  if (!quoteState) return;
+  const c = quoteState.systemChoice;
+  quoteState.plan = buildQuotePlan(quotePlanReport(), c && c.picked);
+  renderQuotePlan();
+  scheduleQuoteSave();
+}
+
+function rebuildQuotePlan() {
+  const q = quoteState;
+  if (!q || !q.plan) return;
+  if (!confirm('Replace the plan\'s steps with fresh ones from the report? Your edits to them will be lost.')) return;
+  const c = q.systemChoice;
+  const fresh = buildQuotePlan(quotePlanReport(), c && c.picked);
+  q.plan.we = fresh.we;
+  q.plan.owner = fresh.owner;
+  q.plan.inspections = fresh.inspections;
+  renderQuotePlan();
+  scheduleQuoteSave();
+}
+
+function onQuotePlanInput() {
+  const p = quoteState && quoteState.plan;
+  if (!p) return;
+  p.we = document.getElementById('qPlanWe').value;
+  p.owner = document.getElementById('qPlanOwner').value;
+  p.inspections = document.getElementById('qPlanInspections').value;
+  const [sub, warn] = quotePlanSummary(quoteState);
+  const subEl = document.getElementById('quotePlanSub');
+  subEl.textContent = sub;
+  subEl.classList.toggle('warn', warn);
+  scheduleQuoteSave();
+}
+
+function setQuotePlanChoice(field, value) {
+  const p = quoteState && quoteState.plan;
+  if (!p) return;
+  p[field] = p[field] === value ? '' : value;
+  renderQuotePlan();
+  scheduleQuoteSave();
+}
+
+function typeQuotePlanChoice(field) {
+  const p = quoteState && quoteState.plan;
+  if (!p) return;
+  const typed = prompt(field === 'time' ? 'How long will the job take on site?' : 'How long is the free service period?', p[field] || '');
+  if (typed === null) return;
+  p[field] = typed.trim();
+  renderQuotePlan();
+  scheduleQuoteSave();
+}
+
 function newSystemChoice(rd) {
   const choices = treatmentChoices((rd && rd.treatmentType) || '');
   return choices.length ? { options: choices, picked: null } : null;
@@ -466,6 +639,7 @@ function createQuoteFromSource(src) {
     items: buildQuoteItemsFromReport(rd),
     systemChoice: newSystemChoice(rd),
     exclusions: buildQuoteExclusions(rd).join('\n'),
+    plan: buildQuotePlan(rd),
     paymentTerms: defaultPaymentTerms(),
     notes: QUOTE_DEFAULT_NOTES,
   };
@@ -567,6 +741,7 @@ function renderQuoteEditor() {
   renderQuoteItems();
   renderQuoteCompanyGaps();
   renderQuoteFolds();
+  renderQuotePlan();
   renderQuoteAnswer();
   ['qProblem', 'qPaymentTerms', 'qExclusions', 'qNotes'].forEach(id => fitQuoteText(document.getElementById(id)));
 }
@@ -662,6 +837,11 @@ function pickQuoteSystem(kind) {
   while (at < q.items.length && q.items[at].key === 'direct') at++;
   q.items.splice(at, 0, ...fresh);
   q.systemChoice.picked = kind;
+  // The plan's steps name the system, so they follow the pick unless edited.
+  if (q.plan && q.plan.we === buildPlanWe(rd)) {
+    q.plan.we = buildPlanWe(rd, kind);
+    renderQuotePlan();
+  }
   renderQuoteItems();
   scheduleQuoteSave();
 }
@@ -1453,8 +1633,68 @@ function buildQuotePDF(q) {
   }
   y += blockH + 4;
 
-  // ── 2. EXCLUSIONS ──
   let sectionNum = 2;
+  // ── 2. TREATMENT PLAN ──
+  const plan = q.plan || {};
+  const planLines = v => (v || '').split('\n').map(s => s.trim()).filter(Boolean);
+  const we = planLines(plan.we), owner = planLines(plan.owner);
+  const facts = [['TIME ON SITE', plan.time], ['FREE SERVICE PERIOD', plan.service], ['INSPECTIONS AFTER', plan.inspections]]
+    .map(([k, v]) => [k, (v || '').trim()]).filter(([, v]) => v);
+  if (we.length || owner.length || facts.length) {
+    sectionTitle('TREATMENT PLAN', sectionNum++);
+    if (facts.length) {
+      const gap = 4, fw = (CW - gap * (facts.length - 1)) / facts.length;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+      const wrapped = facts.map(([, v]) => doc.splitTextToSize(v, fw - 8));
+      const fh = 10 + Math.max(...wrapped.map(l => l.length)) * 4.4;
+      ensure(fh + 6);
+      facts.forEach(([k], i) => {
+        const x = M + i * (fw + gap);
+        doc.setFillColor(...C.accentLight); doc.roundedRect(x, y, fw, fh, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...C.accentDark);
+        pdfTracked(doc, k, x + 4, y + 5.5, { cs: 0.5 });
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...C.ink);
+        doc.text(wrapped[i], x + 4, y + 10.8);
+      });
+      y += fh + 6;
+    }
+    const steps = (label, list, numbered) => {
+      if (!list.length) return;
+      ensure(14);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
+      pdfTracked(doc, label, M, y, { cs: 0.5 });
+      y += 5;
+      list.forEach((line, i) => {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+        const lines = doc.splitTextToSize(line, CW - 8);
+        ensure(lines.length * 4.2 + 2);
+        if (numbered) {
+          doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.accentDark);
+          doc.text(`${i + 1}.`, M, y);
+          doc.setFont('helvetica', 'normal');
+        } else {
+          doc.setFillColor(...C.accent); doc.circle(M + 1.6, y - 1.1, 0.8, 'F');
+        }
+        doc.setTextColor(...C.ink); doc.text(lines, M + 5, y);
+        y += lines.length * 4.2 + 2;
+      });
+      y += 3;
+    };
+    steps('WHAT WE WILL DO', we, true);
+    steps('WHAT WE ASK YOU TO DO', owner, false);
+    if (plan.service && plan.service.trim() && !/^none$/i.test(plan.service.trim())) {
+      doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5);
+      const lines = doc.splitTextToSize(`During the free service period, if termites return to the treated areas we will come back and treat them at no charge. ` +
+        `This only applies while the recommended timber pest inspections are carried out and the steps asked of you above are done.`, CW - 5);
+      const h = lines.length * 4 + 3;
+      ensure(h);
+      doc.setFillColor(...C.ruleLight); doc.rect(M, y - 3, 1.5, h - 2, 'F');
+      doc.setTextColor(...C.inkMuted); doc.text(lines, M + 4, y);
+      y += h + 2;
+    }
+  }
+
+  // ── EXCLUSIONS ──
   const exclusions = (q.exclusions || '').split('\n').map(s => s.trim()).filter(Boolean);
   if (exclusions.length) {
     sectionTitle('EXCLUSIONS & WORK BY OTHERS', sectionNum++);

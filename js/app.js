@@ -6010,6 +6010,8 @@ const FGROUP_CONCERNS = {
   subfloorDrainage: [['POOR'], 'poor subfloor drainage'], subfloorVentilation: [['POOR'], 'poor ventilation'], mouldSeen: [['YES'], 'mould'],
   timberSoil: [['YES'], 'timber touching soil'], slabEdge: [['OBSTRUCTED'], 'slab edge concealed'], weepHoles: [['BRIDGED'], 'weep holes bridged'],
   antCapping: [['GAPS', 'NONE'], 'ant capping'], nonDurableTimber: [['YES'], 'non-durable timber'],
+  borerActivity: [['ACTIVE', 'INACTIVE'], v => v === 'ACTIVE' ? 'active borers' : 'old borer holes'], decayFound: [['YES'], 'wood decay'],
+  delignification: [['YES'], 'chemical delignification'], previousTreatment: [['YES'], 'signs of a past treatment'],
 };
 
 // The questions a group asks right now: hidden follow-ups (a "where" box
@@ -6040,10 +6042,10 @@ function watchFieldGroups() {
 // in sentence case, with a word of context where an answer alone would be
 // unclear ("Detached house, single storey, brick veneer walls, front faces
 // north"). Brand names and codes such as AS 3660 keep their capitals.
-const FGROUP_KEEP_CASE = new Set(['Colorbond', 'Zincalume', 'Hebel', 'Queenslander']);
+const FGROUP_KEEP_CASE = new Set(['Colorbond', 'Zincalume', 'Hebel', 'Queenslander', 'Termidor', 'Sentricon', 'Exterra', 'Kordon', 'Termimesh', 'Altriset', 'Trelona', 'Biflex', 'Premise', 'Granitgard']);
 const FGROUP_LOWER = new Set(['structureType', 'height', 'wallConstruction', 'roofType', 'floorType', 'facadeDirection', 'constructionEra',
   'siteSurroundings', 'siteSlope', 'termiteHistory', 'existingSystem', 'occupancyStatus', 'furnishing', 'peoplePresent',
-  'weatherConditions', 'recentWeather', 'toolsUsed']);
+  'weatherConditions', 'recentWeather', 'toolsUsed', 'treatmentType', 'inspectionFrequency']);
 const FGROUP_PHRASES = {
   wallConstruction: v => /wall/i.test(v) ? v : v + ' walls',
   roofType: v => /roof/i.test(v) ? v : v + ' roof',
@@ -6056,11 +6058,15 @@ const FGROUP_PHRASES = {
   humidity: v => /humid/i.test(v) ? v : v + ' humidity',
   rainLast24h: v => /^(none|nil|no rain)$/i.test(v) ? 'no rain in the last 24 hours' : /rain/i.test(v) ? v : v + ' of rain in the last 24 hours',
   recentWeather: v => /^normal/.test(v) ? 'weather ' + v : v,
+  riskLevel: v => v.toLowerCase() + ' risk',
+  inspectionFrequency: v => /^every/.test(v) ? 're-inspect ' + v : v,
 };
 function fgroupSentence(keys) {
   const items = [];
   keys.forEach(k => {
     let v = String(reportData[k] ?? '').trim();
+    if (k === 'treatmentRecommended') v = { YES: 'treatment required', NO: 'no treatment required' }[v] || '';
+    if (k === 'invasiveInspection') v = { YES: 'recommended', NO: 'not recommended' }[v] || '';
     if (!v || /^(YES|NO|N\/A)$/.test(v)) return;
     v = v.replace(/\s+—\s+(.+)$/, ' ($1)');
     if (FGROUP_LOWER.has(k)) v = v.replace(/\b[A-Z][a-z]+\b/g, w => FGROUP_KEEP_CASE.has(w) ? w : w.toLowerCase());
@@ -6073,9 +6079,42 @@ function fgroupSentence(keys) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+// Groups whose answers live in cards rather than single questions. Each
+// returns what the header shows; these groups stay open on a step tap.
+const FGROUP_CUSTOM = {
+  termites: () => {
+    const list = Array.isArray(reportData.findings) ? reportData.findings : [];
+    const acts = list.map(f => f.termiteActivity).filter(Boolean);
+    const live = acts.filter(a => a === 'ACTIVE').length, old = acts.filter(a => a === 'INACTIVE').length;
+    const found = [live && `${live} active`, old && `${old} inactive`].filter(Boolean);
+    return {
+      done: list.length > 0 && acts.length === list.length, started: acts.length > 0,
+      count: list.length ? `${list.length} finding${list.length === 1 ? '' : 's'}` : '',
+      text: found.length ? 'Found: ' + found.join(', ') : acts.length ? 'No termites found' : '', concern: found.length > 0,
+    };
+  },
+  advice: () => {
+    const lines = getRecLines().length, other = !isBlankValue(reportData.otherRecommendations);
+    return {
+      done: lines > 0 || other, started: false, count: lines ? `${lines} added` : '',
+      text: [lines && `${lines} common recommendation${lines === 1 ? '' : 's'}`, other && String(reportData.otherRecommendations).trim()].filter(Boolean).join(', '),
+    };
+  },
+};
+
 function renderFieldGroups() {
   watchFieldGroups();
   document.querySelectorAll('#reportBody details.fgroup').forEach(group => {
+    const custom = FGROUP_CUSTOM[group.dataset.summary];
+    if (custom) {
+      const r = custom();
+      group.classList.toggle('fgroup-done', !!r.done);
+      group.classList.toggle('fgroup-started', !!r.started && !r.done);
+      const count = group.querySelector('.fgroup-count'), sub = group.querySelector('.fgroup-sub');
+      if (count) { count.textContent = r.count; count.hidden = !r.count; }
+      if (sub) { sub.textContent = r.text || 'Not answered yet'; sub.classList.toggle('concern', !!r.concern); }
+      return;
+    }
     const keys = fgroupKeys(group);
     const answered = keys.filter(k => !isBlankValue(reportData[k]));
     const done = keys.length > 0 && answered.length === keys.length;
@@ -6087,7 +6126,8 @@ function renderFieldGroups() {
     if (!sub) return;
     let text, concern = false;
     if (group.dataset.summary === 'concerns') {
-      const concerns = keys.filter(k => FGROUP_CONCERNS[k] && FGROUP_CONCERNS[k][0].includes(reportData[k])).map(k => FGROUP_CONCERNS[k][1]);
+      const concerns = keys.filter(k => FGROUP_CONCERNS[k] && FGROUP_CONCERNS[k][0].includes(reportData[k]))
+        .map(k => typeof FGROUP_CONCERNS[k][1] === 'function' ? FGROUP_CONCERNS[k][1](reportData[k]) : FGROUP_CONCERNS[k][1]);
       concern = concerns.length > 0;
       text = concern ? 'Found: ' + concerns.join(', ') : (answered.length ? 'Nothing of concern so far' : '');
     } else {
@@ -6103,6 +6143,7 @@ function foldAnsweredGroups(stepId) {
   const step = stepOf(stepId);
   step.sections.forEach(s => {
     document.querySelectorAll(`#section-${s} details.fgroup`).forEach(group => {
+      if (FGROUP_CUSTOM[group.dataset.summary]) return;
       group.open = !group.classList.contains('fgroup-done');
     });
   });
@@ -7299,6 +7340,7 @@ function toggleRecLine(id) {
   const list = getRecLines();
   reportData.recLines = list.some(l => l.id === id) ? list.filter(l => l.id !== id) : [...list, { id, text: line[2] }];
   renderRecLines();
+  renderFieldGroups();
   saveDraft();
 }
 

@@ -1224,7 +1224,7 @@
                Not applicable, and any obstruction or restricted reason is ticked
                under it. Rendered by renderAreaChecklist(). -->
           <div class="areas-intro">
-            <p class="access-intro">Mark every area and what was found there. If something limited the inspection, tick the kind of reason. You'll say where exactly in Access.</p>
+            <p class="access-intro">Mark every area and what was found there. If something limited the inspection, tick the kind of reason. You'll add where exactly further down.</p>
             <div class="areas-bar">
               <span class="areas-progress" id="areasProgress"></span>
               <button type="button" class="link-btn areas-mark-all" id="markAllAreasBtn" onclick="markRemainingAreasInspected()">Mark the rest as inspected</button>
@@ -1254,7 +1254,7 @@
         </div>
 
         <!-- RESTRICTIONS -->
-        <div class="report-section" id="section-restrictions" style="display:none">
+        <div class="report-section grouped" id="section-restrictions" style="display:none">
           <div class="section-header">
             <h3><span class="sec-num">5.</span>Areas Unable to Be Inspected</h3>
             <span class="sec-badge empty" id="sts-restrictions">Not started</span>
@@ -1279,16 +1279,36 @@
               <div class="field-val" id="f-noAccessAreas">—</div>
             </div>
 
-            <div class="sec-group-title">Come back once there's access<small>Areas to check again when they're unlocked, cleared or reachable</small></div>
+          </div>
+          <details class="fgroup" id="fg-recheck" open>
+            <summary class="fgroup-head">
+              <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></span>
+              <span class="fgroup-text"><span class="fgroup-title">Recheck later</span><span class="fgroup-sub"></span></span>
+              <span class="fgroup-count"></span>
+              <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
+          <p class="fgroup-hint">Areas to check again once they're unlocked, cleared or reachable.</p>
+          <div class="section-fields">
             <div class="field field-wide">
               <div class="field-label">High Risk Areas</div>
               <div class="field-val" id="f-highRiskAreas" onclick="startEdit(this,'highRiskAreas','highrisk')">—</div>
               <div class="access-hint" id="accessHighRiskHint" hidden></div>
             </div>
-            <div class="sec-group-title">Invasive inspection<small>Walls, linings or timbers cut, drilled or removed to see inside</small></div>
+          </div>
+          </details>
+          <details class="fgroup" id="fg-invasive" open>
+            <summary class="fgroup-head">
+              <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
+              <span class="fgroup-text"><span class="fgroup-title">Invasive</span><span class="fgroup-sub"></span></span>
+              <span class="fgroup-count"></span>
+              <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
+          <p class="fgroup-hint">Walls, linings or timbers cut, drilled or removed to see inside.</p>
+          <div class="section-fields">
             <div class="field"><div class="field-label">Invasive Inspection Recommended</div><div class="field-val" id="f-invasiveInspection" onclick="startEdit(this,'invasiveInspection','yesno')">—</div></div>
             <div class="field field-wide" id="invasiveDetailsWrap" hidden><div class="field-label">Invasive Inspection: Where, Why and When</div><div class="field-val" id="f-invasiveInspectionDetails" onclick="startEdit(this,'invasiveInspectionDetails','text')">—</div></div>
           </div>
+          </details>
 
 
           <!-- Older reports only; new photos go on each spot above. -->
@@ -1318,7 +1338,7 @@
         </div>
 
         <!-- FINDINGS -->
-        <div class="report-section" id="section-findings" style="display:none">
+        <div class="report-section grouped" id="section-findings" style="display:none">
           <div class="section-header">
             <h3><span class="sec-num">6.</span>Findings</h3>
             <span class="sec-badge empty" id="sts-findings">Not started</span>
@@ -1341,6 +1361,13 @@
             </div>
           </div>
           <div class="area-finding-prompts" id="findingsFromAreas" hidden></div>
+          <details class="fgroup" id="fg-termites" open data-summary="termites">
+            <summary class="fgroup-head">
+              <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M9 7.13v-1a3 3 0 1 1 6 0v1"/><path d="M6 13H2M22 13h-4M6.53 9C4.6 8.8 3 7.1 3 5M21 5c0 2.1-1.6 3.8-3.5 4M3 21c0-2.1 1.7-3.9 3.8-4M17.2 17c2.1.1 3.8 1.9 3.8 4"/></svg></span>
+              <span class="fgroup-text"><span class="fgroup-title">Termites</span><span class="fgroup-sub"></span></span>
+              <span class="fgroup-count"></span>
+              <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
           <!-- Dynamic finding cards rendered by renderFindingsUI() -->
           <div class="findings-list" id="findingsList"></div>
 
@@ -1382,45 +1409,61 @@
             <span>No termite activity or evidence found — no further findings details required for this section.</span>
           </div>
 
+          </details>
+
           <!-- Borers and wood decay: the other timber pests AS 4349.3 requires a report on -->
-          <div class="system-verify" id="otherTimberPests">
-            <div class="system-verify-header">
-              <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
-              <span>Borers, Wood Decay &amp; Delignification</span>
-            </div>
-            <p class="system-verify-hint">AS 4349.3 timber pests other than termites. Record what you saw, even if it's none.</p>
-            <div class="section-fields">
-              <div class="field"><div class="field-label">Borers of Seasoned Timber</div><div class="field-val" id="f-borerActivity" onclick="startEdit(this,'borerActivity','activity')">—</div></div>
-              <!-- One card per place borers were found (renderBorerFindings) -->
-              <div class="field field-wide borer-findings" id="borerFindingsWrap" style="display:none">
-                <div id="borerFindingsList"></div>
-                <button type="button" class="findings-add-btn" id="addBorerBtn" onclick="addBorerFinding()">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-                  <span>Add Another Borer Finding</span>
-                </button>
-              </div>
-              <div class="field"><div class="field-label">Wood Decay Fungi (Rot)</div><div class="field-val" id="f-decayFound" onclick="startEdit(this,'decayFound','yesno')">—</div></div>
-              <div class="field"><div class="field-label">What</div><div class="field-val" id="f-decayDetails" onclick="startEdit(this,'decayDetails','decaywhat')">—</div></div>
-              <div class="field"><div class="field-label">Where</div><div class="field-val" id="f-decayWhere" onclick="startEdit(this,'decayWhere','decaywhere')">—</div></div>
-              <div class="field"><div class="field-label">Chemical Delignification</div><div class="field-val" id="f-delignification" onclick="startEdit(this,'delignification','yesno')">—</div></div>
-              <div class="field"><div class="field-label">What</div><div class="field-val" id="f-delignificationDetails" onclick="startEdit(this,'delignificationDetails','delignwhat')">—</div></div>
-              <div class="field"><div class="field-label">Where</div><div class="field-val" id="f-delignificationWhere" onclick="startEdit(this,'delignificationWhere','delignwhere')">—</div></div>
+          <details class="fgroup" id="fg-borers" open data-summary="concerns">
+            <summary class="fgroup-head">
+              <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="2"/><circle cx="8" cy="12" r="1"/><circle cx="12" cy="10.5" r="1"/><circle cx="16" cy="13" r="1"/></svg></span>
+              <span class="fgroup-text"><span class="fgroup-title">Borers</span><span class="fgroup-sub"></span></span>
+              <span class="fgroup-count"></span>
+              <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
+          <p class="fgroup-hint">AS 4349.3 timber pests other than termites. Record what you saw, even if it's none.</p>
+          <div class="section-fields">
+            <div class="field field-wide"><div class="field-label">Borers of Seasoned Timber</div><div class="field-val" id="f-borerActivity" onclick="startEdit(this,'borerActivity','activity')">—</div></div>
+            <!-- One card per place borers were found (renderBorerFindings) -->
+            <div class="field field-wide borer-findings" id="borerFindingsWrap" style="display:none">
+              <div id="borerFindingsList"></div>
+              <button type="button" class="findings-add-btn" id="addBorerBtn" onclick="addBorerFinding()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                <span>Add Another Borer Finding</span>
+              </button>
             </div>
           </div>
+          </details>
+          <details class="fgroup" id="fg-decay" open data-summary="concerns">
+            <summary class="fgroup-head">
+              <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="m11 7 2 3-2 2 2 5"/></svg></span>
+              <span class="fgroup-text"><span class="fgroup-title">Timber decay</span><span class="fgroup-sub"></span></span>
+              <span class="fgroup-count"></span>
+              <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
+          <div class="section-fields">
+            <div class="field field-wide"><div class="field-label">Wood Decay Fungi (Rot)</div><div class="field-val" id="f-decayFound" onclick="startEdit(this,'decayFound','yesno')">—</div></div>
+            <div class="field"><div class="field-label">What</div><div class="field-val" id="f-decayDetails" onclick="startEdit(this,'decayDetails','decaywhat')">—</div></div>
+            <div class="field"><div class="field-label">Where</div><div class="field-val" id="f-decayWhere" onclick="startEdit(this,'decayWhere','decaywhere')">—</div></div>
+            <div class="field field-wide"><div class="field-label">Chemical Delignification</div><div class="field-val" id="f-delignification" onclick="startEdit(this,'delignification','yesno')">—</div></div>
+            <div class="field"><div class="field-label">What</div><div class="field-val" id="f-delignificationDetails" onclick="startEdit(this,'delignificationDetails','delignwhat')">—</div></div>
+            <div class="field"><div class="field-label">Where</div><div class="field-val" id="f-delignificationWhere" onclick="startEdit(this,'delignificationWhere','delignwhere')">—</div></div>
+          </div>
+          </details>
 
           <!-- Signs of an earlier termite treatment -->
-          <div class="system-verify" id="previousTreatmentBox">
-            <div class="system-verify-header">
-              <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
-              <span>Previous Termite Treatment</span>
-            </div>
-            <p class="system-verify-hint">Drill holes in the slab or paving, dusting residue, bait or monitoring stations.</p>
-            <div class="section-fields">
-              <div class="field"><div class="field-label">Evidence of Previous Treatment</div><div class="field-val" id="f-previousTreatment" onclick="startEdit(this,'previousTreatment','yesno')">—</div></div>
-              <div class="field"><div class="field-label">What</div><div class="field-val" id="f-previousTreatmentDetails" onclick="startEdit(this,'previousTreatmentDetails','prevtreatment')">—</div></div>
-              <div class="field"><div class="field-label">Where</div><div class="field-val" id="f-previousTreatmentWhere" onclick="startEdit(this,'previousTreatmentWhere','prevtreatmentwhere')">—</div></div>
-            </div>
+          <details class="fgroup" id="fg-previous" open data-summary="concerns">
+            <summary class="fgroup-head">
+              <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg></span>
+              <span class="fgroup-text"><span class="fgroup-title">Past treatment</span><span class="fgroup-sub"></span></span>
+              <span class="fgroup-count"></span>
+              <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
+          <p class="fgroup-hint">Drill holes in the slab or paving, dusting residue, bait or monitoring stations.</p>
+          <div class="section-fields">
+            <div class="field field-wide"><div class="field-label">Evidence of Previous Treatment</div><div class="field-val" id="f-previousTreatment" onclick="startEdit(this,'previousTreatment','yesno')">—</div></div>
+            <div class="field"><div class="field-label">What</div><div class="field-val" id="f-previousTreatmentDetails" onclick="startEdit(this,'previousTreatmentDetails','prevtreatment')">—</div></div>
+            <div class="field"><div class="field-label">Where</div><div class="field-val" id="f-previousTreatmentWhere" onclick="startEdit(this,'previousTreatmentWhere','prevtreatmentwhere')">—</div></div>
           </div>
+          </details>
 
           <!-- Findings take photos per finding now; this box only shows for
                reports that already have photos in it. -->
@@ -1494,7 +1537,7 @@
           </details>
           <details class="fgroup" id="fg-entry" open data-summary="concerns">
             <summary class="fgroup-head">
-              <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M9 7.13v-1a3 3 0 1 1 6 0v1"/><path d="M6 13H2M22 13h-4M6.53 9C4.6 8.8 3 7.1 3 5M21 5c0 2.1-1.6 3.8-3.5 4M3 21c0-2.1 1.7-3.9 3.8-4M17.2 17c2.1.1 3.8 1.9 3.8 4"/></svg></span>
+              <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4h3a2 2 0 0 1 2 2v14"/><path d="M2 20h3"/><path d="M13 20h9"/><path d="M10 12v.01"/><path d="M13 4.56v16.16a1 1 0 0 1-1.24.97L5 20V5.56a2 2 0 0 1 1.52-1.94l4-1A2 2 0 0 1 13 4.56Z"/></svg></span>
               <span class="fgroup-text"><span class="fgroup-title">Entry points</span><span class="fgroup-sub"></span></span>
               <span class="fgroup-count"></span>
               <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
@@ -1538,9 +1581,9 @@
         </div>
 
         <!-- RECOMMENDATIONS -->
-        <div class="report-section" id="section-recommendations" style="display:none">
+        <div class="report-section grouped" id="section-recommendations" style="display:none">
           <div class="section-header">
-            <h3><span class="sec-num">8.</span>Recommendations &amp; Risk</h3>
+            <h3><span class="sec-num">8.</span>Recommendations and Risk</h3>
             <span class="sec-badge empty" id="sts-recommendations">Not started</span>
           </div>
           <!-- Shown when live termites set Treatment Required to Yes -->
@@ -1548,20 +1591,41 @@
             <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
             <div><strong>Treatment required: live termites found</strong><span>Set to Yes from your findings. Add the treatment type below, or change it if that's wrong.</span></div>
           </div>
+          <details class="fgroup" id="fg-treatment" open>
+            <summary class="fgroup-head">
+              <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.53a2 2 0 0 1-.21.9L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.07-10.13a2 2 0 0 1-.21-.9V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/></svg></span>
+              <span class="fgroup-text"><span class="fgroup-title">Treatment</span><span class="fgroup-sub"></span></span>
+              <span class="fgroup-count"></span>
+              <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
           <div class="section-fields">
+            <div class="fsub">Risk</div>
             <div class="field field-wide"><div class="field-label">Risk of Termite Attack</div><div class="field-val" id="f-riskLevel" onclick="startEdit(this,'riskLevel','risk')">—</div></div>
-            <div class="field"><div class="field-label">Treatment Required</div><div class="field-val" id="f-treatmentRecommended" onclick="startEdit(this,'treatmentRecommended','yesno')">—</div></div>
+            <div class="fsub">Treatment</div>
+            <div class="field field-wide"><div class="field-label">Treatment Required</div><div class="field-val" id="f-treatmentRecommended" onclick="startEdit(this,'treatmentRecommended','yesno')">—</div></div>
             <div class="field field-wide"><div class="field-label">Treatment Type</div><div class="field-val" id="f-treatmentType" onclick="startEdit(this,'treatmentType','treatmenttype')">—</div></div>
+            <div class="fsub">Follow-up</div>
             <div class="field field-wide"><div class="field-label">Re-inspection Frequency</div><div class="field-val" id="f-inspectionFrequency" onclick="startEdit(this,'inspectionFrequency','reinspection')">—</div></div>
-            <div class="field field-wide"><div class="field-label">Other Recommendations</div><div class="field-val" id="f-otherRecommendations" onclick="startEdit(this,'otherRecommendations','text')">—</div></div>
           </div>
+          </details>
+          <details class="fgroup" id="fg-advice" open data-summary="advice">
+            <summary class="fgroup-head">
+              <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></svg></span>
+              <span class="fgroup-text"><span class="fgroup-title">Advice</span><span class="fgroup-sub"></span></span>
+              <span class="fgroup-count"></span>
+              <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
           <!-- Ready-made lines: a tap adds or removes one; renderRecLines(). -->
           <div class="rec-lines">
             <div class="rec-lines-head"><span>Common recommendations</span><small id="recLinesCount">Tap to add to the report</small></div>
             <div class="rec-lines-list" id="recLines"></div>
             <ul class="rec-lines-added" id="recLinesAdded" hidden></ul>
           </div>
+          <div class="section-fields">
+            <div class="field field-wide"><div class="field-label">Other Recommendations</div><div class="field-val" id="f-otherRecommendations" onclick="startEdit(this,'otherRecommendations','text')">—</div></div>
+          </div>
           <div class="warn-note note-info"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> All recommendations must be verified by the licensed inspector before the report is issued, in accordance with the applicable Australian Standard.</div>
+          </details>
         
 
           <!-- Section photo widget -->
@@ -1614,27 +1678,15 @@
             <h3><span class="sec-num">✓</span>Sign-Off</h3>
             <span class="sec-badge empty" id="sts-signoff">Not started</span>
           </div>
-          <!-- Inspector details -->
-          <div style="padding:14px 16px 4px;">
-            <div class="field-label" style="margin-bottom:6px">Inspector Name</div>
-            <input type="text" id="jobInspector"
-              class="job-input"
-              placeholder="Your full name"
-              style="width:100%;max-width:320px"
-              oninput="saveDraft();updateProgress()">
-          </div>
-          <!-- Pest licence field -->
-          <div style="padding:6px 16px 6px;">
-            <div class="field-label" style="margin-bottom:6px">Pest Licence No.</div>
-            <input type="text" id="inspectorLicence"
-              class="job-input"
-              placeholder="e.g. PL/NSW/12345"
-              style="width:100%;max-width:260px"
-              oninput="reportData.inspectorLicence=this.value.trim();saveDraft();updateProgress()">
-            <p style="font-size:10px;color:var(--text3);margin-top:5px;line-height:1.5">Required on all AS 3660.2 / AS 4349.3 compliant reports.</p>
-          </div>
-          <div class="signoff-fields">
-            <div class="signature-block">
+          <div class="section-fields signoff-grid">
+            <div class="fsub">Inspector</div>
+            <div class="field"><div class="field-label">Inspector Name</div>
+              <input type="text" id="jobInspector" class="job-input" placeholder="Your full name" oninput="saveDraft();updateProgress()"></div>
+            <div class="field"><div class="field-label">Pest Licence No.</div>
+              <input type="text" id="inspectorLicence" class="job-input" placeholder="e.g. PL12345"
+                oninput="reportData.inspectorLicence=this.value.trim();saveDraft();updateProgress()"></div>
+            <p class="field-wide signoff-hint">The licence number is required on all AS 3660.2 and AS 4349.3 compliant reports.</p>
+            <div class="field-wide signature-block">
               <div class="field-label">Inspector Signature</div>
               <div class="signature-pad-wrap">
                 <canvas class="signature-canvas" id="sigCanvasInspector" width="640" height="220"></canvas>
@@ -1645,7 +1697,8 @@
                 <button class="signature-clear-btn" onclick="clearInspectorSignature()">Clear</button>
               </div>
             </div>
-            <div class="signature-block">
+            <div class="fsub">Client</div>
+            <div class="field-wide signature-block">
               <div class="field-label">Client Agreement</div>
               <div class="signoff-agreement" id="signoffAgreementStatus">Not signed yet. The client signs the agreement before the inspection starts.</div>
               <div class="signature-footer">

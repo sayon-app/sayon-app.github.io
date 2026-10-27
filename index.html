@@ -1305,8 +1305,10 @@
             </summary>
           <p class="fgroup-hint">Walls, linings or timbers cut, drilled or removed to see inside.</p>
           <div class="section-fields">
-            <div class="field"><div class="field-label">Invasive Inspection Recommended</div><div class="field-val" id="f-invasiveInspection" onclick="startEdit(this,'invasiveInspection','yesno')">—</div></div>
-            <div class="field field-wide" id="invasiveDetailsWrap" hidden><div class="field-label">Invasive Inspection: Where, Why and When</div><div class="field-val" id="f-invasiveInspectionDetails" onclick="startEdit(this,'invasiveInspectionDetails','text')">—</div></div>
+            <div class="field-wide field-pair">
+              <div class="field"><div class="field-label">Invasive Inspection Recommended</div><div class="field-val" id="f-invasiveInspection" onclick="startEdit(this,'invasiveInspection','yesno')">—</div></div>
+              <div class="field" id="invasiveDetailsWrap" hidden><div class="field-label">Where, Why and When</div><div class="field-val" id="f-invasiveInspectionDetails" onclick="startEdit(this,'invasiveInspectionDetails','text')">—</div></div>
+            </div>
           </div>
           </details>
 
@@ -1440,12 +1442,20 @@
               <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
             </summary>
           <div class="section-fields">
-            <div class="field field-wide"><div class="field-label">Wood Decay Fungi (Rot)</div><div class="field-val" id="f-decayFound" onclick="startEdit(this,'decayFound','yesno')">—</div></div>
-            <div class="field"><div class="field-label">What</div><div class="field-val" id="f-decayDetails" onclick="startEdit(this,'decayDetails','decaywhat')">—</div></div>
-            <div class="field"><div class="field-label">Where</div><div class="field-val" id="f-decayWhere" onclick="startEdit(this,'decayWhere','decaywhere')">—</div></div>
-            <div class="field field-wide"><div class="field-label">Chemical Delignification</div><div class="field-val" id="f-delignification" onclick="startEdit(this,'delignification','yesno')">—</div></div>
-            <div class="field"><div class="field-label">What</div><div class="field-val" id="f-delignificationDetails" onclick="startEdit(this,'delignificationDetails','delignwhat')">—</div></div>
-            <div class="field"><div class="field-label">Where</div><div class="field-val" id="f-delignificationWhere" onclick="startEdit(this,'delignificationWhere','delignwhere')">—</div></div>
+            <div class="field-wide field-pair">
+              <div class="field"><div class="field-label">Wood Decay Fungi (Rot)</div><div class="field-val" id="f-decayFound" onclick="startEdit(this,'decayFound','yesno')">—</div></div>
+              <div class="field-pair-row">
+                <div class="field"><div class="field-label">What</div><div class="field-val" id="f-decayDetails" onclick="startEdit(this,'decayDetails','decaywhat')">—</div></div>
+                <div class="field"><div class="field-label">Where</div><div class="field-val" id="f-decayWhere" onclick="startEdit(this,'decayWhere','decaywhere')">—</div></div>
+              </div>
+            </div>
+            <div class="field-wide field-pair">
+              <div class="field"><div class="field-label">Chemical Delignification</div><div class="field-val" id="f-delignification" onclick="startEdit(this,'delignification','yesno')">—</div></div>
+              <div class="field-pair-row">
+                <div class="field"><div class="field-label">What</div><div class="field-val" id="f-delignificationDetails" onclick="startEdit(this,'delignificationDetails','delignwhat')">—</div></div>
+                <div class="field"><div class="field-label">Where</div><div class="field-val" id="f-delignificationWhere" onclick="startEdit(this,'delignificationWhere','delignwhere')">—</div></div>
+              </div>
+            </div>
           </div>
           </details>
 
@@ -1459,9 +1469,13 @@
             </summary>
           <p class="fgroup-hint">Drill holes in the slab or paving, dusting residue, bait or monitoring stations.</p>
           <div class="section-fields">
-            <div class="field field-wide"><div class="field-label">Evidence of Previous Treatment</div><div class="field-val" id="f-previousTreatment" onclick="startEdit(this,'previousTreatment','yesno')">—</div></div>
-            <div class="field"><div class="field-label">What</div><div class="field-val" id="f-previousTreatmentDetails" onclick="startEdit(this,'previousTreatmentDetails','prevtreatment')">—</div></div>
-            <div class="field"><div class="field-label">Where</div><div class="field-val" id="f-previousTreatmentWhere" onclick="startEdit(this,'previousTreatmentWhere','prevtreatmentwhere')">—</div></div>
+            <div class="field-wide field-pair">
+              <div class="field"><div class="field-label">Evidence of Previous Treatment</div><div class="field-val" id="f-previousTreatment" onclick="startEdit(this,'previousTreatment','yesno')">—</div></div>
+              <div class="field-pair-row">
+                <div class="field"><div class="field-label">What</div><div class="field-val" id="f-previousTreatmentDetails" onclick="startEdit(this,'previousTreatmentDetails','prevtreatment')">—</div></div>
+                <div class="field"><div class="field-label">Where</div><div class="field-val" id="f-previousTreatmentWhere" onclick="startEdit(this,'previousTreatmentWhere','prevtreatmentwhere')">—</div></div>
+              </div>
+            </div>
           </div>
           </details>
 
@@ -1509,17 +1523,21 @@
               <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
             </summary>
           <div class="section-fields">
-            <div class="field"><div class="field-label">Moisture Detected</div><div class="field-val" id="f-moistureReadings" onclick="startEdit(this,'moistureReadings','yesno')">—</div></div>
             <!-- Water leaks and location only show if moisture detected = YES -->
-            <div id="waterLeakWrap" style="display:none">
-              <div class="field"><div class="field-label">Water Leaks</div><div class="field-val" id="f-waterLeaks" onclick="startEdit(this,'waterLeaks','yesno')">—</div></div>
-              <div class="field field-wide" id="leakLocationWrap" style="display:none"><div class="field-label">Location of Moisture Ingress</div><div class="field-val" id="f-leakLocation" onclick="startEdit(this,'leakLocation','text')">—</div></div>
+            <div class="field-wide field-pair">
+              <div class="field"><div class="field-label">Moisture Detected</div><div class="field-val" id="f-moistureReadings" onclick="startEdit(this,'moistureReadings','yesno')">—</div></div>
+              <div class="fp-follow" id="waterLeakWrap" style="display:none">
+                <div class="field"><div class="field-label">Water Leaks</div><div class="field-val" id="f-waterLeaks" onclick="startEdit(this,'waterLeaks','yesno')">—</div></div>
+                <div class="field" id="leakLocationWrap" style="display:none"><div class="field-label">Location of Moisture Ingress</div><div class="field-val" id="f-leakLocation" onclick="startEdit(this,'leakLocation','text')">—</div></div>
+              </div>
             </div>
             <div class="field"><div class="field-label">Site Drainage</div><div class="field-val" id="f-siteDrainage" onclick="startEdit(this,'siteDrainage','drainage')">—</div></div>
             <div class="field"><div class="field-label">Subfloor Drainage</div><div class="field-val" id="f-subfloorDrainage" onclick="startEdit(this,'subfloorDrainage','drainage')">—</div></div>
             <div class="field"><div class="field-label">Subfloor Ventilation</div><div class="field-val" id="f-subfloorVentilation" onclick="startEdit(this,'subfloorVentilation','ventilation')">—</div></div>
-            <div class="field"><div class="field-label">Mould Seen</div><div class="field-val" id="f-mouldSeen" onclick="startEdit(this,'mouldSeen','yesno')">—</div></div>
-            <div class="field field-wide"><div class="field-label">Mould: Where</div><div class="field-val" id="f-mouldWhere" onclick="startEdit(this,'mouldWhere','text')">—</div></div>
+            <div class="field-wide field-pair">
+              <div class="field"><div class="field-label">Mould Seen</div><div class="field-val" id="f-mouldSeen" onclick="startEdit(this,'mouldSeen','yesno')">—</div></div>
+              <div class="field"><div class="field-label">Where</div><div class="field-val" id="f-mouldWhere" onclick="startEdit(this,'mouldWhere','text')">—</div></div>
+            </div>
           </div>
           <!-- Above-ground leak / secondary colony reminder -->
           <div class="inactive-reminder" id="secondaryColonyReminder" style="display:none">
@@ -1546,11 +1564,17 @@
             <div class="field"><div class="field-label">Timber-to-Soil Contact</div><div class="field-val" id="f-timberSoil" onclick="startEdit(this,'timberSoil','yesno')">—</div></div>
             <div class="field"><div class="field-label">Slab Edge Concealed</div><div class="field-val" id="f-slabEdge" onclick="startEdit(this,'slabEdge','slabedge')">—</div></div>
             <div class="field"><div class="field-label">Weep Holes</div><div class="field-val" id="f-weepHoles" onclick="startEdit(this,'weepHoles','weepholes')">—</div></div>
-            <div class="field"><div class="field-label">Ant Capping</div><div class="field-val" id="f-antCapping" onclick="startEdit(this,'antCapping','antcapping')">—</div></div>
-            <div class="field field-wide"><div class="field-label">Ant Capping: Where and What</div><div class="field-val" id="f-antCappingDetails" onclick="startEdit(this,'antCappingDetails','text')">—</div></div>
-            <div class="field"><div class="field-label">Non-durable Timber in Damp Areas</div><div class="field-val" id="f-nonDurableTimber" onclick="startEdit(this,'nonDurableTimber','yesno')">—</div></div>
-            <div class="field"><div class="field-label">Non-durable Timber: What</div><div class="field-val" id="f-nonDurableTimberDetails" onclick="startEdit(this,'nonDurableTimberDetails','nondurable')">—</div></div>
-            <div class="field"><div class="field-label">Non-durable Timber: Where</div><div class="field-val" id="f-nonDurableTimberWhere" onclick="startEdit(this,'nonDurableTimberWhere','nondurablewhere')">—</div></div>
+            <div class="field-wide field-pair">
+              <div class="field"><div class="field-label">Ant Capping</div><div class="field-val" id="f-antCapping" onclick="startEdit(this,'antCapping','antcapping')">—</div></div>
+              <div class="field"><div class="field-label">Where and What</div><div class="field-val" id="f-antCappingDetails" onclick="startEdit(this,'antCappingDetails','text')">—</div></div>
+            </div>
+            <div class="field-wide field-pair">
+              <div class="field"><div class="field-label">Non-durable Timber in Damp Areas</div><div class="field-val" id="f-nonDurableTimber" onclick="startEdit(this,'nonDurableTimber','yesno')">—</div></div>
+              <div class="field-pair-row">
+                <div class="field"><div class="field-label">What</div><div class="field-val" id="f-nonDurableTimberDetails" onclick="startEdit(this,'nonDurableTimberDetails','nondurable')">—</div></div>
+                <div class="field"><div class="field-label">Where</div><div class="field-val" id="f-nonDurableTimberWhere" onclick="startEdit(this,'nonDurableTimberWhere','nondurablewhere')">—</div></div>
+              </div>
+            </div>
           </div>
           </details>
 
@@ -1602,8 +1626,10 @@
             <div class="fsub">Risk</div>
             <div class="field field-wide"><div class="field-label">Risk of Termite Attack</div><div class="field-val" id="f-riskLevel" onclick="startEdit(this,'riskLevel','risk')">—</div></div>
             <div class="fsub">Treatment</div>
-            <div class="field field-wide"><div class="field-label">Treatment Required</div><div class="field-val" id="f-treatmentRecommended" onclick="startEdit(this,'treatmentRecommended','yesno')">—</div></div>
-            <div class="field field-wide"><div class="field-label">Treatment Type</div><div class="field-val" id="f-treatmentType" onclick="startEdit(this,'treatmentType','treatmenttype')">—</div></div>
+            <div class="field-wide field-pair">
+              <div class="field"><div class="field-label">Treatment Required</div><div class="field-val" id="f-treatmentRecommended" onclick="startEdit(this,'treatmentRecommended','yesno')">—</div></div>
+              <div class="field"><div class="field-label">Treatment Type</div><div class="field-val" id="f-treatmentType" onclick="startEdit(this,'treatmentType','treatmenttype')">—</div></div>
+            </div>
             <div class="fsub">Follow-up</div>
             <div class="field field-wide"><div class="field-label">Re-inspection Frequency</div><div class="field-val" id="f-inspectionFrequency" onclick="startEdit(this,'inspectionFrequency','reinspection')">—</div></div>
           </div>

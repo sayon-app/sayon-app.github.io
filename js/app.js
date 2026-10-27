@@ -4431,9 +4431,12 @@ function buildChoiceCards() {
     panel.dataset.set = set;
     panel.setAttribute('role', 'radiogroup');
     const label = getFieldLabel(el);
-    if (label) panel.setAttribute('aria-label', label.textContent.trim());
-    el.insertAdjacentElement('afterend', panel);
     const field = el.closest('.field');
+    // "What" under a side line reads as "Wood Decay Fungi (Rot): What".
+    const pairHead = field?.closest('.field-pair')?.querySelector(':scope > .field:first-child');
+    const lead = pairHead && pairHead !== field ? pairHead.querySelector('.field-label')?.textContent.trim() + ': ' : '';
+    if (label) panel.setAttribute('aria-label', lead + label.textContent.trim());
+    el.insertAdjacentElement('afterend', panel);
     if (field) field.classList.add('choice-field');
     syncChoiceCards(key);
     new MutationObserver(() => syncChoiceCards(key)).observe(el, { childList: true, characterData: true, subtree: true });
@@ -4469,6 +4472,9 @@ function syncDetailField(key) {
     const hide = noAnswers.includes(reportData[key]) && !String(reportData[k] || '').trim();
     field.style.display = hide ? 'none' : '';
   });
+  // A What and Where row under a question hides with its last box.
+  const row = document.getElementById('f-' + detailKey)?.closest('.field-pair-row');
+  if (row) row.style.display = [...row.querySelectorAll(':scope > .field')].every(f => f.style.display === 'none') ? 'none' : '';
 }
 
 function syncChoiceCards(key) {

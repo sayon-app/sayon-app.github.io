@@ -6145,22 +6145,22 @@ const DEFAULT_AGREEMENT_TEXT = `1. The inspection
 {company} will carry out a {inspectionType} inspection of {address} for {client} on {date}, in line with {standard}.
 
 2. What is inspected
-A visual inspection of the readily accessible areas of the building and site for termites, borers of seasoned timber and wood decay fungi, and for conditions that make timber pest attack more likely. This normally covers the interior, roof space, subfloor, exterior, outbuildings, and the site within 50 m of the building, where they can be safely reached.
+A visual inspection of the readily accessible areas of the building and site for termites, borers of seasoned timber and wood decay fungi, and for conditions that make timber pest attack more likely. This normally covers the interior, roof space, subfloor, exterior, outbuildings, and the site within 50 m of the building and inside the property boundary, where they can be safely reached.
 
-3. Limits of the inspection
-The inspection is visual and non-invasive. We do not move furniture, stored goods, floor coverings, insulation or vegetation, and we do not cut, drill or remove any part of the building. Areas we cannot reach or see will be recorded in the report, and timber pests or damage may be hidden in them. The inspection cannot guarantee that the property is, or will stay, free of timber pests. It is not a building, structural, asbestos, mould or electrical inspection.
+3. How we inspect, and the limits
+The inspection is visual and non-invasive. We may tap timbers and use a moisture meter or other tools that do not damage the building. We do not move furniture, stored goods, floor coverings, insulation or vegetation, and we do not cut, drill or remove any part of the building. Areas we cannot reach or see will be recorded in the report, and timber pests or damage may be hidden in them. The inspection cannot guarantee that the property is, or will stay, free of timber pests. It is not a building, structural, asbestos, mould or electrical inspection. If we find timber damage, we may recommend that a builder or engineer assesses it.
 
 4. Invasive inspection
 An invasive inspection is not included. If one is recommended, it needs a separate written agreement and fee.
 
 5. Access
-Please arrange safe access to all areas on the day. Any area we can't get into will be noted in the report, and coming back to inspect it later may cost extra.
+Please arrange safe access to all areas on the day, including the roof space, the subfloor and any locked areas. Any area we can't get into will be noted in the report. If you would like us to come back to inspect it, we will tell you the cost before we do.
 
 6. The report
-You will receive a written report after the inspection. It is for your use only and must not be relied on by anyone else without our written consent.
+You will receive a written report by email after the inspection. It is for your use only and must not be relied on by anyone else without our written consent.
 
-7. Voice notes
-The inspector may dictate notes into a phone app as they go, and the phone may pick up conversation nearby. What it hears is turned into text to write your report. The audio is not kept.
+7. Voice notes and your details
+The inspector may speak notes into a phone app during the inspection, and the phone may pick up conversation nearby. A speech-to-text service turns what it hears into written notes for your report. The recording is not kept. If you would rather not be recorded, tell the inspector and they will type their notes instead. Your details and the report are only used and shared as needed to provide this service.
 
 8. Fee
 {fee}
@@ -6254,14 +6254,16 @@ function openAgreementSheet() {
   document.getElementById('agreementEdit').style.display = a ? 'none' : '';
   document.getElementById('agreementView').style.display = a ? '' : 'none';
   if (a) {
+    document.getElementById('agreementViewName').textContent = a.signerName;
     document.getElementById('agreementViewSummary').textContent =
-      `Signed by ${a.signerName} on ${formatAgreementSignedAt(a.signedAt)}` +
-      (a.method === 'other' ? ` · ${a.otherNote}` : ' · signed on this device');
-    document.getElementById('agreementViewText').textContent = a.text;
+      formatAgreementSignedAt(a.signedAt) + (a.method === 'other' ? ` · ${a.otherNote}` : ' · signed on this device');
+    renderAgreementDoc(document.getElementById('agreementViewText'), a.text);
     const img = document.getElementById('agreementViewSignature');
     img.style.display = a.signature ? '' : 'none';
     if (a.signature) img.src = a.signature;
   } else {
+    document.getElementById('agreementAddr').textContent = getFullAddress() || 'No address yet';
+    document.getElementById('agreementAddr').classList.toggle('empty', !getFullAddress());
     document.getElementById('agreementSignerName').value = document.getElementById('jobClient').value.trim();
     document.getElementById('agreementInspectionType').value = reportData.jobInspectionType || '';
     // Job Details may already have the inspection date and fee.
@@ -6275,6 +6277,50 @@ function openAgreementSheet() {
     refreshAgreementPreview();
   }
   document.getElementById('agreementOverlay').classList.add('open');
+  document.querySelectorAll('#agreementOverlay .page-sheet-body').forEach(b => { b.scrollTop = 0; });
+}
+
+// The agreement as a document: each "N. Heading" block becomes a numbered
+// clause, any other paragraph plain text, and a blank still to fill in is
+// marked. Works on a business's own wording as well as the default.
+function renderAgreementDoc(el, text) {
+  el.textContent = '';
+  const withBlanks = (node, str) => {
+    str.split(/(_{4,})/).forEach(part => {
+      if (!part) return;
+      if (/^_{4,}$/.test(part)) {
+        const b = document.createElement('span');
+        b.className = 'agr-blank'; b.textContent = 'not filled in';
+        node.appendChild(b);
+      } else node.appendChild(document.createTextNode(part));
+    });
+  };
+  const para = (parent, str, cls) => {
+    const p = document.createElement('p');
+    if (cls) p.className = cls;
+    withBlanks(p, str);
+    parent.appendChild(p);
+  };
+  let sawClause = false;
+  String(text || '').split(/\n\s*\n/).forEach(block => {
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return;
+    const m = lines[0].match(/^(\d+)\.\s+(.+)$/);
+    if (m) {
+      sawClause = true;
+      const sec = document.createElement('section');
+      sec.className = 'agr-clause';
+      const num = document.createElement('span');
+      num.className = 'agr-clause-num'; num.textContent = m[1];
+      const h = document.createElement('h4');
+      h.className = 'agr-clause-title'; h.textContent = m[2];
+      sec.append(num, h);
+      lines.slice(1).forEach(l => para(sec, l));
+      el.appendChild(sec);
+    } else {
+      lines.forEach(l => para(el, l, sawClause ? 'agr-doc-close' : 'agr-doc-intro'));
+    }
+  });
 }
 
 // The fee as the agreement prints it: "$440 inc GST" from "440".
@@ -6311,7 +6357,9 @@ function closeAgreementSheet() {
 }
 
 function refreshAgreementPreview() {
-  if (!reportData.agreement) document.getElementById('agreementText').textContent = agreementFormValues().text;
+  if (!reportData.agreement) renderAgreementDoc(document.getElementById('agreementText'), agreementFormValues().text);
+  const hint = document.getElementById('agreementFeeHint');
+  if (hint) hint.hidden = !!document.getElementById('agreementFee').value.trim();
   updateAgreementSignButton();
 }
 
@@ -6332,10 +6380,28 @@ function agreementTypeChosen() {
 function updateAgreementSignButton() {
   const btn = document.getElementById('agreementSignBtn');
   if (!btn) return;
-  btn.disabled = !(agreementTypeChosen()
-    && document.getElementById('agreementSignerName').value.trim()
-    && document.getElementById('agreementAgree').checked
-    && agreementSignaturePad && !agreementSignaturePad.empty);
+  const typed = agreementTypeChosen();
+  const named = !!document.getElementById('agreementSignerName').value.trim();
+  const agreed = document.getElementById('agreementAgree').checked;
+  const drawn = !!(agreementSignaturePad && !agreementSignaturePad.empty);
+  btn.disabled = !(typed && named && agreed && drawn);
+  // The side line: each step ticks off once it's done.
+  const steps = [['agreementStepJob', typed], ['agreementStepRead', agreed], ['agreementStepSign', named && drawn]];
+  let nowSet = false;
+  steps.forEach(([id, done]) => {
+    const li = document.getElementById(id);
+    if (!li) return;
+    li.classList.toggle('done', done);
+    li.classList.toggle('now', !done && !nowSet);
+    if (!done) nowSet = true;
+  });
+  const need = [!typed && 'choose the inspection type', !agreed && 'tick that the client has read it',
+    !named && "enter the client's name", !drawn && 'get their signature'].filter(Boolean);
+  const needEl = document.getElementById('agreementSignNeed');
+  if (needEl) {
+    needEl.hidden = !need.length;
+    needEl.textContent = need.length ? `To sign: ${need.join(', ')}.` : '';
+  }
 }
 
 function toggleAgreementOther() {
@@ -6417,22 +6483,59 @@ function shareAgreementPdf() {
 function drawAgreementBody(doc, a, y, { M, CW, onNewPage }) {
   const C = PDF_COLORS;
   const bottom = 281;
-  const room = (h) => { if (y + h > bottom) { doc.addPage(); y = onNewPage(); } };
-  a.text.split(/\n/).forEach(line => {
-    const isHeading = /^\d+\.\s/.test(line);
-    doc.setFont('helvetica', isHeading ? 'bold' : 'normal');
-    doc.setFontSize(isHeading ? 9.5 : 8.5);
-    doc.setTextColor(...(isHeading ? C.ink : C.inkLight));
-    if (!line.trim()) { y += 2.5; return; }
-    const wrapped = doc.splitTextToSize(line, CW);
-    wrapped.forEach(w => { room(5); doc.text(w, M, y); y += isHeading ? 4.8 : 4; });
-    if (isHeading) y += 0.4;
+  const room = (h) => { if (y + h > bottom) { doc.addPage(); y = onNewPage(); return true; } return false; };
+  const GUT = 9, LH = 4;
+  // Same blocks as the sheet: "N. Heading" clauses with a numbered gutter
+  // and a hairline between, other paragraphs plain, the closing shaded.
+  const blocks = String(a.text || '').split(/\n\s*\n/).map(b => b.split('\n').map(l => l.trim()).filter(Boolean)).filter(b => b.length);
+  let sawClause = false, first = true;
+  blocks.forEach((lines, bi) => {
+    const m = lines[0].match(/^(\d+)\.\s+(.+)$/);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+    if (m) {
+      sawClause = true;
+      const body = lines.slice(1).map(l => doc.splitTextToSize(l, CW - GUT - 3));
+      const firstH = 5 + (body[0] ? Math.min(body[0].length, 2) * LH : 0);
+      if (!room(firstH + 4) && !first) {
+        doc.setDrawColor(...C.ruleLight); doc.setLineWidth(0.2); doc.line(M + GUT, y - 1.6, M + CW, y - 1.6);
+      }
+      y += 2.2;
+      doc.setFillColor(...C.accentLight); doc.roundedRect(M, y - 3.4, 5.6, 4.6, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...C.accentDark);
+      doc.text(m[1], M + 2.8, y, { align: 'center' });
+      doc.setFontSize(9.5); doc.setTextColor(...C.ink);
+      doc.text(doc.splitTextToSize(m[2], CW - GUT - 3)[0], M + GUT, y);
+      y += 4.8;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...C.inkLight);
+      body.forEach((wrapped, i) => {
+        if (i) y += 1.5;
+        wrapped.forEach(w => { room(LH); doc.text(w, M + GUT, y); y += LH; });
+      });
+      y += 2.6;
+    } else if (sawClause) {
+      const wrapped = lines.flatMap(l => doc.splitTextToSize(l, CW - 13));
+      const h = wrapped.length * LH + 6;
+      // The last paragraph keeps the signatures company on its page.
+      room(h + 2 + (bi === blocks.length - 1 ? 34 : 0));
+      y += 1;
+      doc.setFillColor(...C.rowAlt); doc.roundedRect(M, y, CW, h, 1.5, 1.5, 'F');
+      doc.setFillColor(...C.accent); doc.rect(M, y, 0.8, h, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.ink);
+      wrapped.forEach((w, i) => doc.text(w, M + 5, y + 4.6 + i * LH));
+      y += h + 2;
+    } else {
+      doc.setTextColor(...C.inkLight);
+      lines.forEach(l => doc.splitTextToSize(l, CW).forEach(w => { room(LH); doc.text(w, M, y); y += LH; }));
+      y += 2.5;
+    }
+    first = false;
   });
   // Who agreed, how and when, as a signature block.
-  y += 3;
-  room(26);
-  doc.setFillColor(...C.accent); doc.rect(M, y, CW, 0.5, 'F');
-  y += 18;
+  y += 4;
+  room(30);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...C.accentDark);
+  pdfTracked(doc, 'AGREED AND SIGNED', M, y, { cs: 0.6 });
+  y += 20;
   const colW = (CW - 16) / 3;
   const onLine = (text, x) => {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...C.ink);

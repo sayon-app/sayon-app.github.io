@@ -260,9 +260,10 @@ function obFinish() {
   localStorage.setItem(OB_KEY, '1');
   document.getElementById('onboardScreen').style.display = 'none';
   document.getElementById('mainMenu').style.display      = 'flex';
-  // Open the sidebar so they can start a new job immediately
+  // Open the job details so they can start a new job immediately
   setTimeout(() => {
-    openMenuPage('jobPanel');
+    openApp('inspect');
+    openJobDetails();
   }, 400);
 }
 
@@ -9648,6 +9649,7 @@ function newReport() {
   saveOpenReportNow();
   track('report_started');
   startBlankReport();
+  refreshDashboardIfOpen();
   showToast('New report started', 'info');
 }
 
@@ -9730,7 +9732,15 @@ function openDashboard() {
   const search = document.getElementById('dashboardSearch');
   if (search) search.value = '';
   renderDashboard();
-  if (dashboardJobs.length && !dashboardJobs.some(j => j.group === 'todo')) setDashboardTab('all');
+  if (!dashboardJobs.length) setDashboardTab('current');
+  else if (!dashboardJobs.some(j => j.group === 'todo')) setDashboardTab('all');
+}
+
+// Opens the dashboard on the open job's details.
+function openJobDetails() {
+  if (!document.getElementById('dashboardOverlay').classList.contains('open')) openDashboard();
+  closeDashboardDetail();
+  setDashboardTab('current');
 }
 
 function refreshDashboardIfOpen() {
@@ -9742,10 +9752,19 @@ function closeDashboard() {
   document.getElementById('dashboardOverlay').classList.remove('open');
 }
 
-// Which list the dashboard shows: 'todo' | 'waiting' | 'done' | 'all'.
+// Which tab the dashboard shows: 'current' (the open job's details) or a
+// list, 'todo' | 'waiting' | 'done' | 'all'.
 let dashboardTab = 'todo';
 let dashboardJobs = [];
-const DASHBOARD_TABS = [['todo', 'Needs you'], ['waiting', 'With client'], ['done', 'Done'], ['all', 'All']];
+const DASHBOARD_TABS = [['current', 'Current report'], ['todo', 'Active'], ['waiting', 'Waiting on client'], ['done', 'Done'], ['all', 'All']];
+
+// Job details sit on the Current report tab. Before the dashboard redraws,
+// the panel goes back to its holder, so its fields survive the redraw.
+function parkJobPanel() {
+  const panel = document.getElementById('jobPanel');
+  const home = document.getElementById('jobPanelHome');
+  if (panel && home && panel.parentNode !== home) home.appendChild(panel);
+}
 
 // The day a job belongs to: its inspection date, else when it was saved.
 function dashboardJobTime(r) {
@@ -9859,6 +9878,7 @@ function setDashboardTab(tab) {
 function renderDashboard() {
   const body = document.getElementById('dashboardBody');
   if (!body) return;
+  parkJobPanel();
   const quotes = getSavedQuotes();
   dashboardJobs = getSavedReports().map(r => dashboardJob(r, quotes)).sort((a, b) => b.time - a.time);
   const need = dashboardJobs.filter(j => j.group === 'todo').length;
@@ -9873,21 +9893,15 @@ function renderDashboard() {
       <h2 class="dash-hero-title" id="dashboardTitle">Dashboard</h2>
       <p class="dash-hero-lead">${lead}</p>
     </div>
-    ${dashboardJobs.length ? `
     <div class="dash-tabs" id="dashboardTabs" role="tablist">
       ${DASHBOARD_TABS.map(([key, label]) => `<button type="button" role="tab" class="dash-tab" data-tab="${key}" onclick="setDashboardTab('${key}')">${label} <span></span></button>`).join('')}
       <span class="dash-tab-line" aria-hidden="true"></span>
     </div>
-    <label class="dash-search">
+    <label class="dash-search" id="dashboardSearchWrap">
       <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z"/><path d="m21 21-4.3-4.3"/></svg>
       <input id="dashboardSearch" type="search" placeholder="Search address or client" autocomplete="off" oninput="renderDashboardJobs()" aria-label="Search jobs">
     </label>
-    <div id="dashboardJobs"></div>` : `
-    <div class="dash-empty">
-      ${document.getElementById('jobAddress')?.value.trim()
-        ? '<button class="job-action-btn save" onclick="saveCurrentReport(); renderDashboard()">Save this report</button>'
-        : '<button class="job-action-btn" onclick="closeDashboard()">Back to the report</button>'}
-    </div>`}
+    <div id="dashboardJobs"></div>
   `;
   renderDashboardJobs();
 }
@@ -9898,7 +9912,8 @@ function renderDashboard() {
 function renderDashboardJobs(fade) {
   const wrap = document.getElementById('dashboardJobs');
   if (!wrap) return;
-  const counts = { todo: 0, waiting: 0, done: 0, all: dashboardJobs.length };
+  parkJobPanel();
+  const counts = { current: '', todo: 0, waiting: 0, done: 0, all: dashboardJobs.length };
   dashboardJobs.forEach(j => counts[j.group]++);
   const searchEl = document.getElementById('dashboardSearch');
   const query = searchEl ? searchEl.value.trim().toLowerCase() : '';
@@ -9915,12 +9930,41 @@ function renderDashboardJobs(fade) {
       btn.setAttribute('aria-selected', on);
       btn.querySelector('span').textContent = counts[btn.dataset.tab];
     });
-    const i = DASHBOARD_TABS.findIndex(([key]) => key === dashboardTab);
-    tabs.querySelector('.dash-tab-line').style.transform = `translateX(${i * 100}%)`;
+    // The tabs are as wide as their names, so the underline is sized to the lit one.
+    const lit = tabs.querySelector('.dash-tab.active');
+    const line = tabs.querySelector('.dash-tab-line');
+    if (lit) {
+      line.style.width = lit.offsetWidth + 'px';
+      line.style.transform = `translateX(${lit.offsetLeft}px)`;
+      if (lit.scrollIntoView && tabs.scrollWidth > tabs.clientWidth) tabs.scrollTo({ left: lit.offsetLeft - 16, behavior: fade ? 'smooth' : 'auto' });
+    }
+  }
+  const searchWrap = document.getElementById('dashboardSearchWrap');
+  if (searchWrap) searchWrap.hidden = dashboardTab === 'current' && !query;
+
+  if (dashboardTab === 'current' && !query) {
+    const j = dashboardJobs.find(x => x.r.id === currentReportId);
+    wrap.innerHTML = `<div class="dash-current${fade ? ' fade-in' : ''}">
+      ${j ? `<button type="button" class="dash-row dash-current-job ${j.group}" onclick="openDashboardDetail('${j.r.id}')">
+          ${dashboardRing(j.steps, j.group)}
+          <span class="dash-row-text">
+            <span class="dash-row-addr">${escapeHtml(j.r.address || 'No address')}</span>
+            <span class="dash-row-sub"><span class="dash-row-status">${escapeHtml(j.status)}</span>${j.r.client ? ' · ' + escapeHtml(j.r.client) : ''}</span>
+          </span>
+          <svg class="icon dash-row-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+        </button>`
+        : '<p class="dash-current-new">A new job. Fill in the address and client to start its report.</p>'}
+      <div class="dash-current-head">Job details</div>
+      <div id="dashCurrentSlot"></div>
+    </div>`;
+    const panel = document.getElementById('jobPanel');
+    if (panel) document.getElementById('dashCurrentSlot').appendChild(panel);
+    return;
   }
 
   const empty = query ? `No jobs match "${escapeHtml(searchEl.value.trim())}".`
-    : { todo: 'Nothing needs you right now.', waiting: 'No quotes are waiting on a client.', done: 'No finished jobs yet.', all: '' }[dashboardTab];
+    : !dashboardJobs.length ? 'Your jobs will show up here once you save a report.'
+    : { todo: 'No active jobs right now.', waiting: 'Nothing is waiting on a client.', done: 'No finished jobs yet.', all: '' }[dashboardTab];
   wrap.innerHTML = shown.length ? `
     <div class="dash-list${fade ? ' fade-in' : ''}">
       ${shown.map(j => `

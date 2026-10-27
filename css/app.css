@@ -3479,7 +3479,7 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 .dash-ring circle.done { stroke: var(--accent); }
 .dash-ring circle.now { stroke: rgba(var(--accent-rgb), 0.4); }
 .dash-ring circle.bad { stroke: var(--risk); }
-.dash-ring circle.skip { opacity: 0.45; }
+.dash-ring circle.skip { stroke: var(--accent); opacity: 0.4; }
 .dash-ring text { font-size: 9.5px; font-weight: 700; fill: var(--text2); font-family: 'Inter', sans-serif; font-feature-settings: 'tnum'; }
 .dash-ring .tick { fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 
@@ -3577,7 +3577,7 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 .dash-timeline li.now .dash-timeline-dot { border-color: var(--accent); color: var(--accent2); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.16); }
 .dash-timeline li.bad .dash-timeline-dot { background: var(--risk); border-color: var(--risk); color: #fff; }
 .dash-timeline li.skip .dash-timeline-dot { border-style: dashed; }
-.dash-timeline li.skip { opacity: 0.55; }
+.dash-timeline li.skip { opacity: 0.75; }
 .dash-timeline-btn {
   position: relative; display: block; width: 100%; padding: 9px 36px 9px 12px;
   border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer;

@@ -515,7 +515,7 @@ function quotePlanSummary(q) {
   const bits = [`${steps} step${steps === 1 ? '' : 's'}`];
   bits.push(p.time ? p.time : 'job time not set');
   bits.push(p.service ? (p.service === 'None' ? 'no service period' : `${p.service} service`) : 'service period not set');
-  return [bits.join(' · '), !p.time || !p.service];
+  return [bits.join(', '), !p.time || !p.service];
 }
 
 function quotePlanChipsHTML(field, options, value) {
@@ -793,11 +793,11 @@ function renderQuoteFolds() {
   const email = (q.clientEmail || '').trim();
   const det = [q.client || 'No client name', email || 'no email yet'];
   const detSub = document.getElementById('quoteDetailsSub');
-  detSub.textContent = det.join(' · ');
+  detSub.textContent = det.join(', ');
   detSub.classList.toggle('warn', !email);
   const excl = (q.exclusions || '').split('\n').filter(l => l.trim()).length;
   document.getElementById('quoteTermsSub').textContent =
-    [(q.paymentTerms || '').trim() ? 'Payment terms set' : 'No payment terms', `${excl} exclusion${excl === 1 ? '' : 's'}`].join(' · ');
+    [(q.paymentTerms || '').trim() ? 'Payment terms set' : 'No payment terms', `${excl} exclusion${excl === 1 ? '' : 's'}`].join(', ');
 }
 
 // What's missing from the business details, which every quote's header shows.
@@ -925,7 +925,7 @@ function renderQuoteWorkSummary() {
   if (!q || !sub) return;
   const n = q.items.length;
   const starting = q.items.filter(isStartingPrice).length;
-  sub.textContent = !n ? 'No lines yet' : `${n} line${n === 1 ? '' : 's'}` + (starting ? ` · ${starting} price${starting === 1 ? '' : 's'} to check` : '');
+  sub.textContent = !n ? 'No lines yet' : `${n} line${n === 1 ? '' : 's'}` + (starting ? `, ${starting} price${starting === 1 ? '' : 's'} to check` : '');
   sub.classList.toggle('warn', !n || starting > 0);
   document.getElementById('quoteWorkTotal').textContent = n ? formatAUD(quoteTotals(q).total) : '';
 }
@@ -1089,7 +1089,7 @@ function quoteAnswerSummary(q) {
   const a = quoteAnswerState(q);
   if (!a) return q.sentAt ? { short: 'Quote sent', text: 'Waiting on the client\'s answer to the quote', tone: 'wait' } : null;
   if (a.stale) return { short: 'Quote changed', text: 'The quote changed after the client answered. Get their answer on the new version', tone: 'warn' };
-  if (a.status === 'accepted' && q.treatment) return { short: 'Treatment done', text: `Treatment done on ${formatAnswerDate(q.treatment.date)}. ${q.certificateSentAt ? 'Certificate sent' : 'Send the client the certificate'}`, tone: 'good' };
+  if (a.status === 'accepted' && q.treatment) return { short: 'Treatment done', text: `Treatment done on ${formatAnswerDate(q.treatment.date)}. ${certificateGiven(q) ? 'Certificate given' : 'Send the client the certificate'}`, tone: 'good' };
   if (a.status === 'accepted') return { short: 'Quote accepted', text: `Quote accepted by ${a.by} on ${formatAnswerDate(a.date)}. Record the treatment once it's done`, tone: 'good' };
   return { short: 'Quote declined', text: `Quote declined on ${formatAnswerDate(a.date)}${a.note ? ` · ${a.note}` : ''}`, tone: 'bad' };
 }
@@ -1116,7 +1116,7 @@ function renderQuoteAnswer() {
       + (starting ? ` · ${starting} starting price${starting === 1 ? '' : 's'} to check` : ''),
   };
   const sent = !q.sentAt
-    ? { title: 'Sent to the client', state: answered ? 'skip' : 'todo', text: answered ? 'They answered before it was sent.' : 'Not sent yet. Send it from the bar below.' }
+    ? { title: 'Sent to the client', state: answered ? 'skip' : 'todo', text: answered ? 'Not needed. They answered before it was sent.' : 'Not sent yet. Send it from the bar below.' }
     : sentNow || answered ? { title: 'Sent to the client', state: 'done', text: `Sent ${esc(formatIssueDate(q.sentAt))}.` }
     : { title: 'Sent to the client', state: 'warn', text: `Sent ${esc(formatIssueDate(q.sentAt))}. You've changed the quote since, so send the new version.` };
 
@@ -1148,20 +1148,22 @@ function renderQuoteAnswer() {
   }
 
   const treatment = answered && a.status === 'accepted'
-    ? { title: 'Treatment', state: q.treatment && q.certificateSentAt ? 'done' : 'now',
+    ? { title: 'Treatment', state: q.treatment && certificateGiven(q) ? 'done' : 'now',
         text: !q.treatment ? 'Record it once the work is done.'
           : q.certificateSentAt ? `Finished. Certificate emailed ${esc(formatIssueDate(q.certificateSentAt))}.`
+          : q.certificateHandedAt ? `Finished. Certificate given in person ${esc(formatIssueDate(q.certificateHandedAt))}.`
           : 'Recorded. One thing left: email the client their certificate.',
         extra: renderTreatmentBlock(q) }
     : answered ? { title: 'Treatment', state: 'skip', text: 'Not needed. The quote was declined.' }
     : { title: 'Treatment', state: 'todo', text: 'After the client accepts.' };
 
   const steps = [priced, sent, answer, treatment];
-  const done = steps.filter(st => st.state === 'done').length;
+  // A step the job didn't need counts as done, so progress still reaches 4 of 4.
+  const done = steps.filter(st => st.state === 'done' || st.state === 'skip').length;
   const tick = '<svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
   el.innerHTML = `<div class="quote-card-head"><div class="quote-card-title">Progress</div><div class="quote-card-count">${done} of 4 done</div></div>
     <ol class="qp">${steps.map((st, i) => `<li class="qp-step ${st.state}">
-        <span class="qp-dot">${st.state === 'done' ? tick : i + 1}</span>
+        <span class="qp-dot">${st.state === 'done' ? tick : st.state === 'skip' ? '–' : i + 1}</span>
         <div class="qp-body">
           <div class="qp-title">${st.title}</div>
           <div class="qp-text">${st.text}</div>
@@ -1311,7 +1313,7 @@ function quoteContentHash(q) {
   const content = Object.assign({}, q);
   // 'booking' and 'invoice' are left over from features that were removed;
   // older quotes may still carry them, and they never counted as content.
-  ['updatedAt', 'createdAt', 'sentAt', 'sentHash', 'certificateSentAt', 'reportKey', 'answer', 'booking', 'treatment', 'invoice',
+  ['updatedAt', 'createdAt', 'sentAt', 'sentHash', 'certificateSentAt', 'certificateHandedAt', 'reportKey', 'answer', 'booking', 'treatment', 'invoice',
     'sourceAddress', 'issuedAt', 'issuedHash'].forEach(k => delete content[k]);
   return sha256Hex(stableJson(content));
 }
@@ -1337,12 +1339,23 @@ function markCertificateSent(q) {
   q.certificateSentAt = Date.now();
   storeSentQuote(q);
 }
+// For a certificate printed and handed over, or left in the letterbox,
+// so a job without an email still finishes.
+function markCertificateHanded() {
+  const q = quoteState;
+  if (!q || !q.treatment) return;
+  q.certificateHandedAt = Date.now();
+  storeSentQuote(q);
+  showToast('Certificate marked as given in person', 'success', { label: 'Undo', run: () => { delete q.certificateHandedAt; storeSentQuote(q); } });
+}
+// The certificate has reached the client, by email or by hand.
+function certificateGiven(q) { return !!(q && (q.certificateSentAt || q.certificateHandedAt)); }
 // Saves a quote whose sent state changed, and redraws every place that
 // shows it. The report's send marks the stored quote, so the open quote
 // takes the same times.
 function storeSentQuote(q) {
   if (quoteState && quoteState !== q && quoteState.reportKey === q.reportKey) {
-    ['sentAt', 'sentHash', 'certificateSentAt', 'issuedAt', 'issuedHash'].forEach(k => { if (q[k]) quoteState[k] = q[k]; });
+    ['sentAt', 'sentHash', 'certificateSentAt', 'certificateHandedAt', 'issuedAt', 'issuedHash'].forEach(k => { if (q[k]) quoteState[k] = q[k]; else if (k === 'certificateHandedAt') delete quoteState[k]; });
   }
   const all = readJSON(quotesStorageKey(), {});
   all[q.reportKey] = q;

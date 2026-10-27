@@ -203,15 +203,18 @@ function renderTreatmentBlock(q) {
       <div><strong>Treatment done</strong> on ${escapeHtml(formatAnswerDate(t.date))}${t.technician ? ` by ${escapeHtml(t.technician)}` : ''}</div>
       ${t.nextInspection ? `<div class="quote-answer-note">Next inspection due ${escapeHtml(formatAnswerDate(t.nextInspection))}</div>` : ''}
     </div>
-    <div class="qp-cert ${q.certificateSentAt ? 'sent' : ''}">
+    <div class="qp-cert ${certificateGiven(q) ? 'sent' : ''}">
       <div class="qp-cert-title">${many ? 'Treatment and installation certificates' : 'Treatment certificate'}</div>
       <p class="qp-cert-text">${q.certificateSentAt
         ? `Emailed ${escapeHtml(formatIssueDate(q.certificateSentAt))}${who ? ` to ${escapeHtml(who)}` : ''}.`
-        : `The PDF${many ? 's' : ''} that record${many ? '' : 's'} what was applied and where, for ${who ? escapeHtml(who) + '\'s' : 'the client\'s'} records. Emailing ${many ? 'them' : 'it'} finishes the job.`}</p>
-      ${to && !q.certificateSentAt ? `<p class="qp-cert-to">Goes to ${escapeHtml(to)}</p>` : ''}
+        : q.certificateHandedAt
+        ? `Given${who ? ` to ${escapeHtml(who)}` : ''} in person ${escapeHtml(formatIssueDate(q.certificateHandedAt))}.`
+        : `The PDF${many ? 's' : ''} that record${many ? '' : 's'} what was applied and where, for ${who ? escapeHtml(who) + '\'s' : 'the client\'s'} records. Emailing ${many ? 'them' : 'it'}, or handing ${many ? 'them' : 'it'} over, finishes the job.`}</p>
+      ${to && !certificateGiven(q) ? `<p class="qp-cert-to">Goes to ${escapeHtml(to)}</p>` : ''}
       ${treatmentSourceReport().propertyState === 'QLD' ? '<div class="quote-answer-note">In Queensland, email alone isn\'t enough: also hand the client a printed copy, or leave one in their letterbox.</div>' : ''}
       <div class="quote-step-actions">
-        <button class="quote-btn ${q.certificateSentAt ? '' : 'primary'} qp-cert-email" onclick="emailTreatmentCertificate()">${q.certificateSentAt ? 'Email again' : `Email ${docs}${who ? ' to ' + escapeHtml(who.split(' ')[0]) : ''}`}</button>
+        <button class="quote-btn ${certificateGiven(q) ? '' : 'primary'} qp-cert-email" onclick="emailTreatmentCertificate()">${q.certificateSentAt ? 'Email again' : q.certificateHandedAt ? 'Email a copy' : `Email ${docs}${who ? ' to ' + escapeHtml(who.split(' ')[0]) : ''}`}</button>
+        ${certificateGiven(q) ? '' : '<button class="quote-link-btn" onclick="markCertificateHanded()">Given in person</button>'}
         <button class="quote-link-btn" onclick="downloadTreatmentCertificate()">Certificate PDF</button>
         ${many ? '<button class="quote-link-btn" onclick="downloadTreatmentCertificate(true)">Installation certificate PDF</button>' : ''}
         <button class="quote-link-btn" onclick="openTreatmentRecord()">Edit treatment</button>

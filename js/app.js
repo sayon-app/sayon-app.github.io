@@ -1618,7 +1618,7 @@ function lookupSpecies(raw) {
 }
 
 const SECTIONS = {
-  property:        { fields:['structureType','height','occupancyStatus','furnishing','peoplePresent','weatherConditions','temperature','humidity','rainLast24h','recentWeather','wallConstruction','roofType','floorType','facadeDirection','constructionEra','siteSurroundings','siteSlope','termiteHistory','standard','toolsUsed'], total:20 },
+  property:        { fields:['structureType','height','occupancyStatus','furnishing','peoplePresent','weatherConditions','temperature','humidity','rainLast24h','recentWeather','wallConstruction','roofType','floorType','facadeDirection','constructionEra','siteSurroundings','siteSlope','termiteHistory','existingSystem','standard','toolsUsed'], total:20 },
   obstructions:    { fields:['areaStatus'], total:1 },
   restrictions:    { fields:['hinderedAreas','hinderedAreasDetail','noAccessAreas','highRiskAreas','invasiveInspection','invasiveInspectionDetails'], total:2 },
   findings:        { fields:['findings','borerActivity','decayFound','delignification','previousTreatment','previousTreatmentDetails'], total:4 },
@@ -1633,7 +1633,7 @@ const SECTIONS = {
 // location, treatment type, restriction detail) and photos are optional.
 // 'standard' is set from the inspection type, so it isn't counted either.
 const REQUIRED_FIELDS = {
-  property:        ['structureType','occupancyStatus','weatherConditions','wallConstruction','roofType','floorType','constructionEra'],
+  property:        ['structureType','occupancyStatus','weatherConditions','wallConstruction','roofType','floorType','constructionEra','existingSystem'],
   obstructions:    ['areaStatus'],
   restrictions:    ['hinderedAreas'],
   findings:        ['findings','borerActivity','decayFound','delignification'],
@@ -1642,6 +1642,7 @@ const REQUIRED_FIELDS = {
   photos:          [],
   signoff:         ['inspectorLicence','inspectorSignature','agreement'],
 };
+const REQUIRED_KEYS = new Set(Object.values(REQUIRED_FIELDS).flat());
 
 const SYSTEM_PROMPT = `You extract report fields for SAYON, an app that Australian timber pest inspectors dictate into. The user message is ONE dictated note from a timber pest inspection (AS 4349.3 / AS 3660.2). An inspector usually records several notes on one job, one per area, and the app merges them: so extract ONLY what THIS note states, and leave every other field null. A field left null stays as it was; a wrong value replaces a right one. Return ONLY a valid JSON object, no markdown and no commentary.
 
@@ -1675,7 +1676,7 @@ DROPDOWN FIELDS: the app shows these as pick-lists. Return the list value EXACTL
 - termiteHistory: what the inspector was told or found about termites here before, only when it comes up: "None known" | "Termites reported before" | "Treated before" | "Unknown". "The owner said they had termites a few years ago" is "Termites reported before"; "had it treated in 2019" is "Treated before". Add the detail in their words when they give one, e.g. "Treated before (2019, Termidor)". Signs of a past treatment seen at the inspection are previousTreatment, not this.
 - temperature, humidity, rainLast24h: only a reading the inspector states, written as "22°C", "70%" and "5 mm" (rainLast24h "None" when they say there was no rain). Never estimate one from the weather description.
 - constructionEra: only from a stated age, decade or year ("built in the 70s" is "1965-1985", "around 1998" is "1985-2003", "2005" is "Post-2003") or from an era-specific material the inspector names (fibro sheeting, asbestos). Never date a house from its wall, floor or roof type: the era prints an asbestos warning in the report, so a guessed era is a false fact.
-- existingSystem (the TYPE of termite management system found): "Physical Barrier" | "Chemical Reticulation System" | "Termite Baiting System" | "Chemical Barrier" | "Combination System — Physical + Chemical" | "System Present — Type Unidentified". A chemical soil treatment or chemical barrier with no reticulation pipes mentioned (e.g. Termidor sprayed around the perimeter) is "Chemical Barrier". Only when a system is actually present; when the inspector says there is no system, no barrier or nothing installed, leave it null (never "No", "None", "Nil").
+- existingSystem (the TYPE of termite management system found): "Physical Barrier" | "Chemical Reticulation System" | "Termite Baiting System" | "Chemical Barrier" | "Combination System — Physical + Chemical" | "System Present — Type Unidentified". A chemical soil treatment or chemical barrier with no reticulation pipes mentioned (e.g. Termidor sprayed around the perimeter) is "Chemical Barrier". When the inspector says there is no system, no barrier or nothing installed, return "No System Found" (never "No", "None", "Nil"); when they don't say either way, null.
 - existingSystemOther: the brand, product or chemical the system is recorded as (HomeGuard Blue, Kordon, Termimesh, Exterra, Sentricon, Termidor, Altriset ...), plus the install year if read from the notice. Only when the inspector names it.
 - inspectionType: "Annual — Existing Building" for an annual, routine, regular or yearly inspection of the client's own home; "Pre-Purchase — Timber Pest" for pre-purchase, pre-sale or a client buying the property ("pre-purchased" is the same); "Pre-Purchase — Combined Building & Pest" only when they say building and pest; "Treatment Follow-Up", "Re-inspection", "New Construction — Completion" and "Insurance / Legal" only when said in those words. Otherwise null.
 - inspectionFrequency: write the NEXT interval first as a number of months, then any later pattern, e.g. "3 months, then every 12 months" or "12 months". Never put a later interval before the first one. It is only the routine re-inspection interval: a one-off invasive or follow-up inspection ("invasive inspection in two weeks") never goes here.
@@ -4236,7 +4237,12 @@ function populateFields(data, transcript) {
   const values = upgradeRenamedChoices({ ...data });
   if (values.waterLeaks === 'YES' && values.moistureReadings !== 'YES') values.moistureReadings = 'YES';
   if (values.moistureReadings === 'NO' && !values.waterLeaks && reportData.waterLeaks === 'YES') delete values.moistureReadings;
-  if (values.existingSystem !== undefined && values.existingSystem !== null && !hasIdentifiedSystem(String(values.existingSystem))) delete values.existingSystem;
+  // "No System Found" is kept, unless an earlier note named a system: a no
+  // from one note doesn't wipe a system another note read off the notice.
+  if (values.existingSystem !== undefined && values.existingSystem !== null && !hasIdentifiedSystem(String(values.existingSystem))) {
+    if (String(values.existingSystem).trim().toLowerCase() === NO_SYSTEM_FOUND.toLowerCase() && !hasIdentifiedSystem(reportData.existingSystem || '')) values.existingSystem = NO_SYSTEM_FOUND;
+    else delete values.existingSystem;
+  }
   NIL_TEXT_KEYS.forEach(k => { if (values[k] !== undefined && values[k] !== null && isNilText(values[k])) values[k] = k === 'hinderedAreas' ? '' : null; });
   mergeBorerExtraction(values);
 
@@ -5058,6 +5064,9 @@ function checkFindingsGate() {
 // "existingSystem" is free text, so a technician typing "No", "None", "Nil",
 // "N/A" etc. must NOT count as an identified system — only an actual system
 // name/description should reveal the verification checklist.
+// The pick-list's answer for a house with no system, so the question is
+// answered rather than left blank.
+const NO_SYSTEM_FOUND = 'No System Found';
 const NO_SYSTEM_VALUES = new Set([
   '', '—', 'no', 'none', 'nil', 'na', 'n a', 'n/a', 'not applicable',
   'no system', 'nothing', 'no existing system', 'not identified',
@@ -5076,6 +5085,9 @@ function checkSystemVerify() {
 
   const hasSystem = hasIdentifiedSystem(reportData.existingSystem);
   block.style.display = hasSystem ? 'block' : 'none';
+  // No system found: no name to give, unless one was typed already.
+  const nameField = document.getElementById('f-existingSystemOther')?.closest('.field');
+  if (nameField) nameField.style.display = !hasSystem && !isBlankValue(reportData.existingSystem) && isBlankValue(reportData.existingSystemOther) ? 'none' : '';
   if (!hasSystem) return;
 
   const flag = document.getElementById('systemVerifyFlag');
@@ -5619,6 +5631,7 @@ function startEdit(el, key, type) {
       'Termite Baiting System',
       'Combination System — Physical + Chemical',
       'System Present — Type Unidentified',
+      NO_SYSTEM_FOUND,
     ],
     // "What and where" boxes: pick the usual answer, or type your own.
     highrisk: [
@@ -6121,13 +6134,20 @@ function renderFieldGroups() {
       if (sub) { sub.textContent = r.text || 'Not answered yet'; sub.classList.toggle('concern', !!r.concern); }
       return;
     }
+    // A group counts only the questions a finished report needs, so a house
+    // that doesn't call for the extras still reaches done. A group of extras
+    // only reads Optional until something goes in it.
     const keys = fgroupKeys(group);
     const answered = keys.filter(k => !isBlankValue(reportData[k]));
-    const done = keys.length > 0 && answered.length === keys.length;
+    const needed = keys.filter(k => REQUIRED_KEYS.has(k));
+    const neededDone = needed.filter(k => !isBlankValue(reportData[k])).length;
+    const done = needed.length ? neededDone === needed.length : answered.length > 0;
+    const optional = !needed.length && !answered.length;
     group.classList.toggle('fgroup-done', done);
     group.classList.toggle('fgroup-started', answered.length > 0 && !done);
+    group.classList.toggle('fgroup-optional', optional);
     const count = group.querySelector('.fgroup-count');
-    if (count) count.textContent = `${answered.length} of ${keys.length}`;
+    if (count) count.textContent = done ? 'Done' : optional ? 'Optional' : `${neededDone} of ${needed.length}`;
     const sub = group.querySelector('.fgroup-sub');
     if (!sub) return;
     let text, concern = false;
@@ -6139,7 +6159,7 @@ function renderFieldGroups() {
     } else {
       text = fgroupSentence(answered);
     }
-    sub.textContent = text || (keys.length ? 'Not answered yet' : '');
+    sub.textContent = text || (optional ? 'Nothing added' : keys.length ? 'Not answered yet' : '');
     sub.classList.toggle('concern', concern);
   });
 }
@@ -10208,7 +10228,7 @@ function dashboardJob(r, quotes) {
     group = 'todo'; status = 'Record the treatment';
     hint = who.charAt(0).toUpperCase() + who.slice(1) + ' accepted the quote. Once the work is done, record what was used and where.';
     next = { label: 'Record treatment', to: 'treatment' };
-  } else if (!q.certificateSentAt) {
+  } else if (!certificateGiven(q)) {
     group = 'todo'; status = 'Email the certificate';
     hint = 'The treatment is recorded. Email ' + who + ' their treatment certificate, the PDF that records what was applied and where. You\'ll see who it goes to before it sends.';
     next = { label: 'Email the certificate', to: 'certificate' };
@@ -10233,13 +10253,13 @@ function dashboardJob(r, quotes) {
         : a.status === 'accepted' ? `Accepted${a.by ? ' by ' + a.by : ''} ${dashDay(a.date)}`
         : `Declined ${dashDay(a.date)}${a.note ? ' · ' + a.note : ''}` },
     { label: 'Treatment', to: 'treatment', state: q && q.treatment ? 'done' : answered && a.status !== 'accepted' || !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
-      text: q && q.treatment ? `Done ${dashDay(q.treatment.date)} · certificate ${q.certificateSentAt ? 'sent' : 'not sent'}` : 'Not recorded yet' },
+      text: q && q.treatment ? `Done ${dashDay(q.treatment.date)} · certificate ${q.certificateSentAt ? 'sent' : q.certificateHandedAt ? 'given' : 'not sent'}` : 'Not recorded yet' },
   ];
   steps.forEach(s => { if (s.state === 'skip') s.text = 'Not needed'; });
   // Each step just says whether it's done; the preview has the detail. A declined answer keeps its wording.
   steps.forEach(s => { if (s.state === 'done' || s.state === 'todo') s.text = s.state === 'done' ? 'Completed' : 'Not completed'; });
   // Recorded but the certificate hasn't gone: the treatment isn't finished.
-  if (q && q.treatment && !q.certificateSentAt && steps[3].state === 'done') Object.assign(steps[3], { state: 'now', text: 'Certificate not emailed yet' });
+  if (q && q.treatment && !certificateGiven(q) && steps[3].state === 'done') Object.assign(steps[3], { state: 'now', text: 'Certificate not emailed yet' });
   if (group !== 'done' && !steps.some(s => s.state === 'now')) { const s = steps.find(s => s.state === 'todo'); if (s) s.state = 'now'; }
   return { r, q, group, status, hint, next, steps, total, time: dashboardJobTime(r) };
 }
@@ -10248,8 +10268,9 @@ function dashboardJob(r, quotes) {
 function dashboardRing(steps, group) {
   const C = 2 * Math.PI * 15, seg = C / 4, gap = 3.2;
   const arcs = steps.map((s, i) => `<circle cx="18" cy="18" r="15" class="${s.state}" stroke-dasharray="${(seg - gap).toFixed(2)} ${(C - seg + gap).toFixed(2)}" stroke-dashoffset="${(-(i * seg) - gap / 2).toFixed(2)}"/>`).join('');
-  const done = steps.filter(s => s.state === 'done').length;
-  const mid = group === 'done' && done === 4
+  // A step the job didn't need counts as done, so a job with no quote still fills.
+  const done = steps.filter(s => s.state === 'done' || s.state === 'skip').length;
+  const mid = group === 'done'
     ? '<path d="m12.5 18.5 3.5 3.5 7-8" class="tick"/>'
     : `<text x="18" y="18" dy="0.35em" text-anchor="middle">${done}/4</text>`;
   return `<svg class="dash-ring" width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><g transform="rotate(-90 18 18)">${arcs}</g>${mid}</svg>`;
@@ -10376,10 +10397,10 @@ function openDashboardDetail(id) {
   const sheet = document.getElementById('dashboardDetailSheet');
   if (!j || !sheet) return;
   const group = (DASHBOARD_TABS.find(([k]) => k === j.group) || [, ''])[1];
-  const done = j.steps.filter(s => s.state === 'done').length;
+  const done = j.steps.filter(s => s.state === 'done' || s.state === 'skip').length;
   const icon = (d) => `<svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
   const dot = (s, i) => s.state === 'done' ? icon('<path d="M20 6 9 17l-5-5"/>')
-    : s.state === 'bad' ? icon('<path d="M18 6 6 18"/><path d="M6 6l12 12"/>') : i + 1;
+    : s.state === 'bad' ? icon('<path d="M18 6 6 18"/><path d="M6 6l12 12"/>') : s.state === 'skip' ? '–' : i + 1;
   const facts = [
     ['Client', j.r.client || 'Not entered'],
     ['Quote', j.total ? formatAUD(j.total).replace(/\.00$/, '') : 'None yet'],
@@ -10513,7 +10534,7 @@ function dashboardPeekBody(j, to) {
     ['Work', Object.keys(t.methods || {}).map(k => (TREATMENT_METHODS[k] || {}).label || k).join(', ')],
     ['Products', (t.products || []).map(p => p.name).filter(Boolean).join(', ')],
     ['Areas', t.areas],
-    ['Certificate', q.certificateSentAt ? `Sent ${dashDate(q.certificateSentAt)}` : 'Not sent yet'],
+    ['Certificate', q.certificateSentAt ? `Sent ${dashDate(q.certificateSentAt)}` : q.certificateHandedAt ? `Given in person ${dashDate(q.certificateHandedAt)}` : 'Not sent yet'],
   ]);
 }
 
@@ -11204,20 +11225,20 @@ function answerDidItSend(yes) {
 }
 
 // One "Sent" line per document the job has (report, quote, certificate),
-// for the report banner and the quote screen. Each: { label, at, stale }.
+// for the report banner and the quote screen. Each: { label, at, stale, verb }.
 function sentDocs(rd, q) {
   const sent = rd && rd.sent;
   const docs = [{ label: 'Report', at: sent ? sent.at : null }];
   if (quoteHasItems(q)) {
     docs.push({ label: 'Quote', at: q.sentAt || null, stale: !!q.sentAt && q.sentHash !== quoteContentHash(q) });
-    if (q.treatment) docs.push({ label: 'Certificate', at: q.certificateSentAt || null });
+    if (q.treatment) docs.push({ label: 'Certificate', at: q.certificateSentAt || q.certificateHandedAt || null, verb: !q.certificateSentAt && q.certificateHandedAt ? 'Given' : '' });
   }
   return docs;
 }
 function renderSentLines(rd, q) {
   return `<div class="doc-sent-lines">${sentDocs(rd, q).map(d =>
     `<div class="doc-sent ${d.at ? (d.stale ? 'stale' : 'sent') : 'unsent'}"><span>${d.label}</span>` +
-    `<strong>${d.at ? `Sent ${formatIssueDate(d.at)}${d.stale ? ' · changed since' : ''}` : 'Not sent yet'}</strong></div>`).join('')}</div>`;
+    `<strong>${d.at ? `${d.verb || 'Sent'} ${formatIssueDate(d.at)}${d.stale ? ' · changed since' : ''}` : 'Not sent yet'}</strong></div>`).join('')}</div>`;
 }
 
 async function sendPdfsDirect({ files, to, subject, body }) {

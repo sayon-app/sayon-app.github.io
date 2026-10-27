@@ -5026,6 +5026,19 @@ body:has(#quoteScreen.open) .toast { bottom: calc(var(--tabbar-h) + var(--mic-cl
   content: ''; position: absolute; left: -22px; top: 18px; bottom: -16px; width: 2px;
   border-radius: 2px; background: rgba(var(--accent-rgb), 0.45);
 }
+/* Follow-ups under a question: a What and Where side by side, or a small
+   stack (water leaks and where). Each takes the hollow dot, and the line
+   stops when nothing is showing under the question. */
+.field-pair > .field-pair-row,
+.field-pair > .fp-follow { position: relative; }
+.field-pair > .field-pair-row::before,
+.field-pair > .fp-follow::before {
+  content: ''; position: absolute; left: -28px; top: 2px; width: 14px; height: 14px; box-sizing: border-box;
+  border-radius: 99px; border: 2px solid var(--accent); background: var(--surface);
+}
+.field-pair-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.fp-follow { display: flex; flex-direction: column; gap: 14px; }
+.field-pair > :first-child:has(+ [hidden], + [style*="display: none"], + [style*="display:none"])::after { display: none; }
 
 /* Ready-made recommendations under Other Recommendations: tap to add. */
 .rec-lines { margin: 4px 14px 12px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface2); }

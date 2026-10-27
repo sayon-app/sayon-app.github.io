@@ -9732,8 +9732,7 @@ function openDashboard() {
   const search = document.getElementById('dashboardSearch');
   if (search) search.value = '';
   renderDashboard();
-  if (!dashboardJobs.length) setDashboardTab('current');
-  else if (!dashboardJobs.some(j => j.group === 'todo')) setDashboardTab('all');
+  if (!dashboardJobs.some(j => j.group === 'todo')) setDashboardTab('current');
 }
 
 // Opens the dashboard on the open job's details.
@@ -9753,10 +9752,10 @@ function closeDashboard() {
 }
 
 // Which tab the dashboard shows: 'current' (the open job's details) or a
-// list, 'todo' | 'waiting' | 'done' | 'all'.
+// list, 'todo' | 'waiting' | 'done'. Search looks through every job.
 let dashboardTab = 'todo';
 let dashboardJobs = [];
-const DASHBOARD_TABS = [['current', 'Current report'], ['todo', 'Active'], ['waiting', 'Waiting on client'], ['done', 'Done'], ['all', 'All']];
+const DASHBOARD_TABS = [['current', 'This job'], ['todo', 'To do'], ['waiting', 'Waiting'], ['done', 'Done']];
 
 // Job details sit on the Current report tab. Before the dashboard redraws,
 // the panel goes back to its holder, so its fields survive the redraw.
@@ -9964,7 +9963,7 @@ function renderDashboardJobs(fade) {
 
   const empty = query ? `No jobs match "${escapeHtml(searchEl.value.trim())}".`
     : !dashboardJobs.length ? 'Your jobs will show up here once you save a report.'
-    : { todo: 'No active jobs right now.', waiting: 'Nothing is waiting on a client.', done: 'No finished jobs yet.', all: '' }[dashboardTab];
+    : { todo: 'Nothing to do right now.', waiting: 'Nothing is waiting on a client.', done: 'No finished jobs yet.' }[dashboardTab];
   wrap.innerHTML = shown.length ? `
     <div class="dash-list${fade ? ' fade-in' : ''}">
       ${shown.map(j => `

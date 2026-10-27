@@ -4886,3 +4886,17 @@ body:has(#quoteScreen.open) .toast { bottom: calc(var(--tabbar-h) + var(--mic-cl
 .dash-current .job-actions, .dash-current .sync-status { padding-left: 16px; padding-right: 16px; }
 .dash-current .sync-status { padding-bottom: 14px; }
 .dash-search[hidden] { display: none; }
+
+/* Two fields that belong together (the termite system and its name),
+   joined down the left by the same side line as the job sheet. */
+.field-pair { display: flex; flex-direction: column; gap: 14px; padding-left: 28px; }
+.field-pair > .field { position: relative; }
+.field-pair > .field::before {
+  content: ''; position: absolute; left: -28px; top: 2px; width: 14px; height: 14px; box-sizing: border-box;
+  border-radius: 99px; border: 2px solid var(--accent); background: var(--surface);
+}
+.field-pair > .field:first-child::before { background: var(--accent); }
+.field-pair > .field:first-child::after {
+  content: ''; position: absolute; left: -22px; top: 18px; bottom: -16px; width: 2px;
+  border-radius: 2px; background: rgba(var(--accent-rgb), 0.45);
+}

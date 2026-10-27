@@ -1082,13 +1082,16 @@
             <div class="field"><div class="field-label">Rain in the Last 24 Hours</div><div class="field-val" id="f-rainLast24h" onclick="startEdit(this,'rainLast24h','text')">—</div></div>
             <div class="field weather-fill"><button type="button" class="link-btn" id="weatherFillBtn" onclick="fillWeather()">Fill from today's weather</button></div>
             <div class="field"><div class="field-label">Applicable Standard</div><div class="field-val" id="f-standard" onclick="startEdit(this,'standard','standard')">—</div></div>
-            <div class="field field-wide">
-              <div class="field-label">Termite Management System</div>
-              <div class="field-val" id="f-existingSystem" onclick="startEdit(this,'existingSystem','existingsystem')">—</div>
-            </div>
-            <div class="field field-wide">
-              <div class="field-label">Specific System Name <span class="field-hint">Optional</span></div>
-              <div class="field-val" id="f-existingSystemOther" onclick="startEdit(this,'existingSystemOther','existingsystemspecific')">—</div>
+            <!-- The system and its name, joined by a side line -->
+            <div class="field-wide field-pair">
+              <div class="field">
+                <div class="field-label">Termite Management System</div>
+                <div class="field-val" id="f-existingSystem" onclick="startEdit(this,'existingSystem','existingsystem')">—</div>
+              </div>
+              <div class="field">
+                <div class="field-label">Specific System Name</div>
+                <div class="field-val" id="f-existingSystemOther" onclick="startEdit(this,'existingSystemOther','existingsystemspecific')">—</div>
+              </div>
             </div>
             <div class="section-photo-widget field-wide">
               <div class="section-photo-header">

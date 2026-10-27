@@ -573,7 +573,7 @@ function renderAreaChecklist() {
         ? `<div class="obs-reasons obs-reasons-${kind}"><div class="obs-items-label">${ACCESS_GROUP_ICONS[kind]}<span>${title}</span></div><div class="obs-items">${items.map(btn).join('')}</div></div>` : '';
       reasons = group('hindered', 'Obstructions: in the way today', zone.items.filter(i => !RESTRICTED_REASONS.has(i)))
         + group('restricted', 'Restricted: permanent or locked', zone.items.filter(i => RESTRICTED_REASONS.has(i)));
-      if (selected.length) reasons += `<div class="area-where">Add where exactly, and photos, in <button type="button" class="link-btn" onclick="showSection('restrictions')">Access</button></div>`;
+      if (selected.length) reasons += `<div class="area-where">Add where exactly, and photos, under <button type="button" class="link-btn" onclick="showSection('restrictions')">Areas unable to be inspected</button> below</div>`;
     }
     let result = '';
     if (areaWasEntered(zoneId)) {
@@ -991,7 +991,7 @@ function renderAccessSummary() {
   [hBox, rBox].forEach(hydrateSpotPhotos);
   const intro = document.getElementById('accessIntro');
   if (intro) intro.innerHTML = allMarked || limited.length ? 'Filled in from your ticks in Areas. Tap a status to change it there, or add where exactly.'
-    : `Mark every area in Section ${REPORT_PARTS.areas} and these fill themselves in. <button type="button" class="link-btn" onclick="showSection('obstructions')">Go to Areas</button>`;
+    : `Mark every area above and these fill themselves in. <button type="button" class="link-btn" onclick="document.getElementById('section-obstructions').scrollIntoView({ behavior: 'smooth', block: 'start' })">Back to the areas</button>`;
   const hint = document.getElementById('accessHighRiskHint');
   if (hint) {
     const fallback = accessLimits().highRisk;
@@ -3776,6 +3776,7 @@ function goToExtractBlank(i) {
   if (el.classList.contains('choice-source')) el = document.getElementById(b.target.replace(/^f-/, 'choices-')) || el;
   const section = el.closest('.report-section');
   if (section && section.id.startsWith('section-')) showSection(section.id.slice(8));
+  openFieldGroups(el);
   if (b.referral) {
     // The "Refer to a Builder or Engineer?" field inside the finding card.
     const label = [...el.querySelectorAll('.field-label')].find(l => /builder or engineer/i.test(l.textContent));
@@ -5941,28 +5942,139 @@ function commitActive() {
 }
 
 // ── NAV ───────────────────────────────────────────────────────────────────
+// ── REPORT STEPS ──────────────────────────────────────────────────────────
+// The report's tabs. A step shows one or more sections: Areas holds the
+// areas and what couldn't be inspected, Finish holds the other photos and
+// the sign-off. Sections stay the unit for progress, voice and the PDF.
+const REPORT_STEPS = [
+  { id: 'property', sections: ['property'] },
+  { id: 'areas', sections: ['obstructions', 'restrictions'] },
+  { id: 'findings', sections: ['findings'] },
+  { id: 'conducive', sections: ['conducive'] },
+  { id: 'recommendations', sections: ['recommendations'] },
+  { id: 'finish', sections: ['photos', 'signoff'] },
+];
+const stepOf = name => REPORT_STEPS.find(st => st.id === name || st.sections.includes(name)) || REPORT_STEPS[0];
+let currentStep = 'property';
+
+// name is a section or a step. A section further down its step is scrolled
+// to, so "Go to Access" lands on it.
 function showSection(name) {
+  const step = stepOf(name);
+  const changed = step.id !== currentStep;
+  currentStep = step.id;
   Object.keys(SECTIONS).forEach(s => {
     const el = document.getElementById('section-' + s);
-    if (el) {
-      if (s === name) {
-        el.style.display = 'block';
-        // Restart animation
+    if (!el) return;
+    if (step.sections.includes(s)) {
+      el.style.display = 'block';
+      if (changed) {
         el.style.animation = 'none';
-        void el.offsetWidth; // force reflow
+        void el.offsetWidth; // restarts the animation
         el.style.animation = '';
-      } else {
-        el.style.display = 'none';
       }
+    } else {
+      el.style.display = 'none';
     }
-    const tab = document.getElementById('tab-' + s);
-    if (tab) tab.classList.toggle('active', s === name);
   });
-
-  // Scroll active tab into view
-  const activeTab = document.getElementById('tab-' + name);
-  if (activeTab) activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  REPORT_STEPS.forEach(st => {
+    const tab = document.getElementById('tab-' + st.id);
+    if (tab) {
+      tab.classList.toggle('active', st.id === step.id);
+      tab.setAttribute('aria-current', st.id === step.id ? 'step' : 'false');
+    }
+  });
+  document.getElementById('reportBody')?.setAttribute('data-step', step.id);
+  if (name !== step.id && name !== step.sections[0]) {
+    const target = document.getElementById('section-' + name);
+    if (target) setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  } else if (changed) {
+    const scroller = document.getElementById('reportBody');
+    if (scroller) scroller.scrollTop = 0;
+  }
   track('screen_viewed', { screen: 'report_' + name });
+}
+
+// A tap on a step tab or a Next button. Groups with every question
+// answered fold to their one-line summary, so what's left is in view.
+function goStep(id) {
+  showSection(id);
+  foldAnsweredGroups(id);
+}
+
+// ── QUESTION GROUPS ──
+// Long steps split their questions into groups that fold (details.fgroup).
+// The header counts the questions answered; folded, it shows the answers.
+const FGROUP_CONCERNS = {
+  moistureReadings: [['YES'], 'moisture detected'], waterLeaks: [['YES'], 'a leak'], siteDrainage: [['POOR'], 'poor site drainage'],
+  subfloorDrainage: [['POOR'], 'poor subfloor drainage'], subfloorVentilation: [['POOR'], 'poor ventilation'], mouldSeen: [['YES'], 'mould'],
+  timberSoil: [['YES'], 'timber touching soil'], slabEdge: [['OBSTRUCTED'], 'slab edge concealed'], weepHoles: [['BRIDGED'], 'weep holes bridged'],
+  antCapping: [['GAPS', 'NONE'], 'ant capping'], nonDurableTimber: [['YES'], 'non-durable timber'],
+};
+
+// The questions a group asks right now: hidden follow-ups (a "where" box
+// after a no, system checks with no system) don't count.
+function fgroupKeys(group) {
+  return [...group.querySelectorAll('.field-val[id^="f-"]')].filter(el => {
+    for (let n = el.closest('.field') || el; n && n !== group; n = n.parentElement) {
+      if (n.hidden || n.style.display === 'none') return false;
+    }
+    return true;
+  }).map(el => el.id.slice(2));
+}
+
+// Follow-up questions show and hide from several places, so the counts
+// are redrawn whenever anything inside a group shows or hides.
+let fgroupObserver = null, fgroupFrame = 0;
+function watchFieldGroups() {
+  if (fgroupObserver || typeof MutationObserver === 'undefined') return;
+  fgroupObserver = new MutationObserver(() => {
+    if (fgroupFrame) return;
+    fgroupFrame = requestAnimationFrame(() => { fgroupFrame = 0; renderFieldGroups(); });
+  });
+  document.querySelectorAll('#reportBody details.fgroup').forEach(group =>
+    fgroupObserver.observe(group, { subtree: true, attributes: true, attributeFilter: ['style', 'hidden'] }));
+}
+
+function renderFieldGroups() {
+  watchFieldGroups();
+  document.querySelectorAll('#reportBody details.fgroup').forEach(group => {
+    const keys = fgroupKeys(group);
+    const answered = keys.filter(k => !isBlankValue(reportData[k]));
+    const done = keys.length > 0 && answered.length === keys.length;
+    group.classList.toggle('fgroup-done', done);
+    group.classList.toggle('fgroup-started', answered.length > 0 && !done);
+    const count = group.querySelector('.fgroup-count');
+    if (count) count.textContent = `${answered.length} of ${keys.length}`;
+    const sub = group.querySelector('.fgroup-sub');
+    if (!sub) return;
+    let text, concern = false;
+    if (group.dataset.summary === 'concerns') {
+      const concerns = keys.filter(k => FGROUP_CONCERNS[k] && FGROUP_CONCERNS[k][0].includes(reportData[k])).map(k => FGROUP_CONCERNS[k][1]);
+      concern = concerns.length > 0;
+      text = concern ? 'Found: ' + concerns.join(', ') : (answered.length ? 'Nothing of concern so far' : '');
+    } else {
+      text = answered.map(k => String(reportData[k]).trim()).filter(v => !/^(YES|NO|N\/A)$/.test(v)).join(' · ');
+    }
+    sub.textContent = text || (keys.length ? 'Not answered yet' : '');
+    sub.classList.toggle('concern', concern);
+  });
+}
+
+function foldAnsweredGroups(stepId) {
+  const step = stepOf(stepId);
+  step.sections.forEach(s => {
+    document.querySelectorAll(`#section-${s} details.fgroup`).forEach(group => {
+      group.open = !group.classList.contains('fgroup-done');
+    });
+  });
+}
+
+// Opens any folded group around el, so a jump to a question can show it.
+function openFieldGroups(el) {
+  for (let n = el && el.parentElement; n; n = n.parentElement) {
+    if (n.matches && n.matches('details.fgroup') && !n.open) n.open = true;
+  }
 }
 
 // ── PROGRESS ──────────────────────────────────────────────────────────────
@@ -5982,30 +6094,37 @@ function updateProgress() {
   // zero real finding data) showed up here too - now sharing one
   // definition (isFieldFilled) so this can't drift out of sync again.
   let filled = 0, total = 0;
+  const secState = {};
   Object.entries(SECTIONS).forEach(([sec, cfg]) => {
     const req = REQUIRED_FIELDS[sec] || [];
     const reqFilled = req.filter(k => isFieldFilled(k)).length;
     const any = cfg.fields.some(k => isFieldFilled(k));
     filled += reqFilled; total += req.length;
 
-    const dot = document.getElementById('dot-' + sec);
     const sts = document.getElementById('sts-' + sec);
     const nextBtn = document.getElementById('next-btn-' + sec);
+    secState[sec] = !any ? 'empty' : reqFilled < req.length ? 'partial' : 'done';
 
     if (!any) {
-      if (dot) dot.className = 'tab-dot';
       if (sts) { sts.className = 'sec-badge empty'; sts.textContent = 'Not started'; }
-      if (nextBtn) nextBtn.classList.remove('visible');
     } else if (reqFilled < req.length) {
-      if (dot) dot.className = 'tab-dot partial';
       if (sts) { sts.className = 'sec-badge partial'; sts.textContent = 'In progress'; }
-      if (nextBtn) nextBtn.classList.remove('visible');
     } else {
-      if (dot) dot.className = 'tab-dot done';
       if (sts) { sts.className = 'sec-badge done'; sts.textContent = 'Complete'; }
-      if (nextBtn) nextBtn.classList.add('visible');
     }
+    // Next always shows, so the steps can be walked in order; it stands
+    // out once the section is complete.
+    if (nextBtn) { nextBtn.classList.add('visible'); nextBtn.classList.toggle('pending', secState[sec] !== 'done'); }
   });
+  // A step's dot: done when every section in it is, started when any is.
+  REPORT_STEPS.forEach(st => {
+    const dot = document.getElementById('dot-' + st.id);
+    if (!dot) return;
+    const states = st.sections.map(s => secState[s]).filter(Boolean);
+    const counted = st.id === 'finish' ? states.slice(1) : states; // other photos are optional
+    dot.className = counted.every(v => v === 'done') ? 'tab-dot done' : states.some(v => v !== 'empty') ? 'tab-dot partial' : 'tab-dot';
+  });
+  renderFieldGroups();
 
   // A completed (locked) job reads Complete whatever the count says.
   const locked = isReportLocked();

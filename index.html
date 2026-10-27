@@ -1020,42 +1020,34 @@
       </div><!-- /progress-wrap -->
 
       <!-- Horizontal section tab strip -->
-      <div class="section-tabs" id="sectionTabs">
-        <button class="section-tab active" onclick="showSection('property')" id="tab-property">
-          <span class="tab-dot current" id="dot-property"></span>
+      <div class="section-tabs" id="sectionTabs" aria-label="Report steps">
+        <button class="section-tab active" onclick="goStep('property')" id="tab-property">
+          <span class="tab-dot" id="dot-property"></span>
           <span class="tab-label">Property</span>
         </button>
-        <button class="section-tab" onclick="showSection('obstructions')" id="tab-obstructions">
-          <span class="tab-dot" id="dot-obstructions"></span>
+        <button class="section-tab" onclick="goStep('areas')" id="tab-areas">
+          <span class="tab-dot" id="dot-areas"></span>
           <span class="tab-label">Areas</span>
         </button>
-        <button class="section-tab" onclick="showSection('restrictions')" id="tab-restrictions">
-          <span class="tab-dot" id="dot-restrictions"></span>
-          <span class="tab-label">Access</span>
-        </button>
-        <button class="section-tab" onclick="showSection('findings')" id="tab-findings">
+        <button class="section-tab" onclick="goStep('findings')" id="tab-findings">
           <span class="tab-dot" id="dot-findings"></span>
           <span class="tab-label">Findings</span>
         </button>
-        <button class="section-tab" onclick="showSection('conducive')" id="tab-conducive">
+        <button class="section-tab" onclick="goStep('conducive')" id="tab-conducive">
           <span class="tab-dot" id="dot-conducive"></span>
           <span class="tab-label">Conducive</span>
         </button>
-        <button class="section-tab" onclick="showSection('recommendations')" id="tab-recommendations">
+        <button class="section-tab" onclick="goStep('recommendations')" id="tab-recommendations">
           <span class="tab-dot" id="dot-recommendations"></span>
-          <span class="tab-label">Recommendations</span>
+          <span class="tab-label">Advice</span>
         </button>
-        <button class="section-tab" onclick="showSection('photos')" id="tab-photos">
-          <span class="tab-dot" id="dot-photos"></span>
-          <span class="tab-label">Photos</span>
-        </button>
-        <button class="section-tab" onclick="showSection('signoff')" id="tab-signoff">
-          <span class="tab-dot" id="dot-signoff"></span>
-          <span class="tab-label">Sign-Off</span>
+        <button class="section-tab" onclick="goStep('finish')" id="tab-finish">
+          <span class="tab-dot" id="dot-finish"></span>
+          <span class="tab-label">Finish</span>
         </button>
       </div><!-- /sectionTabs -->
 
-      <div class="report-body edit-mode" id="reportBody">
+      <div class="report-body edit-mode" id="reportBody" data-step="property">
 
         <!-- Job completion: sent, complete, locked, amending (see COMPLETED
              JOBS in js/app.js) -->
@@ -1075,6 +1067,12 @@
             <h3><span class="sec-num">3.</span>About the Property</h3>
             <span class="sec-badge empty" id="sts-property">Not started</span>
           </div>
+          <details class="fgroup" id="fg-building" open>
+            <summary class="fgroup-head">
+              <span class="fgroup-text"><span class="fgroup-title">The building</span><span class="fgroup-sub"></span></span>
+              <span class="fgroup-count"></span>
+              <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
           <div class="section-fields">
             <div class="field"><div class="field-label">Structure Type</div><div class="field-val" id="f-structureType" onclick="startEdit(this,'structureType','structuretype')">—</div></div>
             <div class="field"><div class="field-label">Height</div><div class="field-val" id="f-height" onclick="startEdit(this,'height','height')">—</div></div>
@@ -1083,20 +1081,43 @@
             <div class="field"><div class="field-label">Floor Type</div><div class="field-val" id="f-floorType" onclick="startEdit(this,'floorType','floortype')">—</div></div>
             <div class="field"><div class="field-label">Orientation</div><div class="field-val" id="f-facadeDirection" onclick="openCompass()">—</div></div>
             <div class="field"><div class="field-label">Year / Period of Construction</div><div class="field-val" id="f-constructionEra" onclick="startEdit(this,'constructionEra','era')">—</div></div>
+          </div>
+          <div class="asb-banner" id="asbestosBanner" style="display:none">
+            <span class="asb-icon"><svg class="icon " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+            <span class="asb-text"></span>
+          </div>
+        
+          <div class="section-photo-widget fgroup-photo">
+            <div class="section-photo-header">
+              <div class="section-photo-header-left">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                Front of the property
+                <span class="section-photo-count" id="sectionPhotoCount-general"></span>
+              </div>
+              <button class="section-photo-add-btn" id="sectionPhotoBtn-general"
+                onclick="choosePhotoSource('sectionPhotoInput-general')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                Add Photo
+              </button>
+              <input type="file" id="sectionPhotoInput-general" accept="image/*" style="display:none"
+                onchange="handleSectionPhotoFiles(this.files,'general')">
+            </div>
+            <div class="section-photo-hint">One photo of the front of the house. It goes on the report cover.</div>
+            <div class="section-photo-grid" id="sectionPhotoGrid-general">
+              <div class="section-photo-empty">No photos added</div>
+            </div>
+          </div>
+          </details>
+          <details class="fgroup" id="fg-site" open>
+            <summary class="fgroup-head">
+              <span class="fgroup-text"><span class="fgroup-title">The site and termite system</span><span class="fgroup-sub"></span></span>
+              <span class="fgroup-count"></span>
+              <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
+          <div class="section-fields">
             <div class="field"><div class="field-label">Surroundings</div><div class="field-val" id="f-siteSurroundings" onclick="startEdit(this,'siteSurroundings','surroundings')">—</div></div>
             <div class="field"><div class="field-label">Site Slope</div><div class="field-val" id="f-siteSlope" onclick="startEdit(this,'siteSlope','siteslope')">—</div></div>
             <div class="field"><div class="field-label">Known Termite History</div><div class="field-val" id="f-termiteHistory" onclick="startEdit(this,'termiteHistory','termitehistory')">—</div></div>
-            <div class="field"><div class="field-label">Occupancy Status</div><div class="field-val" id="f-occupancyStatus" onclick="startEdit(this,'occupancyStatus','occupancystatus')">—</div></div>
-            <div class="field"><div class="field-label">Furnishing</div><div class="field-val" id="f-furnishing" onclick="startEdit(this,'furnishing','furnishing')">—</div></div>
-            <div class="field"><div class="field-label">People Present</div><div class="field-val" id="f-peoplePresent" onclick="startEdit(this,'peoplePresent','peoplepresent')">—</div></div>
-            <div class="field"><div class="field-label">Weather Conditions</div><div class="field-val" id="f-weatherConditions" onclick="startEdit(this,'weatherConditions','weatherconditions')">—</div></div>
-            <div class="field"><div class="field-label">Temperature</div><div class="field-val" id="f-temperature" onclick="startEdit(this,'temperature','text')">—</div></div>
-            <div class="field"><div class="field-label">Humidity</div><div class="field-val" id="f-humidity" onclick="startEdit(this,'humidity','text')">—</div></div>
-            <div class="field"><div class="field-label">Rain in the Last 24 Hours</div><div class="field-val" id="f-rainLast24h" onclick="startEdit(this,'rainLast24h','text')">—</div></div>
-            <div class="field"><div class="field-label">Recent Weather</div><div class="field-val" id="f-recentWeather" onclick="startEdit(this,'recentWeather','recentweather')">—</div></div>
-            <div class="field weather-fill"><button type="button" class="link-btn" id="weatherFillBtn" onclick="fillWeather()">Fill from today's weather</button></div>
-            <div class="field"><div class="field-label">Applicable Standard</div><div class="field-val" id="f-standard" onclick="startEdit(this,'standard','standard')">—</div></div>
-            <div class="field"><div class="field-label">Tools Used</div><div class="field-val" id="f-toolsUsed" onclick="startEdit(this,'toolsUsed','toolsused')">—</div></div>
             <!-- The system and its name, joined by a side line -->
             <div class="field-wide field-pair">
               <div class="field">
@@ -1150,34 +1171,30 @@
               <span id="systemVerifyFlagText">One or more verification checks indicate the existing system may not be fully inspectable. Recommend rectification and re-verification.</span>
             </div>
           </div>
-          <div class="asb-banner" id="asbestosBanner" style="display:none">
-            <span class="asb-icon"><svg class="icon " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
-            <span class="asb-text"></span>
+          </details>
+          <details class="fgroup" id="fg-day" open>
+            <summary class="fgroup-head">
+              <span class="fgroup-text"><span class="fgroup-title">On the day</span><span class="fgroup-sub"></span></span>
+              <span class="fgroup-count"></span>
+              <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
+          <div class="section-fields">
+            <div class="field"><div class="field-label">Occupancy Status</div><div class="field-val" id="f-occupancyStatus" onclick="startEdit(this,'occupancyStatus','occupancystatus')">—</div></div>
+            <div class="field"><div class="field-label">Furnishing</div><div class="field-val" id="f-furnishing" onclick="startEdit(this,'furnishing','furnishing')">—</div></div>
+            <div class="field"><div class="field-label">People Present</div><div class="field-val" id="f-peoplePresent" onclick="startEdit(this,'peoplePresent','peoplepresent')">—</div></div>
+            <div class="field"><div class="field-label">Weather Conditions</div><div class="field-val" id="f-weatherConditions" onclick="startEdit(this,'weatherConditions','weatherconditions')">—</div></div>
+            <div class="field"><div class="field-label">Temperature</div><div class="field-val" id="f-temperature" onclick="startEdit(this,'temperature','text')">—</div></div>
+            <div class="field"><div class="field-label">Humidity</div><div class="field-val" id="f-humidity" onclick="startEdit(this,'humidity','text')">—</div></div>
+            <div class="field"><div class="field-label">Rain in the Last 24 Hours</div><div class="field-val" id="f-rainLast24h" onclick="startEdit(this,'rainLast24h','text')">—</div></div>
+            <div class="field"><div class="field-label">Recent Weather</div><div class="field-val" id="f-recentWeather" onclick="startEdit(this,'recentWeather','recentweather')">—</div></div>
+            <div class="field weather-fill"><button type="button" class="link-btn" id="weatherFillBtn" onclick="fillWeather()">Fill from today's weather</button></div>
+            <div class="field"><div class="field-label">Applicable Standard</div><div class="field-val" id="f-standard" onclick="startEdit(this,'standard','standard')">—</div></div>
+            <div class="field"><div class="field-label">Tools Used</div><div class="field-val" id="f-toolsUsed" onclick="startEdit(this,'toolsUsed','toolsused')">—</div></div>
           </div>
-        
-          <div class="section-photo-widget">
-            <div class="section-photo-header">
-              <div class="section-photo-header-left">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
-                Front of the property
-                <span class="section-photo-count" id="sectionPhotoCount-general"></span>
-              </div>
-              <button class="section-photo-add-btn" id="sectionPhotoBtn-general"
-                onclick="choosePhotoSource('sectionPhotoInput-general')">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                Add Photo
-              </button>
-              <input type="file" id="sectionPhotoInput-general" accept="image/*" style="display:none"
-                onchange="handleSectionPhotoFiles(this.files,'general')">
-            </div>
-            <div class="section-photo-hint">One photo of the front of the house. It goes on the report cover.</div>
-            <div class="section-photo-grid" id="sectionPhotoGrid-general">
-              <div class="section-photo-empty">No photos added</div>
-            </div>
-          </div>
-          <button class="next-section-btn" id="next-btn-property" onclick="showSection('obstructions')">
+          </details>
+          <button class="next-section-btn" id="next-btn-property" onclick="goStep('areas')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-            Next: Areas Inspected
+            Next: Areas
           </button>
         </div>
 
@@ -1219,10 +1236,6 @@
               <div class="section-photo-empty">No photos added</div>
             </div>
           </div>
-          <button class="next-section-btn" id="next-btn-obstructions" onclick="showSection('restrictions')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-            Next: Areas Unable to Be Inspected
-          </button>
         </div>
 
         <!-- RESTRICTIONS -->
@@ -1283,7 +1296,7 @@
               <div class="section-photo-empty">No photos added</div>
             </div>
           </div>
-          <button class="next-section-btn" id="next-btn-restrictions" onclick="showSection('findings')">
+          <button class="next-section-btn" id="next-btn-restrictions" onclick="goStep('findings')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
             Next: Findings
           </button>
@@ -1415,9 +1428,9 @@
               <div class="section-photo-empty">No photos added</div>
             </div>
           </div>
-          <button class="next-section-btn" id="next-btn-findings" onclick="showSection('conducive')">
+          <button class="next-section-btn" id="next-btn-findings" onclick="goStep('conducive')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-            Next: Conducive Conditions
+            Next: Conducive
           </button>
         </div>
 
@@ -1430,6 +1443,12 @@
           <button type="button" class="nothing-found-btn" id="nothingFound-conducive" onclick="markNothingFound('conducive')" hidden>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><strong>No conducive conditions</strong><small>Fills the blank answers. Change any that differ.</small></span>
           </button>
+          <details class="fgroup" id="fg-moisture" open data-summary="concerns">
+            <summary class="fgroup-head">
+              <span class="fgroup-text"><span class="fgroup-title">Moisture, drainage and ventilation</span><span class="fgroup-sub"></span></span>
+              <span class="fgroup-count"></span>
+              <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
           <div class="section-fields">
             <div class="field"><div class="field-label">Moisture Detected</div><div class="field-val" id="f-moistureReadings" onclick="startEdit(this,'moistureReadings','yesno')">—</div></div>
             <!-- Water leaks and location only show if moisture detected = YES -->
@@ -1439,17 +1458,9 @@
             </div>
             <div class="field"><div class="field-label">Site Drainage</div><div class="field-val" id="f-siteDrainage" onclick="startEdit(this,'siteDrainage','drainage')">—</div></div>
             <div class="field"><div class="field-label">Subfloor Drainage</div><div class="field-val" id="f-subfloorDrainage" onclick="startEdit(this,'subfloorDrainage','drainage')">—</div></div>
-            <div class="field"><div class="field-label">Timber-to-Soil Contact</div><div class="field-val" id="f-timberSoil" onclick="startEdit(this,'timberSoil','yesno')">—</div></div>
-            <div class="field"><div class="field-label">Slab Edge Concealed</div><div class="field-val" id="f-slabEdge" onclick="startEdit(this,'slabEdge','slabedge')">—</div></div>
-            <div class="field"><div class="field-label">Weep Holes</div><div class="field-val" id="f-weepHoles" onclick="startEdit(this,'weepHoles','weepholes')">—</div></div>
-            <div class="field"><div class="field-label">Ant Capping</div><div class="field-val" id="f-antCapping" onclick="startEdit(this,'antCapping','antcapping')">—</div></div>
-            <div class="field field-wide"><div class="field-label">Ant Capping: Where &amp; What</div><div class="field-val" id="f-antCappingDetails" onclick="startEdit(this,'antCappingDetails','text')">—</div></div>
             <div class="field"><div class="field-label">Subfloor Ventilation</div><div class="field-val" id="f-subfloorVentilation" onclick="startEdit(this,'subfloorVentilation','ventilation')">—</div></div>
             <div class="field"><div class="field-label">Mould Seen</div><div class="field-val" id="f-mouldSeen" onclick="startEdit(this,'mouldSeen','yesno')">—</div></div>
             <div class="field"><div class="field-label">Mould: Where</div><div class="field-val" id="f-mouldWhere" onclick="startEdit(this,'mouldWhere','text')">—</div></div>
-            <div class="field"><div class="field-label">Non-durable Timber in Damp Areas</div><div class="field-val" id="f-nonDurableTimber" onclick="startEdit(this,'nonDurableTimber','yesno')">—</div></div>
-            <div class="field"><div class="field-label">Non-durable Timber: What</div><div class="field-val" id="f-nonDurableTimberDetails" onclick="startEdit(this,'nonDurableTimberDetails','nondurable')">—</div></div>
-            <div class="field"><div class="field-label">Non-durable Timber: Where</div><div class="field-val" id="f-nonDurableTimberWhere" onclick="startEdit(this,'nonDurableTimberWhere','nondurablewhere')">—</div></div>
           </div>
           <!-- Above-ground leak / secondary colony reminder -->
           <div class="inactive-reminder" id="secondaryColonyReminder" style="display:none">
@@ -1464,7 +1475,24 @@
             <div id="moistureTableRows"></div>
             <button class="findings-add-btn" onclick="addMoistureReading()">+ Add Reading</button>
           </div>
-        
+          </details>
+          <details class="fgroup" id="fg-entry" open data-summary="concerns">
+            <summary class="fgroup-head">
+              <span class="fgroup-text"><span class="fgroup-title">Ways in for termites</span><span class="fgroup-sub"></span></span>
+              <span class="fgroup-count"></span>
+              <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
+          <div class="section-fields">
+            <div class="field"><div class="field-label">Timber-to-Soil Contact</div><div class="field-val" id="f-timberSoil" onclick="startEdit(this,'timberSoil','yesno')">—</div></div>
+            <div class="field"><div class="field-label">Slab Edge Concealed</div><div class="field-val" id="f-slabEdge" onclick="startEdit(this,'slabEdge','slabedge')">—</div></div>
+            <div class="field"><div class="field-label">Weep Holes</div><div class="field-val" id="f-weepHoles" onclick="startEdit(this,'weepHoles','weepholes')">—</div></div>
+            <div class="field"><div class="field-label">Ant Capping</div><div class="field-val" id="f-antCapping" onclick="startEdit(this,'antCapping','antcapping')">—</div></div>
+            <div class="field field-wide"><div class="field-label">Ant Capping: Where &amp; What</div><div class="field-val" id="f-antCappingDetails" onclick="startEdit(this,'antCappingDetails','text')">—</div></div>
+            <div class="field"><div class="field-label">Non-durable Timber in Damp Areas</div><div class="field-val" id="f-nonDurableTimber" onclick="startEdit(this,'nonDurableTimber','yesno')">—</div></div>
+            <div class="field"><div class="field-label">Non-durable Timber: What</div><div class="field-val" id="f-nonDurableTimberDetails" onclick="startEdit(this,'nonDurableTimberDetails','nondurable')">—</div></div>
+            <div class="field"><div class="field-label">Non-durable Timber: Where</div><div class="field-val" id="f-nonDurableTimberWhere" onclick="startEdit(this,'nonDurableTimberWhere','nondurablewhere')">—</div></div>
+          </div>
+          </details>
 
           <!-- Section photo widget -->
           <div class="section-photo-widget">
@@ -1486,9 +1514,9 @@
               <div class="section-photo-empty">No photos added</div>
             </div>
           </div>
-          <button class="next-section-btn" id="next-btn-conducive" onclick="showSection('recommendations')">
+          <button class="next-section-btn" id="next-btn-conducive" onclick="goStep('recommendations')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-            Next: Recommendations
+            Next: Advice
           </button>
         </div>
 
@@ -1539,16 +1567,16 @@
               <div class="section-photo-empty">No photos added</div>
             </div>
           </div>
-          <button class="next-section-btn" id="next-btn-recommendations" onclick="showSection('photos')">
+          <button class="next-section-btn" id="next-btn-recommendations" onclick="goStep('finish')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-            Next: Photos
+            Next: Finish
           </button>
         </div>
 
         <!-- PHOTOS -->
         <div class="report-section" id="section-photos" style="display:none">
           <div class="section-header">
-            <h3><span class="sec-num">9.</span>Photos</h3>
+            <h3><span class="sec-num">9.</span>Other photos</h3>
             <span class="sec-badge empty" id="sts-photos">Not started</span>
           </div>
           <input type="file" id="photoFileInput" accept="image/*" multiple style="display:none" onchange="handlePhotoFiles(this.files)">
@@ -1559,13 +1587,8 @@
               Add Photos
             </button>
           </div>
-          <div class="photo-empty-state" id="photoEmptyState">No photos attached yet. Photos are compressed automatically and limited to 12 per report to keep things running smoothly on your device.</div>
+          <div class="photo-empty-state" id="photoEmptyState">Photos that don't belong to one section go here. Each section has its own photo box too. Photos are made smaller automatically so the report stays quick.</div>
           <div class="photo-grid" id="photoGrid" style="display:none"></div>
-        
-          <button class="next-section-btn" id="next-btn-photos" onclick="showSection('signoff')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-            Next: Sign-Off
-          </button>
         </div>
 
         <!-- SIGN-OFF -->

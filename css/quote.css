@@ -388,3 +388,16 @@ body:not(.dark-screen) .quote-card-title { color: var(--text); }
 .quote-work-fold[open] > summary { border-bottom: 1px solid var(--border); margin-bottom: 2px; }
 .quote-work-fold[open] .quote-work-total { visibility: hidden; }
 .qi-row { min-height: 52px; }
+
+/* Treatment plan: steps as text, time and service period as chips. */
+.qp-body { display: flex; flex-direction: column; gap: 12px; }
+.qp-body > .quote-text-btn { margin-top: -4px; }
+.qp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.qp-chip {
+  min-height: 40px; padding: 8px 12px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface2); color: var(--text2);
+  font: 600 13px 'Inter', sans-serif; cursor: pointer;
+}
+.qp-chip.on { background: rgba(var(--accent-rgb), 0.12); border-color: rgba(var(--accent-rgb), 0.55); color: var(--accent2); }
+.qp-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

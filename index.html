@@ -305,6 +305,14 @@
           <button class="quote-text-btn" onclick="rebuildQuoteFromReport()">Start the lines again from the report</button>
         </details>
 
+        <details class="quote-card quote-fold" id="quotePlanFold" ontoggle="this.querySelectorAll('.quote-textarea').forEach(fitQuoteText)">
+          <summary>
+            <span class="quote-fold-text"><span class="quote-card-title">Treatment plan</span><span class="quote-fold-sub" id="quotePlanSub"></span></span>
+            <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <div id="quotePlanBody" class="qp-body"></div>
+        </details>
+
         <details class="quote-card quote-fold" id="quoteDetailsFold" ontoggle="this.querySelectorAll('.quote-textarea').forEach(fitQuoteText)">
           <summary>
             <span class="quote-fold-text"><span class="quote-card-title">Client and quote details</span><span class="quote-fold-sub" id="quoteDetailsSub"></span></span>

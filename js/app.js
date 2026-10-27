@@ -1618,11 +1618,11 @@ function lookupSpecies(raw) {
 }
 
 const SECTIONS = {
-  property:        { fields:['structureType','height','occupancyStatus','furnishing','peoplePresent','weatherConditions','temperature','humidity','rainLast24h','recentWeather','wallConstruction','roofType','floorType','facadeDirection','constructionEra','standard','toolsUsed'], total:17 },
+  property:        { fields:['structureType','height','occupancyStatus','furnishing','peoplePresent','weatherConditions','temperature','humidity','rainLast24h','recentWeather','wallConstruction','roofType','floorType','facadeDirection','constructionEra','siteSurroundings','siteSlope','termiteHistory','standard','toolsUsed'], total:20 },
   obstructions:    { fields:['areaStatus'], total:1 },
   restrictions:    { fields:['hinderedAreas','hinderedAreasDetail','noAccessAreas','highRiskAreas','invasiveInspection','invasiveInspectionDetails'], total:2 },
   findings:        { fields:['findings','borerActivity','decayFound','delignification','previousTreatment','previousTreatmentDetails'], total:4 },
-  conducive:       { fields:['waterLeaks','moistureReadings','leakLocation','siteDrainage','subfloorDrainage','subfloorVentilation','timberSoil','slabEdge','weepHoles','antCapping','antCappingDetails','nonDurableTimber','nonDurableTimberDetails'], total:6 },
+  conducive:       { fields:['waterLeaks','moistureReadings','leakLocation','siteDrainage','subfloorDrainage','subfloorVentilation','mouldSeen','mouldWhere','timberSoil','slabEdge','weepHoles','antCapping','antCappingDetails','nonDurableTimber','nonDurableTimberDetails'], total:6 },
   recommendations: { fields:['riskLevel','treatmentRecommended','treatmentType','inspectionFrequency','otherRecommendations'], total:4 },
   photos:          { fields:['photos'], total:1 },
   signoff:         { fields:['inspectorLicence','inspectorSignature','agreement'], total:3 }
@@ -1649,12 +1649,12 @@ THE ONE RULE: a field holds only what the inspector said or plainly meant. Never
 
 FIELDS (every one null unless the note gives it):
 {"propertyStreetAddress":string,"propertySuburb":string,"propertyState":"NSW"|"VIC"|"QLD"|"WA"|"SA"|"TAS"|"ACT"|"NT","propertyPostcode":string,"clientName":string,"inspectionType":"Annual — Existing Building"|"Pre-Purchase — Timber Pest"|"Pre-Purchase — Combined Building & Pest"|"New Construction — Completion"|"Treatment Follow-Up"|"Re-inspection"|"Insurance / Legal",
-"structureType":string,"height":string,"wallConstruction":string,"roofType":string,"floorType":string,"facadeDirection":string,"constructionEra":"Pre-1920s"|"1920s-1940s"|"1945-1965"|"1965-1985"|"1985-2003"|"Post-2003","occupancyStatus":string,"furnishing":string,"peoplePresent":string,"weatherConditions":string,"temperature":string,"humidity":string,"rainLast24h":string,"recentWeather":string,"toolsUsed":string,
+"structureType":string,"height":string,"wallConstruction":string,"roofType":string,"floorType":string,"facadeDirection":string,"constructionEra":"Pre-1920s"|"1920s-1940s"|"1945-1965"|"1965-1985"|"1985-2003"|"Post-2003","occupancyStatus":string,"furnishing":string,"peoplePresent":string,"weatherConditions":string,"temperature":string,"humidity":string,"rainLast24h":string,"recentWeather":string,"toolsUsed":string,"siteSurroundings":string,"siteSlope":string,"termiteHistory":string,
 "existingSystem":string,"existingSystemOther":string,"durableNoticePresent":"YES"|"NO","hardLandscaping":"YES"|"NO","zone25mmVisible":"YES"|"NO","softLandscaping":"YES"|"NO","zone75mmVisible":"YES"|"NO","antCapSoldered":"YES"|"NO"|"N/A",
 "areaStatus":{"interior"|"exterior"|"subfloor"|"roofvoid"|"outbuildings"|"site"|"fences"|"retainingwalls"|"landscapingtimbers":"INSPECTED"|"PARTIAL"|"NOT"|"NA"},"areaResult":{same area keys:"CLEAR"|"FOUND"},"obstructions":string,"restrictedAccess":string,"noAccessAreas":string,"highRiskAreas":string,"hinderedAreas":string,"hinderedAreasDetail":string,
 "findings":[{"termiteActivity":"ACTIVE"|"INACTIVE"|"NONE","species":string,"damageDescription":string,"activityLocation":string,"timberAffected":string,"nestLocated":"YES"|"NO","structuralConcern":"YES"|"NO"}],
 "borerActivity":"ACTIVE"|"INACTIVE"|"NONE","borerFindings":[{"borerActivity":"ACTIVE"|"INACTIVE","borerType":string,"location":string,"timberAffected":string,"description":string,"structuralConcern":"YES"|"NO"}],"decayFound":"YES"|"NO","decayDetails":string,"decayWhere":string,"delignification":"YES"|"NO","delignificationDetails":string,"delignificationWhere":string,"previousTreatment":"YES"|"NO","previousTreatmentDetails":string,"previousTreatmentWhere":string,
-"moistureReadings":"YES"|"NO","waterLeaks":"YES"|"NO","leakLocation":string,"moistureMeterReadings":[{"location":string,"reading":string}],"timberSoil":"YES"|"NO","slabEdge":"CLEAR"|"OBSTRUCTED","weepHoles":"CLEAR"|"BRIDGED"|"NONE","siteDrainage":"ADEQUATE"|"POOR","subfloorDrainage":"ADEQUATE"|"POOR","antCapping":"INTACT"|"GAPS"|"NONE","antCappingDetails":string,"subfloorVentilation":"ADEQUATE"|"POOR","nonDurableTimber":"YES"|"NO","nonDurableTimberDetails":string,"nonDurableTimberWhere":string,
+"moistureReadings":"YES"|"NO","waterLeaks":"YES"|"NO","mouldSeen":"YES"|"NO","mouldWhere":string,"leakLocation":string,"moistureMeterReadings":[{"location":string,"reading":string}],"timberSoil":"YES"|"NO","slabEdge":"CLEAR"|"OBSTRUCTED","weepHoles":"CLEAR"|"BRIDGED"|"NONE","siteDrainage":"ADEQUATE"|"POOR","subfloorDrainage":"ADEQUATE"|"POOR","antCapping":"INTACT"|"GAPS"|"NONE","antCappingDetails":string,"subfloorVentilation":"ADEQUATE"|"POOR","nonDurableTimber":"YES"|"NO","nonDurableTimberDetails":string,"nonDurableTimberWhere":string,
 "riskLevel":"LOW"|"MEDIUM"|"HIGH","treatmentRecommended":"YES"|"NO","treatmentType":string,"inspectionFrequency":string,"invasiveInspection":"YES"|"NO","invasiveInspectionDetails":string,"otherRecommendations":string}
 
 DROPDOWN FIELDS: the app shows these as pick-lists. Return the list value EXACTLY as written below when the inspector's words fit one; when they describe something the list cannot express, return their words instead (never a list value that adds a fact they did not state).
@@ -1670,6 +1670,9 @@ DROPDOWN FIELDS: the app shows these as pick-lists. Return the list value EXACTL
 - weatherConditions: "Fine and dry" | "Overcast" | "Light rain" | "Heavy rain" | "Humid" | "Windy".
 - recentWeather: the weather over the past weeks, only when the inspector describes it: "Normal for the season" | "Prolonged dry period" | "Prolonged wet period". "Hasn't rained in weeks" is "Prolonged dry period"; "rained all week" or "a wet month" is "Prolonged wet period".
 - toolsUsed: the tools the inspector says they used, as a short list in this order: moisture meter, sounding tool, thermal camera, movement detector, e.g. "Moisture meter and sounding tool" or "Moisture meter, sounding tool and thermal camera". A Termatrac is a movement detector; "tapped the timbers" or "sounded" means a sounding tool. Add anything else they name in their words ("torch, ladder"). Never list a tool they did not name.
+- siteSurroundings: what is around the property, only when the inspector describes it: "Suburban, few trees" | "Trees close to the building" | "Next to bushland or a reserve" | "Rural". A big gum or trees overhanging the house is "Trees close to the building"; a creek, park or bush behind is "Next to bushland or a reserve". Anything else in their words.
+- siteSlope: "Flat" | "Slopes away from the building" | "Slopes towards the building" | "Steep". Only when the inspector says how the ground falls.
+- termiteHistory: what the inspector was told or found about termites here before, only when it comes up: "None known" | "Termites reported before" | "Treated before" | "Unknown". "The owner said they had termites a few years ago" is "Termites reported before"; "had it treated in 2019" is "Treated before". Add the detail in their words when they give one, e.g. "Treated before (2019, Termidor)". Signs of a past treatment seen at the inspection are previousTreatment, not this.
 - temperature, humidity, rainLast24h: only a reading the inspector states, written as "22°C", "70%" and "5 mm" (rainLast24h "None" when they say there was no rain). Never estimate one from the weather description.
 - constructionEra: only from a stated age, decade or year ("built in the 70s" is "1965-1985", "around 1998" is "1985-2003", "2005" is "Post-2003") or from an era-specific material the inspector names (fibro sheeting, asbestos). Never date a house from its wall, floor or roof type: the era prints an asbestos warning in the report, so a guessed era is a false fact.
 - existingSystem (the TYPE of termite management system found): "Physical Barrier" | "Chemical Reticulation System" | "Termite Baiting System" | "Chemical Barrier" | "Combination System — Physical + Chemical" | "System Present — Type Unidentified". A chemical soil treatment or chemical barrier with no reticulation pipes mentioned (e.g. Termidor sprayed around the perimeter) is "Chemical Barrier". Only when a system is actually present; when the inspector says there is no system, no barrier or nothing installed, leave it null (never "No", "None", "Nil").
@@ -1737,6 +1740,7 @@ MOISTURE AND CONDUCIVE CONDITIONS:
 - siteDrainage: "ADEQUATE" when the inspector says the site drains well; "POOR" for poor, inadequate or no drainage around the building: water pooling, ponding, ground falling towards the house, soggy soil against the walls, downpipes discharging at the walls. Null when not raised.
 - subfloorDrainage: the same for the subfloor: "POOR" for water lying or pooling in the subfloor, wet or boggy subfloor soil, or drainage the inspector calls poor; "ADEQUATE" when they say it is dry and drains well. Null when not raised or there is no subfloor.
 - subfloorVentilation: "ADEQUATE" when the inspector says the subfloor is well ventilated or vents are fine; "POOR" for poor, inadequate, little or blocked ventilation, too few vents, or a stuffy, damp, humid subfloor they put down to airflow. Null when not raised or there is no subfloor.
+- mouldSeen: "YES" when the inspector mentions mould, mildew or fungal growth on surfaces (not wood decay in timber, which is decayFound); "NO" when they say they saw none. mouldWhere: where, in their words, only when mouldSeen is YES.
 - nonDurableTimber: "YES" when untreated, non-durable or softwood timber is used where it gets wet or touches the ground (pine sleepers, untreated garden edging, untreated posts, untreated decking near soil). "NO" when they say the timber there is treated or durable. nonDurableTimberDetails: what the timber is, without the place ("untreated pine sleepers"). nonDurableTimberWhere: where it is, in their words ("rear garden bed against the house"). Null when not raised. This is separate from timberSoil, and both can be YES.
 
 EXISTING SYSTEM AND VERIFICATION:
@@ -4387,7 +4391,7 @@ const CHOICE_SETS = {
   height:    [['Single storey', 'neutral'], ['Double storey', 'neutral'], ['Split level', 'neutral'], ['Multiple storey', 'neutral']],
 };
 // Report fields: the set comes from the field's key, else its edit type.
-const CHOICE_SET_BY_KEY = { borerActivity: 'borer', durableNoticePresent: 'wantyes', antCapSoldered: 'wantyes', hardLandscaping: 'neutral', softLandscaping: 'neutral' };
+const CHOICE_SET_BY_KEY = { borerActivity: 'borer', mouldSeen: 'finding', durableNoticePresent: 'wantyes', antCapSoldered: 'wantyes', hardLandscaping: 'neutral', softLandscaping: 'neutral' };
 // Choice labels that were renamed. Reports saved with the old label show
 // the new one when they are opened.
 const RENAMED_CHOICES = {
@@ -4446,6 +4450,7 @@ const DETAIL_FIELD_FOR = {
   delignification: ['delignificationDetails', ['NO', 'N/A']],
   previousTreatment: ['previousTreatmentDetails', ['NO', 'N/A']],
   nonDurableTimber: ['nonDurableTimberDetails', ['NO', 'N/A']],
+  mouldSeen: ['mouldWhere', ['NO']],
   antCapping: ['antCappingDetails', ['INTACT']],
 };
 
@@ -5479,6 +5484,9 @@ function startEdit(el, key, type) {
     peoplepresent: ['Client', 'Client and agent', 'Real estate agent', 'Vendor', 'Purchaser', 'Tenant', 'No one', OTHER_TYPE_IT],
     recentweather: ['Normal for the season', 'Prolonged dry period', 'Prolonged wet period', OTHER_TYPE_IT],
     toolsused: ['Moisture meter', 'Moisture meter and sounding tool', 'Moisture meter, sounding tool and thermal camera', 'Moisture meter, sounding tool and movement detector', 'Moisture meter, sounding tool, thermal camera and movement detector', OTHER_TYPE_IT],
+    surroundings: ['Suburban, few trees', 'Trees close to the building', 'Next to bushland or a reserve', 'Rural', OTHER_TYPE_IT],
+    siteslope: ['Flat', 'Slopes away from the building', 'Slopes towards the building', 'Steep', OTHER_TYPE_IT],
+    termitehistory: ['None known', 'Termites reported before', 'Treated before', 'Unknown', OTHER_TYPE_IT],
     occupancystatus: [
       'Occupied — residential',
       'Owner occupied',
@@ -10610,6 +10618,7 @@ function reportSummary() {
   else if (reportData.antCapping === 'NONE') conducive.push('no ant capping on piers');
   if (reportData.slabEdge === 'OBSTRUCTED') conducive.push('slab edge concealed');
   if (reportData.subfloorVentilation === 'POOR') conducive.push('poor subfloor ventilation');
+  if (reportData.mouldSeen === 'YES') conducive.push(`mould growth${reportData.mouldWhere ? ` (${reportData.mouldWhere})` : ''}`);
   if (reportData.siteDrainage === 'POOR') conducive.push('poor site drainage');
   if (reportData.subfloorDrainage === 'POOR') conducive.push('poor subfloor drainage');
   if (reportData.nonDurableTimber === 'YES') conducive.push(`untreated or non-durable timber in a damp area${whatWhere(reportData.nonDurableTimberDetails, reportData.nonDurableTimberWhere) ? ` (${whatWhere(reportData.nonDurableTimberDetails, reportData.nonDurableTimberWhere)})` : ''}`);
@@ -11759,7 +11768,7 @@ async function buildReportPdf() {
   // ── NOTES BLOCK ───────────────────────────────────────────────────────────
   const FIELD_LABELS = {
     structureType:'Structure Type', wallConstruction:'Wall Construction', floorType:'Floor Type', roofType:'Roof Type',
-    height:'Height', facadeDirection:'Orientation', occupancyStatus:'Occupancy Status', furnishing:'Furnishing', peoplePresent:'People Present', weatherConditions:'Weather Conditions', temperature:'Temperature', humidity:'Humidity', rainLast24h:'Rain in the Last 24 Hours', recentWeather:'Recent Weather', toolsUsed:'Tools Used',
+    height:'Height', facadeDirection:'Orientation', occupancyStatus:'Occupancy Status', furnishing:'Furnishing', peoplePresent:'People Present', weatherConditions:'Weather Conditions', temperature:'Temperature', humidity:'Humidity', rainLast24h:'Rain in the Last 24 Hours', recentWeather:'Recent Weather', toolsUsed:'Tools Used', siteSurroundings:'Surroundings', siteSlope:'Site Slope', termiteHistory:'Known Termite History', mouldSeen:'Mould Seen', mouldWhere:'Mould: Where',
     constructionEra:'Year / Period of Construction', standard:'Applicable Standard',
     hinderedAreas:'Hindered Access: Where', obstructions:'Areas Not Inspected', restrictedAccess:'Obstructions', hinderedAreasDetail:'What Hindered Access', noAccessAreas:'Restricted Access: Where & Why', highRiskAreas:'High Risk Areas',
     previousTreatment:'Evidence of Previous Treatment', previousTreatmentDetails:'Previous Treatment: What', previousTreatmentWhere:'Previous Treatment: Where', siteDrainage:'Site Drainage', subfloorDrainage:'Subfloor Drainage',
@@ -12049,6 +12058,9 @@ async function buildReportPdf() {
     disclaimer('Buildings from this period may contain asbestos-containing materials. This is not an asbestos inspection: nothing was tested or disturbed, and no opinion is given on whether asbestos is present. Have a licensed asbestos assessor check before any work that disturbs building materials.');
     resetRowShade();
   }
+  if (reportData.siteSurroundings) row('Surroundings', reportData.siteSurroundings);
+  if (reportData.siteSlope) row('Site Slope', reportData.siteSlope);
+  if (reportData.termiteHistory) row('Known Termite History', reportData.termiteHistory);
   row('Occupancy Status', reportData.occupancyStatus);
   if (reportData.furnishing) row('Furnishing', reportData.furnishing);
   // The furniture note follows what was recorded about furniture; without
@@ -12326,8 +12338,9 @@ async function buildReportPdf() {
     weepHoles: 'Weep holes covered by soil, paving or garden beds give termites a hidden way into the wall cavity.',
     antCapping: 'Ant caps do not stop termites, but make them build their mud leads in the open where they can be seen. Gaps or missing caps let them pass unseen.',
     nonDurableTimber: 'Untreated or non-durable timber in damp areas is readily attacked by termites and wood decay.',
+    mouldSeen: 'Mould is a sign of damp conditions, which attract termites and let wood decay start. This is not a mould inspection, and no opinion is given on the mould itself.',
   };
-  const ADVERSE = { waterLeaks: ['YES'], moistureReadings: ['YES'], siteDrainage: ['POOR'], subfloorDrainage: ['POOR'], subfloorVentilation: ['POOR'],
+  const ADVERSE = { waterLeaks: ['YES'], moistureReadings: ['YES'], siteDrainage: ['POOR'], subfloorDrainage: ['POOR'], subfloorVentilation: ['POOR'], mouldSeen: ['YES'],
     timberSoil: ['YES'], slabEdge: ['OBSTRUCTED'], weepHoles: ['BRIDGED'], antCapping: ['GAPS', 'NONE'], nonDurableTimber: ['YES'] };
   function condRow(label, key, shown) {
     const v = reportData[key];
@@ -12359,6 +12372,8 @@ async function buildReportPdf() {
   condRow('Site Drainage', 'siteDrainage');
   condRow('Subfloor Drainage', 'subfloorDrainage');
   condRow('Subfloor Ventilation', 'subfloorVentilation');
+  if (reportData.mouldSeen) condRow('Mould Seen', 'mouldSeen');
+  if (reportData.mouldWhere) row('Mould: Where', reportData.mouldWhere);
   gap(4);
 
   // ── Construction group ─────────────────────────────────────────────────

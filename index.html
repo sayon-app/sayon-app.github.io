@@ -1497,6 +1497,12 @@
             <div class="field field-wide"><div class="field-label">Re-inspection Frequency</div><div class="field-val" id="f-inspectionFrequency" onclick="startEdit(this,'inspectionFrequency','reinspection')">—</div></div>
             <div class="field field-wide"><div class="field-label">Other Recommendations</div><div class="field-val" id="f-otherRecommendations" onclick="startEdit(this,'otherRecommendations','text')">—</div></div>
           </div>
+          <!-- Ready-made lines: a tap adds or removes one; renderRecLines(). -->
+          <div class="rec-lines">
+            <div class="rec-lines-head"><span>Common recommendations</span><small id="recLinesCount">Tap to add to the report</small></div>
+            <div class="rec-lines-list" id="recLines"></div>
+            <ul class="rec-lines-added" id="recLinesAdded" hidden></ul>
+          </div>
           <div class="warn-note note-info"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> All recommendations must be verified by the licensed inspector before the report is issued, in accordance with the applicable Australian Standard.</div>
         
 

@@ -4692,6 +4692,46 @@ body:not(.dark-screen) .choice-card { transition: background-color 0.3s, border-
 .area-where .link-btn { display: inline; min-height: 0; margin: 0; padding: 0; font-size: inherit; }
 .area-status-btn { font-size: 12px; line-height: 1.2; }
 
+/* Areas on a side line, like a job's steps: a dot per area shows its status
+   (tick, amber tick for limits, cross, dash for not applicable, or its
+   number while unmarked), and the line turns teal past each marked area. */
+.areas-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; width: 100%; margin-top: 2px; }
+.areas-bar > * { white-space: nowrap; }
+.areas-progress { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); font-variant-numeric: tabular-nums; }
+#areaChecklist { gap: 10px; }
+.area-node { position: relative; padding-left: 30px; }
+.area-node::before {
+  content: ''; position: absolute; left: 9px; top: 36px; bottom: -24px; width: 2px;
+  border-radius: 2px; background: var(--border); transition: background 0.2s;
+}
+.area-node:last-child::before { display: none; }
+.area-node[class*="area-node-"]::before { background: rgba(var(--accent-rgb), 0.55); }
+.area-node-dot {
+  position: absolute; left: 0; top: 14px; width: 20px; height: 20px; box-sizing: border-box; border-radius: 99px;
+  border: 2px solid var(--border); background: var(--surface); color: var(--text3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.area-node-inspected .area-node-dot { background: var(--accent); border-color: var(--accent); color: #fff; }
+.area-node-partial .area-node-dot { background: var(--yellow); border-color: var(--yellow); color: #fff; }
+.area-node-not .area-node-dot { background: var(--risk); border-color: var(--risk); color: #fff; }
+.area-node-na .area-node-dot { border-style: dashed; border-color: var(--text3); color: var(--text2); font-size: 13px; }
+.area-node.open .area-node-dot { box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.16); }
+.area-node:not([class*="area-node-"]).open .area-node-dot { border-color: var(--accent); color: var(--accent2); }
+
+/* Inside an open area: one card, sections split by hairlines, no boxes in boxes. */
+#areaChecklist .obs-zone-panel { border-radius: 12px; }
+#areaChecklist .obs-zone-panel[open] { background: var(--surface); box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 14px -6px rgba(15,23,42,0.10); }
+#areaChecklist .area-sum-name { font-size: 14.5px; letter-spacing: -0.01em; }
+#areaChecklist .area-status { gap: 5px; padding: 12px 10px; }
+#areaChecklist .area-status-btn { padding: 7px 2px; font-size: 11.5px; letter-spacing: -0.01em; white-space: nowrap; }
+#areaChecklist .area-result-label { padding: 0 12px 8px; }
+#areaChecklist .obs-reasons { margin: 0; padding: 12px 12px 0; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: none; }
+#areaChecklist .obs-reasons .obs-items { padding: 8px 0 12px; }
+#areaChecklist .area-where { padding: 10px 12px 12px; border-top: 1px solid var(--border); }
+@media (min-width: 900px) { #areaChecklist .area-status, #areaChecklist .area-result { max-width: 640px; } }
+
 /* Address suggestions under the street address box */
 .addr-wrap { position: relative; }
 .addr-suggest { display: none; position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 50;

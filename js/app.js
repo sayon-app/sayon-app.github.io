@@ -4392,7 +4392,7 @@ const CHOICE_SETS = {
   height:    [['Single storey', 'neutral'], ['Double storey', 'neutral'], ['Split level', 'neutral'], ['Multiple storey', 'neutral']],
 };
 // Report fields: the set comes from the field's key, else its edit type.
-const CHOICE_SET_BY_KEY = { borerActivity: 'borer', mouldSeen: 'finding', durableNoticePresent: 'wantyes', antCapSoldered: 'wantyes', hardLandscaping: 'neutral', softLandscaping: 'neutral' };
+const CHOICE_SET_BY_KEY = { borerActivity: 'borer', mouldSeen: 'finding', durableNoticePresent: 'wantyes', antCapSoldered: 'wantyes', zone25mmVisible: 'wantyes', zone75mmVisible: 'wantyes', hardLandscaping: 'neutral', softLandscaping: 'neutral' };
 // Choice labels that were renamed. Reports saved with the old label show
 // the new one when they are opened.
 const RENAMED_CHOICES = {
@@ -4590,7 +4590,7 @@ function findingCardHTML(finding, index, total) {
             <div class="field field-wide"><div class="field-label">Location of Activity</div>${pickFieldHTML(id, 'activityLocation', PLACES, finding.activityLocation)}</div>
             <div class="field field-wide"><div class="field-label">Timber Affected</div>${pickFieldHTML(id, 'timberAffected', TIMBER_PARTS, finding.timberAffected)}</div>
             <div class="field field-wide"><div class="field-label">Damage Description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${pickFieldHTML(id, 'damageDescription', TERMITE_SIGNS, finding.damageDescription)}</div>
-            <div class="field"><div class="field-label">Species / Genus</div>${fv('species','specieslist')}</div>
+            <div class="field field-wide"><div class="field-label">Species / Genus</div>${fv('species','specieslist')}</div>
             <div class="field choice-field"><div class="field-label">Termite Nest Found?</div>${fv('nestLocated','yesno')}</div>
             <div class="field choice-field"><div class="field-label">Refer to a Builder or Engineer?</div>${fv('structuralConcern','yesno')}</div>
             <div class="field field-wide finding-photos"><div class="field-label">Photos of this finding</div>${spotPhotosHTML(findingPhotoSection(id))}</div>
@@ -6099,6 +6099,7 @@ function renderFieldGroups() {
 }
 
 function foldAnsweredGroups(stepId) {
+  renderFieldGroups();
   const step = stepOf(stepId);
   step.sections.forEach(s => {
     document.querySelectorAll(`#section-${s} details.fgroup`).forEach(group => {
@@ -9416,7 +9417,7 @@ function loadDraft() {
       const count = cfg.fields.filter(k => isFieldFilled(k)).length;
       if (count > bestCount) { bestCount = count; bestSection = sec; }
     });
-    showSection(bestSection);
+    goStep(stepOf(bestSection).id);
 
     return true;
   } catch (e) {
@@ -9664,7 +9665,7 @@ function loadReport(id, quiet) {
     const count = cfg.fields.filter(k => isFieldFilled(k)).length;
     if (count > bestCount) { bestCount = count; bestSection = sec; }
   });
-  showSection(bestSection);
+  goStep(stepOf(bestSection).id);
   lastReportSig = reportSig();
   saveDraft();
 
@@ -10882,7 +10883,7 @@ function reportPrepGaps() {
     `<button class="link-btn" onclick="fixSendGap('inspected')">Mark the rest as inspected</button>` +
     `<button class="link-btn" onclick="fixSendGap('na')">Mark the rest not applicable</button>`);
   const noResult = areasMissingResult();
-  if (noResult.length) push(`${noResult.length} area${noResult.length === 1 ? ' has' : 's have'} no result for what was found there (${noResult.map(z => OBS_ZONES[z].label).join(', ')})`,
+  if (noResult.length) push(`${noResult.length} area${noResult.length === 1 ? ' has' : 's have'} no result for what was found there (${noResult.map(z => OBS_ZONES[z].label.replace(/^The /, '')).join(', ')})`,
     `<button class="link-btn" onclick="fixSendGap('clear')">Mark the rest as nothing found</button>`);
   areasEvidenceUnlinked().forEach(z => push(`${OBS_ZONES[z].label}: marked "evidence found", but no finding mentions it`,
     `<button class="link-btn" onclick="closeSendReview(); addFindingForArea('${z}')">Add finding</button>`));
@@ -11697,7 +11698,8 @@ async function buildReportPdf() {
   // ── DATA ROW ──────────────────────────────────────────────────────────────
   let _rowShade = false;
   // invert: for questions where YES is the good answer (e.g. "inspection
-  // zone visible"), so NO shows red and YES green.
+  // zone visible"), so NO shows red and YES green. 'plain' prints the
+  // answer in ink, for a fact that is neither good nor bad.
   function row(label, value, invert) {
     const v     = String(value || '');
     const isEmpty = !value && value !== 0;
@@ -11724,6 +11726,8 @@ async function buildReportPdf() {
     // Value — colour-coded
     if (isEmpty) {
       doc.setTextColor(...C.inkMuted); doc.setFont('helvetica','italic');
+    } else if (invert === 'plain') {
+      doc.setTextColor(...C.ink); doc.setFont('helvetica','bold');
     } else if (invert && (v === 'YES' || v === 'NO')) {
       doc.setTextColor(...(v === 'NO' ? C.danger : C.safe)); doc.setFont('helvetica','bold');
     } else if (['YES','HIGH','OBSTRUCTED','BRIDGED','ACTIVE'].includes(v)) {
@@ -12236,9 +12240,9 @@ async function buildReportPdf() {
   if (reportData.existingSystemOther) row('Specific System Name', reportData.existingSystemOther);
   row('Durable Notice Present (Meter Box)', reportData.durableNoticePresent, true);
   if (hasIdentifiedSystem(reportData.existingSystem)) {
-    row('Hard Landscaping Adjacent', reportData.hardLandscaping);
+    row('Hard Landscaping Adjacent', reportData.hardLandscaping, 'plain');
     row('25mm Inspection Zone Visible', reportData.zone25mmVisible, true);
-    row('Soft Landscaping Adjacent', reportData.softLandscaping);
+    row('Soft Landscaping Adjacent', reportData.softLandscaping, 'plain');
     row('75mm Inspection Zone Visible', reportData.zone75mmVisible, true);
     row('Ant Cap / Strip Shield Joins Soldered', reportData.antCapSoldered, true);
     const concerns = [];

@@ -350,7 +350,7 @@ function renderTreatmentProducts(products) {
       <div class="job-field">
         <div class="job-field-label">Batch No.</div>
         <div class="treat-batch">
-          <input class="job-input" data-f="batch" value="${esc(p.batch || '')}" placeholder="Printed on the drum or container">
+          <input class="job-input" data-f="batch" value="${esc(p.batch || '')}" placeholder="On the drum">
           <label class="quote-link-btn treat-label-btn" onclick="if (event.target === this) { event.preventDefault(); choosePhotoSource(this.querySelector('input')); }">${p.labelPhoto ? 'Retake label photo' : 'Photo of the label'}
             <input type="file" accept="image/*" hidden onchange="loadTreatmentLabelPhoto(this, ${i})">
           </label>

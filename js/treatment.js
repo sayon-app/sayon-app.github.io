@@ -188,15 +188,26 @@ function renderTreatmentBlock(q) {
   if (!t) {
     return `<button class="quote-btn primary quote-step-btn" onclick="openTreatmentRecord()">Treatment done? Record it</button>`;
   }
+  const many = installedSystems(t).length > 0;
+  const docs = many ? 'certificates' : 'certificate';
+  const who = (q.client || '').trim();
+  const to = (q.clientEmail || '').trim();
   return `<div class="quote-step">
       <div><strong>Treatment done</strong> on ${escapeHtml(formatAnswerDate(t.date))}${t.technician ? ` by ${escapeHtml(t.technician)}` : ''}</div>
       ${t.nextInspection ? `<div class="quote-answer-note">Next inspection due ${escapeHtml(formatAnswerDate(t.nextInspection))}</div>` : ''}
+    </div>
+    <div class="qp-cert ${q.certificateSentAt ? 'sent' : ''}">
+      <div class="qp-cert-title">${many ? 'Treatment and installation certificates' : 'Treatment certificate'}</div>
+      <p class="qp-cert-text">${q.certificateSentAt
+        ? `Emailed ${escapeHtml(formatIssueDate(q.certificateSentAt))}${who ? ` to ${escapeHtml(who)}` : ''}.`
+        : `The PDF${many ? 's' : ''} that record${many ? '' : 's'} what was applied and where, for ${who ? escapeHtml(who) + '\'s' : 'the client\'s'} records. Emailing ${many ? 'them' : 'it'} finishes the job.`}</p>
+      ${to && !q.certificateSentAt ? `<p class="qp-cert-to">Goes to ${escapeHtml(to)}</p>` : ''}
       ${treatmentSourceReport().propertyState === 'QLD' ? '<div class="quote-answer-note">In Queensland, email alone isn\'t enough: also hand the client a printed copy, or leave one in their letterbox.</div>' : ''}
       <div class="quote-step-actions">
-        <button class="quote-btn primary" onclick="emailTreatmentCertificate()">Email ${installedSystems(t).length ? 'certificates' : 'certificate'}</button>
+        <button class="quote-btn ${q.certificateSentAt ? '' : 'primary'} qp-cert-email" onclick="emailTreatmentCertificate()">${q.certificateSentAt ? 'Email again' : `Email ${docs}${who ? ' to ' + escapeHtml(who.split(' ')[0]) : ''}`}</button>
         <button class="quote-link-btn" onclick="downloadTreatmentCertificate()">Certificate PDF</button>
-        ${installedSystems(t).length ? '<button class="quote-link-btn" onclick="downloadTreatmentCertificate(true)">Installation certificate PDF</button>' : ''}
-        <button class="quote-link-btn" onclick="openTreatmentRecord()">Edit</button>
+        ${many ? '<button class="quote-link-btn" onclick="downloadTreatmentCertificate(true)">Installation certificate PDF</button>' : ''}
+        <button class="quote-link-btn" onclick="openTreatmentRecord()">Edit treatment</button>
       </div>
     </div>`;
 }
@@ -479,7 +490,7 @@ function emailTreatmentCertificate() {
   if (!q || !q.treatment) return;
   if (!jsPDF) {
     ensureJsPDFLoaded()
-      .then(() => showToast('Ready — tap Email certificate again', 'info'))
+      .then(() => showToast('Ready. Tap Email again to send it', 'info'))
       .catch(e => showToast((e && e.message) || 'Could not load the PDF tools', 'error'));
     return;
   }

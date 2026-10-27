@@ -968,8 +968,10 @@ function renderQuoteAnswer() {
   }
 
   const treatment = answered && a.status === 'accepted'
-    ? { title: 'Treatment', state: q.treatment ? 'done' : 'now',
-        text: q.treatment ? `Certificate ${q.certificateSentAt ? 'sent ' + esc(formatIssueDate(q.certificateSentAt)) : 'not sent yet'}.` : 'Record it once the work is done.',
+    ? { title: 'Treatment', state: q.treatment && q.certificateSentAt ? 'done' : 'now',
+        text: !q.treatment ? 'Record it once the work is done.'
+          : q.certificateSentAt ? `Finished. Certificate emailed ${esc(formatIssueDate(q.certificateSentAt))}.`
+          : 'Recorded. One thing left: email the client their certificate.',
         extra: renderTreatmentBlock(q) }
     : answered ? { title: 'Treatment', state: 'skip', text: 'Not needed. The quote was declined.' }
     : { title: 'Treatment', state: 'todo', text: 'After the client accepts.' };

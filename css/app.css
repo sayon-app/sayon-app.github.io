@@ -3396,44 +3396,91 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 .dash-detail.open .dash-detail-sheet { transform: none; }
 .dash-detail-grab { width: 40px; height: 4px; margin: 0 auto 14px; border-radius: 99px; background: var(--border); }
 .dash-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.dash-detail-head-text { min-width: 0; }
+.dash-detail-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; margin-bottom: 10px;
+  border-radius: 99px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.2px;
+  background: rgba(var(--accent-rgb), 0.12); color: var(--accent2);
+}
+.dash-detail-chip::before { content: ''; width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
+.dash-detail-chip.waiting { background: rgba(255,182,72,0.16); color: var(--yellow-text); }
+.dash-detail-chip.done { background: var(--surface2); color: var(--text2); }
 .dash-detail-addr {
   margin: 0; font-family: 'Space Grotesk', sans-serif;
-  font-size: 21px; line-height: 1.2; font-weight: 800; letter-spacing: -0.3px; color: var(--text);
+  font-size: 22px; line-height: 1.2; font-weight: 800; letter-spacing: -0.3px; color: var(--text);
 }
-.dash-detail-meta { margin-top: 4px; font-size: 13px; color: var(--text3); }
 .dash-detail-close {
   flex-shrink: 0; width: 40px; height: 40px; border-radius: 99px;
   border: 1px solid var(--border); background: var(--surface2); color: var(--text2);
   display: flex; align-items: center; justify-content: center; cursor: pointer;
 }
 
-.dash-timeline { list-style: none; margin: 20px 0 22px; padding: 0; }
-.dash-timeline li { position: relative; padding: 0 0 18px 32px; }
+/* Client, quote and date in one row of small facts. */
+.dash-detail-facts {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 16px 0 0;
+  border: 1px solid var(--border); border-radius: 14px; background: var(--surface2);
+}
+.dash-detail-facts > div { min-width: 0; padding: 10px 12px; }
+.dash-detail-facts > div + div { border-left: 1px solid var(--border); }
+.dash-detail-facts dt { font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text3); }
+.dash-detail-facts dd { margin: 3px 0 0; font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+/* What to do next, with why, above the progress. */
+.dash-next {
+  margin-top: 14px; padding: 16px; border-radius: 16px;
+  background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.10), rgba(var(--accent-rgb), 0.03));
+  border: 1px solid rgba(var(--accent-rgb), 0.28);
+}
+.dash-next.done { background: var(--surface2); border-color: var(--border); }
+.dash-next.waiting { background: rgba(255,182,72,0.08); border-color: rgba(255,182,72,0.35); }
+.dash-next-label { font-size: 11px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: var(--accent2); }
+.dash-next.done .dash-next-label { color: var(--text3); }
+.dash-next.waiting .dash-next-label { color: var(--yellow-text); }
+.dash-next-title { margin-top: 4px; font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: -0.2px; color: var(--text); }
+.dash-next-hint { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--text2); }
+.dash-next .dash-detail-primary { margin-top: 14px; }
+
+.dash-detail-section {
+  display: flex; justify-content: space-between; align-items: baseline; margin: 22px 0 10px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text3);
+}
+.dash-detail-section span + span { letter-spacing: 0; text-transform: none; font-size: 12.5px; font-weight: 600; }
+
+/* The side line: numbered dots, ticked when done, joined by a line that fills in teal. */
+.dash-timeline { list-style: none; margin: 0; padding: 0; }
+.dash-timeline li { position: relative; padding: 0 0 10px 40px; }
 .dash-timeline li:last-child { padding-bottom: 0; }
 .dash-timeline li::before {
-  content: ''; position: absolute; left: 6px; top: 18px; bottom: -2px; width: 2px;
+  content: ''; position: absolute; left: 11px; top: 30px; bottom: 2px; width: 2px;
   border-radius: 2px; background: var(--border);
 }
 .dash-timeline li:last-child::before { display: none; }
 .dash-timeline li.done::before { background: var(--accent); }
 .dash-timeline-dot {
-  position: absolute; left: 0; top: 2px; width: 14px; height: 14px; border-radius: 99px;
+  position: absolute; left: 0; top: 8px; width: 24px; height: 24px; border-radius: 99px;
   border: 2px solid var(--border); background: var(--surface); box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11.5px; font-weight: 800; color: var(--text3); font-variant-numeric: tabular-nums;
 }
-.dash-timeline li.done .dash-timeline-dot { background: var(--accent); border-color: var(--accent); }
-.dash-timeline li.now .dash-timeline-dot { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.16); }
-.dash-timeline li.bad .dash-timeline-dot { background: var(--risk); border-color: var(--risk); }
-.dash-timeline li.skip { opacity: 0.5; }
+.dash-timeline li.done .dash-timeline-dot { background: var(--accent); border-color: var(--accent); color: #fff; }
+.dash-timeline li.now .dash-timeline-dot { border-color: var(--accent); color: var(--accent2); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.16); }
+.dash-timeline li.bad .dash-timeline-dot { background: var(--risk); border-color: var(--risk); color: #fff; }
+.dash-timeline li.skip .dash-timeline-dot { border-style: dashed; }
+.dash-timeline li.skip { opacity: 0.55; }
 .dash-timeline-btn {
-  position: relative; display: block; width: calc(100% + 8px); margin: -6px 0 -6px -8px; padding: 6px 34px 6px 8px;
-  border: none; border-radius: 10px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
-  min-height: 44px; box-sizing: border-box;
+  position: relative; display: block; width: 100%; padding: 9px 36px 9px 12px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer;
+  min-height: 52px; box-sizing: border-box; transition: border-color 0.15s, background 0.15s;
 }
-.dash-timeline-btn:hover, .dash-timeline-btn:focus-visible { background: rgba(var(--accent-rgb), 0.08); outline: none; }
-.dash-timeline-btn:active { background: rgba(var(--accent-rgb), 0.14); }
-.dash-timeline-chev { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: var(--text3); }
+.dash-timeline li.now .dash-timeline-btn { border-color: rgba(var(--accent-rgb), 0.45); }
+.dash-timeline-btn:hover, .dash-timeline-btn:focus-visible { background: rgba(var(--accent-rgb), 0.06); border-color: rgba(var(--accent-rgb), 0.45); outline: none; }
+.dash-timeline-btn:active { background: rgba(var(--accent-rgb), 0.12); }
+.dash-timeline-chev { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text3); }
 .dash-timeline-label { display: block; font-size: 14px; font-weight: 700; color: var(--text); }
-.dash-timeline-text { display: block; margin-top: 2px; font-size: 13px; color: var(--text2); }
+.dash-timeline-text { display: block; margin-top: 1px; font-size: 12.5px; font-weight: 500; color: var(--text3); }
+.dash-timeline li.done .dash-timeline-text { color: var(--accent2); }
+.dash-timeline li.now .dash-timeline-text { color: var(--text2); }
+.dash-timeline li.bad .dash-timeline-text { color: var(--risk); }
 .dash-timeline li.now .dash-timeline-label { color: var(--accent2); }
 
 .dash-detail-primary {
@@ -4784,9 +4831,10 @@ body:has(#quoteScreen.open) .toast { bottom: calc(var(--tabbar-h) + var(--mic-cl
 .menu-account-actions .profile-dropdown-item { width: auto; flex: 1; justify-content: center; min-height: 40px; border: 1px solid var(--border); border-radius: 10px; }
 .sidebar.on-page .menu-account { display: none; }
 
-/* Delete sits quietly under the job's next step. */
+/* Delete sits quietly at the foot of the job sheet. */
+.dash-detail-foot { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--border); }
 .dash-detail-delete {
-  display: block; width: 100%; margin-top: 8px; min-height: 44px;
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 4px;
   border: none; background: none; cursor: pointer;
   color: var(--risk); font: 600 13px 'Inter', sans-serif;
 }
@@ -4794,3 +4842,14 @@ body:has(#quoteScreen.open) .toast { bottom: calc(var(--tabbar-h) + var(--mic-cl
 /* Generate PDF sits at the foot of the report's sign-off page; Send stays in the menu. */
 .signoff-pdf { padding: 4px 16px 30px; }
 .drawer-footer .share-btn { flex: 1; }
+
+/* The certificate on the quote's Treatment step, and its Email button lit when arriving from the dashboard. */
+.qp-cert { margin-top: 8px; padding: 12px; border-radius: 12px; border: 1px solid rgba(var(--accent-rgb), 0.35); background: var(--surface); }
+.qp-cert.sent { border-color: var(--border); }
+.qp-cert-title { font-size: 13.5px; font-weight: 700; color: var(--text); }
+.qp-cert-text { margin: 3px 0 0; font-size: 13px; line-height: 1.5; color: var(--text2); }
+.qp-cert-to { margin: 6px 0 0; font-size: 12.5px; font-weight: 600; color: var(--text3); }
+.qp-cert .quote-step-actions { margin-top: 10px; }
+.qp-cert-email.flash { animation: qp-flash 0.8s ease-in-out 3; }
+@keyframes qp-flash { 50% { box-shadow: 0 0 0 6px rgba(var(--accent-rgb), 0.3); } }
+@media (prefers-reduced-motion: reduce) { .qp-cert-email.flash { animation: none; } }

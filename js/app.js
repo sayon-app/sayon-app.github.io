@@ -9771,34 +9771,44 @@ function dashboardJob(r, quotes) {
   const reportDone = reportSent || !!d.pdfAt || (r.completion || 0) >= 100;
   const needsQuote = d.treatmentRecommended === 'YES';
   const total = hasQuote ? quoteTotals(q).total : 0;
-  let group, status, next = null;
+  const who = (r.client || '').trim() || 'the client';
+  let group, status, hint = '', next = null;
   if (!reportDone) {
     group = 'todo'; status = 'Finish the report';
+    hint = 'Fill in the rest of the report, then make the PDF from the Sign-Off page.';
     next = { label: 'Open report', to: 'report' };
   } else if (!hasQuote && needsQuote) {
     group = 'todo'; status = 'Write the quote';
-    next = { label: 'Move to quote', to: 'quote' };
+    hint = 'The report recommends a treatment. Price the work for ' + who + '.';
+    next = { label: 'Write the quote', to: 'quote' };
   } else if (!hasQuote) {
     group = reportSent ? 'done' : 'todo';
     status = reportSent ? 'No quote needed' : 'Send the report';
+    hint = reportSent ? 'The report has gone to ' + who + ' and no treatment was recommended.' : 'The report is ready. Send it to ' + who + '.';
     if (!reportSent) next = { label: 'Open report', to: 'report' };
   } else if (!a) {
     group = q.sentAt ? 'waiting' : 'todo';
     status = q.sentAt ? `Quote sent ${dashDate(q.sentAt)}` : 'Send the quote';
-    next = { label: q.sentAt ? 'Record their answer' : 'Send quote', to: 'quote' };
+    hint = q.sentAt ? 'Waiting on ' + who + '. When they answer, record it on the quote.' : 'The quote is priced. Send it to ' + who + '.';
+    next = { label: q.sentAt ? 'Record their answer' : 'Send the quote', to: q.sentAt ? 'answer' : 'quote' };
   } else if (a.stale) {
     group = 'todo'; status = 'Quote changed, get a new answer';
+    hint = 'The quote changed after ' + who + ' answered. Send the new version and record their answer again.';
     next = { label: 'Open quote', to: 'quote' };
   } else if (a.status !== 'accepted') {
     group = 'done'; status = 'Quote declined';
+    hint = who.charAt(0).toUpperCase() + who.slice(1) + ' declined the quote, so there\'s nothing more to do.';
   } else if (!q.treatment) {
     group = 'todo'; status = 'Record the treatment';
+    hint = who.charAt(0).toUpperCase() + who.slice(1) + ' accepted the quote. Once the work is done, record what was used and where.';
     next = { label: 'Record treatment', to: 'treatment' };
   } else if (!q.certificateSentAt) {
-    group = 'todo'; status = 'Send the certificate';
-    next = { label: 'Send certificate', to: 'quote' };
+    group = 'todo'; status = 'Email the certificate';
+    hint = 'The treatment is recorded. Email ' + who + ' their treatment certificate, the PDF that records what was applied and where. You\'ll see who it goes to before it sends.';
+    next = { label: 'Email the certificate', to: 'certificate' };
   } else {
     group = 'done'; status = 'Treated';
+    hint = 'Finished. ' + who.charAt(0).toUpperCase() + who.slice(1) + ' has their treatment certificate.';
   }
 
   const answered = a && !a.stale;
@@ -9808,7 +9818,7 @@ function dashboardJob(r, quotes) {
       text: d.issue ? `Completed${sentOn ? ' ' + dashDate(sentOn) : ''}` : d.sent ? `Sent ${dashDate(d.sent.at)}`
         : d.pdfAt ? `PDF made ${dashDate(d.pdfAt)}, not sent yet`
         : reportDone ? 'Ready to send' : 'In progress' },
-    { label: 'Quote', to: 'quote', state: hasQuote && q.sentAt ? 'done' : !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
+    { label: 'Quote', to: 'quote', state: hasQuote && (q.sentAt || answered) ? 'done' : !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
       text: hasQuote ? `${formatAUD(total).replace(/\.00$/, '')} · ${q.sentAt ? 'sent ' + dashDate(q.sentAt) : 'not sent yet'}`
         : reportDone && !needsQuote ? 'Not needed' : 'Not written yet' },
     { label: 'Client\'s answer', to: 'answer', state: answered ? (a.status === 'accepted' ? 'done' : 'bad') : !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
@@ -9822,8 +9832,10 @@ function dashboardJob(r, quotes) {
   steps.forEach(s => { if (s.state === 'skip') s.text = 'Not needed'; });
   // Each step just says whether it's done; the preview has the detail. A declined answer keeps its wording.
   steps.forEach(s => { if (s.state === 'done' || s.state === 'todo') s.text = s.state === 'done' ? 'Completed' : 'Not completed'; });
-  if (group !== 'done') { const s = steps.find(s => s.state === 'todo'); if (s) s.state = 'now'; }
-  return { r, q, group, status, next, steps, total, time: dashboardJobTime(r) };
+  // Recorded but the certificate hasn't gone: the treatment isn't finished.
+  if (q && q.treatment && !q.certificateSentAt && steps[3].state === 'done') Object.assign(steps[3], { state: 'now', text: 'Certificate not emailed yet' });
+  if (group !== 'done' && !steps.some(s => s.state === 'now')) { const s = steps.find(s => s.state === 'todo'); if (s) s.state = 'now'; }
+  return { r, q, group, status, hint, next, steps, total, time: dashboardJobTime(r) };
 }
 
 // A ring of four arcs, one per step, filled as the job moves along.
@@ -9932,22 +9944,43 @@ function openDashboardDetail(id) {
   const j = dashboardJobs.find(x => x.r.id === id);
   const sheet = document.getElementById('dashboardDetailSheet');
   if (!j || !sheet) return;
-  const meta = [j.r.client, dashDate(j.time)].filter(Boolean).map(escapeHtml).join(' · ');
+  const group = (DASHBOARD_TABS.find(([k]) => k === j.group) || [, ''])[1];
+  const done = j.steps.filter(s => s.state === 'done').length;
+  const icon = (d) => `<svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const dot = (s, i) => s.state === 'done' ? icon('<path d="M20 6 9 17l-5-5"/>')
+    : s.state === 'bad' ? icon('<path d="M18 6 6 18"/><path d="M6 6l12 12"/>') : i + 1;
+  const facts = [
+    ['Client', j.r.client || 'Not entered'],
+    ['Quote', j.total ? formatAUD(j.total).replace(/\.00$/, '') : 'None yet'],
+    ['Date', dashDate(j.time)],
+  ];
   sheet.innerHTML = `
     <div class="dash-detail-grab" aria-hidden="true"></div>
     <div class="dash-detail-head">
-      <div>
+      <div class="dash-detail-head-text">
+        <span class="dash-detail-chip ${j.group}">${group}</span>
         <h3 class="dash-detail-addr">${escapeHtml(j.r.address || 'No address')}</h3>
-        <div class="dash-detail-meta">${meta}</div>
       </div>
       <button type="button" class="dash-detail-close" onclick="closeDashboardDetail()" aria-label="Close">
         <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
       </button>
     </div>
+    <dl class="dash-detail-facts">
+      ${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${escapeHtml(v)}</dd></div>`).join('')}
+    </dl>
+    <section class="dash-next ${j.group}">
+      <div class="dash-next-label">${j.next ? 'Next step' : 'Where it\'s at'}</div>
+      <div class="dash-next-title">${escapeHtml(j.status)}</div>
+      ${j.hint ? `<p class="dash-next-hint">${escapeHtml(j.hint)}</p>` : ''}
+      ${j.next ? `<button type="button" class="dash-detail-primary" onclick="openDashboardJob('${j.r.id}', '${j.next.to}')">${j.next.label}</button>` : ''}
+    </section>
+    <div class="dash-detail-section">
+      <span>Progress</span><span>${done} of 4 done</span>
+    </div>
     <ol class="dash-timeline">
-      ${j.steps.map(s => `
+      ${j.steps.map((s, i) => `
         <li class="${s.state}">
-          <span class="dash-timeline-dot" aria-hidden="true"></span>
+          <span class="dash-timeline-dot" aria-hidden="true">${dot(s, i)}</span>
           <button type="button" class="dash-timeline-btn" onclick="openDashboardPeek('${j.r.id}', '${s.to}')">
             <span class="dash-timeline-label">${s.label}</span>
             <span class="dash-timeline-text">${escapeHtml(s.text)}</span>
@@ -9955,11 +9988,13 @@ function openDashboardDetail(id) {
           </button>
         </li>`).join('')}
     </ol>
-    <div class="dash-detail-actions">
-      ${j.next ? `<button type="button" class="dash-detail-primary" onclick="openDashboardJob('${j.r.id}', '${j.next.to}')">${j.next.label}</button>` : ''}
-      <button type="button" class="dash-detail-delete" onclick="closeDashboardDetail(); deleteReport('${j.r.id}')">Delete this job</button>
+    <div class="dash-detail-foot">
+      <button type="button" class="dash-detail-delete" onclick="closeDashboardDetail(); deleteReport('${j.r.id}')">
+        <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete this job
+      </button>
     </div>
   `;
+  sheet.scrollTop = 0;
   document.getElementById('dashboardDetail').classList.add('open');
 }
 
@@ -10066,9 +10101,15 @@ function openDashboardJob(id, to) {
   if (to === 'report') return;
   openQuote('app', id);
   if (to === 'treatment') openTreatmentRecord();
-  if (to === 'answer') {
+  if (to === 'answer' || to === 'certificate') {
     const card = document.getElementById('quoteAnswer');
     if (card && card.style.display !== 'none') card.scrollIntoView({ block: 'center' });
+  }
+  // The certificate's Email button, lit so it's the obvious next tap.
+  if (to === 'certificate') {
+    ensureJsPDFLoaded().catch(() => {});
+    const btn = document.querySelector('#quoteAnswer .qp-cert-email');
+    if (btn) { btn.scrollIntoView({ block: 'center' }); btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 2400); }
   }
 }
 

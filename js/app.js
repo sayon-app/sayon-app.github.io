@@ -550,7 +550,10 @@ function renderAreaChecklist() {
   migrateLegacyObstructions();
   const markAll = document.getElementById('markAllAreasBtn');
   if (markAll) markAll.hidden = Object.keys(OBS_ZONES).every(z => areaStatusOf(z));
-  wrap.innerHTML = Object.entries(OBS_ZONES).map(([zoneId, zone]) => {
+  const marked = Object.keys(OBS_ZONES).filter(z => areaStatusOf(z)).length;
+  const prog = document.getElementById('areasProgress');
+  if (prog) prog.textContent = `${marked} of ${Object.keys(OBS_ZONES).length} areas marked`;
+  wrap.innerHTML = Object.entries(OBS_ZONES).map(([zoneId, zone], i) => {
     const status = areaStatusOf(zoneId);
     const lit = status === 'PARTIAL' ? 'INSPECTED' : status;
     const statusBtns = AREA_STATUS_BUTTONS.map(([val, label]) =>
@@ -585,17 +588,29 @@ function renderAreaChecklist() {
         if (ev.length) result += `<div class="area-evidence">See ${escapeHtml(ev.join('; '))}</div>`;
       }
     }
-    return `<details class="obs-zone-panel" data-zone="${zoneId}"${areaOpen.has(zoneId) ? ' open' : ''} ontoggle="onAreaToggle('${zoneId}', this.open)">
+    // Each area sits on a side line with a dot showing its status, so with
+    // several open it's clear where one ends and the next begins.
+    const dot = { INSPECTED: AREA_DOT_TICK, PARTIAL: AREA_DOT_TICK, NOT: AREA_DOT_CROSS, NA: AREA_DOT_DASH }[status] || String(i + 1);
+    return `<div class="area-node${status ? ' area-node-' + status.toLowerCase() : ''}${areaOpen.has(zoneId) ? ' open' : ''}" data-zone-node="${zoneId}">
+      <span class="area-node-dot" aria-hidden="true">${dot}</span>
+      <details class="obs-zone-panel" data-zone="${zoneId}"${areaOpen.has(zoneId) ? ' open' : ''} ontoggle="onAreaToggle('${zoneId}', this.open)">
       <summary class="obs-zone-panel-header area-summary">${areaSummary(zoneId, zone.label.replace(/^The /, ''))}</summary>
-      <div class="area-status">${statusBtns}</div>${result}${reasons}</details>`;
+      <div class="area-status">${statusBtns}</div>${result}${reasons}</details></div>`;
   }).join('');
 }
+const AREA_DOT_TICK = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+const AREA_DOT_DASH = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M5 12h14"/></svg>';
+const AREA_DOT_CROSS = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
 
 // Each area is a row that opens when tapped, showing what's recorded so the
 // list reads at a glance. Which rows are open survives the re-render that
 // every tap does.
 const areaOpen = new Set();
-function onAreaToggle(zoneId, open) { if (open) areaOpen.add(zoneId); else areaOpen.delete(zoneId); }
+function onAreaToggle(zoneId, open) {
+  if (open) areaOpen.add(zoneId); else areaOpen.delete(zoneId);
+  const node = document.querySelector(`[data-zone-node="${zoneId}"]`);
+  if (node) node.classList.toggle('open', open);
+}
 
 function areaSummary(zoneId, name) {
   const status = areaStatusOf(zoneId);

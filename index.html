@@ -1178,9 +1178,12 @@
                under it. Rendered by renderAreaChecklist(). -->
           <div class="areas-intro">
             <p class="access-intro">Mark every area and what was found there. If something limited the inspection, tick the kind of reason. You'll say where exactly in Access.</p>
-            <button type="button" class="link-btn areas-mark-all" id="markAllAreasBtn" onclick="markRemainingAreasInspected()">Mark the rest as inspected</button>
+            <div class="areas-bar">
+              <span class="areas-progress" id="areasProgress"></span>
+              <button type="button" class="link-btn areas-mark-all" id="markAllAreasBtn" onclick="markRemainingAreasInspected()">Mark the rest as inspected</button>
+            </div>
           </div>
-          <div class="obs-panels-wrap" id="areaChecklist" style="padding:4px 14px 8px"></div>
+          <div class="obs-panels-wrap" id="areaChecklist" style="padding:4px 14px 8px 10px"></div>
 
           <div class="section-photo-widget" data-legacy-photos hidden>
             <div class="section-photo-header">

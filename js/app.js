@@ -7080,12 +7080,61 @@ function renderAllSectionPhotoGrids() {
 // Re-draws the parts of the report that aren't plain fields, after a
 // report is loaded, restored or reset.
 function renderReportWidgets() {
+  renderRecLines();
   renderPhotoGrid();
   renderAllSectionPhotoGrids();
   renderAreaChecklist();
   renderMoistureTable();
   renderPendingNotes();
   renderIssueState();
+}
+
+// ── READY-MADE RECOMMENDATIONS ─────────────────────────────────────────────
+// Lines the inspector would otherwise say on most jobs, added with a tap.
+// The report stores the text as it was when added (reportData.recLines =
+// [{ id, text }]), so a later change of wording never changes a report
+// already sent. Never a structural verdict, never a risk by species.
+const REC_LINES = [
+  ['maintain', 'Maintain the system', 'Keep the termite management system on this property maintained as its installer specifies, and follow the recommendations in this report.'],
+  ['warranty', 'Keep the warranty', 'Have the termite management system inspected and serviced as its warranty requires, so any warranty or service period stays in place.'],
+  ['expired', 'System may be expired', 'The termite management system on this property may be past its service life. Have it assessed and, if needed, re-treated or replaced.'],
+  ['install', 'Install a system', 'Have a termite management system installed to AS 3660.2, such as a chemical soil treated zone or a monitoring and baiting system. A quote can be provided.'],
+  ['zone', 'Keep inspection zones clear', 'Keep the slab edge and the inspection zones around the building clear of soil, garden beds, paving and stored items, so termite entry can be seen.'],
+  ['debris', 'Clear timber and debris', 'Remove stored timber, garden debris and other materials from against the building and from the subfloor.'],
+  ['drainage', 'Keep water away', 'Keep gutters, downpipes, taps and drainage in good repair, and keep the ground around the building dry and draining away from it.'],
+  ['plumber', 'Plumber for moisture', 'Have a licensed plumber find and fix the source of the moisture noted in this report.'],
+  ['ventilation', 'Improve ventilation', 'Improve subfloor ventilation and keep the vents clear: damp subfloors attract termites and decay.'],
+  ['stumps', 'Check trees and stumps', 'Have trees and stumps on the property checked for termite nests, and remove dead stumps and old landscaping timbers.'],
+  ['declined', 'Client declined for now', 'Termite management options were discussed with the client, who chose not to go ahead at this time. A quote can be provided on request.'],
+  ['sample', 'Sample sent for ID', 'A sample was taken for identification. Further advice will follow once it has been identified.'],
+];
+
+function getRecLines() { return Array.isArray(reportData.recLines) ? reportData.recLines : []; }
+
+function renderRecLines() {
+  const el = document.getElementById('recLines');
+  if (!el) return;
+  const have = new Set(getRecLines().map(l => l.id));
+  el.innerHTML = REC_LINES.map(([id, label]) =>
+    `<button type="button" class="rec-line${have.has(id) ? ' on' : ''}" aria-pressed="${have.has(id)}" onclick="toggleRecLine('${id}')">${escapeHtml(label)}</button>`).join('');
+  const added = document.getElementById('recLinesAdded');
+  if (added) {
+    added.innerHTML = getRecLines().map(l => `<li>${escapeHtml(l.text)}</li>`).join('');
+    added.hidden = !have.size;
+  }
+  const n = have.size;
+  const count = document.getElementById('recLinesCount');
+  if (count) count.textContent = n ? `${n} added to the report` : 'Tap to add to the report';
+}
+
+function toggleRecLine(id) {
+  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  const line = REC_LINES.find(l => l[0] === id);
+  if (!line) return;
+  const list = getRecLines();
+  reportData.recLines = list.some(l => l.id === id) ? list.filter(l => l.id !== id) : [...list, { id, text: line[2] }];
+  renderRecLines();
+  saveDraft();
 }
 
 // ── LEGACY GENERAL PHOTOS (Photos tab) ─────────────────────────────────────
@@ -10648,6 +10697,7 @@ function reportSummary() {
     const other = String(reportData.otherRecommendations).trim().replace(/\.$/, '');
     next.push(`Also recommended: ${other.charAt(0).toLowerCase()}${other.slice(1)}.`);
   }
+  getRecLines().forEach(l => next.push(l.text));
   if (limitedZones.length) next.push(`Provide access to ${limitedZones.map(z => OBS_ZONES[z].label.replace(/^The /, '').toLowerCase()).join(', ')} for a follow-up inspection.`);
   next.push(`Next timber pest inspection: ${reportData.inspectionFrequency || 'within 12 months'}.`);
   return { groups, limited, next, basis };
@@ -12342,6 +12392,7 @@ async function buildReportPdf() {
   row('Re-inspection Interval', reportData.inspectionFrequency);
   if (reportData.invasiveInspection === 'YES') row('Invasive Inspection', `Recommended, see Section ${REPORT_PARTS.access}`);
   if (reportData.otherRecommendations) row('Other Recommendations', reportData.otherRecommendations);
+  if (getRecLines().length) row('Also Recommended', getRecLines().map(l => `•  ${l.text}`).join('\n'));
   notesBlock('recommendations');
   renderSectionPhotosInPDF('recommendations', 'Recommendations');
   gap(4);

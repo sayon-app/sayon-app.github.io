@@ -2634,13 +2634,106 @@ body.report-locked #micDock { opacity: 0.4; }
 .agreement-other-toggle { align-self: center; }
 .agreement-other { display: flex; gap: 8px; }
 .agreement-other .job-input { flex: 1; min-width: 0; }
-.agreement-view-summary { font-size: 13px; font-weight: 700; color: var(--green); }
 .agreement-view-signature {
-  max-width: 220px;
+  display: block; max-width: 240px; width: 100%; margin-top: 14px;
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 10px;
 }
+
+/* The agreement sheet: an intro with the address, then three steps on a
+   side line (the job, read it together, client signs), as on a job's sheet. */
+.agr-body { gap: 0; padding-left: 20px; padding-right: 20px; font-feature-settings: 'cv11', 'ss01'; }
+.agr-intro { padding: 6px 0 20px; }
+.agr-kicker, .agr-section-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent2); }
+.agr-addr {
+  margin: 6px 0 0; font-family: 'Space Grotesk', sans-serif; font-size: 23px; line-height: 1.15;
+  font-weight: 700; letter-spacing: -0.02em; color: var(--text); text-wrap: balance;
+}
+.agr-addr.empty { color: var(--text3); }
+.agr-lede { margin: 8px 0 0; font-size: 14px; line-height: 1.55; color: var(--text2); text-wrap: pretty; }
+
+.agr-steps { list-style: none; margin: 0; padding: 0; }
+.agr-step { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 0 0 28px 40px; }
+.agr-step:last-child { padding-bottom: 0; }
+.agr-step::before {
+  content: ''; position: absolute; left: 11px; top: 30px; bottom: 4px; width: 2px;
+  border-radius: 2px; background: var(--border); transition: background 0.2s;
+}
+.agr-step:last-child::before { display: none; }
+.agr-step.done::before { background: var(--accent); }
+.agr-step-dot {
+  position: absolute; left: 0; top: 0; width: 24px; height: 24px; border-radius: 99px; box-sizing: border-box;
+  border: 2px solid var(--border); background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11.5px; font-weight: 700; color: var(--text3); font-variant-numeric: tabular-nums;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.agr-step.now .agr-step-dot { border-color: var(--accent); color: var(--accent2); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.16); }
+.agr-step.done .agr-step-dot { background: var(--accent); border-color: var(--accent); color: #fff; }
+.agr-step.done .agr-step-dot b { display: none; }
+.agr-step.done .agr-step-dot::after {
+  content: ''; width: 9px; height: 5px; margin-top: -2px;
+  border: solid #fff; border-width: 0 0 2px 2px; transform: rotate(-45deg);
+}
+.agr-step-title {
+  margin: 1px 0 2px; font-family: 'Space Grotesk', sans-serif; font-size: 17px; line-height: 22px;
+  font-weight: 700; letter-spacing: -0.015em; color: var(--text);
+}
+.agr-step .job-field, .agr-step .job-row { margin: 0; }
+.agr-hint { margin: -2px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--yellow-text); }
+.agr-hint[hidden] { display: none; }
+.agr-sign-need { margin: 0; color: var(--text3); text-align: center; }
+
+/* The wording, set as a document: numbered clauses with a hairline between. */
+.agr-doc {
+  padding: 2px 16px; border: 1px solid var(--border); border-radius: 14px;
+  background: var(--surface2); color: var(--text2);
+}
+.agr-clause {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: start;
+  padding: 14px 0; border-bottom: 1px solid var(--border);
+}
+.agr-clause > p { grid-column: 1 / -1; }
+.agr-clause:last-of-type { border-bottom: 0; }
+.agr-clause-num {
+  margin-top: 1px; min-width: 20px; height: 20px; padding: 0 4px; box-sizing: border-box; border-radius: 6px;
+  background: rgba(var(--accent-rgb), 0.12); color: var(--accent2);
+  font-size: 11px; font-weight: 700; line-height: 20px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.agr-clause-title { margin: 0 0 4px; font-size: 14.5px; line-height: 22px; font-weight: 650; letter-spacing: -0.01em; color: var(--text); }
+.agr-doc p { margin: 0; font-size: 14px; line-height: 1.6; text-wrap: pretty; }
+.agr-doc p + p { margin-top: 8px; }
+.agr-doc-intro { padding: 14px 0 0; }
+.agr-doc-close {
+  margin: 2px -16px -2px !important; padding: 14px 16px 16px;
+  border-top: 1px solid var(--border); border-radius: 0 0 13px 13px;
+  background: rgba(var(--accent-rgb), 0.07); color: var(--text); font-weight: 500;
+}
+.agr-doc-close + .agr-doc-close { margin-top: 0 !important; border-top: 0; padding-top: 0; }
+.agr-blank {
+  display: inline-block; padding: 0 6px; border-radius: 5px; font-size: 12.5px; font-weight: 600;
+  background: rgba(255,182,72,0.18); color: var(--yellow-text);
+}
+.agr-step .agreement-check { padding: 2px 0; }
+
+/* Signed: who and when on top, then the wording. */
+.agr-signed {
+  margin: 4px 0 22px; padding: 18px; border-radius: 16px;
+  background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.10), rgba(var(--accent-rgb), 0.03));
+  border: 1px solid rgba(var(--accent-rgb), 0.28);
+}
+.agr-signed-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px;
+  border-radius: 99px; font-size: 12px; font-weight: 650; background: rgba(var(--accent-rgb), 0.14); color: var(--accent2);
+}
+.agr-signed-chip::before { content: ''; width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
+.agr-signed-name { margin-top: 10px; font-family: 'Space Grotesk', sans-serif; font-size: 21px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
+.agr-signed-meta { margin-top: 3px; font-size: 13.5px; color: var(--text2); font-variant-numeric: tabular-nums; }
+.agr-section-label { color: var(--text3); margin-bottom: 10px; }
+#agreementView .agr-doc + .extract-btn { margin-top: 18px; }
+#agreementView .agreement-other-toggle { margin-top: 6px; }
+#agreementEdit .agr-step .extract-btn { margin-top: 4px; }
 /* Check before sending */
 .send-review-label {
   margin-top: 6px;

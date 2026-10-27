@@ -1739,67 +1739,94 @@
       <button class="voice-popover-close" onclick="closeAgreementSheet()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
     </div>
 
-    <!-- Not signed yet: job details, wording, signature -->
-    <div class="page-sheet-body" id="agreementEdit">
-      <!-- The type decides the standard and the wording of clause 1, so it
-           is chosen before the client signs (see onAgreementTypeChange). -->
-      <div class="job-field">
-        <div class="job-field-label">Inspection Type</div>
-        <select class="job-input job-select" id="agreementInspectionType" onchange="onAgreementTypeChange()">
-          <option value="">Select…</option>
-          <option>Annual — Existing Building</option>
-          <option>Pre-Purchase — Timber Pest</option>
-          <option>Pre-Purchase — Combined Building & Pest</option>
-          <option>New Construction — Completion</option>
-          <option>Treatment Follow-Up</option>
-          <option>Re-inspection</option>
-          <option>Insurance / Legal</option>
-          <option>Other</option>
-        </select>
+    <!-- Not signed yet: the job, the wording, the signature, as three
+         steps on a side line that fills in as each one is done. -->
+    <div class="page-sheet-body agr-body" id="agreementEdit">
+      <div class="agr-intro">
+        <div class="agr-kicker">Before the inspection starts</div>
+        <h2 class="agr-addr" id="agreementAddr"></h2>
+        <p class="agr-lede">Fill in the job, read the agreement through with the client, then they sign on this screen.</p>
       </div>
-      <div class="job-row">
-        <div class="job-field">
-          <div class="job-field-label">Inspection Date</div>
-          <input class="job-input" id="agreementDate" type="date" onchange="refreshAgreementPreview()">
-        </div>
-        <div class="job-field">
-          <div class="job-field-label">Fee</div>
-          <input class="job-input" id="agreementFee" inputmode="decimal" placeholder="$330" oninput="addDollarSign(this);onAgreementFeeInput()">
-        </div>
-      </div>
-      <div class="job-field">
-        <div class="job-field-label">Special Requests</div>
-        <input class="job-input" id="agreementNotes" placeholder="e.g. check the back deck closely" oninput="refreshAgreementPreview()">
-      </div>
-      <div class="agreement-text" id="agreementText"></div>
-      <div class="job-field">
-        <div class="job-field-label">Client Name</div>
-        <input class="job-input" id="agreementSignerName" placeholder="Full name of the person signing" oninput="refreshAgreementPreview()">
-      </div>
-      <label class="agreement-check">
-        <input type="checkbox" id="agreementAgree" onchange="updateAgreementSignButton()">
-        <span>I have read and agree to this agreement</span>
-      </label>
-      <div class="signature-pad-wrap agreement-sig-wrap">
-        <canvas class="signature-canvas" id="agreementSigCanvas" width="640" height="220"></canvas>
-        <div class="signature-placeholder" id="agreementSigPlaceholder">Client signs here</div>
-      </div>
-      <div class="agreement-sig-actions">
-        <button class="signature-clear-btn" onclick="agreementSignaturePad.clear();updateAgreementSignButton()">Clear signature</button>
-      </div>
-      <button class="extract-btn" id="agreementSignBtn" onclick="signAgreement('onsite')" disabled>Sign agreement</button>
-      <button class="link-btn agreement-other-toggle" onclick="toggleAgreementOther()">Signed on paper or by email instead?</button>
-      <div class="agreement-other" id="agreementOtherWrap" style="display:none">
-        <input class="job-input" id="agreementOtherNote" placeholder="e.g. Signed on paper, agreed by email">
-        <button class="agreement-banner-btn" onclick="signAgreement('other')">Record it</button>
-      </div>
+      <ol class="agr-steps">
+        <li class="agr-step" id="agreementStepJob">
+          <span class="agr-step-dot" aria-hidden="true"><b>1</b></span>
+          <h3 class="agr-step-title">The job</h3>
+          <!-- The type decides the standard and the wording of clause 1, so it
+               is chosen before the client signs (see onAgreementTypeChange). -->
+          <div class="job-field">
+            <div class="job-field-label">Inspection Type</div>
+            <select class="job-input job-select" id="agreementInspectionType" onchange="onAgreementTypeChange()">
+              <option value="">Select…</option>
+              <option>Annual — Existing Building</option>
+              <option>Pre-Purchase — Timber Pest</option>
+              <option>Pre-Purchase — Combined Building & Pest</option>
+              <option>New Construction — Completion</option>
+              <option>Treatment Follow-Up</option>
+              <option>Re-inspection</option>
+              <option>Insurance / Legal</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="job-row">
+            <div class="job-field">
+              <div class="job-field-label">Inspection Date</div>
+              <input class="job-input" id="agreementDate" type="date" onchange="refreshAgreementPreview()">
+            </div>
+            <div class="job-field">
+              <div class="job-field-label">Fee</div>
+              <input class="job-input" id="agreementFee" inputmode="decimal" placeholder="$330" oninput="addDollarSign(this);onAgreementFeeInput()">
+            </div>
+          </div>
+          <p class="agr-hint" id="agreementFeeHint">No fee yet, so the agreement says "As quoted". Add it so the client signs to a figure.</p>
+          <div class="job-field">
+            <div class="job-field-label">Special Requests</div>
+            <input class="job-input" id="agreementNotes" placeholder="e.g. check the back deck closely" oninput="refreshAgreementPreview()">
+          </div>
+        </li>
+        <li class="agr-step" id="agreementStepRead">
+          <span class="agr-step-dot" aria-hidden="true"><b>2</b></span>
+          <h3 class="agr-step-title">Read it together</h3>
+          <article class="agr-doc" id="agreementText"></article>
+          <label class="agreement-check">
+            <input type="checkbox" id="agreementAgree" onchange="updateAgreementSignButton()">
+            <span>I have read and agree to this agreement</span>
+          </label>
+        </li>
+        <li class="agr-step" id="agreementStepSign">
+          <span class="agr-step-dot" aria-hidden="true"><b>3</b></span>
+          <h3 class="agr-step-title">Client signs</h3>
+          <div class="job-field">
+            <div class="job-field-label">Client Name</div>
+            <input class="job-input" id="agreementSignerName" placeholder="Full name of the person signing" oninput="refreshAgreementPreview()">
+          </div>
+          <div class="signature-pad-wrap agreement-sig-wrap">
+            <canvas class="signature-canvas" id="agreementSigCanvas" width="640" height="220"></canvas>
+            <div class="signature-placeholder" id="agreementSigPlaceholder">Client signs here</div>
+          </div>
+          <div class="agreement-sig-actions">
+            <button class="signature-clear-btn" onclick="agreementSignaturePad.clear();updateAgreementSignButton()">Clear signature</button>
+          </div>
+          <button class="extract-btn" id="agreementSignBtn" onclick="signAgreement('onsite')" disabled>Sign agreement</button>
+          <p class="agr-hint agr-sign-need" id="agreementSignNeed"></p>
+          <button class="link-btn agreement-other-toggle" onclick="toggleAgreementOther()">Signed on paper or by email instead?</button>
+          <div class="agreement-other" id="agreementOtherWrap" style="display:none">
+            <input class="job-input" id="agreementOtherNote" placeholder="e.g. Signed on paper, agreed by email">
+            <button class="agreement-banner-btn" onclick="signAgreement('other')">Record it</button>
+          </div>
+        </li>
+      </ol>
     </div>
 
-    <!-- Signed: what was agreed, read-only -->
-    <div class="page-sheet-body" id="agreementView" style="display:none">
-      <div class="agreement-view-summary" id="agreementViewSummary"></div>
-      <img class="agreement-view-signature" id="agreementViewSignature" alt="Client signature">
-      <div class="agreement-text" id="agreementViewText"></div>
+    <!-- Signed: who signed and when, then what was agreed, read-only -->
+    <div class="page-sheet-body agr-body" id="agreementView" style="display:none">
+      <section class="agr-signed">
+        <div class="agr-signed-chip">Signed</div>
+        <div class="agr-signed-name" id="agreementViewName"></div>
+        <div class="agr-signed-meta" id="agreementViewSummary"></div>
+        <img class="agreement-view-signature" id="agreementViewSignature" alt="Client signature">
+      </section>
+      <div class="agr-section-label">What was agreed</div>
+      <article class="agr-doc" id="agreementViewText"></article>
       <button class="extract-btn" onclick="shareAgreementPdf()">Send the client a copy (PDF)</button>
       <button class="link-btn agreement-other-toggle" onclick="removeAgreement()">Remove and sign again</button>
     </div>

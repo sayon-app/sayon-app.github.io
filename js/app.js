@@ -5366,11 +5366,11 @@ function checkAsbestosFlag() {
   if (HIGH_ASBESTOS_ERAS.includes(era)) {
     banner.style.display = 'flex';
     banner.querySelector('.asb-text').textContent =
-      `Construction era (${era}) carries a HIGH likelihood of asbestos-containing materials (fibro, ACM sheeting). Note as observation only — do not disturb. Recommend licensed asbestos assessor if suspected ACM is identified.`;
+      `High chance of asbestos materials for this era (${era.replace(/(\d)-(\d)/g, '$1–$2')}), such as fibro and cement sheeting. Note them as an observation only and don't disturb them. If you suspect asbestos, recommend a licensed asbestos assessor.`;
   } else if (MODERATE_ASBESTOS_ERAS.includes(era)) {
     banner.style.display = 'flex';
     banner.querySelector('.asb-text').textContent =
-      `Construction era (${era}) carries a MODERATE likelihood of asbestos-containing materials. Note as observation only — do not disturb if suspected.`;
+      `Some chance of asbestos materials for this era (${era.replace(/(\d)-(\d)/g, '$1–$2')}). Note them as an observation only and don't disturb anything you suspect.`;
   } else {
     banner.style.display = 'none';
   }
@@ -6036,6 +6036,43 @@ function watchFieldGroups() {
     fgroupObserver.observe(group, { subtree: true, attributes: true, attributeFilter: ['style', 'hidden'] }));
 }
 
+// Folded, a group reads as a short sentence: the answers in a comma list,
+// in sentence case, with a word of context where an answer alone would be
+// unclear ("Detached house, single storey, brick veneer walls, front faces
+// north"). Brand names and codes such as AS 3660 keep their capitals.
+const FGROUP_KEEP_CASE = new Set(['Colorbond', 'Zincalume', 'Hebel', 'Queenslander']);
+const FGROUP_LOWER = new Set(['structureType', 'height', 'wallConstruction', 'roofType', 'floorType', 'facadeDirection', 'constructionEra',
+  'siteSurroundings', 'siteSlope', 'termiteHistory', 'existingSystem', 'occupancyStatus', 'furnishing', 'peoplePresent',
+  'weatherConditions', 'recentWeather', 'toolsUsed']);
+const FGROUP_PHRASES = {
+  wallConstruction: v => /wall/i.test(v) ? v : v + ' walls',
+  roofType: v => /roof/i.test(v) ? v : v + ' roof',
+  facadeDirection: v => 'front faces ' + v,
+  constructionEra: v => 'built ' + v.replace(/(\d)-(\d)/g, '$1\u2060–\u2060$2'),
+  siteSurroundings: v => v.replace(/^suburban, few trees$/, 'suburban with few trees'),
+  siteSlope: v => /^slopes/.test(v) ? 'site ' + v : /site|block|land/.test(v) ? v : v + ' site',
+  termiteHistory: v => ({ 'none known': 'no known termite history', unknown: 'termite history unknown', 'treated before': 'treated for termites before' })[v] || v,
+  peoplePresent: v => /present/.test(v) ? v : v + ' present',
+  humidity: v => /humid/i.test(v) ? v : v + ' humidity',
+  rainLast24h: v => /^(none|nil|no rain)$/i.test(v) ? 'no rain in the last 24 hours' : /rain/i.test(v) ? v : v + ' of rain in the last 24 hours',
+  recentWeather: v => /^normal/.test(v) ? 'weather ' + v : v,
+};
+function fgroupSentence(keys) {
+  const items = [];
+  keys.forEach(k => {
+    let v = String(reportData[k] ?? '').trim();
+    if (!v || /^(YES|NO|N\/A)$/.test(v)) return;
+    v = v.replace(/\s+—\s+(.+)$/, ' ($1)');
+    if (FGROUP_LOWER.has(k)) v = v.replace(/\b[A-Z][a-z]+\b/g, w => FGROUP_KEEP_CASE.has(w) ? w : w.toLowerCase());
+    if (FGROUP_PHRASES[k]) v = FGROUP_PHRASES[k](v);
+    const last = items[items.length - 1];
+    if (k === 'existingSystemOther' && last && last.key === 'existingSystem') { last.text += ` (${v})`; return; }
+    items.push({ key: k, text: v });
+  });
+  const text = items.map(i => i.text).join(', ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 function renderFieldGroups() {
   watchFieldGroups();
   document.querySelectorAll('#reportBody details.fgroup').forEach(group => {
@@ -6054,7 +6091,7 @@ function renderFieldGroups() {
       concern = concerns.length > 0;
       text = concern ? 'Found: ' + concerns.join(', ') : (answered.length ? 'Nothing of concern so far' : '');
     } else {
-      text = answered.map(k => String(reportData[k]).trim()).filter(v => !/^(YES|NO|N\/A)$/.test(v)).join(' · ');
+      text = fgroupSentence(answered);
     }
     sub.textContent = text || (keys.length ? 'Not answered yet' : '');
     sub.classList.toggle('concern', concern);
@@ -11888,7 +11925,7 @@ async function buildReportPdf() {
   const FIELD_LABELS = {
     structureType:'Structure Type', wallConstruction:'Wall Construction', floorType:'Floor Type', roofType:'Roof Type',
     height:'Height', facadeDirection:'Orientation', occupancyStatus:'Occupancy Status', furnishing:'Furnishing', peoplePresent:'People Present', weatherConditions:'Weather Conditions', temperature:'Temperature', humidity:'Humidity', rainLast24h:'Rain in the Last 24 Hours', recentWeather:'Recent Weather', toolsUsed:'Tools Used', siteSurroundings:'Surroundings', siteSlope:'Site Slope', termiteHistory:'Known Termite History', mouldSeen:'Mould Seen', mouldWhere:'Mould: Where',
-    constructionEra:'Year / Period of Construction', standard:'Applicable Standard',
+    constructionEra:'Year or Period Built', standard:'Applicable Standard',
     hinderedAreas:'Hindered Access: Where', obstructions:'Areas Not Inspected', restrictedAccess:'Obstructions', hinderedAreasDetail:'What Hindered Access', noAccessAreas:'Restricted Access: Where & Why', highRiskAreas:'High Risk Areas',
     previousTreatment:'Evidence of Previous Treatment', previousTreatmentDetails:'Previous Treatment: What', previousTreatmentWhere:'Previous Treatment: Where', siteDrainage:'Site Drainage', subfloorDrainage:'Subfloor Drainage',
     borerActivity:'Borers of Seasoned Timber', borerDetails:'Borer Type, Location & Evidence', decayFound:'Wood Decay Fungi (Rot)', decayDetails:'Wood Decay: What', decayWhere:'Wood Decay: Where',
@@ -11896,7 +11933,7 @@ async function buildReportPdf() {
     waterLeaks:'Water Leaks', leakLocation:'Location of Moisture Ingress', moistureReadings:'Moisture Readings', timberSoil:'Timber-to-Soil Contact', slabEdge:'Slab Edge Concealed', weepHoles:'Weep Holes (Clear / Bridged)', existingSystem:'Existing System',
     durableNoticePresent:'Durable Notice Present', hardLandscaping:'Hard Landscaping Adjacent', zone25mmVisible:'25mm Inspection Zone Visible', softLandscaping:'Soft Landscaping Adjacent', zone75mmVisible:'75mm Inspection Zone Visible', antCapSoldered:'Ant Cap Joins Soldered',
     treatmentRecommended:'Treatment Recommended', treatmentType:'Treatment Type', inspectionFrequency:'Inspection Frequency', riskLevel:'Risk of Termite Attack',
-    invasiveInspection:'Invasive Inspection Recommended', invasiveInspectionDetails:'Invasive Inspection: Where, Why & When', otherRecommendations:'Other Recommendations', antCapping:'Ant Capping', antCappingDetails:'Ant Capping: Where & What',
+    invasiveInspection:'Invasive Inspection Recommended', invasiveInspectionDetails:'Invasive Inspection: Where, Why and When', otherRecommendations:'Other Recommendations', antCapping:'Ant Capping', antCappingDetails:'Ant Capping: Where and What',
     delignification:'Chemical Delignification', delignificationDetails:'Delignification: What', delignificationWhere:'Delignification: Where', subfloorVentilation:'Subfloor Ventilation', nonDurableTimber:'Non-durable Timber in Damp Areas', nonDurableTimberDetails:'Non-durable Timber: What', nonDurableTimberWhere:'Non-durable Timber: Where',
   };
 
@@ -12279,7 +12316,7 @@ async function buildReportPdf() {
 
   subhead('INVASIVE INSPECTION');
   row('Invasive Inspection Recommended', reportData.invasiveInspection || 'Not recorded');
-  if (reportData.invasiveInspectionDetails) row('Where, Why & When', reportData.invasiveInspectionDetails);
+  if (reportData.invasiveInspectionDetails) row('Where, Why and When', reportData.invasiveInspectionDetails);
   if (reportData.invasiveInspection === 'YES') {
     gap(3);
     disclaimer('An invasive inspection may involve cutting, drilling or removing linings, floor coverings or timbers to see inside them. It needs the owner\'s written permission and a separate agreement.');
@@ -12501,7 +12538,7 @@ async function buildReportPdf() {
   condRow('Slab Edge Concealed', 'slabEdge');
   condRow('Weep Holes', 'weepHoles', reportData.weepHoles === 'NONE' ? 'None located' : '');
   condRow('Ant Capping', 'antCapping');
-  if (reportData.antCappingDetails) row('Ant Capping: Where & What', reportData.antCappingDetails);
+  if (reportData.antCappingDetails) row('Ant Capping: Where and What', reportData.antCappingDetails);
   condRow('Non-durable Timber in Damp Areas', 'nonDurableTimber');
   if (reportData.nonDurableTimberDetails) row('Non-durable Timber: What', reportData.nonDurableTimberDetails);
   if (reportData.nonDurableTimberWhere) row('Non-durable Timber: Where', reportData.nonDurableTimberWhere);

@@ -4747,11 +4747,6 @@ body:not(.dark-screen) .choice-card { transition: background-color 0.3s, border-
 .addr-suggest-area { font-size: 12px; color: var(--text2); }
 .addr-suggest-credit { padding: 5px 12px 6px; font-size: 10.5px; color: var(--text3, var(--text2)); text-align: right; border-top: 1px solid var(--border); }
 
-/* "Fill from today's weather", under the weather readings */
-.field.weather-fill { grid-column: 1 / -1; display: flex; align-items: center; justify-content: flex-start; margin-top: -6px; }
-.field.weather-fill .link-btn { padding: 0; min-height: 44px; font-size: 14px; text-align: left; }
-.field.weather-fill .link-btn:disabled { opacity: 0.6; }
-
 /* ── PHOTO VIEWER ── any photo, full screen, pinch or double-tap to zoom. */
 .photo-viewer {
   position: fixed; inset: 0; z-index: 400;
@@ -5098,7 +5093,10 @@ body:not(.dark-screen) .next-section-btn.pending:hover { background: rgba(var(--
 .fgroup-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 10px; }
 .fgroup-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .fgroup-title { font: 700 15px 'Space Grotesk', sans-serif; letter-spacing: -0.2px; color: var(--text); }
-.fgroup-sub { font-size: 12.5px; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fgroup-sub {
+  font-size: 12.5px; line-height: 1.4; color: var(--text3);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 .fgroup-sub.concern { color: var(--yellow-text); font-weight: 600; }
 .fgroup[open] .fgroup-sub { display: none; }
 .fgroup-count {
@@ -5113,6 +5111,45 @@ body:not(.dark-screen) .next-section-btn.pending:hover { background: rgba(var(--
 .fgroup > .section-fields { padding-top: 2px; }
 .fgroup > :last-child { margin-bottom: 14px; }
 @media (prefers-reduced-motion: reduce) { .fgroup-chev { transition: none; } }
+.fgroup-icon {
+  flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
+  background: rgba(var(--accent-rgb),0.12); color: var(--accent2);
+}
+
+/* Grouped steps: each group is a card of its own on a soft panel, with a
+   tinted header, so the groups read apart at a glance. */
+.report-section.grouped { background: var(--surface2); }
+body:not(.dark-screen) .report-section.grouped > .section-header { background-color: var(--surface); }
+.report-section.grouped > details.fgroup {
+  margin: 10px 8px 0; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+  box-shadow: 0 1px 3px rgba(13,40,60,0.07);
+}
+.report-section.grouped > details.fgroup > .fgroup-head {
+  background: linear-gradient(135deg, rgba(var(--accent-rgb),0.07), rgba(var(--accent-rgb),0.015));
+}
+.report-section.grouped > details.fgroup[open] > .fgroup-head { border-bottom: 1px solid var(--border); }
+.report-section.grouped > details.fgroup > .fgroup-head { padding: 12px 12px 12px 10px; }
+.report-section.grouped > details.fgroup > .section-fields { padding: 14px 12px; }
+.report-section.grouped > details.fgroup .section-fields > .section-photo-widget { margin: 0; }
+.report-section.grouped > details.fgroup > .section-photo-widget { margin: 2px 12px 4px; }
+.report-section.grouped > .section-photo-widget { margin: 10px 8px 0; background: var(--surface); }
+.report-section.grouped > .next-section-btn { margin-top: 14px; }
+body.dark-screen .report-section.grouped > details.fgroup { border-width: 2px; box-shadow: none; }
+
+/* Sub-headings inside a group: a teal bullet, the topic, a fading rule. */
+.fsub {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-height: 22px; margin-top: 8px;
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text2);
+}
+.section-fields > .fsub:first-child { margin-top: 0; }
+.fsub::before { content: ''; flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.fsub::after { content: ''; order: 1; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border), rgba(0,0,0,0)); }
+.fsub .fsub-action {
+  order: 2; min-height: 44px; padding: 0 2px; font-size: 13px; font-weight: 600;
+  letter-spacing: normal; text-transform: none; white-space: nowrap;
+}
+.fsub .fsub-action:disabled { opacity: 0.6; }
 
 /* Other photos are optional, so they carry no status. */
 #sts-photos { display: none; }

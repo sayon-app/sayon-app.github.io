@@ -1618,7 +1618,7 @@ function lookupSpecies(raw) {
 }
 
 const SECTIONS = {
-  property:        { fields:['structureType','height','occupancyStatus','weatherConditions','temperature','humidity','rainLast24h','wallConstruction','roofType','floorType','facadeDirection','constructionEra','standard'], total:13 },
+  property:        { fields:['structureType','height','occupancyStatus','furnishing','peoplePresent','weatherConditions','temperature','humidity','rainLast24h','recentWeather','wallConstruction','roofType','floorType','facadeDirection','constructionEra','standard','toolsUsed'], total:17 },
   obstructions:    { fields:['areaStatus'], total:1 },
   restrictions:    { fields:['hinderedAreas','hinderedAreasDetail','noAccessAreas','highRiskAreas','invasiveInspection','invasiveInspectionDetails'], total:2 },
   findings:        { fields:['findings','borerActivity','decayFound','delignification','previousTreatment','previousTreatmentDetails'], total:4 },
@@ -1649,7 +1649,7 @@ THE ONE RULE: a field holds only what the inspector said or plainly meant. Never
 
 FIELDS (every one null unless the note gives it):
 {"propertyStreetAddress":string,"propertySuburb":string,"propertyState":"NSW"|"VIC"|"QLD"|"WA"|"SA"|"TAS"|"ACT"|"NT","propertyPostcode":string,"clientName":string,"inspectionType":"Annual — Existing Building"|"Pre-Purchase — Timber Pest"|"Pre-Purchase — Combined Building & Pest"|"New Construction — Completion"|"Treatment Follow-Up"|"Re-inspection"|"Insurance / Legal",
-"structureType":string,"height":string,"wallConstruction":string,"roofType":string,"floorType":string,"facadeDirection":string,"constructionEra":"Pre-1920s"|"1920s-1940s"|"1945-1965"|"1965-1985"|"1985-2003"|"Post-2003","occupancyStatus":string,"weatherConditions":string,"temperature":string,"humidity":string,"rainLast24h":string,
+"structureType":string,"height":string,"wallConstruction":string,"roofType":string,"floorType":string,"facadeDirection":string,"constructionEra":"Pre-1920s"|"1920s-1940s"|"1945-1965"|"1965-1985"|"1985-2003"|"Post-2003","occupancyStatus":string,"furnishing":string,"peoplePresent":string,"weatherConditions":string,"temperature":string,"humidity":string,"rainLast24h":string,"recentWeather":string,"toolsUsed":string,
 "existingSystem":string,"existingSystemOther":string,"durableNoticePresent":"YES"|"NO","hardLandscaping":"YES"|"NO","zone25mmVisible":"YES"|"NO","softLandscaping":"YES"|"NO","zone75mmVisible":"YES"|"NO","antCapSoldered":"YES"|"NO"|"N/A",
 "areaStatus":{"interior"|"exterior"|"subfloor"|"roofvoid"|"outbuildings"|"site"|"fences"|"retainingwalls"|"landscapingtimbers":"INSPECTED"|"PARTIAL"|"NOT"|"NA"},"areaResult":{same area keys:"CLEAR"|"FOUND"},"obstructions":string,"restrictedAccess":string,"noAccessAreas":string,"highRiskAreas":string,"hinderedAreas":string,"hinderedAreasDetail":string,
 "findings":[{"termiteActivity":"ACTIVE"|"INACTIVE"|"NONE","species":string,"damageDescription":string,"activityLocation":string,"timberAffected":string,"nestLocated":"YES"|"NO","structuralConcern":"YES"|"NO"}],
@@ -1664,8 +1664,12 @@ DROPDOWN FIELDS: the app shows these as pick-lists. Return the list value EXACTL
 - floorType: "Concrete slab on ground" | "Timber suspended floor" | "Elevated timber (stumps)" | "Combination slab / timber". "Not a slab" plus joists, bearers or a subfloor means "Timber suspended floor"; stumps means "Elevated timber (stumps)".
 - roofType: "Colorbond metal" | "Tiled — concrete" | "Tiled — terracotta" | "Corrugated iron" | "Flat membrane" | "Mixed". A tiled roof whose tile material is not named is written as the inspector said it, e.g. "Tiled roof, timber framed": never pick concrete or terracotta for them. Roof framing (timber or steel) has no field of its own, so it may be appended here.
 - facadeDirection: "North" | "North-east" | "East" | "South-east" | "South" | "South-west" | "West" | "North-west" (the direction the front of the building faces).
-- occupancyStatus: "Occupied — residential" | "Owner occupied" | "Tenanted" | "Vacant" | "Under renovation" | "Commercial / industrial". "Occupied" or "furnished" alone is "Occupied — residential".
+- occupancyStatus: "Occupied — residential" | "Owner occupied" | "Tenanted" | "Vacant" | "Under renovation" | "Commercial / industrial". "Occupied" alone is "Occupied — residential". Furniture is furnishing, not occupancy: "furnished" alone sets furnishing and leaves occupancyStatus null.
+- furnishing: "Fully furnished" | "Partly furnished" | "Unfurnished". "Empty", "no furniture" or "nothing in it" is "Unfurnished"; "a few things left", "half moved out" is "Partly furnished".
+- peoplePresent: who was at the property during the inspection, only when the inspector says so: "Client" | "Client and agent" | "Real estate agent" | "Vendor" | "Purchaser" | "Tenant" | "No one". Any other mix is written as a short list in their words, e.g. "Vendor and purchaser".
 - weatherConditions: "Fine and dry" | "Overcast" | "Light rain" | "Heavy rain" | "Humid" | "Windy".
+- recentWeather: the weather over the past weeks, only when the inspector describes it: "Normal for the season" | "Prolonged dry period" | "Prolonged wet period". "Hasn't rained in weeks" is "Prolonged dry period"; "rained all week" or "a wet month" is "Prolonged wet period".
+- toolsUsed: the tools the inspector says they used, as a short list in this order: moisture meter, sounding tool, thermal camera, movement detector, e.g. "Moisture meter and sounding tool" or "Moisture meter, sounding tool and thermal camera". A Termatrac is a movement detector; "tapped the timbers" or "sounded" means a sounding tool. Add anything else they name in their words ("torch, ladder"). Never list a tool they did not name.
 - temperature, humidity, rainLast24h: only a reading the inspector states, written as "22°C", "70%" and "5 mm" (rainLast24h "None" when they say there was no rain). Never estimate one from the weather description.
 - constructionEra: only from a stated age, decade or year ("built in the 70s" is "1965-1985", "around 1998" is "1985-2003", "2005" is "Post-2003") or from an era-specific material the inspector names (fibro sheeting, asbestos). Never date a house from its wall, floor or roof type: the era prints an asbestos warning in the report, so a guessed era is a false fact.
 - existingSystem (the TYPE of termite management system found): "Physical Barrier" | "Chemical Reticulation System" | "Termite Baiting System" | "Chemical Barrier" | "Combination System — Physical + Chemical" | "System Present — Type Unidentified". A chemical soil treatment or chemical barrier with no reticulation pipes mentioned (e.g. Termidor sprayed around the perimeter) is "Chemical Barrier". Only when a system is actually present; when the inspector says there is no system, no barrier or nothing installed, leave it null (never "No", "None", "Nil").
@@ -5471,6 +5475,10 @@ function startEdit(el, key, type) {
       'West',
       'North-west',
     ],
+    furnishing: ['Fully furnished', 'Partly furnished', 'Unfurnished'],
+    peoplepresent: ['Client', 'Client and agent', 'Real estate agent', 'Vendor', 'Purchaser', 'Tenant', 'No one', OTHER_TYPE_IT],
+    recentweather: ['Normal for the season', 'Prolonged dry period', 'Prolonged wet period', OTHER_TYPE_IT],
+    toolsused: ['Moisture meter', 'Moisture meter and sounding tool', 'Moisture meter, sounding tool and thermal camera', 'Moisture meter, sounding tool and movement detector', 'Moisture meter, sounding tool, thermal camera and movement detector', OTHER_TYPE_IT],
     occupancystatus: [
       'Occupied — residential',
       'Owner occupied',
@@ -11701,7 +11709,7 @@ async function buildReportPdf() {
   // ── NOTES BLOCK ───────────────────────────────────────────────────────────
   const FIELD_LABELS = {
     structureType:'Structure Type', wallConstruction:'Wall Construction', floorType:'Floor Type', roofType:'Roof Type',
-    height:'Height', facadeDirection:'Orientation', occupancyStatus:'Occupancy Status', weatherConditions:'Weather Conditions', temperature:'Temperature', humidity:'Humidity', rainLast24h:'Rain in the Last 24 Hours',
+    height:'Height', facadeDirection:'Orientation', occupancyStatus:'Occupancy Status', furnishing:'Furnishing', peoplePresent:'People Present', weatherConditions:'Weather Conditions', temperature:'Temperature', humidity:'Humidity', rainLast24h:'Rain in the Last 24 Hours', recentWeather:'Recent Weather', toolsUsed:'Tools Used',
     constructionEra:'Year / Period of Construction', standard:'Applicable Standard',
     hinderedAreas:'Hindered Access: Where', obstructions:'Areas Not Inspected', restrictedAccess:'Obstructions', hinderedAreasDetail:'What Hindered Access', noAccessAreas:'Restricted Access: Where & Why', highRiskAreas:'High Risk Areas',
     previousTreatment:'Evidence of Previous Treatment', previousTreatmentDetails:'Previous Treatment: What', previousTreatmentWhere:'Previous Treatment: Where', siteDrainage:'Site Drainage', subfloorDrainage:'Subfloor Drainage',
@@ -11874,12 +11882,15 @@ async function buildReportPdf() {
   row('Property Inspected', address);
   row('Inspection Date', inspectionDate);
   row('Inspection Time', inspectionTime);
+  if (reportData.peoplePresent) row('People Present', reportData.peoplePresent);
   row('Weather Conditions', reportData.weatherConditions);
   row('Temperature', reportData.temperature);
   row('Humidity', reportData.humidity);
   row('Rain in the Last 24 Hours', reportData.rainLast24h);
+  if (reportData.recentWeather) row('Recent Weather', reportData.recentWeather);
   row('Inspection Type', inspType);
   row('Applicable Standard', standardLabel);
+  if (reportData.toolsUsed) row('Tools Used', reportData.toolsUsed);
   row('Order / Job ID', orderId);
   row('Report Reference', reportId);
   gap(4);
@@ -11989,9 +12000,15 @@ async function buildReportPdf() {
     resetRowShade();
   }
   row('Occupancy Status', reportData.occupancyStatus);
-  if (/occupied|tenanted|owner/i.test(reportData.occupancyStatus || '')) {
+  if (reportData.furnishing) row('Furnishing', reportData.furnishing);
+  // The furniture note follows what was recorded about furniture; without
+  // that, an occupied home is taken to be furnished, as before.
+  const furnished = reportData.furnishing
+    ? !/^unfurnished/i.test(reportData.furnishing)
+    : /occupied|tenanted|owner/i.test(reportData.occupancyStatus || '');
+  if (furnished) {
     gap(1.5);
-    disclaimer('The property was occupied and furnished at the time of inspection. Furniture, stored goods and floor coverings hid parts of the walls and floors, and timber pest activity or damage may be concealed behind them.');
+    disclaimer(`The property was ${/partly/i.test(reportData.furnishing || '') ? 'partly furnished' : (reportData.furnishing ? 'furnished' : 'occupied and furnished')} at the time of inspection. Furniture, stored goods and floor coverings hid parts of the walls and floors, and timber pest activity or damage may be concealed behind them.`);
     resetRowShade();
   }
 

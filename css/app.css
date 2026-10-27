@@ -5053,3 +5053,66 @@ body:has(#quoteScreen.open) .toast { bottom: calc(var(--tabbar-h) + var(--mic-cl
 .rec-lines-added[hidden] { display: none; }
 .rec-lines-added li { position: relative; padding-left: 16px; font-size: 13px; line-height: 1.5; color: var(--text2); }
 .rec-lines-added li::before { content: ''; position: absolute; left: 3px; top: 8px; width: 5px; height: 5px; border-radius: 99px; background: var(--accent); }
+
+/* ── REPORT STEPS ──
+   Six steps that fit across a phone without sliding: the dot sits over the
+   label. The strip still scrolls if larger text makes it wider. */
+.section-tabs { gap: 2px; padding: 6px 8px; }
+.section-tab {
+  flex: 1 1 auto; min-width: 0;
+  flex-direction: column; justify-content: center; gap: 4px;
+  padding: 7px 6px; font-size: 11.5px; letter-spacing: -0.1px;
+}
+.section-tab .tab-label { line-height: 1.15; }
+@media (min-width: 600px) {
+  .section-tab { flex-direction: row; gap: 6px; padding: 10px 12px; font-size: 13px; }
+}
+body.large-touch .section-tab { flex: 0 0 auto; }
+/* The in-app numbers read oddly (the first tab is 3.); the PDF keeps them. */
+.report-section .section-header h3 .sec-num { display: none; }
+/* The agreement banner shows where it's acted on: before the inspection and
+   at sign-off. */
+#reportBody:not([data-step="property"]):not([data-step="finish"]) > #agreementBanner { display: none !important; }
+
+/* Next: always there, so the steps can be walked in order; quieter until
+   the section is complete. */
+.next-section-btn { width: auto; margin: 4px 14px 14px; }
+.next-section-btn.pending { background: transparent; }
+body:not(.dark-screen) .next-section-btn.pending {
+  background: var(--surface); color: var(--accent2); text-shadow: none;
+  border: 1px solid rgba(var(--accent-rgb), 0.45); box-shadow: none;
+}
+body:not(.dark-screen) .next-section-btn.pending:hover { background: rgba(var(--accent-rgb), 0.08); }
+
+/* ── QUESTION GROUPS ──
+   Long steps fold into groups. The header counts what's answered; folded,
+   it shows the answers (or, for conducive conditions, what was found). */
+.fgroup { border-top: 1px solid var(--border); }
+.section-header + .fgroup, .nothing-found-btn + .fgroup { border-top: none; }
+.fgroup-head {
+  list-style: none; display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px; min-height: 58px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.fgroup-head::-webkit-details-marker { display: none; }
+.fgroup-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 10px; }
+.fgroup-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.fgroup-title { font: 700 15px 'Space Grotesk', sans-serif; letter-spacing: -0.2px; color: var(--text); }
+.fgroup-sub { font-size: 12.5px; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fgroup-sub.concern { color: var(--yellow-text); font-weight: 600; }
+.fgroup[open] .fgroup-sub { display: none; }
+.fgroup-count {
+  flex-shrink: 0; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 99px;
+  border: 1px solid var(--border2); color: var(--text3); white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.fgroup-started .fgroup-count { background: rgba(255,182,72,0.1); color: var(--yellow-text); border-color: rgba(255,182,72,0.3); }
+.fgroup-done .fgroup-count { background: rgba(var(--green-rgb),0.1); color: var(--green); border-color: rgba(var(--green-rgb),0.3); }
+.fgroup-done .fgroup-count::before { content: '✓ '; }
+.fgroup-chev { flex-shrink: 0; color: var(--text3); transition: transform 0.2s ease; }
+.fgroup[open] .fgroup-chev { transform: rotate(180deg); }
+.fgroup > .section-fields { padding-top: 2px; }
+.fgroup > :last-child { margin-bottom: 14px; }
+@media (prefers-reduced-motion: reduce) { .fgroup-chev { transition: none; } }
+
+/* Other photos are optional, so they carry no status. */
+#sts-photos { display: none; }

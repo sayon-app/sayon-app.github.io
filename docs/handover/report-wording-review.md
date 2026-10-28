@@ -156,19 +156,3 @@ Not changed: `js/quote.js`, `js/treatment.js`, `SYSTEM_PROMPT`, `terms.html`, `p
 
 - "deploy PR #N" for the go-live. Merging is not deploying.
 - No Worker, Supabase or Stripe change is needed.
-
-## 6. Pre-inspection agreement, second review (2026-10-27)
-
-A fresh read of `DEFAULT_AGREEMENT_TEXT` as the client sees it, against AS 4349.3-2010, AS 3660.2-2017 and the ACL. Not legal advice: nobody here is a lawyer, and nobody has the text of the standards. Changing the default changes new agreements only. Agreements already signed keep the exact text they were signed with (`reportData.agreement.text`), and a business with its own wording (`agreementText` in company details) keeps it.
-
-| Clause | Was | Problem | Now | Rating |
-|---|---|---|---|---|
-| 2 What is inspected | "the site within 50 m of the building" | No boundary limit: read literally, it takes in the neighbours' land. Published reports use both "within 30 m" and "within 50 m of the building", always "within the property boundaries". | "within 50 m of the building and inside the property boundary". The 50 m is kept: **check it against the standard** (some reports say 30 m). | should |
-| 3 Limits | Visual and non-invasive; nothing moved or cut | Didn't say what the inspector *does* use. Tapping timbers and a moisture meter are normal and the client should know. Nothing on what happens when damage is found. | Retitled "How we inspect, and the limits". Adds "We may tap timbers and use a moisture meter or other tools that do not damage the building" and "If we find timber damage, we may recommend that a builder or engineer assesses it" (the trade rule: no structural verdict). | should |
-| 5 Access | "coming back to inspect it later may cost extra" | An open-ended charge the client hasn't agreed to. | Names the roof space, subfloor and locked areas, and "we will tell you the cost before we do". | should |
-| 6 The report | "a written report" | The closing line agrees to email delivery; clause 6 didn't say how. | "a written report by email". | could |
-| 7 Voice notes | "What it hears is turned into text… The audio is not kept." | Incomplete. The speech goes to a speech-to-text service (the phone's own, and SAYON's transcription service when the trial setting is on); the text is kept with the report; bystanders can be picked up, and recording laws differ by state. No way for the client to say no. Nothing on the client's details. | Retitled "Voice notes and your details". Says a speech-to-text service turns speech into written notes, the recording is not kept, the notes are kept with the report, and if the client would rather not be recorded the inspector types instead. Adds that their details and the report are only used and shared as needed to provide the service. | must |
-| 8 Fee | "As quoted." when blank | Still fine as a fallback, but the client should sign to a figure. | Unchanged wording. The sheet now shows a note under the Fee box while it's empty. | could |
-| 1, 4, 9, 10, closing | — | Fine. | Unchanged. | — |
-
-Still open: the 50 m figure (above), and whether the inspector's business wants its own privacy wording in clause 7. The sheet now marks any blank the client would sign to ("not filled in") in amber.

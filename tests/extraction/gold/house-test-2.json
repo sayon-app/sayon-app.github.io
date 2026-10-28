@@ -912,11 +912,10 @@
     },
     {
       "id": "no-existing-system",
-      "kind": "equals",
+      "kind": "absent",
       "path": "existingSystem",
-      "values": ["No System Found", null],
       "weight": 3,
-      "why": "said no termite management system: \"No System Found\" (null also passes), never 'None' or a brand"
+      "why": "said no termite management system; the field stays empty, never 'None' or a brand"
     },
     {
       "id": "durable-notice",

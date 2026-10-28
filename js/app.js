@@ -2725,6 +2725,206 @@ function dismissServerTranscript() {
   if (panel) panel.style.display = 'none';
 }
 
+// ── WHISPER LISTENING ─────────────────────────────────────────────────────
+// The phone's own speech service (Web Speech in Safari) badly mishears trade
+// words: "live termites in the front porch post" came back as "last night in
+// Port Coast" in the 28 Oct field test. When the phone is online and signed
+// in, the mic is recorded instead and each phrase is sent to Whisper through
+// the Worker's /transcribe, with the trade vocabulary as a hint. Text lands a
+// moment after each pause, in order. Only one thing uses the mic at a time:
+// Web Speech is the fallback when Whisper can't be used, never alongside it.
+const WHISPER_PAUSE_MS = 1200;       // a pause this long ends a phrase
+const WHISPER_MAX_SEGMENT_MS = 25000; // a phrase is cut here even mid-flow
+const WHISPER_MIN_SPEECH_MS = 300;    // less than this is a cough or a bump
+const WHISPER_POLL_MS = 100;
+// What Whisper is known to "hear" in near-silence.
+const WHISPER_NOISE_RE = /^(?:thank you|thanks for watching|thank you for watching|you|bye|okay|\.)[.!\s]*$/i;
+
+let whisper = null;          // the live session, or null
+let whisperOff = false;      // Whisper failed this visit: use the phone's speech
+let whisperQueue = [];       // phrases sent or waiting, in the order spoken
+let whisperSettleWaiters = [];
+let voiceJobEpoch = 0;       // goes up when the job changes, see clearFilledNotes
+
+function canUseWhisperListening() {
+  const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+  return !isNative && !whisperOff && navigator.onLine && !!authSession?.access_token
+    && isAudioCaptureSupported() && !!(window.AudioContext || window.webkitAudioContext);
+}
+
+// Resolves once every phrase spoken so far has come back (or after a
+// timeout), so a fill never runs before the last words are in.
+function whisperSettled(timeoutMs = 15000) {
+  if (!whisperQueue.length) return Promise.resolve();
+  return new Promise(resolve => {
+    const timer = setTimeout(done, timeoutMs);
+    function done() { clearTimeout(timer); whisperSettleWaiters = whisperSettleWaiters.filter(f => f !== done); resolve(); }
+    whisperSettleWaiters.push(done);
+  });
+}
+
+function whisperShowPending() {
+  const box = document.getElementById('transcriptBox');
+  if (!box) return;
+  const waiting = whisperQueue.length || (whisper && whisper.speechMs >= WHISPER_MIN_SPEECH_MS);
+  box.textContent = currentTranscript + (waiting ? '…' : '');
+  box.classList.toggle('active', !!(currentTranscript || waiting));
+}
+
+// Returns true when Whisper listening started; false means use Web Speech.
+async function startWhisperListening() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  // Made inside the tap, before any await, so iPhone lets it run.
+  const ctx = new Ctx();
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  } catch (err) {
+    try { ctx.close(); } catch (e) {}
+    console.warn('Whisper listening: no mic stream, using the phone\'s speech instead:', err && err.message);
+    return false;
+  }
+  if (!isRecording) { stream.getTracks().forEach(t => t.stop()); try { ctx.close(); } catch (e) {} return true; }
+  try { await ctx.resume(); } catch (e) {}
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 1024;
+  ctx.createMediaStreamSource(stream).connect(analyser);
+  const s = whisper = {
+    ctx, stream, analyser, buf: new Float32Array(analyser.fftSize),
+    recorder: null, chunks: [], startedAt: 0, speechMs: 0, quietMs: 0,
+    floor: 0.01, epoch: voiceJobEpoch, timer: null,
+  };
+  whisperNewSegment(s);
+  s.timer = setInterval(() => whisperTick(s), WHISPER_POLL_MS);
+  return true;
+}
+
+function whisperNewSegment(s) {
+  const mimeType = pickAudioMimeType();
+  const rec = mimeType ? new MediaRecorder(s.stream, { mimeType }) : new MediaRecorder(s.stream);
+  const chunks = [];
+  rec.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+  rec.start();
+  s.recorder = rec; s.chunks = chunks; s.startedAt = Date.now(); s.speechMs = 0; s.quietMs = 0;
+}
+
+function whisperTick(s) {
+  if (whisper !== s) return;
+  s.analyser.getFloatTimeDomainData(s.buf);
+  let sum = 0;
+  for (let i = 0; i < s.buf.length; i++) sum += s.buf[i] * s.buf[i];
+  const rms = Math.sqrt(sum / s.buf.length);
+  const threshold = Math.max(0.012, s.floor * 3);
+  if (rms > threshold) {
+    s.speechMs += WHISPER_POLL_MS; s.quietMs = 0;
+    waveLevel = Math.min(1, Math.max(waveLevel, rms * 8));
+  } else {
+    s.quietMs += WHISPER_POLL_MS;
+    s.floor = s.floor * 0.95 + rms * 0.05; // follows the background noise
+  }
+  if (s.speechMs >= WHISPER_MIN_SPEECH_MS && s.speechMs < WHISPER_MIN_SPEECH_MS + WHISPER_POLL_MS) whisperShowPending();
+  const age = Date.now() - s.startedAt;
+  if ((s.speechMs >= WHISPER_MIN_SPEECH_MS && s.quietMs >= WHISPER_PAUSE_MS) || age >= WHISPER_MAX_SEGMENT_MS) whisperCutSegment(s);
+}
+
+// Ends the current phrase and starts the next one straight away, so no
+// words fall between the two.
+function whisperCutSegment(s, last) {
+  const rec = s.recorder, chunks = s.chunks, hadSpeech = s.speechMs >= WHISPER_MIN_SPEECH_MS;
+  if (!rec) return Promise.resolve();
+  if (!last) whisperNewSegment(s);
+  const entry = hadSpeech ? { text: null, done: false, epoch: s.epoch } : null;
+  if (entry) whisperQueue.push(entry);
+  const finished = new Promise(resolve => {
+    rec.onstop = () => resolve(chunks.length ? new Blob(chunks, { type: rec.mimeType || 'audio/mp4' }) : null);
+    try { rec.stop(); } catch (e) { resolve(null); }
+  });
+  if (!entry) return finished;
+  whisperShowPending();
+  return finished.then(blob => whisperSend(entry, blob, 0));
+}
+
+async function whisperSend(entry, blob, tries) {
+  if (!blob) { entry.done = true; whisperApply(); return; }
+  try {
+    const form = new FormData();
+    const ext = blob.type.includes('mp4') ? 'mp4' : blob.type.includes('ogg') ? 'ogg' : 'webm';
+    form.append('audio', blob, `phrase.${ext}`);
+    // The words just before help Whisper with the next phrase.
+    const context = currentTranscript.trim().slice(-300);
+    form.append('initial_prompt', (buildTranscriptionVocabHint() + ' Say "Stop Sayon" to finish.' + (context ? ' ' + context : '')).slice(-1000));
+    const res = await workerFetch('/transcribe', { method: 'POST', body: form });
+    if (res.status === 502 && /no text/i.test(await res.text().catch(() => ''))) { entry.text = ''; entry.done = true; whisperApply(); return; } // nothing heard
+    if (!res.ok) { const err = new Error('HTTP ' + res.status); err.status = res.status; throw err; }
+    const data = await res.json();
+    entry.text = typeof data?.transcript === 'string' ? data.transcript.trim() : '';
+    entry.done = true;
+    whisperApply();
+  } catch (err) {
+    const status = err && err.status;
+    if (!status && tries < 20) {
+      // No signal: try again once it's back, the words aren't lost.
+      const wait = navigator.onLine ? Math.min(2000 * (tries + 1), 10000) : 0;
+      if (!navigator.onLine) window.addEventListener('online', () => whisperSend(entry, blob, tries + 1), { once: true });
+      else setTimeout(() => whisperSend(entry, blob, tries + 1), wait);
+      return;
+    }
+    console.warn('Whisper listening failed, using the phone\'s speech instead:', err && err.message);
+    entry.text = ''; entry.done = true;
+    whisperApply();
+    whisperFallBack(status === 429 ? 'Monthly AI allowance reached. Using the phone\'s own speech for now' : 'Using the phone\'s own speech for now');
+  }
+}
+
+// Adds finished phrases to the transcript in the order they were spoken.
+function whisperApply() {
+  while (whisperQueue.length && whisperQueue[0].done) {
+    const entry = whisperQueue.shift();
+    let text = (entry.text || '').trim();
+    if (!text || WHISPER_NOISE_RE.test(text)) continue;
+    if (entry.epoch !== voiceJobEpoch) { showToast('You changed job before the last words came back, so they were left out', 'info'); continue; }
+    text = correctKnownMishearings(text);
+    const stopAt = text.search(VOICE_STOP_LIVE_RE);
+    if (stopAt >= 0) text = text.slice(0, stopAt).trim();
+    if (text) currentTranscript += text + ' ';
+    pulseWave();
+    if (stopAt >= 0 && isRecording) {
+      stopRecording();
+      playTone(440, 200, 0.2);
+      setTimeout(() => { if (!isRecording && currentTranscript.trim()) processTranscript(); }, 600);
+    }
+    if (!isRecording && currentTranscript.trim()) document.getElementById('extractBtn').disabled = false;
+    saveDraft();
+  }
+  whisperShowPending();
+  if (!whisperQueue.length) whisperSettleWaiters.slice().forEach(f => f());
+}
+
+// Ends the session; the last phrase is still sent. Resolves when the mic
+// is released.
+function stopWhisperListening() {
+  const s = whisper;
+  if (!s) return Promise.resolve();
+  whisper = null;
+  clearInterval(s.timer);
+  const last = whisperCutSegment(s, true);
+  return Promise.resolve(last).catch(() => {}).finally(() => {
+    try { s.stream.getTracks().forEach(t => t.stop()); } catch (e) {}
+    try { s.ctx.close(); } catch (e) {}
+  });
+}
+
+// Whisper can't be used (not set up, allowance used, signed out): finish
+// this recording with the phone's speech, and keep to it for this visit.
+function whisperFallBack(message) {
+  if (whisperOff) return;
+  whisperOff = true;
+  if (!whisper) return;
+  showToast(message, 'info');
+  stopWhisperListening().then(() => { if (isRecording && whisperFallbackListen) whisperFallbackListen(); });
+}
+let whisperFallbackListen = null;
+
 // The wave under the mic moves with what the phone hears: each batch of
 // words it recognises kicks the bars up, and they settle back while it's
 // quiet. It reads the speech results, not the microphone, so it never opens
@@ -2749,7 +2949,8 @@ function driveWave(on) {
 
 function startRecording() {
   const SR = getSpeechRecognitionCtor();
-  if (!SR) { showToast('Speech recognition not supported — tap the transcript box to type instead', 'error'); return; }
+  const useWhisper = canUseWhisperListening();
+  if (!SR && !useWhisper) { showToast('Speech recognition not supported — tap the transcript box to type instead', 'error'); return; }
   track('dictation_started');
 
   lowConfidenceFlagged = false;
@@ -2875,7 +3076,14 @@ function startRecording() {
     };
     recognition.start();
   };
-  listen();
+  whisperFallbackListen = SR ? () => { try { listen(); } catch (e) { stopRecording(); } } : null;
+  if (useWhisper) {
+    recognition = null;
+    startWhisperListening().catch(err => { console.warn('Whisper listening could not start:', err && err.message); stopWhisperListening(); return false; }).then(ok => {
+      if (ok || !isRecording) return;
+      if (whisperFallbackListen) whisperFallbackListen(); else stopRecording();
+    });
+  } else listen();
   holdScreenAwake();
   setPocketLock(true);
   isRecording = true;
@@ -2890,8 +3098,9 @@ function startRecording() {
   // AFTER recognition.start() so the primary, working dictation path is
   // already underway before this second, unproven mic consumer gets
   // involved at all. Fire-and-forget: startAudioCapture() handles its own
-  // errors internally and never throws.
-  startAudioCapture();
+  // errors internally and never throws. Not needed while Whisper is
+  // already listening.
+  if (!useWhisper) startAudioCapture();
 }
 
 // Resolves once recognition has delivered its last result. Web Speech
@@ -2934,6 +3143,7 @@ function releaseScreenAwake() {
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && isRecording) holdScreenAwake(); });
 
 function stopRecording() {
+  stopWhisperListening();
   releaseScreenAwake();
   setPocketLock(false);
   const recognitionEnded = waitForRecognitionEnd(recognition);
@@ -3418,6 +3628,7 @@ function keepFilledNote(note) {
 }
 
 function clearFilledNotes() {
+  voiceJobEpoch++; // words still with Whisper belong to the old job
   const wrap = document.getElementById('transcriptDone');
   if (!wrap) return;
   wrap.querySelector('.transcript-done-text').textContent = '';
@@ -3441,6 +3652,8 @@ async function processTranscript(opts) {
 }
 
 async function runFill({ whileRecording = false } = {}) {
+  // The last phrase may still be with Whisper.
+  if (!whileRecording) await whisperSettled();
   const note = currentTranscript;
   if (!note.trim()) return false;
   setAI('thinking', 'Filling in the report from your note...');

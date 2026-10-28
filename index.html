@@ -283,79 +283,118 @@
         <div class="quote-lock-note" id="quoteLockNote" style="display:none">This job is complete, so the quote is locked. Amend the job from its report to change it.</div>
         <div class="quote-company-gaps" id="quoteCompanyGaps" style="display:none"></div>
 
-        <!-- Who it's for first, then the work and how it'll go, then the
-             terms. Each fold has an icon, bulleted sub-headings inside, and
-             its answers in one line while folded. -->
-        <details class="quote-card quote-fold" id="quoteDetailsFold" ontoggle="this.querySelectorAll('.quote-textarea').forEach(fitQuoteText)">
-          <summary>
-            <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
-            <span class="quote-fold-text"><span class="quote-card-title">Client and quote details</span><span class="quote-fold-sub" id="quoteDetailsSub"></span></span>
-            <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-          </summary>
-          <div class="quote-grid">
-            <div class="fsub">Client</div>
-            <label class="quote-field"><span>Name</span><input class="quote-input" id="qClient" oninput="onQuoteFieldInput()"></label>
-            <label class="quote-field"><span>Phone</span><input class="quote-input" id="qClientPhone" type="tel" inputmode="tel" onchange="tidyPhoneInput(this)" oninput="onQuoteFieldInput()"></label>
-            <label class="quote-field wide"><span>Email</span><input class="quote-input" id="qClientEmail" type="email" oninput="onQuoteFieldInput()"></label>
-            <div class="fsub">Property</div>
-            <label class="quote-field wide"><span>Address</span><input class="quote-input" id="qAddress" oninput="onQuoteFieldInput()"></label>
-            <label class="quote-field wide"><span>Purpose of treatment</span><textarea class="quote-input quote-textarea" id="qProblem" rows="2" placeholder="e.g. Live termites found (front porch post)" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea></label>
-            <div class="fsub">Quote</div>
-            <label class="quote-field"><span>Quote no.</span><input class="quote-input" id="qNumber" oninput="onQuoteFieldInput()"></label>
-            <label class="quote-field"><span>Valid for (days)</span><input class="quote-input" id="qValidDays" type="number" min="1" inputmode="numeric" oninput="onQuoteFieldInput()"></label>
-          </div>
-        </details>
+        <!-- The quote as a guide: four steps on a side line, each holding
+             its part of the job. Writing the quote holds who it's for, the
+             work, the plan and the terms; the others fill in as it goes.
+             renderQuoteAnswer() updates each step in place, so a fold being
+             typed in is never rebuilt. -->
+        <div class="quote-card quote-answer quote-guide" id="quoteAnswer">
+          <div class="quote-card-head"><div class="quote-card-title"><span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 8 2a6 6 0 0 0 3.6-1.2 1 1 0 0 1 1.4.9V15a1 1 0 0 1-.4.8A6 6 0 0 1 16 17c-3 0-5-2-8-2a6 6 0 0 0-4 1.5"/></svg></span>Quote guide</div><div class="quote-card-count" id="quoteGuideCount"></div></div>
+          <ol class="qp">
+            <li class="qp-step" id="qgStep1">
+              <span class="qp-dot">1</span>
+              <div class="qp-body">
+                <div class="qp-title"></div>
+                <div class="qp-text"></div>
+                <div class="qp-extra"></div>
+                <div class="qp-folds">
+                  <details class="quote-card quote-fold" id="quoteDetailsFold" ontoggle="this.querySelectorAll('.quote-textarea').forEach(fitQuoteText)">
+                    <summary>
+                      <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
+                      <span class="quote-fold-text"><span class="quote-card-title">Client and quote details</span><span class="quote-fold-sub" id="quoteDetailsSub"></span></span>
+                      <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </summary>
+                    <div class="quote-grid">
+                      <div class="fsub">Client</div>
+                      <label class="quote-field"><span>Name</span><input class="quote-input" id="qClient" oninput="onQuoteFieldInput()"></label>
+                      <label class="quote-field"><span>Phone</span><input class="quote-input" id="qClientPhone" type="tel" inputmode="tel" onchange="tidyPhoneInput(this)" oninput="onQuoteFieldInput()"></label>
+                      <label class="quote-field wide"><span>Email</span><input class="quote-input" id="qClientEmail" type="email" oninput="onQuoteFieldInput()"></label>
+                      <div class="fsub">Property</div>
+                      <label class="quote-field wide"><span>Address</span><input class="quote-input" id="qAddress" oninput="onQuoteFieldInput()"></label>
+                      <label class="quote-field wide"><span>Purpose of treatment</span><textarea class="quote-input quote-textarea" id="qProblem" rows="2" placeholder="e.g. Live termites found (front porch post)" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea></label>
+                      <div class="fsub">Quote</div>
+                      <label class="quote-field"><span>Quote no.</span><input class="quote-input" id="qNumber" oninput="onQuoteFieldInput()"></label>
+                      <label class="quote-field"><span>Valid for (days)</span><input class="quote-input" id="qValidDays" type="number" min="1" inputmode="numeric" oninput="onQuoteFieldInput()"></label>
+                    </div>
+                  </details>
 
-        <!-- The work, folded to one row with its total until it's opened. -->
-        <details class="quote-card quote-fold quote-work-fold" id="quoteWorkFold">
-          <summary>
-            <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/></svg></span>
-            <span class="quote-fold-text"><span class="quote-card-title">Work to quote</span><span class="quote-fold-sub" id="quoteItemCount"></span></span>
-            <span class="quote-work-total" id="quoteWorkTotal"></span>
-            <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-          </summary>
-          <div id="quoteSystemChoice" class="quote-system-choice" style="display:none"></div>
-          <div class="fsub">The work</div>
-          <div id="quoteItems"></div>
-          <button class="quote-add-btn" onclick="addQuoteItem()">+ Add a line</button>
-          <div class="fsub">Total</div>
-          <div class="quote-totals">
-            <div class="quote-total-row"><span id="qSubtotalLabel">Subtotal (ex GST)</span><span id="qSubtotal">$0.00</span></div>
-            <div class="quote-total-row">
-              <label class="quote-gst-toggle"><input type="checkbox" id="qGst" onchange="onQuoteFieldInput()"> Add GST (10%)</label>
-              <span id="qGstAmt">$0.00</span>
-            </div>
-            <div class="quote-total-row grand"><span>Total</span><span id="qTotal">$0.00</span></div>
-          </div>
-          <div class="quote-hint" id="quoteStartHint"></div>
-          <button class="quote-text-btn" onclick="rebuildQuoteFromReport()">Start the lines again from the report</button>
-        </details>
+                  <!-- The work, folded to one row with its total until it's opened. -->
+                  <details class="quote-card quote-fold quote-work-fold" id="quoteWorkFold">
+                    <summary>
+                      <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/></svg></span>
+                      <span class="quote-fold-text"><span class="quote-card-title">Work to quote</span><span class="quote-fold-sub" id="quoteItemCount"></span></span>
+                      <span class="quote-work-total" id="quoteWorkTotal"></span>
+                      <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </summary>
+                    <div id="quoteSystemChoice" class="quote-system-choice" style="display:none"></div>
+                    <div class="fsub">The work</div>
+                    <div id="quoteItems"></div>
+                    <button class="quote-add-btn" onclick="addQuoteItem()">+ Add a line</button>
+                    <div class="fsub">Total</div>
+                    <div class="quote-totals">
+                      <div class="quote-total-row"><span id="qSubtotalLabel">Subtotal (ex GST)</span><span id="qSubtotal">$0.00</span></div>
+                      <div class="quote-total-row">
+                        <label class="quote-gst-toggle"><input type="checkbox" id="qGst" onchange="onQuoteFieldInput()"> Add GST (10%)</label>
+                        <span id="qGstAmt">$0.00</span>
+                      </div>
+                      <div class="quote-total-row grand"><span>Total</span><span id="qTotal">$0.00</span></div>
+                    </div>
+                    <div class="quote-hint" id="quoteStartHint"></div>
+                    <button class="quote-text-btn" onclick="rebuildQuoteFromReport()">Start the lines again from the report</button>
+                  </details>
 
-        <details class="quote-card quote-fold" id="quotePlanFold" ontoggle="this.querySelectorAll('.quote-textarea').forEach(fitQuoteText)">
-          <summary>
-            <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg></span>
-            <span class="quote-fold-text"><span class="quote-card-title">Treatment plan</span><span class="quote-fold-sub" id="quotePlanSub"></span></span>
-            <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-          </summary>
-          <div id="quotePlanBody" class="qp-body"></div>
-        </details>
+                  <details class="quote-card quote-fold" id="quotePlanFold" ontoggle="this.querySelectorAll('.quote-textarea').forEach(fitQuoteText)">
+                    <summary>
+                      <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg></span>
+                      <span class="quote-fold-text"><span class="quote-card-title">Treatment plan</span><span class="quote-fold-sub" id="quotePlanSub"></span></span>
+                      <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </summary>
+                    <div id="quotePlanBody" class="qp-body"></div>
+                  </details>
 
-        <details class="quote-card quote-fold" id="quoteTermsFold" ontoggle="this.querySelectorAll('.quote-textarea').forEach(fitQuoteText)">
-          <summary>
-            <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span>
-            <span class="quote-fold-text"><span class="quote-card-title">Terms and exclusions</span><span class="quote-fold-sub" id="quoteTermsSub"></span></span>
-            <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-          </summary>
-          <div class="fsub">Payment</div>
-          <textarea class="quote-input quote-textarea" id="qPaymentTerms" rows="2" aria-label="Payment terms" placeholder="e.g. 50% deposit to book, balance on completion" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea>
-          <div class="fsub">Exclusions and work by others<button type="button" class="link-btn fsub-action" onclick="editQuoteList('qExclusions')">Edit</button></div>
-          <textarea class="quote-input quote-textarea" id="qExclusions" rows="5" data-qlist="No exclusions. Tap to add one." aria-label="Exclusions and work by others, one per line" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea>
-          <div class="quote-hint">Filled in from builder referrals, moisture sources and areas the report couldn't reach.</div>
-          <div class="fsub">Terms and notes</div>
-          <textarea class="quote-input quote-textarea" id="qNotes" rows="4" aria-label="Terms and notes" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea>
-        </details>
-
-        <div class="quote-card quote-answer" id="quoteAnswer" style="display:none"></div>
+                  <details class="quote-card quote-fold" id="quoteTermsFold" ontoggle="this.querySelectorAll('.quote-textarea').forEach(fitQuoteText)">
+                    <summary>
+                      <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span>
+                      <span class="quote-fold-text"><span class="quote-card-title">Terms and exclusions</span><span class="quote-fold-sub" id="quoteTermsSub"></span></span>
+                      <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </summary>
+                    <div class="fsub">Payment</div>
+                    <textarea class="quote-input quote-textarea" id="qPaymentTerms" rows="2" aria-label="Payment terms" placeholder="e.g. 50% deposit to book, balance on completion" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea>
+                    <div class="fsub">Exclusions and work by others<button type="button" class="link-btn fsub-action" onclick="editQuoteList('qExclusions')">Edit</button></div>
+                    <textarea class="quote-input quote-textarea" id="qExclusions" rows="5" data-qlist="No exclusions. Tap to add one." aria-label="Exclusions and work by others, one per line" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea>
+                    <div class="quote-hint">Filled in from builder referrals, moisture sources and areas the report couldn't reach.</div>
+                    <div class="fsub">Terms and notes</div>
+                    <textarea class="quote-input quote-textarea" id="qNotes" rows="4" aria-label="Terms and notes" oninput="fitQuoteText(this); onQuoteFieldInput()"></textarea>
+                  </details>
+                </div>
+              </div>
+            </li>
+            <li class="qp-step" id="qgStep2">
+              <span class="qp-dot">2</span>
+              <div class="qp-body">
+                <div class="qp-title"></div>
+                <div class="qp-text"></div>
+                <div class="qp-extra"></div>
+              </div>
+            </li>
+            <li class="qp-step" id="qgStep3">
+              <span class="qp-dot">3</span>
+              <div class="qp-body">
+                <div class="qp-title"></div>
+                <div class="qp-text"></div>
+                <div class="qp-extra"></div>
+              </div>
+            </li>
+            <li class="qp-step" id="qgStep4">
+              <span class="qp-dot">4</span>
+              <div class="qp-body">
+                <div class="qp-title"></div>
+                <div class="qp-text"></div>
+                <div class="qp-extra"></div>
+              </div>
+            </li>
+          </ol>
+        </div>
       </div>
     </div>
   </div>

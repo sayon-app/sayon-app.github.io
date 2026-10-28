@@ -513,7 +513,7 @@ function quotePlanSummary(q) {
   if (!p) return ['No plan yet', true];
   const steps = (p.we || '').split('\n').filter(l => l.trim()).length + (p.owner || '').split('\n').filter(l => l.trim()).length;
   const bits = [`${steps} step${steps === 1 ? '' : 's'}`];
-  bits.push(p.time ? p.time : 'job time not set');
+  bits.push(p.time ? (QUOTE_PLAN_TIMES.includes(p.time) ? p.time.charAt(0).toLowerCase() + p.time.slice(1) + ' on site' : p.time) : 'job time not set');
   bits.push(p.service ? (p.service === 'None' ? 'no service period' : `${p.service} service`) : 'service period not set');
   return [bits.join(', '), !p.time || !p.service];
 }
@@ -538,21 +538,57 @@ function renderQuotePlan() {
       <button class="quote-btn" style="margin-top:10px" onclick="addQuotePlan()">Add a plan from the report</button>`;
     return;
   }
+  // The two lists of steps read as bullets, and the timing as a side line
+  // from the day of the job to the inspections after it.
   body.innerHTML = `
-    <label class="quote-field"><span>What we'll do, one step per line</span>
-      <textarea class="quote-input quote-textarea" id="qPlanWe" rows="3" oninput="fitQuoteText(this); onQuotePlanInput()">${escapeHtml(p.we || '')}</textarea>
-    </label>
-    <label class="quote-field"><span>What we ask the owner to do, one per line</span>
-      <textarea class="quote-input quote-textarea" id="qPlanOwner" rows="3" placeholder="e.g. Keep garden beds below the weep holes" oninput="fitQuoteText(this); onQuotePlanInput()">${escapeHtml(p.owner || '')}</textarea>
-    </label>
-    <div class="quote-field"><span>Time on site</span><div class="qp-chips">${quotePlanChipsHTML('time', QUOTE_PLAN_TIMES, p.time)}</div></div>
-    <div class="quote-field"><span>Free service period</span><div class="qp-chips">${quotePlanChipsHTML('service', QUOTE_PLAN_SERVICE, p.service)}</div></div>
-    ${p.service && p.service !== 'None' ? '<div class="quote-hint" style="margin-top:6px">The quote says it only holds while the recommended inspections are kept up and the owner does their part.</div>' : ''}
-    <label class="quote-field"><span>Timber pest inspections after</span>
-      <input class="quote-input" id="qPlanInspections" placeholder="e.g. Every 12 months" value="${escapeHtml(p.inspections || '')}" oninput="onQuotePlanInput()">
-    </label>
+    <div class="fsub">What we'll do<button type="button" class="link-btn fsub-action" onclick="editQuoteList('qPlanWe')">Edit</button></div>
+    <textarea class="quote-input quote-textarea" id="qPlanWe" rows="3" data-qlist="No steps yet. Tap to add one." aria-label="What we'll do, one step per line" oninput="fitQuoteText(this); onQuotePlanInput()">${escapeHtml(p.we || '')}</textarea>
+    <div class="fsub">What the owner does<button type="button" class="link-btn fsub-action" onclick="editQuoteList('qPlanOwner')">Edit</button></div>
+    <textarea class="quote-input quote-textarea" id="qPlanOwner" rows="3" data-qlist="Nothing asked of the owner yet. Tap to add." aria-label="What we ask the owner to do, one per line" placeholder="e.g. Keep garden beds below the weep holes" oninput="fitQuoteText(this); onQuotePlanInput()">${escapeHtml(p.owner || '')}</textarea>
+    <div class="fsub">Timing</div>
+    <div class="q-line">
+      <div class="quote-field"><span>On the day: time on site</span><div class="qp-chips">${quotePlanChipsHTML('time', QUOTE_PLAN_TIMES, p.time)}</div></div>
+      <div class="quote-field"><span>After: free service period</span><div class="qp-chips">${quotePlanChipsHTML('service', QUOTE_PLAN_SERVICE, p.service)}</div>
+        ${p.service && p.service !== 'None' ? '<div class="quote-hint">The quote says it only holds while the recommended inspections are kept up and the owner does their part.</div>' : ''}</div>
+      <label class="quote-field"><span>Then: timber pest inspections</span>
+        <input class="quote-input" id="qPlanInspections" placeholder="e.g. Every 12 months" value="${escapeHtml(p.inspections || '')}" oninput="onQuotePlanInput()">
+      </label>
+    </div>
     <button class="quote-text-btn" onclick="rebuildQuotePlan()">Start the plan again from the report</button>`;
+  syncQuoteLists();
   body.querySelectorAll('.quote-textarea').forEach(fitQuoteText);
+}
+
+// A one-per-line box reads as a bulleted list until it's tapped, then
+// opens as the box to type in, and goes back to a list when left.
+function syncQuoteLists() {
+  document.querySelectorAll('#quoteEditor textarea[data-qlist]').forEach(ta => {
+    if (document.activeElement === ta) return;
+    let list = ta.previousElementSibling;
+    if (!list || !list.classList.contains('qlist')) {
+      list = document.createElement('div');
+      list.className = 'qlist';
+      list.setAttribute('role', 'button');
+      list.tabIndex = 0;
+      list.setAttribute('aria-label', 'Edit: ' + (ta.getAttribute('aria-label') || 'list'));
+      list.addEventListener('click', () => editQuoteList(ta.id));
+      list.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); editQuoteList(ta.id); } });
+      ta.before(list);
+      ta.addEventListener('blur', () => setTimeout(syncQuoteLists, 0));
+    }
+    const lines = ta.value.split('\n').map(l => l.trim()).filter(Boolean);
+    list.innerHTML = lines.length ? `<ul>${lines.map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ul>` : `<span class="qlist-empty">${escapeHtml(ta.dataset.qlist)}</span>`;
+    list.hidden = false;
+    ta.hidden = true;
+  });
+}
+function editQuoteList(id) {
+  const ta = document.getElementById(id);
+  if (!ta) return;
+  if (ta.previousElementSibling && ta.previousElementSibling.classList.contains('qlist')) ta.previousElementSibling.hidden = true;
+  ta.hidden = false;
+  fitQuoteText(ta);
+  ta.focus();
 }
 
 function addQuotePlan() {
@@ -743,6 +779,7 @@ function renderQuoteEditor() {
   renderQuoteFolds();
   renderQuotePlan();
   renderQuoteAnswer();
+  syncQuoteLists();
   ['qProblem', 'qPaymentTerms', 'qExclusions', 'qNotes'].forEach(id => fitQuoteText(document.getElementById(id)));
 }
 
@@ -1049,6 +1086,7 @@ function rebuildQuoteFromReport() {
   quoteState.problem = buildQuoteProblem(src.reportData);
   document.getElementById('qExclusions').value = quoteState.exclusions;
   document.getElementById('qProblem').value = quoteState.problem;
+  syncQuoteLists();
   quoteOpenItems.clear();
   renderQuoteItems();
   renderQuoteFolds();
@@ -1112,8 +1150,8 @@ function renderQuoteAnswer() {
 
   const priced = {
     title: 'Priced', state: sentNow || answered ? 'done' : 'now',
-    text: `${n} line${n === 1 ? '' : 's'} · ${formatAUD(quoteTotals(q).total)}${q.gst !== false ? ' inc GST' : ''}`
-      + (starting ? ` · ${starting} starting price${starting === 1 ? '' : 's'} to check` : ''),
+    text: `${n} line${n === 1 ? '' : 's'}, ${formatAUD(quoteTotals(q).total)}${q.gst !== false ? ' inc GST' : ''}`
+      + (starting ? `, ${starting} starting price${starting === 1 ? '' : 's'} to check` : ''),
   };
   const sent = !q.sentAt
     ? { title: 'Sent to the client', state: answered ? 'skip' : 'todo', text: answered ? 'Not needed. They answered before it was sent.' : 'Not sent yet. Send it from the bar below.' }
@@ -1139,7 +1177,7 @@ function renderQuoteAnswer() {
     const how = a.status === 'accepted' ? (QUOTE_ANSWER_METHODS[a.method] || '') : '';
     answer = {
       title: 'Client\'s answer', state: a.stale ? 'warn' : a.status === 'accepted' ? 'done' : 'bad',
-      text: `<strong>${a.status === 'accepted' ? 'Accepted' : 'Declined'}</strong> by ${esc(a.by)} on ${esc(formatAnswerDate(a.date))}${how ? ` · ${esc(how)}` : ''}`,
+      text: `<strong>${a.status === 'accepted' ? 'Accepted' : 'Declined'}</strong> by ${esc(a.by)} on ${esc(formatAnswerDate(a.date))}${how ? `, ${esc(how)}` : ''}`,
       extra: `${a.note ? `<div class="quote-answer-note">${esc(a.note)}</div>` : ''}
         ${isSignatureImage(a.signature) ? `<img class="quote-answer-sig" src="${a.signature}" alt="Client signature">` : ''}
         ${a.stale ? '<div class="quote-answer-warn">The quote has changed since then. Send the new version and record the client\'s answer again.</div>' : ''}
@@ -1161,7 +1199,7 @@ function renderQuoteAnswer() {
   // A step the job didn't need counts as done, so progress still reaches 4 of 4.
   const done = steps.filter(st => st.state === 'done' || st.state === 'skip').length;
   const tick = '<svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
-  el.innerHTML = `<div class="quote-card-head"><div class="quote-card-title">Progress</div><div class="quote-card-count">${done} of 4 done</div></div>
+  el.innerHTML = `<div class="quote-card-head"><div class="quote-card-title"><span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 8 2a6 6 0 0 0 3.6-1.2 1 1 0 0 1 1.4.9V15a1 1 0 0 1-.4.8A6 6 0 0 1 16 17c-3 0-5-2-8-2a6 6 0 0 0-4 1.5"/></svg></span>Progress</div><div class="quote-card-count">${done} of 4 done</div></div>
     <ol class="qp">${steps.map((st, i) => `<li class="qp-step ${st.state}">
         <span class="qp-dot">${st.state === 'done' ? tick : st.state === 'skip' ? '–' : i + 1}</span>
         <div class="qp-body">

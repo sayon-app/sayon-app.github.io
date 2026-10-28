@@ -3429,12 +3429,31 @@ function noteForEarlierJob(target, note) {
   entry.savedAt = Date.now();
   if (!setSavedReports(reports)) return;
   supabaseSave(entry, true);
+  keepFilledNote(note);
   currentTranscript = currentTranscript.startsWith(note) ? currentTranscript.slice(note.length).trimStart() : '';
   saveDraft();
   const box = document.getElementById('transcriptBox');
   box.textContent = currentTranscript || 'Tap the mic and start speaking, or tap here to type instead.';
   box.classList.toggle('active', !!currentTranscript);
   showToast(`That note will fill in ${entry.address || 'the last job'} next time you open it`, 'info');
+}
+
+// A note that has gone into the report leaves the box, so it isn't sent
+// twice, but stays readable above it until the job changes.
+function keepFilledNote(note) {
+  const text = String(note || '').trim();
+  const wrap = document.getElementById('transcriptDone');
+  if (!text || !wrap) return;
+  const body = wrap.querySelector('.transcript-done-text');
+  body.textContent = (body.textContent ? body.textContent + ' ' : '') + text;
+  wrap.hidden = false;
+}
+
+function clearFilledNotes() {
+  const wrap = document.getElementById('transcriptDone');
+  if (!wrap) return;
+  wrap.querySelector('.transcript-done-text').textContent = '';
+  wrap.hidden = true;
 }
 
 let fillRunning = false, fillAgain = false;
@@ -3521,6 +3540,7 @@ async function runFill({ whileRecording = false } = {}) {
   // On a phone the popover closes to show the filled report, unless the
   // inspector is already dictating again or has closed it themselves.
   if (window.innerWidth <= 768 && !whileRecording && !isRecording && document.getElementById('voicePopover').classList.contains('open')) toggleVoicePopover();
+  keepFilledNote(note);
   currentTranscript = currentTranscript.startsWith(note) ? currentTranscript.slice(note.length).trimStart() : '';
   saveDraft();
   const box = document.getElementById('transcriptBox');
@@ -9660,6 +9680,7 @@ function loadReport(id, quiet) {
     // A report with no address yet is never saved, so it's dropped here,
     // and so is the quote made for it.
     if (!currentReportId && typeof forgetDraftQuote === 'function') forgetDraftQuote();
+    clearFilledNotes();
   }
   const reports = getSavedReports();
   const entry = reports.find(r => r.id === id);
@@ -10046,6 +10067,7 @@ function startBlankReport() {
   // Before the reset, so the banners it redraws don't show the last job's
   // quote and certificate.
   if (!currentReportId && typeof forgetDraftQuote === 'function') forgetDraftQuote();
+  clearFilledNotes();
   currentReportId = null;
   resetReportState();
   document.getElementById('jobAddress').value = '';

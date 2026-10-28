@@ -1792,7 +1792,7 @@
     </div><!-- /mainPanel -->
 
   <!-- POCKET LOCK: covers the page while recording, under the voice popover -->
-  <div class="pocket-shield" id="pocketShield" hidden><span>Screen locked while recording. Hold Stop to unlock.</span></div>
+  <div class="pocket-shield" id="pocketShield" hidden><span>Screen locked while recording. Tap Stop to unlock.</span></div>
   <!-- VOICE POPOVER -->
   <div class="voice-popover" id="voicePopover">
     <div class="voice-popover-header">
@@ -1800,7 +1800,7 @@
       <button class="voice-popover-close" onclick="toggleVoicePopover()"><svg class="icon " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
     </div>
 
-    <button class="voice-btn" id="voiceBtn" onclick="toggleRecording()" onpointerdown="onVoiceBtnDown()" onpointerup="onVoiceBtnUp()" onpointercancel="onVoiceBtnUp()" onpointerleave="onVoiceBtnUp()">
+    <button class="voice-btn" id="voiceBtn" onclick="toggleRecording()">
       <svg class="mic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
         <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>

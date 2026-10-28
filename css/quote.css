@@ -452,3 +452,21 @@ textarea.quote-input[hidden] { display: none; }
 .quote-fold > .quote-add-btn { width: calc(100% - 28px); }
 .quote-answer .quote-card-head .quote-card-title { display: flex; align-items: center; gap: 10px; }
 .quote-fold-sub { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; line-height: 1.35; }
+
+/* ── The quote guide: Progress holds the whole quote. Step 1's folds sit
+   inside it as lighter cards, on the same side line as the steps. ── */
+.qp-folds { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.qp-extra[hidden] { display: none; }
+.qp-extra:empty { display: none; }
+.quote-guide .qp-folds .quote-fold { border: 1px solid var(--border); border-radius: 12px; }
+body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--border); box-shadow: 0 1px 3px rgba(13,40,60,0.08); }
+.quote-guide .qp-folds .quote-fold > summary { padding: 12px 10px; min-height: 56px; gap: 10px; }
+.quote-guide .qp-folds .quote-fold[open] > summary { padding-bottom: 12px; margin-bottom: 12px; }
+.quote-guide .qp-folds .quote-fold > :not(summary) { margin-left: 12px; margin-right: 12px; }
+.quote-guide .qp-folds .quote-fold > .quote-add-btn { width: calc(100% - 24px); }
+.quote-guide .qp-folds .fgroup-icon { width: 32px; height: 32px; border-radius: 9px; }
+.quote-guide .qp-folds .quote-card-title { font-size: 15.5px; }
+.quote-guide .qp-folds .quote-work-total { font-size: 15px; }
+.quote-guide > .qp > .qp-step > .qp-body { min-width: 0; }
+.quote-card.quote-guide { padding: 14px 12px; }
+.quote-guide > .qp > .qp-step { gap: 10px; }

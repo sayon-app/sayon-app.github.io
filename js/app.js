@@ -10554,8 +10554,8 @@ function openDashboardJob(id, to) {
   openQuote('app', id);
   if (to === 'treatment') openTreatmentRecord();
   if (to === 'answer' || to === 'certificate') {
-    const card = document.getElementById('quoteAnswer');
-    if (card && card.style.display !== 'none') card.scrollIntoView({ block: 'center' });
+    const step = document.getElementById('qgStep3');
+    if (step) step.scrollIntoView({ block: 'center' });
   }
   // The certificate's Email button, lit so it's the obvious next tap.
   if (to === 'certificate') {

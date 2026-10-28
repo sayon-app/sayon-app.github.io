@@ -1649,7 +1649,7 @@ const SYSTEM_PROMPT = `You extract report fields for SAYON, an app that Australi
 THE ONE RULE: a field holds only what the inspector said or plainly meant. Never guess, infer from typical houses, or complete a pattern. When a value is not in the note, it is null. When the note is ambiguous, prefer null over a guess for YES/NO and dropdown fields, and keep the inspector's own words for text fields.
 
 FIELDS (every one null unless the note gives it):
-{"propertyStreetAddress":string,"propertySuburb":string,"propertyState":"NSW"|"VIC"|"QLD"|"WA"|"SA"|"TAS"|"ACT"|"NT","propertyPostcode":string,"clientName":string,"inspectionType":"Annual — Existing Building"|"Pre-Purchase — Timber Pest"|"Pre-Purchase — Combined Building & Pest"|"New Construction — Completion"|"Treatment Follow-Up"|"Re-inspection"|"Insurance / Legal",
+{"propertyStreetAddress":string,"propertySuburb":string,"propertyState":"NSW"|"VIC"|"QLD"|"WA"|"SA"|"TAS"|"ACT"|"NT","propertyPostcode":string,"clientName":string,"clientPhone":string,"clientEmail":string,"inspectionFee":string,"accessNotes":string,"inspectionType":"Annual — Existing Building"|"Pre-Purchase — Timber Pest"|"Pre-Purchase — Combined Building & Pest"|"New Construction — Completion"|"Treatment Follow-Up"|"Re-inspection"|"Insurance / Legal",
 "structureType":string,"height":string,"wallConstruction":string,"roofType":string,"floorType":string,"facadeDirection":string,"constructionEra":"Pre-1920s"|"1920s-1940s"|"1945-1965"|"1965-1985"|"1985-2003"|"Post-2003","occupancyStatus":string,"furnishing":string,"peoplePresent":string,"weatherConditions":string,"temperature":string,"humidity":string,"rainLast24h":string,"recentWeather":string,"toolsUsed":string,"siteSurroundings":string,"siteSlope":string,"termiteHistory":string,
 "existingSystem":string,"existingSystemOther":string,"durableNoticePresent":"YES"|"NO","hardLandscaping":"YES"|"NO","zone25mmVisible":"YES"|"NO","softLandscaping":"YES"|"NO","zone75mmVisible":"YES"|"NO","antCapSoldered":"YES"|"NO"|"N/A",
 "areaStatus":{"interior"|"exterior"|"subfloor"|"roofvoid"|"outbuildings"|"site"|"fences"|"retainingwalls"|"landscapingtimbers":"INSPECTED"|"PARTIAL"|"NOT"|"NA"},"areaResult":{same area keys:"CLEAR"|"FOUND"},"obstructions":string,"restrictedAccess":string,"noAccessAreas":string,"highRiskAreas":string,"hinderedAreas":string,"hinderedAreasDetail":string,
@@ -1775,7 +1775,7 @@ HOW TO READ DICTATION:
 - Brand names in the wrong slot are ordinary words: "active Termimesh in the tree" is active termites; "Exterra perimeter" is the exterior perimeter; "Sentricon" or "Termidor" in a sentence about the outside wall is probably "centre", "exterior" or "termite". A brand is real ONLY when the inspector says it is installed, is on the durable notice, or is what they recommend. Then it goes in existingSystemOther or treatmentType, nowhere else.
 - A Latin-sounding mangle in a species slot is a genus (see species). "Termite door" or "terminator" in a treatment slot is Termidor; "cold on" / "quote on" before "physical barrier" is Kordon.
 
-ADDRESS AND CLIENT: fill propertyStreetAddress, propertySuburb, propertyState, propertyPostcode and clientName only from words actually spoken ("inspection at 14 Wattle Court, client Priya Nair"). A street name that is also a suburb is still the street. Never infer a suburb, state or postcode, and never take a name from anywhere else in the note. Spoken state names become their abbreviation.`;
+ADDRESS AND CLIENT: clientPhone and clientEmail only as said (spoken email words become symbols: "jo at example dot com" is jo@example.com). inspectionFee: the fee for this inspection as "$350", only when said. accessNotes: how to get in or around the property (gate code, key, dog, agent to call), in brief. Fill propertyStreetAddress, propertySuburb, propertyState, propertyPostcode and clientName only from words actually spoken ("inspection at 14 Wattle Court, client Priya Nair"). A street name that is also a suburb is still the street. Never infer a suburb, state or postcode, and never take a name from anywhere else in the note. Spoken state names become their abbreviation.`;
 
 // System prompt for the "scan compliance plate" photo feature — a separate,
 // narrow prompt (not the giant voice SYSTEM_PROMPT above) for reading a
@@ -4427,6 +4427,10 @@ function populateFields(data, transcript) {
     propertyState: 'jobState',
     propertyPostcode: 'jobPostcode',
     clientName: 'jobClient',
+    clientPhone: 'jobClientPhone',
+    clientEmail: 'jobClientEmail',
+    inspectionFee: 'jobFee',
+    accessNotes: 'jobNotes',
   };
   let jobFieldsChanged = false;
   Object.entries(jobFieldMap).forEach(([key, elId]) => {
@@ -4438,7 +4442,7 @@ function populateFields(data, transcript) {
       jobFieldsChanged = true;
     }
   });
-  if (jobFieldsChanged) updateJob();
+  if (jobFieldsChanged) { saveJobInfo(); updateJob(); }
 
   if (data.inspectionType) {
     const sel = document.getElementById('jobInspectionType');
@@ -6604,6 +6608,220 @@ function restoreSignaturePads() {
   renderAgreementBanner();
 }
 
+// ── SAY IT INSTEAD ──────────────────────────────────────────────────────
+// The agreement and the treatment record can be spoken as well as typed:
+// a "Say it instead" button at the top of each sheet records one note,
+// Whisper hears it (or the phone's own speech when Whisper can't be
+// reached), and a short AI call fills the sheet's boxes from it. Every box
+// stays editable, and a box the note doesn't mention is left as it was.
+// SHEET_VOICE[kind] = { box, prompt(), apply(fields) }; the prompts live
+// with their sheets (agreement below, treatment in js/treatment.js).
+const SHEET_VOICE_MAX_MS = 180000;
+let sheetVoice = null;   // { kind, recorder, stream, chunks, recognition, text, timer }
+
+function sheetVoiceKinds() {
+  return {
+    agreement: { box: 'agreementVoice', prompt: agreementVoicePrompt, apply: applyAgreementVoice },
+    treatment: { box: 'trVoice', prompt: typeof treatmentVoicePrompt === 'function' ? treatmentVoicePrompt : null, apply: typeof applyTreatmentVoice === 'function' ? applyTreatmentVoice : null },
+  };
+}
+
+function setSheetVoiceState(kind, state, text) {
+  const box = document.getElementById(sheetVoiceKinds()[kind].box);
+  if (!box) return;
+  box.dataset.state = state;
+  const label = box.querySelector('.sheet-voice-label');
+  if (label) label.textContent = { idle: 'Say it instead', listening: 'Listening… tap to stop', hearing: 'Hearing it…', filling: 'Filling it in…' }[state] || 'Say it instead';
+  const btn = box.querySelector('.sheet-voice-btn');
+  if (btn) btn.disabled = state === 'hearing' || state === 'filling';
+  const said = box.querySelector('.sheet-voice-text');
+  if (said && text !== undefined) { said.textContent = text; said.hidden = !text; }
+}
+
+function toggleSheetVoice(kind) {
+  if (sheetVoice) { if (sheetVoice.kind === kind) stopSheetVoice(); return; }
+  if (isRecording) { showToast('Stop the report recording first', 'error'); return; }
+  if (!navigator.onLine) { showToast('Needs a signal to fill it in. Type it for now', 'error'); return; }
+  if (!authSession?.access_token) { showToast('Sign in first', 'error'); return; }
+  const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+  if (!isNative && !whisperOff && isAudioCaptureSupported()) startSheetRecorder(kind);
+  else startSheetRecognition(kind);
+}
+
+async function startSheetRecorder(kind) {
+  sheetVoice = { kind, chunks: [] };
+  setSheetVoiceState(kind, 'listening', '');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    if (!sheetVoice || sheetVoice.kind !== kind) { stream.getTracks().forEach(t => t.stop()); return; }
+    const type = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
+    const recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+    recorder.ondataavailable = e => { if (e.data && e.data.size) sheetVoice && sheetVoice.chunks.push(e.data); };
+    recorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      const v = sheetVoice;
+      if (!v) return;
+      const blob = new Blob(v.chunks, { type: recorder.mimeType || 'audio/webm' });
+      sheetVoiceHear(kind, blob);
+    };
+    Object.assign(sheetVoice, { stream, recorder, timer: setTimeout(stopSheetVoice, SHEET_VOICE_MAX_MS) });
+    recorder.start(1000);
+  } catch (e) {
+    sheetVoice = null;
+    setSheetVoiceState(kind, 'idle');
+    showToast('Microphone not allowed. Check the microphone permission', 'error');
+  }
+}
+
+function startSheetRecognition(kind) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition || (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() ? NativeSpeechRecognition : null);
+  if (!SR) { showToast('Voice isn\'t available on this phone. Type it instead', 'error'); return; }
+  const recognition = new SR();
+  recognition.continuous = true; recognition.interimResults = true; recognition.lang = 'en-AU';
+  sheetVoice = { kind, recognition, text: '', finals: '' };
+  recognition.onresult = e => {
+    if (!sheetVoice) return;
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) sheetVoice.finals += e.results[i][0].transcript + ' ';
+      else interim += e.results[i][0].transcript;
+    }
+    sheetVoice.text = (sheetVoice.finals + interim).trim();
+    setSheetVoiceState(kind, 'listening', sheetVoice.text);
+  };
+  recognition.onerror = () => {};
+  recognition.onend = () => {
+    // Safari ends a long listen on its own; carry on until Stop is tapped.
+    if (sheetVoice && sheetVoice.recognition === recognition && !sheetVoice.stopping) { try { recognition.start(); } catch (e) { stopSheetVoice(); } return; }
+    if (sheetVoice && sheetVoice.recognition === recognition) { const text = sheetVoice.text; sheetVoice = null; sheetVoiceFill(kind, text); }
+  };
+  sheetVoice.timer = setTimeout(stopSheetVoice, SHEET_VOICE_MAX_MS);
+  setSheetVoiceState(kind, 'listening', '');
+  try { recognition.start(); } catch (e) { sheetVoice = null; setSheetVoiceState(kind, 'idle'); showToast('Couldn\'t start listening', 'error'); }
+}
+
+function stopSheetVoice() {
+  const v = sheetVoice;
+  if (!v) return;
+  clearTimeout(v.timer);
+  if (v.recorder) { if (v.recorder.state !== 'inactive') v.recorder.stop(); return; }
+  if (v.recognition) { v.stopping = true; try { v.recognition.stop(); } catch (e) { sheetVoice = null; sheetVoiceFill(v.kind, v.text); } }
+}
+
+// Closing a sheet stops its listening and throws the words away.
+function cancelSheetVoice(kind) {
+  const v = sheetVoice;
+  if (!v || v.kind !== kind) { setSheetVoiceState(kind, 'idle', ''); return; }
+  sheetVoice = null;
+  clearTimeout(v.timer);
+  try { if (v.recorder && v.recorder.state !== 'inactive') { v.recorder.onstop = null; v.recorder.stop(); } } catch (e) {}
+  if (v.stream) v.stream.getTracks().forEach(t => t.stop());
+  try { if (v.recognition) { v.recognition.onend = null; v.recognition.abort(); } } catch (e) {}
+  setSheetVoiceState(kind, 'idle', '');
+}
+
+async function sheetVoiceHear(kind, blob) {
+  sheetVoice = null;
+  setSheetVoiceState(kind, 'hearing');
+  try {
+    const form = new FormData();
+    const ext = blob.type.includes('mp4') ? 'mp4' : blob.type.includes('ogg') ? 'ogg' : 'webm';
+    form.append('audio', blob, `note.${ext}`);
+    form.append('initial_prompt', buildTranscriptionVocabHint().slice(-1000));
+    const res = await workerFetch('/transcribe', { method: 'POST', body: form });
+    if (res.status === 502 && /no text/i.test(await res.clone().text().catch(() => ''))) { setSheetVoiceState(kind, 'idle', ''); showToast('Didn\'t catch anything. Try again closer to the phone', 'info'); return; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const text = correctKnownMishearings(typeof data?.transcript === 'string' ? data.transcript.trim() : '');
+    sheetVoiceFill(kind, text);
+  } catch (e) {
+    setSheetVoiceState(kind, 'idle', '');
+    showToast('Couldn\'t hear that one. Try again, or type it', 'error');
+  }
+}
+
+async function sheetVoiceFill(kind, text) {
+  const k = sheetVoiceKinds()[kind];
+  text = (text || '').trim();
+  if (!text) { setSheetVoiceState(kind, 'idle', ''); showToast('Didn\'t catch anything. Try again', 'info'); return; }
+  setSheetVoiceState(kind, 'filling', text);
+  try {
+    const res = await workerFetch('', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        max_tokens: 4000,
+        output_config: { effort: 'low' },
+        system: k.prompt(),
+        messages: [{ role: 'user', content: `Today is ${todayIsoDate()}.\n\n${text}` }],
+      }),
+    });
+    const raw = await res.text();
+    if (!res.ok) { const err = new Error('HTTP ' + res.status); err.status = res.status; throw err; }
+    const data = JSON.parse(raw);
+    const answer = (data.content || []).map(c => c.text || '').join('');
+    const fields = JSON.parse(answer.replace(/```json|```/g, '').trim());
+    const n = k.apply(fields || {});
+    setSheetVoiceState(kind, 'idle', text);
+    showToast(n ? `Filled in ${n} box${n === 1 ? '' : 'es'}. Check them before you save` : 'Nothing in that note fits these boxes', n ? 'success' : 'info');
+    track('sheet_voice_filled', { kind, boxes: n });
+  } catch (e) {
+    setSheetVoiceState(kind, 'idle', text);
+    showToast(e && e.status ? extractionProblem(e) : 'Couldn\'t fill it in. Check the signal and try again, or type it', 'error');
+  }
+}
+
+// Sets a box from a spoken value, only when there is one. Returns 1 when it
+// changed, so the caller can count what was filled.
+function setSpokenBox(id, value) {
+  const el = document.getElementById(id);
+  const v = value == null ? '' : String(value).trim();
+  if (!el || !v || el.value === v) return 0;
+  el.value = v;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  return 1;
+}
+
+function agreementVoicePrompt() {
+  const types = [...document.getElementById('agreementInspectionType').options].map(o => o.value).filter(Boolean);
+  return `You fill in a pre-inspection agreement for SAYON, an app for Australian timber pest inspectors. The user message is what the inspector said about the job, and the date today. Return ONLY a JSON object, no markdown, with these keys, each null unless the inspector said it:
+{"inspectionType":${types.map(t => JSON.stringify(t)).join('|')},"date":"YYYY-MM-DD","fee":string,"specialRequests":string,"signerName":string,"clientName":string,"clientPhone":string,"clientEmail":string,"streetAddress":string,"suburb":string,"state":"NSW"|"VIC"|"QLD"|"WA"|"SA"|"TAS"|"ACT"|"NT","postcode":string}
+- inspectionType: the closest of the listed types to what they said ("pre-purchase pest" is "Pre-Purchase — Timber Pest"; "annual" is "Annual — Existing Building"). Null when not said.
+- date: the inspection date. "Today" and "tomorrow" count from today's date; a weekday means the next one.
+- fee: the inspection fee in dollars as digits with a $ ("$350"). Never invent one.
+- specialRequests: anything the client asked to be looked at or done, in brief ("Check the back deck closely").
+- signerName: who will sign, when they say it's someone other than the client. clientName: the client. Phone and email as said; spoken email words become symbols ("jo at example dot com" is jo@example.com).
+- Only words actually said. Never guess.`;
+}
+
+function applyAgreementVoice(f) {
+  let n = 0;
+  if (f.inspectionType && [...document.getElementById('agreementInspectionType').options].some(o => o.value === f.inspectionType)) {
+    n += setSpokenBox('agreementInspectionType', f.inspectionType);
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(f.date || '')) n += setSpokenBox('agreementDate', f.date);
+  if (f.fee) {
+    const fee = String(f.fee).replace(/[^\d.]/g, '');
+    if (fee) n += setSpokenBox('agreementFee', '$' + fee);
+  }
+  n += setSpokenBox('agreementNotes', f.specialRequests);
+  // The client and the address are the job's own details, so they fill the
+  // job too, but never over something already typed there.
+  const job = { jobClient: f.clientName, jobClientPhone: f.clientPhone, jobClientEmail: f.clientEmail, jobAddress: f.streetAddress, jobSuburb: f.suburb, jobState: f.state, jobPostcode: f.postcode };
+  let jobChanged = false;
+  Object.entries(job).forEach(([id, v]) => {
+    const el = document.getElementById(id);
+    if (el && v && !el.value.trim()) { el.value = String(v).trim(); jobChanged = true; n++; }
+  });
+  if (jobChanged) { saveJobInfo(); updateJob(); document.getElementById('agreementAddr').textContent = getFullAddress() || 'No address yet'; document.getElementById('agreementAddr').classList.toggle('empty', !getFullAddress()); }
+  const signer = (f.signerName || f.clientName || '').trim();
+  if (signer && !document.getElementById('agreementSignerName').value.trim()) n += setSpokenBox('agreementSignerName', signer);
+  refreshAgreementPreview();
+  return n;
+}
+
 // ── PRE-INSPECTION AGREEMENT ────────────────────────────────────────────
 // AS 4349.3 expects a written agreement before a timber pest inspection
 // starts, so the client signs (or the inspector records a paper / emailed
@@ -6752,6 +6970,7 @@ function openAgreementSheet() {
     if (agreementSignaturePad) agreementSignaturePad.clear();
     refreshAgreementPreview();
   }
+  cancelSheetVoice('agreement');
   document.getElementById('agreementOverlay').classList.add('open');
   document.querySelectorAll('#agreementOverlay .page-sheet-body').forEach(b => { b.scrollTop = 0; });
 }
@@ -6829,6 +7048,7 @@ function onAgreementFeeInput() {
 }
 
 function closeAgreementSheet() {
+  cancelSheetVoice('agreement');
   document.getElementById('agreementOverlay').classList.remove('open');
 }
 

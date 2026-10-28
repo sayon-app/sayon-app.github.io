@@ -548,6 +548,11 @@
     </div>
     <div class="page-sheet-body">
       <p class="quote-hint" style="margin:0">Fill this in once the treatment is done. It goes on the client's treatment certificate, and the boxes are ticked from the quote so you only change what was different.</p>
+      <div class="sheet-voice" id="trVoice" data-state="idle">
+        <button type="button" class="sheet-voice-btn" onclick="toggleSheetVoice('treatment')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg><span class="sheet-voice-label">Say it instead</span></button>
+        <p class="sheet-voice-hint">e.g. "Done today, 8 till 11:30, fine and 22 degrees. Trenched and rodded the perimeter, 48 metres of Termidor at the label rate, foam at the porch post. Didn't do under the rear deck, no access. New notice in the meter box."</p>
+        <p class="sheet-voice-text" hidden></p>
+      </div>
       <div class="job-row">
         <div class="job-field">
           <div class="job-field-label">Date treated</div>
@@ -910,7 +915,8 @@
             <p>Every plan has the whole app: voice reports, quotes, treatment certificates, PDFs and sending to clients. Plans only differ in how many AI fills you get each month.</p>
             <p><strong>One AI fill</strong> is one job the AI does for you:</p>
             <ul>
-              <li>filling in the report from what you said (each time you say "Stop Sayon" or tap Fill)</li>
+              <li>filling in the report and quote from what you said (each time you say "Stop Sayon" or tap Fill)</li>
+              <li>filling in the agreement or treatment record when you tap Say it instead</li>
               <li>reading a compliance plate from a photo</li>
               <li>checking a photo when you tap Analyze</li>
             </ul>
@@ -1953,6 +1959,11 @@
         <div class="agr-kicker">Before the inspection starts</div>
         <h2 class="agr-addr" id="agreementAddr"></h2>
         <p class="agr-lede">Fill in the job, read the agreement through with the client, then they sign on this screen.</p>
+      </div>
+      <div class="sheet-voice" id="agreementVoice" data-state="idle">
+        <button type="button" class="sheet-voice-btn" onclick="toggleSheetVoice('agreement')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg><span class="sheet-voice-label">Say it instead</span></button>
+        <p class="sheet-voice-hint">e.g. "Pre-purchase pest for Jo Tester, today, fee $350, she wants the back deck checked closely."</p>
+        <p class="sheet-voice-text" hidden></p>
       </div>
       <ol class="agr-steps">
         <li class="agr-step" id="agreementStepJob">

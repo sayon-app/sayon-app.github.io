@@ -1858,6 +1858,22 @@ body.pocket-lock .voice-btn { user-select: none; -webkit-user-select: none; -web
 
 .transcript-box.active { border-color: var(--accent); color: var(--text); }
 
+/* Notes already sent to the report: kept to re-read, not editable. */
+.transcript-done {
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg);
+  max-height: min(30vh, 220px);
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text2);
+}
+.transcript-done[hidden] { display: none; }
+.transcript-done-label { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
+
 .low-confidence-warning {
   display: none;
   align-items: center;

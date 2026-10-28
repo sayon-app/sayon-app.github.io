@@ -2758,7 +2758,6 @@ function startRecording() {
   dismissCleanupSuggestion();
   dismissServerTranscript();
   recordingStartText = currentTranscript;
-  autoFilledThisRecording = false;
 
   // Browsers end a speech session on their own after a quiet stretch or a
   // minute or so of talk. While the inspector still has recording on, open a
@@ -2829,7 +2828,7 @@ function startRecording() {
         stopRecording();
         playTone(440, 200, 0.2);
         setTimeout(() => { if (!isRecording && currentTranscript.trim()) processTranscript(); }, 2100);
-      } else if (final) scheduleAutoFill();
+      }
     };
 
     recognition.onerror = (e) => {
@@ -2869,7 +2868,6 @@ function startRecording() {
           setTimeout(() => { if (!isRecording && currentTranscript.trim()) processTranscript(); }, 2100);
           return;
         }
-        scheduleAutoFill();
       }
       quickEnds = Date.now() - startedAt < 1500 ? quickEnds + 1 : 0;
       if (quickEnds >= 5) { showToast('Recording stopped: the microphone kept dropping out', 'error'); stopRecording(); return; }
@@ -2938,7 +2936,6 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 function stopRecording() {
   releaseScreenAwake();
   setPocketLock(false);
-  clearTimeout(autoFillTimer);
   const recognitionEnded = waitForRecognitionEnd(recognition);
   if (recognition) recognition.stop();
   isRecording = false;
@@ -2960,9 +2957,7 @@ function stopRecording() {
   // is taken only after the last phrase has landed - taken earlier, that
   // late phrase made the transcript "changed" and the suggestion was
   // silently dropped.
-  // Skipped after an auto-fill: the recording's audio covers notes already
-  // filled in, and offering it as a replacement would fill them twice.
-  if (audioCaptureEnabled && !audioCaptureFailedThisSession && !autoFilledThisRecording) {
+  if (audioCaptureEnabled && !audioCaptureFailedThisSession) {
     const before = recordingStartText;
     Promise.all([stopAudioCapture(), recognitionEnded]).then(([blob]) => {
       if (isRecording) return;
@@ -3021,17 +3016,13 @@ function usePrompt(el) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// VOICE AUTO-FILL
+// VOICE STOP WORDS
 // ══════════════════════════════════════════════════════════════════════════
-// One voice button, no separate hands-free mode. While recording is on,
-// each pause fills the report from what was said since the last fill, so a
-// phone left recording in a shirt pocket fills the report room by room.
-// Recording carries on while the AI reads the note; anything said meanwhile
-// waits for the next pause. Saying "stop Sayon" ends the recording and
-// fills in the rest. Stopped with a tap, the rest waits in the box for
-// Fill report, so it can be checked first.
-const AUTO_FILL_PAUSE_MS = 6000;
-const AUTO_FILL_MIN_WORDS = 6;
+// One voice button. Recording carries on until a tap on Stop or "stop
+// Sayon". The report is filled once, from the whole note: "stop Sayon"
+// fills it straight away, and after a tap the note waits in the box for
+// Extract, so it can be checked first. Filling at every pause was taken out
+// on 28 Oct: on an iPhone it mangled the words that followed each fill.
 // Phones punctuate and mishear the name ("Stop. Simon.", "stop saying"),
 // so the words can be split by punctuation and "Sayon" has its common
 // mishearings. It's checked on the live (interim) text as well as the
@@ -3041,29 +3032,6 @@ const VOICE_STOP_LIVE_RE = /\b(?:stop|done|pause|finish)[\s,.!?-]+(?:sayon|say o
 // test) are ordinary words too ("the lead stops on the bearer"), so they
 // only count as the last words of a finished phrase, never in live text.
 const VOICE_STOP_RE = new RegExp(VOICE_STOP_LIVE_RE.source + '|\\bstops?[\\s,.!?-]+(?:on|son)[\\s,.!?]*$', 'i');
-let autoFillTimer = null;
-let autoFillRunning = false;
-let autoFilledThisRecording = false;
-
-function scheduleAutoFill() {
-  clearTimeout(autoFillTimer);
-  autoFillTimer = setTimeout(autoFillFromPause, AUTO_FILL_PAUSE_MS);
-}
-
-async function autoFillFromPause() {
-  if (!isRecording) return;
-  if (autoFillRunning || document.body.classList.contains('ai-busy')) { scheduleAutoFill(); return; }
-  if (currentTranscript.trim().split(/\s+/).length < AUTO_FILL_MIN_WORDS) return;
-  autoFillRunning = true;
-  autoFilledThisRecording = true;
-  try {
-    const filled = await processTranscript({ whileRecording: true });
-    if (filled) playTone(660, 100, 0.25);
-  } finally {
-    autoFillRunning = false;
-  }
-}
-
 // ── Soft audio tone: a beep the inspector hears with the phone in a pocket ──
 function playTone(freq = 880, duration = 120, vol = 0.3) {
   try {
@@ -3407,7 +3375,7 @@ function extractionProblem(err) {
   return `The AI couldn't read it (${reason})`;
 }
 
-// whileRecording: an auto-fill from a pause (VOICE AUTO-FILL). It reads the
+// whileRecording: a fill while the mic is still on. It reads the
 // note as it stood when it started; words spoken during the AI call stay in
 // the box for the next fill, and the voice popover and the after-Extract
 // sheet stay out of the way. Returns true when the report was filled.

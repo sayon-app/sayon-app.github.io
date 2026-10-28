@@ -53,7 +53,7 @@ Read this before you touch voice capture, transcript cleanup, `SYSTEM_PROMPT` or
 - **WAITING NOTES** (`2843–2949`). Notes are stored in `reportData.pendingNotes`, capped at `MAX_PENDING_NOTES = 50` (`2851`).
   - `processPendingNotes` (`2907`) runs oldest first and stops at the first failure (`2920–2928`). It skips locked reports (`2908`) and stops if a different report is opened.
   - It is triggered by the `online` event (`6550`), at `6560`, at `6799`, at app init (`1372`), and after any successful extraction.
-  - While recording, `autoFillFromPause` (VOICE AUTO-FILL) calls the same `processTranscript({ whileRecording: true })` after a 6 s pause once there are 6 words.
+  - Nothing fills while recording (the pause auto-fill was removed on 28 Oct). "Stop Sayon" stops and calls `processTranscript()`.
 - **Worker constraints** (`worker/worker.js`):
   - `ALLOWED_MODEL='claude-sonnet-5'` (`117`) is forced at `258`.
   - `MAX_TOKENS_CEILING=16000` (`121`), applied as `Math.min(body.max_tokens||ceiling, ceiling)` (`259`).

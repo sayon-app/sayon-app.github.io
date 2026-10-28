@@ -1139,9 +1139,8 @@ function renderQuoteAnswer() {
   const q = quoteState;
   renderQuoteHead();
   renderQuoteSendLabel();
-  if (!q || !quoteHasItems(q)) { el.style.display = 'none'; return; }
-  el.style.display = '';
-  const a = quoteAnswerState(q);
+  if (!q || !el) return;
+  const a = quoteHasItems(q) ? quoteAnswerState(q) : null;
   const esc = escapeHtml;
   const sentNow = !!q.sentAt && q.sentHash === quoteContentHash(q);
   const answered = a && !a.stale;
@@ -1149,8 +1148,8 @@ function renderQuoteAnswer() {
   const starting = q.items.filter(isStartingPrice).length;
 
   const priced = {
-    title: 'Priced', state: sentNow || answered ? 'done' : 'now',
-    text: `${n} line${n === 1 ? '' : 's'}, ${formatAUD(quoteTotals(q).total)}${q.gst !== false ? ' inc GST' : ''}`
+    title: 'Write the quote', state: sentNow || answered ? 'done' : 'now',
+    text: !n ? 'No lines yet. Add the work below.' : `${n} line${n === 1 ? '' : 's'}, ${formatAUD(quoteTotals(q).total)}${q.gst !== false ? ' inc GST' : ''}`
       + (starting ? `, ${starting} starting price${starting === 1 ? '' : 's'} to check` : ''),
   };
   const sent = !q.sentAt
@@ -1199,15 +1198,21 @@ function renderQuoteAnswer() {
   // A step the job didn't need counts as done, so progress still reaches 4 of 4.
   const done = steps.filter(st => st.state === 'done' || st.state === 'skip').length;
   const tick = '<svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
-  el.innerHTML = `<div class="quote-card-head"><div class="quote-card-title"><span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 8 2a6 6 0 0 0 3.6-1.2 1 1 0 0 1 1.4.9V15a1 1 0 0 1-.4.8A6 6 0 0 1 16 17c-3 0-5-2-8-2a6 6 0 0 0-4 1.5"/></svg></span>Progress</div><div class="quote-card-count">${done} of 4 done</div></div>
-    <ol class="qp">${steps.map((st, i) => `<li class="qp-step ${st.state}">
-        <span class="qp-dot">${st.state === 'done' ? tick : st.state === 'skip' ? '–' : i + 1}</span>
-        <div class="qp-body">
-          <div class="qp-title">${st.title}</div>
-          <div class="qp-text">${st.text}</div>
-          ${st.extra || ''}
-        </div>
-      </li>`).join('')}</ol>`;
+  // Each step is updated in place: step 1 holds the quote's folds, and
+  // rebuilding it would drop whatever is being typed there.
+  document.getElementById('quoteGuideCount').textContent = `${done} of 4 done`;
+  steps.forEach((st, i) => {
+    const li = document.getElementById('qgStep' + (i + 1));
+    if (!li) return;
+    li.className = 'qp-step ' + st.state;
+    li.querySelector('.qp-dot').innerHTML = st.state === 'done' ? tick : st.state === 'skip' ? '–' : String(i + 1);
+    li.querySelector('.qp-title').textContent = st.title;
+    li.querySelector('.qp-text').innerHTML = st.text;
+    const extra = li.querySelector('.qp-extra');
+    const html = st.extra || '';
+    if (extra.dataset.html !== html) { extra.innerHTML = html; extra.dataset.html = html; }
+    extra.hidden = !html;
+  });
 }
 
 // The bar's Send button says what sending does now.

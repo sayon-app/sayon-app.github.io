@@ -384,10 +384,11 @@
     },
     {
       "id": "no-existing-system",
-      "kind": "absent",
+      "kind": "equals",
       "path": "existingSystem",
+      "values": ["No System Found", null],
       "weight": 3,
-      "why": "'no system installed'"
+      "why": "'no system installed': \"No System Found\" (null also passes)"
     },
     {
       "id": "treatment-yes",

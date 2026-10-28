@@ -434,6 +434,215 @@ function buildQuoteExclusions(rd) {
   return out;
 }
 
+// ── TREATMENT PLAN ──
+// How the job will go, in plain words for the client: what we do, what we
+// ask them to do, how long it takes, the free service period and the
+// inspections after. q.plan = { we, owner, time, service, inspections },
+// with we and owner one step per line. It starts from the report, which the
+// voice notes fill, so the inspector only checks it. Quotes made before the
+// plan was added have none until the inspector adds one, so a quote already
+// sent doesn't change.
+const QUOTE_PLAN_TIMES = ['1 to 2 hours', 'Half a day', '1 day', '2 days'];
+const QUOTE_PLAN_SERVICE = ['None', '12 months', '24 months', '36 months', '60 months'];
+
+function buildPlanWe(rd, system) {
+  rd = rd || {};
+  const lc = v => { v = (v || '').trim(); return /^[A-Z][a-z]/.test(v) ? v[0].toLowerCase() + v.slice(1) : v; };
+  const findings = (Array.isArray(rd.findings) ? rd.findings : []).filter(f => f && f.termiteActivity === 'ACTIVE');
+  const places = findings.map(f => lc(f.activityLocation)).filter(Boolean);
+  const type = (rd.treatmentType || '').trim();
+  const wants = rd.treatmentRecommended === 'YES' || (type && rd.treatmentRecommended !== 'NO') || findings.length > 0;
+  const choices = treatmentChoices(type);
+  const kind = system || (choices.length ? '' : classifyTreatment(type));
+  const out = [];
+  if (findings.length) out.push(`Treat the live termites${places.length ? ` (${places.join('; ')})` : ''} to control the colony.`);
+  if (wants) {
+    if (kind === 'bait') out.push('Install bait stations around the building and check them regularly while termites are feeding, then keep monitoring.');
+    else if (kind === 'barrier') out.push('Treat the soil around the building to form a continuous treated zone.');
+    else if (kind === 'system') out.push(`Top up the existing termite management system${rd.existingSystem ? ` (${rd.existingSystem})` : ''}.`);
+    else if (kind) out.push('Install a termite management system.');
+  }
+  if (rd.borerActivity === 'ACTIVE') out.push('Treat the timbers with live borers.');
+  if (rd.timberSoil === 'YES') out.push('Remove the timber touching the soil.');
+  if (rd.weepHoles === 'BRIDGED') out.push('Clear the bridged weep holes.');
+  if (rd.slabEdge === 'OBSTRUCTED') out.push('Expose the concealed slab edge so it can be inspected.');
+  if (wants && kind) out.push('Fit a durable notice in the meter box showing what was used and when.');
+  return out.join('\n');
+}
+
+// The owner's part: upkeep that keeps the treatment working. Repairs by a
+// plumber or builder are in the exclusions, so they aren't repeated here.
+function buildPlanOwner(rd) {
+  rd = rd || {};
+  const type = (rd.treatmentType || '').trim();
+  const treated = rd.treatmentRecommended === 'YES' || (type && rd.treatmentRecommended !== 'NO') ||
+    (rd.findings || []).some(f => f && f.termiteActivity === 'ACTIVE');
+  const out = [];
+  if (rd.siteDrainage === 'POOR' || rd.subfloorDrainage === 'POOR') {
+    out.push(`Improve the drainage so water runs away from the building${rd.subfloorDrainage === 'POOR' ? ' and out of the subfloor' : ''}.`);
+  }
+  if (rd.subfloorVentilation === 'POOR') out.push('Improve the subfloor ventilation so it stays dry.');
+  if (rd.timberSoil === 'YES') out.push('Keep timber, firewood and stored goods off the soil and away from the walls.');
+  if (rd.weepHoles === 'BRIDGED') out.push('Keep garden beds, mulch and paving below the weep holes.');
+  if (rd.slabEdge === 'OBSTRUCTED' || rd.zone25mmVisible === 'NO' || rd.zone75mmVisible === 'NO') {
+    out.push('Keep the slab edge clear and visible all the way around.');
+  }
+  if (treated) out.push('Leave the treated areas and any stations undisturbed, and tell us before any building or landscaping work near them.');
+  return out.join('\n');
+}
+
+function buildPlanInspections(rd) {
+  const f = ((rd && rd.inspectionFrequency) || '').trim();
+  if (!f) return '';
+  const every = f.replace(/\s*\((annual|yearly)\)/i, '');
+  return /^every\b/i.test(every) ? every : `Every ${every}`;
+}
+
+function buildQuotePlan(rd, system) {
+  return { we: buildPlanWe(rd, system), owner: buildPlanOwner(rd), time: '', service: '', inspections: buildPlanInspections(rd) };
+}
+
+function quotePlanReport() {
+  const src = currentQuoteSource();
+  return src ? (src.key === (currentReportId || 'draft') ? reportData : src.reportData) : null;
+}
+
+// One line for the folded row: what's set, and what's still to choose.
+function quotePlanSummary(q) {
+  const p = q && q.plan;
+  if (!p) return ['No plan yet', true];
+  const steps = (p.we || '').split('\n').filter(l => l.trim()).length + (p.owner || '').split('\n').filter(l => l.trim()).length;
+  const bits = [`${steps} step${steps === 1 ? '' : 's'}`];
+  bits.push(p.time ? (QUOTE_PLAN_TIMES.includes(p.time) ? p.time.charAt(0).toLowerCase() + p.time.slice(1) + ' on site' : p.time) : 'job time not set');
+  bits.push(p.service ? (p.service === 'None' ? 'no service period' : `${p.service} service`) : 'service period not set');
+  return [bits.join(', '), !p.time || !p.service];
+}
+
+function quotePlanChipsHTML(field, options, value) {
+  const custom = value && !options.includes(value);
+  return options.map(o => `<button type="button" class="qp-chip${o === value ? ' on' : ''}" onclick="setQuotePlanChoice('${field}', ${escapeHtml(JSON.stringify(o))})">${escapeHtml(o)}</button>`).join('') +
+    `<button type="button" class="qp-chip${custom ? ' on' : ''}" onclick="typeQuotePlanChoice('${field}')">${custom ? escapeHtml(value) : 'Type it'}</button>`;
+}
+
+function renderQuotePlan() {
+  const q = quoteState;
+  const body = document.getElementById('quotePlanBody');
+  if (!q || !body) return;
+  const [sub, warn] = quotePlanSummary(q);
+  const subEl = document.getElementById('quotePlanSub');
+  subEl.textContent = sub;
+  subEl.classList.toggle('warn', warn);
+  const p = q.plan;
+  if (!p) {
+    body.innerHTML = `<div class="quote-hint" style="margin-top:0">Set out how the job will go: what you'll do, what the owner should do, how long it takes and the free service period. It starts from the report.</div>
+      <button class="quote-btn" style="margin-top:10px" onclick="addQuotePlan()">Add a plan from the report</button>`;
+    return;
+  }
+  // The two lists of steps read as bullets, and the timing as a side line
+  // from the day of the job to the inspections after it.
+  body.innerHTML = `
+    <div class="fsub">What we'll do<button type="button" class="link-btn fsub-action" onclick="editQuoteList('qPlanWe')">Edit</button></div>
+    <textarea class="quote-input quote-textarea" id="qPlanWe" rows="3" data-qlist="No steps yet. Tap to add one." aria-label="What we'll do, one step per line" oninput="fitQuoteText(this); onQuotePlanInput()">${escapeHtml(p.we || '')}</textarea>
+    <div class="fsub">What the owner does<button type="button" class="link-btn fsub-action" onclick="editQuoteList('qPlanOwner')">Edit</button></div>
+    <textarea class="quote-input quote-textarea" id="qPlanOwner" rows="3" data-qlist="Nothing asked of the owner yet. Tap to add." aria-label="What we ask the owner to do, one per line" placeholder="e.g. Keep garden beds below the weep holes" oninput="fitQuoteText(this); onQuotePlanInput()">${escapeHtml(p.owner || '')}</textarea>
+    <div class="fsub">Timing</div>
+    <div class="q-line">
+      <div class="quote-field"><span>On the day: time on site</span><div class="qp-chips">${quotePlanChipsHTML('time', QUOTE_PLAN_TIMES, p.time)}</div></div>
+      <div class="quote-field"><span>After: free service period</span><div class="qp-chips">${quotePlanChipsHTML('service', QUOTE_PLAN_SERVICE, p.service)}</div>
+        ${p.service && p.service !== 'None' ? '<div class="quote-hint">The quote says it only holds while the recommended inspections are kept up and the owner does their part.</div>' : ''}</div>
+      <label class="quote-field"><span>Then: timber pest inspections</span>
+        <input class="quote-input" id="qPlanInspections" placeholder="e.g. Every 12 months" value="${escapeHtml(p.inspections || '')}" oninput="onQuotePlanInput()">
+      </label>
+    </div>
+    <button class="quote-text-btn" onclick="rebuildQuotePlan()">Start the plan again from the report</button>`;
+  syncQuoteLists();
+  body.querySelectorAll('.quote-textarea').forEach(fitQuoteText);
+}
+
+// A one-per-line box reads as a bulleted list until it's tapped, then
+// opens as the box to type in, and goes back to a list when left.
+function syncQuoteLists() {
+  document.querySelectorAll('#quoteEditor textarea[data-qlist]').forEach(ta => {
+    if (document.activeElement === ta) return;
+    let list = ta.previousElementSibling;
+    if (!list || !list.classList.contains('qlist')) {
+      list = document.createElement('div');
+      list.className = 'qlist';
+      list.setAttribute('role', 'button');
+      list.tabIndex = 0;
+      list.setAttribute('aria-label', 'Edit: ' + (ta.getAttribute('aria-label') || 'list'));
+      list.addEventListener('click', () => editQuoteList(ta.id));
+      list.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); editQuoteList(ta.id); } });
+      ta.before(list);
+      ta.addEventListener('blur', () => setTimeout(syncQuoteLists, 0));
+    }
+    const lines = ta.value.split('\n').map(l => l.trim()).filter(Boolean);
+    list.innerHTML = lines.length ? `<ul>${lines.map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ul>` : `<span class="qlist-empty">${escapeHtml(ta.dataset.qlist)}</span>`;
+    list.hidden = false;
+    ta.hidden = true;
+  });
+}
+function editQuoteList(id) {
+  const ta = document.getElementById(id);
+  if (!ta) return;
+  if (ta.previousElementSibling && ta.previousElementSibling.classList.contains('qlist')) ta.previousElementSibling.hidden = true;
+  ta.hidden = false;
+  fitQuoteText(ta);
+  ta.focus();
+}
+
+function addQuotePlan() {
+  if (!quoteState) return;
+  const c = quoteState.systemChoice;
+  quoteState.plan = buildQuotePlan(quotePlanReport(), c && c.picked);
+  renderQuotePlan();
+  scheduleQuoteSave();
+}
+
+function rebuildQuotePlan() {
+  const q = quoteState;
+  if (!q || !q.plan) return;
+  if (!confirm('Replace the plan\'s steps with fresh ones from the report? Your edits to them will be lost.')) return;
+  const c = q.systemChoice;
+  const fresh = buildQuotePlan(quotePlanReport(), c && c.picked);
+  q.plan.we = fresh.we;
+  q.plan.owner = fresh.owner;
+  q.plan.inspections = fresh.inspections;
+  renderQuotePlan();
+  scheduleQuoteSave();
+}
+
+function onQuotePlanInput() {
+  const p = quoteState && quoteState.plan;
+  if (!p) return;
+  p.we = document.getElementById('qPlanWe').value;
+  p.owner = document.getElementById('qPlanOwner').value;
+  p.inspections = document.getElementById('qPlanInspections').value;
+  const [sub, warn] = quotePlanSummary(quoteState);
+  const subEl = document.getElementById('quotePlanSub');
+  subEl.textContent = sub;
+  subEl.classList.toggle('warn', warn);
+  scheduleQuoteSave();
+}
+
+function setQuotePlanChoice(field, value) {
+  const p = quoteState && quoteState.plan;
+  if (!p) return;
+  p[field] = p[field] === value ? '' : value;
+  renderQuotePlan();
+  scheduleQuoteSave();
+}
+
+function typeQuotePlanChoice(field) {
+  const p = quoteState && quoteState.plan;
+  if (!p) return;
+  const typed = prompt(field === 'time' ? 'How long will the job take on site?' : 'How long is the free service period?', p[field] || '');
+  if (typed === null) return;
+  p[field] = typed.trim();
+  renderQuotePlan();
+  scheduleQuoteSave();
+}
+
 function newSystemChoice(rd) {
   const choices = treatmentChoices((rd && rd.treatmentType) || '');
   return choices.length ? { options: choices, picked: null } : null;
@@ -466,6 +675,7 @@ function createQuoteFromSource(src) {
     items: buildQuoteItemsFromReport(rd),
     systemChoice: newSystemChoice(rd),
     exclusions: buildQuoteExclusions(rd).join('\n'),
+    plan: buildQuotePlan(rd),
     paymentTerms: defaultPaymentTerms(),
     notes: QUOTE_DEFAULT_NOTES,
   };
@@ -567,7 +777,9 @@ function renderQuoteEditor() {
   renderQuoteItems();
   renderQuoteCompanyGaps();
   renderQuoteFolds();
+  renderQuotePlan();
   renderQuoteAnswer();
+  syncQuoteLists();
   ['qProblem', 'qPaymentTerms', 'qExclusions', 'qNotes'].forEach(id => fitQuoteText(document.getElementById(id)));
 }
 
@@ -618,11 +830,11 @@ function renderQuoteFolds() {
   const email = (q.clientEmail || '').trim();
   const det = [q.client || 'No client name', email || 'no email yet'];
   const detSub = document.getElementById('quoteDetailsSub');
-  detSub.textContent = det.join(' · ');
+  detSub.textContent = det.join(', ');
   detSub.classList.toggle('warn', !email);
   const excl = (q.exclusions || '').split('\n').filter(l => l.trim()).length;
   document.getElementById('quoteTermsSub').textContent =
-    [(q.paymentTerms || '').trim() ? 'Payment terms set' : 'No payment terms', `${excl} exclusion${excl === 1 ? '' : 's'}`].join(' · ');
+    [(q.paymentTerms || '').trim() ? 'Payment terms set' : 'No payment terms', `${excl} exclusion${excl === 1 ? '' : 's'}`].join(', ');
 }
 
 // What's missing from the business details, which every quote's header shows.
@@ -662,6 +874,11 @@ function pickQuoteSystem(kind) {
   while (at < q.items.length && q.items[at].key === 'direct') at++;
   q.items.splice(at, 0, ...fresh);
   q.systemChoice.picked = kind;
+  // The plan's steps name the system, so they follow the pick unless edited.
+  if (q.plan && q.plan.we === buildPlanWe(rd)) {
+    q.plan.we = buildPlanWe(rd, kind);
+    renderQuotePlan();
+  }
   renderQuoteItems();
   scheduleQuoteSave();
 }
@@ -745,7 +962,7 @@ function renderQuoteWorkSummary() {
   if (!q || !sub) return;
   const n = q.items.length;
   const starting = q.items.filter(isStartingPrice).length;
-  sub.textContent = !n ? 'No lines yet' : `${n} line${n === 1 ? '' : 's'}` + (starting ? ` · ${starting} price${starting === 1 ? '' : 's'} to check` : '');
+  sub.textContent = !n ? 'No lines yet' : `${n} line${n === 1 ? '' : 's'}` + (starting ? `, ${starting} price${starting === 1 ? '' : 's'} to check` : '');
   sub.classList.toggle('warn', !n || starting > 0);
   document.getElementById('quoteWorkTotal').textContent = n ? formatAUD(quoteTotals(q).total) : '';
 }
@@ -869,6 +1086,7 @@ function rebuildQuoteFromReport() {
   quoteState.problem = buildQuoteProblem(src.reportData);
   document.getElementById('qExclusions').value = quoteState.exclusions;
   document.getElementById('qProblem').value = quoteState.problem;
+  syncQuoteLists();
   quoteOpenItems.clear();
   renderQuoteItems();
   renderQuoteFolds();
@@ -909,7 +1127,7 @@ function quoteAnswerSummary(q) {
   const a = quoteAnswerState(q);
   if (!a) return q.sentAt ? { short: 'Quote sent', text: 'Waiting on the client\'s answer to the quote', tone: 'wait' } : null;
   if (a.stale) return { short: 'Quote changed', text: 'The quote changed after the client answered. Get their answer on the new version', tone: 'warn' };
-  if (a.status === 'accepted' && q.treatment) return { short: 'Treatment done', text: `Treatment done on ${formatAnswerDate(q.treatment.date)}. ${q.certificateSentAt ? 'Certificate sent' : 'Send the client the certificate'}`, tone: 'good' };
+  if (a.status === 'accepted' && q.treatment) return { short: 'Treatment done', text: `Treatment done on ${formatAnswerDate(q.treatment.date)}. ${certificateGiven(q) ? 'Certificate given' : 'Send the client the certificate'}`, tone: 'good' };
   if (a.status === 'accepted') return { short: 'Quote accepted', text: `Quote accepted by ${a.by} on ${formatAnswerDate(a.date)}. Record the treatment once it's done`, tone: 'good' };
   return { short: 'Quote declined', text: `Quote declined on ${formatAnswerDate(a.date)}${a.note ? ` · ${a.note}` : ''}`, tone: 'bad' };
 }
@@ -932,11 +1150,11 @@ function renderQuoteAnswer() {
 
   const priced = {
     title: 'Priced', state: sentNow || answered ? 'done' : 'now',
-    text: `${n} line${n === 1 ? '' : 's'} · ${formatAUD(quoteTotals(q).total)}${q.gst !== false ? ' inc GST' : ''}`
-      + (starting ? ` · ${starting} starting price${starting === 1 ? '' : 's'} to check` : ''),
+    text: `${n} line${n === 1 ? '' : 's'}, ${formatAUD(quoteTotals(q).total)}${q.gst !== false ? ' inc GST' : ''}`
+      + (starting ? `, ${starting} starting price${starting === 1 ? '' : 's'} to check` : ''),
   };
   const sent = !q.sentAt
-    ? { title: 'Sent to the client', state: answered ? 'skip' : 'todo', text: answered ? 'They answered before it was sent.' : 'Not sent yet. Send it from the bar below.' }
+    ? { title: 'Sent to the client', state: answered ? 'skip' : 'todo', text: answered ? 'Not needed. They answered before it was sent.' : 'Not sent yet. Send it from the bar below.' }
     : sentNow || answered ? { title: 'Sent to the client', state: 'done', text: `Sent ${esc(formatIssueDate(q.sentAt))}.` }
     : { title: 'Sent to the client', state: 'warn', text: `Sent ${esc(formatIssueDate(q.sentAt))}. You've changed the quote since, so send the new version.` };
 
@@ -959,7 +1177,7 @@ function renderQuoteAnswer() {
     const how = a.status === 'accepted' ? (QUOTE_ANSWER_METHODS[a.method] || '') : '';
     answer = {
       title: 'Client\'s answer', state: a.stale ? 'warn' : a.status === 'accepted' ? 'done' : 'bad',
-      text: `<strong>${a.status === 'accepted' ? 'Accepted' : 'Declined'}</strong> by ${esc(a.by)} on ${esc(formatAnswerDate(a.date))}${how ? ` · ${esc(how)}` : ''}`,
+      text: `<strong>${a.status === 'accepted' ? 'Accepted' : 'Declined'}</strong> by ${esc(a.by)} on ${esc(formatAnswerDate(a.date))}${how ? `, ${esc(how)}` : ''}`,
       extra: `${a.note ? `<div class="quote-answer-note">${esc(a.note)}</div>` : ''}
         ${isSignatureImage(a.signature) ? `<img class="quote-answer-sig" src="${a.signature}" alt="Client signature">` : ''}
         ${a.stale ? '<div class="quote-answer-warn">The quote has changed since then. Send the new version and record the client\'s answer again.</div>' : ''}
@@ -968,18 +1186,22 @@ function renderQuoteAnswer() {
   }
 
   const treatment = answered && a.status === 'accepted'
-    ? { title: 'Treatment', state: q.treatment ? 'done' : 'now',
-        text: q.treatment ? `Certificate ${q.certificateSentAt ? 'sent ' + esc(formatIssueDate(q.certificateSentAt)) : 'not sent yet'}.` : 'Record it once the work is done.',
+    ? { title: 'Treatment', state: q.treatment && certificateGiven(q) ? 'done' : 'now',
+        text: !q.treatment ? 'Record it once the work is done.'
+          : q.certificateSentAt ? `Finished. Certificate emailed ${esc(formatIssueDate(q.certificateSentAt))}.`
+          : q.certificateHandedAt ? `Finished. Certificate given in person ${esc(formatIssueDate(q.certificateHandedAt))}.`
+          : 'Recorded. One thing left: email the client their certificate.',
         extra: renderTreatmentBlock(q) }
     : answered ? { title: 'Treatment', state: 'skip', text: 'Not needed. The quote was declined.' }
     : { title: 'Treatment', state: 'todo', text: 'After the client accepts.' };
 
   const steps = [priced, sent, answer, treatment];
-  const done = steps.filter(st => st.state === 'done').length;
+  // A step the job didn't need counts as done, so progress still reaches 4 of 4.
+  const done = steps.filter(st => st.state === 'done' || st.state === 'skip').length;
   const tick = '<svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
-  el.innerHTML = `<div class="quote-card-head"><div class="quote-card-title">Progress</div><div class="quote-card-count">${done} of 4 done</div></div>
+  el.innerHTML = `<div class="quote-card-head"><div class="quote-card-title"><span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 8 2a6 6 0 0 0 3.6-1.2 1 1 0 0 1 1.4.9V15a1 1 0 0 1-.4.8A6 6 0 0 1 16 17c-3 0-5-2-8-2a6 6 0 0 0-4 1.5"/></svg></span>Progress</div><div class="quote-card-count">${done} of 4 done</div></div>
     <ol class="qp">${steps.map((st, i) => `<li class="qp-step ${st.state}">
-        <span class="qp-dot">${st.state === 'done' ? tick : i + 1}</span>
+        <span class="qp-dot">${st.state === 'done' ? tick : st.state === 'skip' ? '–' : i + 1}</span>
         <div class="qp-body">
           <div class="qp-title">${st.title}</div>
           <div class="qp-text">${st.text}</div>
@@ -1129,7 +1351,7 @@ function quoteContentHash(q) {
   const content = Object.assign({}, q);
   // 'booking' and 'invoice' are left over from features that were removed;
   // older quotes may still carry them, and they never counted as content.
-  ['updatedAt', 'createdAt', 'sentAt', 'sentHash', 'certificateSentAt', 'reportKey', 'answer', 'booking', 'treatment', 'invoice',
+  ['updatedAt', 'createdAt', 'sentAt', 'sentHash', 'certificateSentAt', 'certificateHandedAt', 'reportKey', 'answer', 'booking', 'treatment', 'invoice',
     'sourceAddress', 'issuedAt', 'issuedHash'].forEach(k => delete content[k]);
   return sha256Hex(stableJson(content));
 }
@@ -1155,12 +1377,23 @@ function markCertificateSent(q) {
   q.certificateSentAt = Date.now();
   storeSentQuote(q);
 }
+// For a certificate printed and handed over, or left in the letterbox,
+// so a job without an email still finishes.
+function markCertificateHanded() {
+  const q = quoteState;
+  if (!q || !q.treatment) return;
+  q.certificateHandedAt = Date.now();
+  storeSentQuote(q);
+  showToast('Certificate marked as given in person', 'success', { label: 'Undo', run: () => { delete q.certificateHandedAt; storeSentQuote(q); } });
+}
+// The certificate has reached the client, by email or by hand.
+function certificateGiven(q) { return !!(q && (q.certificateSentAt || q.certificateHandedAt)); }
 // Saves a quote whose sent state changed, and redraws every place that
 // shows it. The report's send marks the stored quote, so the open quote
 // takes the same times.
 function storeSentQuote(q) {
   if (quoteState && quoteState !== q && quoteState.reportKey === q.reportKey) {
-    ['sentAt', 'sentHash', 'certificateSentAt', 'issuedAt', 'issuedHash'].forEach(k => { if (q[k]) quoteState[k] = q[k]; });
+    ['sentAt', 'sentHash', 'certificateSentAt', 'certificateHandedAt', 'issuedAt', 'issuedHash'].forEach(k => { if (q[k]) quoteState[k] = q[k]; else if (k === 'certificateHandedAt') delete quoteState[k]; });
   }
   const all = readJSON(quotesStorageKey(), {});
   all[q.reportKey] = q;
@@ -1451,8 +1684,68 @@ function buildQuotePDF(q) {
   }
   y += blockH + 4;
 
-  // ── 2. EXCLUSIONS ──
   let sectionNum = 2;
+  // ── 2. TREATMENT PLAN ──
+  const plan = q.plan || {};
+  const planLines = v => (v || '').split('\n').map(s => s.trim()).filter(Boolean);
+  const we = planLines(plan.we), owner = planLines(plan.owner);
+  const facts = [['TIME ON SITE', plan.time], ['FREE SERVICE PERIOD', plan.service], ['INSPECTIONS AFTER', plan.inspections]]
+    .map(([k, v]) => [k, (v || '').trim()]).filter(([, v]) => v);
+  if (we.length || owner.length || facts.length) {
+    sectionTitle('TREATMENT PLAN', sectionNum++);
+    if (facts.length) {
+      const gap = 4, fw = (CW - gap * (facts.length - 1)) / facts.length;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+      const wrapped = facts.map(([, v]) => doc.splitTextToSize(v, fw - 8));
+      const fh = 10 + Math.max(...wrapped.map(l => l.length)) * 4.4;
+      ensure(fh + 6);
+      facts.forEach(([k], i) => {
+        const x = M + i * (fw + gap);
+        doc.setFillColor(...C.accentLight); doc.roundedRect(x, y, fw, fh, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...C.accentDark);
+        pdfTracked(doc, k, x + 4, y + 5.5, { cs: 0.5 });
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...C.ink);
+        doc.text(wrapped[i], x + 4, y + 10.8);
+      });
+      y += fh + 6;
+    }
+    const steps = (label, list, numbered) => {
+      if (!list.length) return;
+      ensure(14);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
+      pdfTracked(doc, label, M, y, { cs: 0.5 });
+      y += 5;
+      list.forEach((line, i) => {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+        const lines = doc.splitTextToSize(line, CW - 8);
+        ensure(lines.length * 4.2 + 2);
+        if (numbered) {
+          doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.accentDark);
+          doc.text(`${i + 1}.`, M, y);
+          doc.setFont('helvetica', 'normal');
+        } else {
+          doc.setFillColor(...C.accent); doc.circle(M + 1.6, y - 1.1, 0.8, 'F');
+        }
+        doc.setTextColor(...C.ink); doc.text(lines, M + 5, y);
+        y += lines.length * 4.2 + 2;
+      });
+      y += 3;
+    };
+    steps('WHAT WE WILL DO', we, true);
+    steps('WHAT WE ASK YOU TO DO', owner, false);
+    if (plan.service && plan.service.trim() && !/^none$/i.test(plan.service.trim())) {
+      doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5);
+      const lines = doc.splitTextToSize(`During the free service period, if termites return to the treated areas we will come back and treat them at no charge. ` +
+        `This only applies while the recommended timber pest inspections are carried out and the steps asked of you above are done.`, CW - 5);
+      const h = lines.length * 4 + 3;
+      ensure(h);
+      doc.setFillColor(...C.ruleLight); doc.rect(M, y - 3, 1.5, h - 2, 'F');
+      doc.setTextColor(...C.inkMuted); doc.text(lines, M + 4, y);
+      y += h + 2;
+    }
+  }
+
+  // ── EXCLUSIONS ──
   const exclusions = (q.exclusions || '').split('\n').map(s => s.trim()).filter(Boolean);
   if (exclusions.length) {
     sectionTitle('EXCLUSIONS & WORK BY OTHERS', sectionNum++);

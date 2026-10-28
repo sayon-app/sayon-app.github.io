@@ -4,7 +4,13 @@
  * The API keys are stored as Cloudflare secrets and never exposed to the
  * browser or public repo. See worker/README.md for setup and deploy steps.
  *
- * CHANGES FROM v9.3 -> v9.4:
+ * CHANGES FROM v9.4 -> v9.5:
+ * - /transcribe no longer counts against the monthly AI allowance. The app
+ *   now sends each spoken phrase to Whisper as it's said, so counting them
+ *   would use up a month's allowance in a few inspections. The plan checks
+ *   (signed in, trial not ended, not canceled) still apply.
+ *
+ * CHANGES FROM v9.3 -> v9.4 (also in this version):
  * - Keeps the prompt-caching marker on the system prompt, so the long
  *   report instructions sent with every voice note are cached for an hour
  *   and re-read at a tenth of the price.
@@ -298,7 +304,8 @@ export default {
     // spend anything calling Anthropic or Workers AI. An allowed call has
     // already reserved its place in the monthly allowance; any answer that
     // isn't a success gives that place back.
-    const gate = await checkPlanAndUsage(verifiedUser.id, env);
+    // Whisper phrases are small and many, so they don't use the allowance.
+    const gate = await checkPlanAndUsage(verifiedUser.id, env, url.pathname !== '/transcribe');
     if (!gate.allowed) {
       return new Response(gate.message, { status: gate.status, headers: corsHeaders(origin) });
     }
@@ -561,7 +568,7 @@ function effectiveUsage(sub) {
 
 // Returns { allowed: true, reservation } with this call's place in the
 // monthly allowance already taken, or { allowed: false, status, message }.
-async function checkPlanAndUsage(userId, env) {
+async function checkPlanAndUsage(userId, env, reserve = true) {
   try {
     const found = await loadBusinessSubscription(userId, env);
     if (!found.ok) {
@@ -576,6 +583,7 @@ async function checkPlanAndUsage(userId, env) {
       return { allowed: false, status: 402, message: 'Your 14-day trial has ended — subscribe to keep using Sayon AI features' };
     }
 
+    if (!reserve) return { allowed: true, reservation: null };
     const limit = PLAN_LIMITS[sub.plan] ?? DEFAULT_PLAN_LIMIT;
     const reservation = await reserveAiCall(sub, limit, env);
     if (reservation === 'limit') {

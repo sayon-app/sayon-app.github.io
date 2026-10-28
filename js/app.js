@@ -260,9 +260,10 @@ function obFinish() {
   localStorage.setItem(OB_KEY, '1');
   document.getElementById('onboardScreen').style.display = 'none';
   document.getElementById('mainMenu').style.display      = 'flex';
-  // Open the sidebar so they can start a new job immediately
+  // Open the job details so they can start a new job immediately
   setTimeout(() => {
-    openMenuPage('jobPanel');
+    openApp('inspect');
+    openJobDetails();
   }, 400);
 }
 
@@ -549,7 +550,10 @@ function renderAreaChecklist() {
   migrateLegacyObstructions();
   const markAll = document.getElementById('markAllAreasBtn');
   if (markAll) markAll.hidden = Object.keys(OBS_ZONES).every(z => areaStatusOf(z));
-  wrap.innerHTML = Object.entries(OBS_ZONES).map(([zoneId, zone]) => {
+  const marked = Object.keys(OBS_ZONES).filter(z => areaStatusOf(z)).length;
+  const prog = document.getElementById('areasProgress');
+  if (prog) prog.textContent = `${marked} of ${Object.keys(OBS_ZONES).length} areas marked`;
+  wrap.innerHTML = Object.entries(OBS_ZONES).map(([zoneId, zone], i) => {
     const status = areaStatusOf(zoneId);
     const lit = status === 'PARTIAL' ? 'INSPECTED' : status;
     const statusBtns = AREA_STATUS_BUTTONS.map(([val, label]) =>
@@ -569,7 +573,7 @@ function renderAreaChecklist() {
         ? `<div class="obs-reasons obs-reasons-${kind}"><div class="obs-items-label">${ACCESS_GROUP_ICONS[kind]}<span>${title}</span></div><div class="obs-items">${items.map(btn).join('')}</div></div>` : '';
       reasons = group('hindered', 'Obstructions: in the way today', zone.items.filter(i => !RESTRICTED_REASONS.has(i)))
         + group('restricted', 'Restricted: permanent or locked', zone.items.filter(i => RESTRICTED_REASONS.has(i)));
-      if (selected.length) reasons += `<div class="area-where">Add where exactly, and photos, in <button type="button" class="link-btn" onclick="showSection('restrictions')">Access</button></div>`;
+      if (selected.length) reasons += `<div class="area-where">Add where exactly, and photos, under <button type="button" class="link-btn" onclick="showSection('restrictions')">Areas unable to be inspected</button> below</div>`;
     }
     let result = '';
     if (areaWasEntered(zoneId)) {
@@ -584,17 +588,29 @@ function renderAreaChecklist() {
         if (ev.length) result += `<div class="area-evidence">See ${escapeHtml(ev.join('; '))}</div>`;
       }
     }
-    return `<details class="obs-zone-panel" data-zone="${zoneId}"${areaOpen.has(zoneId) ? ' open' : ''} ontoggle="onAreaToggle('${zoneId}', this.open)">
+    // Each area sits on a side line with a dot showing its status, so with
+    // several open it's clear where one ends and the next begins.
+    const dot = { INSPECTED: AREA_DOT_TICK, PARTIAL: AREA_DOT_TICK, NOT: AREA_DOT_CROSS, NA: AREA_DOT_DASH }[status] || String(i + 1);
+    return `<div class="area-node${status ? ' area-node-' + status.toLowerCase() : ''}${areaOpen.has(zoneId) ? ' open' : ''}" data-zone-node="${zoneId}">
+      <span class="area-node-dot" aria-hidden="true">${dot}</span>
+      <details class="obs-zone-panel" data-zone="${zoneId}"${areaOpen.has(zoneId) ? ' open' : ''} ontoggle="onAreaToggle('${zoneId}', this.open)">
       <summary class="obs-zone-panel-header area-summary">${areaSummary(zoneId, zone.label.replace(/^The /, ''))}</summary>
-      <div class="area-status">${statusBtns}</div>${result}${reasons}</details>`;
+      <div class="area-status">${statusBtns}</div>${result}${reasons}</details></div>`;
   }).join('');
 }
+const AREA_DOT_TICK = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+const AREA_DOT_DASH = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M5 12h14"/></svg>';
+const AREA_DOT_CROSS = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
 
 // Each area is a row that opens when tapped, showing what's recorded so the
 // list reads at a glance. Which rows are open survives the re-render that
 // every tap does.
 const areaOpen = new Set();
-function onAreaToggle(zoneId, open) { if (open) areaOpen.add(zoneId); else areaOpen.delete(zoneId); }
+function onAreaToggle(zoneId, open) {
+  if (open) areaOpen.add(zoneId); else areaOpen.delete(zoneId);
+  const node = document.querySelector(`[data-zone-node="${zoneId}"]`);
+  if (node) node.classList.toggle('open', open);
+}
 
 function areaSummary(zoneId, name) {
   const status = areaStatusOf(zoneId);
@@ -975,7 +991,7 @@ function renderAccessSummary() {
   [hBox, rBox].forEach(hydrateSpotPhotos);
   const intro = document.getElementById('accessIntro');
   if (intro) intro.innerHTML = allMarked || limited.length ? 'Filled in from your ticks in Areas. Tap a status to change it there, or add where exactly.'
-    : `Mark every area in Section ${REPORT_PARTS.areas} and these fill themselves in. <button type="button" class="link-btn" onclick="showSection('obstructions')">Go to Areas</button>`;
+    : `Mark every area above and these fill themselves in. <button type="button" class="link-btn" onclick="document.getElementById('section-obstructions').scrollIntoView({ behavior: 'smooth', block: 'start' })">Back to the areas</button>`;
   const hint = document.getElementById('accessHighRiskHint');
   if (hint) {
     const fallback = accessLimits().highRisk;
@@ -1602,11 +1618,11 @@ function lookupSpecies(raw) {
 }
 
 const SECTIONS = {
-  property:        { fields:['structureType','height','occupancyStatus','weatherConditions','temperature','humidity','rainLast24h','wallConstruction','roofType','floorType','facadeDirection','constructionEra','standard'], total:13 },
+  property:        { fields:['structureType','height','occupancyStatus','furnishing','peoplePresent','weatherConditions','temperature','humidity','rainLast24h','recentWeather','wallConstruction','roofType','floorType','facadeDirection','constructionEra','siteSurroundings','siteSlope','termiteHistory','existingSystem','standard','toolsUsed'], total:20 },
   obstructions:    { fields:['areaStatus'], total:1 },
   restrictions:    { fields:['hinderedAreas','hinderedAreasDetail','noAccessAreas','highRiskAreas','invasiveInspection','invasiveInspectionDetails'], total:2 },
   findings:        { fields:['findings','borerActivity','decayFound','delignification','previousTreatment','previousTreatmentDetails'], total:4 },
-  conducive:       { fields:['waterLeaks','moistureReadings','leakLocation','siteDrainage','subfloorDrainage','subfloorVentilation','timberSoil','slabEdge','weepHoles','antCapping','antCappingDetails','nonDurableTimber','nonDurableTimberDetails'], total:6 },
+  conducive:       { fields:['waterLeaks','moistureReadings','leakLocation','siteDrainage','subfloorDrainage','subfloorVentilation','mouldSeen','mouldWhere','timberSoil','slabEdge','weepHoles','antCapping','antCappingDetails','nonDurableTimber','nonDurableTimberDetails'], total:6 },
   recommendations: { fields:['riskLevel','treatmentRecommended','treatmentType','inspectionFrequency','otherRecommendations'], total:4 },
   photos:          { fields:['photos'], total:1 },
   signoff:         { fields:['inspectorLicence','inspectorSignature','agreement'], total:3 }
@@ -1617,7 +1633,7 @@ const SECTIONS = {
 // location, treatment type, restriction detail) and photos are optional.
 // 'standard' is set from the inspection type, so it isn't counted either.
 const REQUIRED_FIELDS = {
-  property:        ['structureType','occupancyStatus','weatherConditions','wallConstruction','roofType','floorType','constructionEra'],
+  property:        ['structureType','occupancyStatus','weatherConditions','wallConstruction','roofType','floorType','constructionEra','existingSystem'],
   obstructions:    ['areaStatus'],
   restrictions:    ['hinderedAreas'],
   findings:        ['findings','borerActivity','decayFound','delignification'],
@@ -1626,6 +1642,7 @@ const REQUIRED_FIELDS = {
   photos:          [],
   signoff:         ['inspectorLicence','inspectorSignature','agreement'],
 };
+const REQUIRED_KEYS = new Set(Object.values(REQUIRED_FIELDS).flat());
 
 const SYSTEM_PROMPT = `You extract report fields for SAYON, an app that Australian timber pest inspectors dictate into. The user message is ONE dictated note from a timber pest inspection (AS 4349.3 / AS 3660.2). An inspector usually records several notes on one job, one per area, and the app merges them: so extract ONLY what THIS note states, and leave every other field null. A field left null stays as it was; a wrong value replaces a right one. Return ONLY a valid JSON object, no markdown and no commentary.
 
@@ -1633,12 +1650,12 @@ THE ONE RULE: a field holds only what the inspector said or plainly meant. Never
 
 FIELDS (every one null unless the note gives it):
 {"propertyStreetAddress":string,"propertySuburb":string,"propertyState":"NSW"|"VIC"|"QLD"|"WA"|"SA"|"TAS"|"ACT"|"NT","propertyPostcode":string,"clientName":string,"inspectionType":"Annual — Existing Building"|"Pre-Purchase — Timber Pest"|"Pre-Purchase — Combined Building & Pest"|"New Construction — Completion"|"Treatment Follow-Up"|"Re-inspection"|"Insurance / Legal",
-"structureType":string,"height":string,"wallConstruction":string,"roofType":string,"floorType":string,"facadeDirection":string,"constructionEra":"Pre-1920s"|"1920s-1940s"|"1945-1965"|"1965-1985"|"1985-2003"|"Post-2003","occupancyStatus":string,"weatherConditions":string,"temperature":string,"humidity":string,"rainLast24h":string,
+"structureType":string,"height":string,"wallConstruction":string,"roofType":string,"floorType":string,"facadeDirection":string,"constructionEra":"Pre-1920s"|"1920s-1940s"|"1945-1965"|"1965-1985"|"1985-2003"|"Post-2003","occupancyStatus":string,"furnishing":string,"peoplePresent":string,"weatherConditions":string,"temperature":string,"humidity":string,"rainLast24h":string,"recentWeather":string,"toolsUsed":string,"siteSurroundings":string,"siteSlope":string,"termiteHistory":string,
 "existingSystem":string,"existingSystemOther":string,"durableNoticePresent":"YES"|"NO","hardLandscaping":"YES"|"NO","zone25mmVisible":"YES"|"NO","softLandscaping":"YES"|"NO","zone75mmVisible":"YES"|"NO","antCapSoldered":"YES"|"NO"|"N/A",
 "areaStatus":{"interior"|"exterior"|"subfloor"|"roofvoid"|"outbuildings"|"site"|"fences"|"retainingwalls"|"landscapingtimbers":"INSPECTED"|"PARTIAL"|"NOT"|"NA"},"areaResult":{same area keys:"CLEAR"|"FOUND"},"obstructions":string,"restrictedAccess":string,"noAccessAreas":string,"highRiskAreas":string,"hinderedAreas":string,"hinderedAreasDetail":string,
 "findings":[{"termiteActivity":"ACTIVE"|"INACTIVE"|"NONE","species":string,"damageDescription":string,"activityLocation":string,"timberAffected":string,"nestLocated":"YES"|"NO","structuralConcern":"YES"|"NO"}],
 "borerActivity":"ACTIVE"|"INACTIVE"|"NONE","borerFindings":[{"borerActivity":"ACTIVE"|"INACTIVE","borerType":string,"location":string,"timberAffected":string,"description":string,"structuralConcern":"YES"|"NO"}],"decayFound":"YES"|"NO","decayDetails":string,"decayWhere":string,"delignification":"YES"|"NO","delignificationDetails":string,"delignificationWhere":string,"previousTreatment":"YES"|"NO","previousTreatmentDetails":string,"previousTreatmentWhere":string,
-"moistureReadings":"YES"|"NO","waterLeaks":"YES"|"NO","leakLocation":string,"moistureMeterReadings":[{"location":string,"reading":string}],"timberSoil":"YES"|"NO","slabEdge":"CLEAR"|"OBSTRUCTED","weepHoles":"CLEAR"|"BRIDGED"|"NONE","siteDrainage":"ADEQUATE"|"POOR","subfloorDrainage":"ADEQUATE"|"POOR","antCapping":"INTACT"|"GAPS"|"NONE","antCappingDetails":string,"subfloorVentilation":"ADEQUATE"|"POOR","nonDurableTimber":"YES"|"NO","nonDurableTimberDetails":string,"nonDurableTimberWhere":string,
+"moistureReadings":"YES"|"NO","waterLeaks":"YES"|"NO","mouldSeen":"YES"|"NO","mouldWhere":string,"leakLocation":string,"moistureMeterReadings":[{"location":string,"reading":string}],"timberSoil":"YES"|"NO","slabEdge":"CLEAR"|"OBSTRUCTED","weepHoles":"CLEAR"|"BRIDGED"|"NONE","siteDrainage":"ADEQUATE"|"POOR","subfloorDrainage":"ADEQUATE"|"POOR","antCapping":"INTACT"|"GAPS"|"NONE","antCappingDetails":string,"subfloorVentilation":"ADEQUATE"|"POOR","nonDurableTimber":"YES"|"NO","nonDurableTimberDetails":string,"nonDurableTimberWhere":string,
 "riskLevel":"LOW"|"MEDIUM"|"HIGH","treatmentRecommended":"YES"|"NO","treatmentType":string,"inspectionFrequency":string,"invasiveInspection":"YES"|"NO","invasiveInspectionDetails":string,"otherRecommendations":string}
 
 DROPDOWN FIELDS: the app shows these as pick-lists. Return the list value EXACTLY as written below when the inspector's words fit one; when they describe something the list cannot express, return their words instead (never a list value that adds a fact they did not state).
@@ -1648,11 +1665,18 @@ DROPDOWN FIELDS: the app shows these as pick-lists. Return the list value EXACTL
 - floorType: "Concrete slab on ground" | "Timber suspended floor" | "Elevated timber (stumps)" | "Combination slab / timber". "Not a slab" plus joists, bearers or a subfloor means "Timber suspended floor"; stumps means "Elevated timber (stumps)".
 - roofType: "Colorbond metal" | "Tiled — concrete" | "Tiled — terracotta" | "Corrugated iron" | "Flat membrane" | "Mixed". A tiled roof whose tile material is not named is written as the inspector said it, e.g. "Tiled roof, timber framed": never pick concrete or terracotta for them. Roof framing (timber or steel) has no field of its own, so it may be appended here.
 - facadeDirection: "North" | "North-east" | "East" | "South-east" | "South" | "South-west" | "West" | "North-west" (the direction the front of the building faces).
-- occupancyStatus: "Occupied — residential" | "Owner occupied" | "Tenanted" | "Vacant" | "Under renovation" | "Commercial / industrial". "Occupied" or "furnished" alone is "Occupied — residential".
+- occupancyStatus: "Occupied — residential" | "Owner occupied" | "Tenanted" | "Vacant" | "Under renovation" | "Commercial / industrial". "Occupied" alone is "Occupied — residential". Furniture is furnishing, not occupancy: "furnished" alone sets furnishing and leaves occupancyStatus null.
+- furnishing: "Fully furnished" | "Partly furnished" | "Unfurnished". "Empty", "no furniture" or "nothing in it" is "Unfurnished"; "a few things left", "half moved out" is "Partly furnished".
+- peoplePresent: who was at the property during the inspection, only when the inspector says so: "Client" | "Client and agent" | "Real estate agent" | "Vendor" | "Purchaser" | "Tenant" | "No one". Any other mix is written as a short list in their words, e.g. "Vendor and purchaser".
 - weatherConditions: "Fine and dry" | "Overcast" | "Light rain" | "Heavy rain" | "Humid" | "Windy".
+- recentWeather: the weather over the past weeks, only when the inspector describes it: "Normal for the season" | "Prolonged dry period" | "Prolonged wet period". "Hasn't rained in weeks" is "Prolonged dry period"; "rained all week" or "a wet month" is "Prolonged wet period".
+- toolsUsed: the tools the inspector says they used, as a short list in this order: moisture meter, sounding tool, thermal camera, movement detector, e.g. "Moisture meter and sounding tool" or "Moisture meter, sounding tool and thermal camera". A Termatrac is a movement detector; "tapped the timbers" or "sounded" means a sounding tool. Add anything else they name in their words ("torch, ladder"). Never list a tool they did not name.
+- siteSurroundings: what is around the property, only when the inspector describes it: "Suburban, few trees" | "Trees close to the building" | "Next to bushland or a reserve" | "Rural". A big gum or trees overhanging the house is "Trees close to the building"; a creek, park or bush behind is "Next to bushland or a reserve". Anything else in their words.
+- siteSlope: "Flat" | "Slopes away from the building" | "Slopes towards the building" | "Steep". Only when the inspector says how the ground falls.
+- termiteHistory: what the inspector was told or found about termites here before, only when it comes up: "None known" | "Termites reported before" | "Treated before" | "Unknown". "The owner said they had termites a few years ago" is "Termites reported before"; "had it treated in 2019" is "Treated before". Add the detail in their words when they give one, e.g. "Treated before (2019, Termidor)". Signs of a past treatment seen at the inspection are previousTreatment, not this.
 - temperature, humidity, rainLast24h: only a reading the inspector states, written as "22°C", "70%" and "5 mm" (rainLast24h "None" when they say there was no rain). Never estimate one from the weather description.
 - constructionEra: only from a stated age, decade or year ("built in the 70s" is "1965-1985", "around 1998" is "1985-2003", "2005" is "Post-2003") or from an era-specific material the inspector names (fibro sheeting, asbestos). Never date a house from its wall, floor or roof type: the era prints an asbestos warning in the report, so a guessed era is a false fact.
-- existingSystem (the TYPE of termite management system found): "Physical Barrier" | "Chemical Reticulation System" | "Termite Baiting System" | "Chemical Barrier" | "Combination System — Physical + Chemical" | "System Present — Type Unidentified". A chemical soil treatment or chemical barrier with no reticulation pipes mentioned (e.g. Termidor sprayed around the perimeter) is "Chemical Barrier". Only when a system is actually present; when the inspector says there is no system, no barrier or nothing installed, leave it null (never "No", "None", "Nil").
+- existingSystem (the TYPE of termite management system found): "Physical Barrier" | "Chemical Reticulation System" | "Termite Baiting System" | "Chemical Barrier" | "Combination System — Physical + Chemical" | "System Present — Type Unidentified". A chemical soil treatment or chemical barrier with no reticulation pipes mentioned (e.g. Termidor sprayed around the perimeter) is "Chemical Barrier". When the inspector says there is no system, no barrier or nothing installed, return "No System Found" (never "No", "None", "Nil"); when they don't say either way, null.
 - existingSystemOther: the brand, product or chemical the system is recorded as (HomeGuard Blue, Kordon, Termimesh, Exterra, Sentricon, Termidor, Altriset ...), plus the install year if read from the notice. Only when the inspector names it.
 - inspectionType: "Annual — Existing Building" for an annual, routine, regular or yearly inspection of the client's own home; "Pre-Purchase — Timber Pest" for pre-purchase, pre-sale or a client buying the property ("pre-purchased" is the same); "Pre-Purchase — Combined Building & Pest" only when they say building and pest; "Treatment Follow-Up", "Re-inspection", "New Construction — Completion" and "Insurance / Legal" only when said in those words. Otherwise null.
 - inspectionFrequency: write the NEXT interval first as a number of months, then any later pattern, e.g. "3 months, then every 12 months" or "12 months". Never put a later interval before the first one. It is only the routine re-inspection interval: a one-off invasive or follow-up inspection ("invasive inspection in two weeks") never goes here.
@@ -1717,6 +1741,7 @@ MOISTURE AND CONDUCIVE CONDITIONS:
 - siteDrainage: "ADEQUATE" when the inspector says the site drains well; "POOR" for poor, inadequate or no drainage around the building: water pooling, ponding, ground falling towards the house, soggy soil against the walls, downpipes discharging at the walls. Null when not raised.
 - subfloorDrainage: the same for the subfloor: "POOR" for water lying or pooling in the subfloor, wet or boggy subfloor soil, or drainage the inspector calls poor; "ADEQUATE" when they say it is dry and drains well. Null when not raised or there is no subfloor.
 - subfloorVentilation: "ADEQUATE" when the inspector says the subfloor is well ventilated or vents are fine; "POOR" for poor, inadequate, little or blocked ventilation, too few vents, or a stuffy, damp, humid subfloor they put down to airflow. Null when not raised or there is no subfloor.
+- mouldSeen: "YES" when the inspector mentions mould, mildew or fungal growth on surfaces (not wood decay in timber, which is decayFound); "NO" when they say they saw none. mouldWhere: where, in their words, only when mouldSeen is YES.
 - nonDurableTimber: "YES" when untreated, non-durable or softwood timber is used where it gets wet or touches the ground (pine sleepers, untreated garden edging, untreated posts, untreated decking near soil). "NO" when they say the timber there is treated or durable. nonDurableTimberDetails: what the timber is, without the place ("untreated pine sleepers"). nonDurableTimberWhere: where it is, in their words ("rear garden bed against the house"). Null when not raised. This is separate from timberSoil, and both can be YES.
 
 EXISTING SYSTEM AND VERIFICATION:
@@ -3752,6 +3777,7 @@ function goToExtractBlank(i) {
   if (el.classList.contains('choice-source')) el = document.getElementById(b.target.replace(/^f-/, 'choices-')) || el;
   const section = el.closest('.report-section');
   if (section && section.id.startsWith('section-')) showSection(section.id.slice(8));
+  openFieldGroups(el);
   if (b.referral) {
     // The "Refer to a Builder or Engineer?" field inside the finding card.
     const label = [...el.querySelectorAll('.field-label')].find(l => /builder or engineer/i.test(l.textContent));
@@ -4211,7 +4237,12 @@ function populateFields(data, transcript) {
   const values = upgradeRenamedChoices({ ...data });
   if (values.waterLeaks === 'YES' && values.moistureReadings !== 'YES') values.moistureReadings = 'YES';
   if (values.moistureReadings === 'NO' && !values.waterLeaks && reportData.waterLeaks === 'YES') delete values.moistureReadings;
-  if (values.existingSystem !== undefined && values.existingSystem !== null && !hasIdentifiedSystem(String(values.existingSystem))) delete values.existingSystem;
+  // "No System Found" is kept, unless an earlier note named a system: a no
+  // from one note doesn't wipe a system another note read off the notice.
+  if (values.existingSystem !== undefined && values.existingSystem !== null && !hasIdentifiedSystem(String(values.existingSystem))) {
+    if (String(values.existingSystem).trim().toLowerCase() === NO_SYSTEM_FOUND.toLowerCase() && !hasIdentifiedSystem(reportData.existingSystem || '')) values.existingSystem = NO_SYSTEM_FOUND;
+    else delete values.existingSystem;
+  }
   NIL_TEXT_KEYS.forEach(k => { if (values[k] !== undefined && values[k] !== null && isNilText(values[k])) values[k] = k === 'hinderedAreas' ? '' : null; });
   mergeBorerExtraction(values);
 
@@ -4367,7 +4398,7 @@ const CHOICE_SETS = {
   height:    [['Single storey', 'neutral'], ['Double storey', 'neutral'], ['Split level', 'neutral'], ['Multiple storey', 'neutral']],
 };
 // Report fields: the set comes from the field's key, else its edit type.
-const CHOICE_SET_BY_KEY = { borerActivity: 'borer', durableNoticePresent: 'wantyes', antCapSoldered: 'wantyes', hardLandscaping: 'neutral', softLandscaping: 'neutral' };
+const CHOICE_SET_BY_KEY = { borerActivity: 'borer', mouldSeen: 'finding', durableNoticePresent: 'wantyes', antCapSoldered: 'wantyes', zone25mmVisible: 'wantyes', zone75mmVisible: 'wantyes', hardLandscaping: 'neutral', softLandscaping: 'neutral' };
 // Choice labels that were renamed. Reports saved with the old label show
 // the new one when they are opened.
 const RENAMED_CHOICES = {
@@ -4406,9 +4437,12 @@ function buildChoiceCards() {
     panel.dataset.set = set;
     panel.setAttribute('role', 'radiogroup');
     const label = getFieldLabel(el);
-    if (label) panel.setAttribute('aria-label', label.textContent.trim());
-    el.insertAdjacentElement('afterend', panel);
     const field = el.closest('.field');
+    // "What" under a side line reads as "Wood Decay Fungi (Rot): What".
+    const pairHead = field?.closest('.field-pair')?.querySelector(':scope > .field:first-child');
+    const lead = pairHead && pairHead !== field ? pairHead.querySelector('.field-label')?.textContent.trim() + ': ' : '';
+    if (label) panel.setAttribute('aria-label', lead + label.textContent.trim());
+    el.insertAdjacentElement('afterend', panel);
     if (field) field.classList.add('choice-field');
     syncChoiceCards(key);
     new MutationObserver(() => syncChoiceCards(key)).observe(el, { childList: true, characterData: true, subtree: true });
@@ -4426,6 +4460,7 @@ const DETAIL_FIELD_FOR = {
   delignification: ['delignificationDetails', ['NO', 'N/A']],
   previousTreatment: ['previousTreatmentDetails', ['NO', 'N/A']],
   nonDurableTimber: ['nonDurableTimberDetails', ['NO', 'N/A']],
+  mouldSeen: ['mouldWhere', ['NO']],
   antCapping: ['antCappingDetails', ['INTACT']],
 };
 
@@ -4443,6 +4478,9 @@ function syncDetailField(key) {
     const hide = noAnswers.includes(reportData[key]) && !String(reportData[k] || '').trim();
     field.style.display = hide ? 'none' : '';
   });
+  // A What and Where row under a question hides with its last box.
+  const row = document.getElementById('f-' + detailKey)?.closest('.field-pair-row');
+  if (row) row.style.display = [...row.querySelectorAll(':scope > .field')].every(f => f.style.display === 'none') ? 'none' : '';
 }
 
 function syncChoiceCards(key) {
@@ -4564,7 +4602,7 @@ function findingCardHTML(finding, index, total) {
             <div class="field field-wide"><div class="field-label">Location of Activity</div>${pickFieldHTML(id, 'activityLocation', PLACES, finding.activityLocation)}</div>
             <div class="field field-wide"><div class="field-label">Timber Affected</div>${pickFieldHTML(id, 'timberAffected', TIMBER_PARTS, finding.timberAffected)}</div>
             <div class="field field-wide"><div class="field-label">Damage Description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${pickFieldHTML(id, 'damageDescription', TERMITE_SIGNS, finding.damageDescription)}</div>
-            <div class="field"><div class="field-label">Species / Genus</div>${fv('species','specieslist')}</div>
+            <div class="field field-wide"><div class="field-label">Species / Genus</div>${fv('species','specieslist')}</div>
             <div class="field choice-field"><div class="field-label">Termite Nest Found?</div>${fv('nestLocated','yesno')}</div>
             <div class="field choice-field"><div class="field-label">Refer to a Builder or Engineer?</div>${fv('structuralConcern','yesno')}</div>
             <div class="field field-wide finding-photos"><div class="field-label">Photos of this finding</div>${spotPhotosHTML(findingPhotoSection(id))}</div>
@@ -5026,6 +5064,9 @@ function checkFindingsGate() {
 // "existingSystem" is free text, so a technician typing "No", "None", "Nil",
 // "N/A" etc. must NOT count as an identified system — only an actual system
 // name/description should reveal the verification checklist.
+// The pick-list's answer for a house with no system, so the question is
+// answered rather than left blank.
+const NO_SYSTEM_FOUND = 'No System Found';
 const NO_SYSTEM_VALUES = new Set([
   '', '—', 'no', 'none', 'nil', 'na', 'n a', 'n/a', 'not applicable',
   'no system', 'nothing', 'no existing system', 'not identified',
@@ -5044,6 +5085,9 @@ function checkSystemVerify() {
 
   const hasSystem = hasIdentifiedSystem(reportData.existingSystem);
   block.style.display = hasSystem ? 'block' : 'none';
+  // No system found: no name to give, unless one was typed already.
+  const nameField = document.getElementById('f-existingSystemOther')?.closest('.field');
+  if (nameField) nameField.style.display = !hasSystem && !isBlankValue(reportData.existingSystem) && isBlankValue(reportData.existingSystemOther) ? 'none' : '';
   if (!hasSystem) return;
 
   const flag = document.getElementById('systemVerifyFlag');
@@ -5340,11 +5384,11 @@ function checkAsbestosFlag() {
   if (HIGH_ASBESTOS_ERAS.includes(era)) {
     banner.style.display = 'flex';
     banner.querySelector('.asb-text').textContent =
-      `Construction era (${era}) carries a HIGH likelihood of asbestos-containing materials (fibro, ACM sheeting). Note as observation only — do not disturb. Recommend licensed asbestos assessor if suspected ACM is identified.`;
+      `High chance of asbestos materials for this era (${era.replace(/(\d)-(\d)/g, '$1–$2')}), such as fibro and cement sheeting. Note them as an observation only and don't disturb them. If you suspect asbestos, recommend a licensed asbestos assessor.`;
   } else if (MODERATE_ASBESTOS_ERAS.includes(era)) {
     banner.style.display = 'flex';
     banner.querySelector('.asb-text').textContent =
-      `Construction era (${era}) carries a MODERATE likelihood of asbestos-containing materials. Note as observation only — do not disturb if suspected.`;
+      `Some chance of asbestos materials for this era (${era.replace(/(\d)-(\d)/g, '$1–$2')}). Note them as an observation only and don't disturb anything you suspect.`;
   } else {
     banner.style.display = 'none';
   }
@@ -5455,6 +5499,13 @@ function startEdit(el, key, type) {
       'West',
       'North-west',
     ],
+    furnishing: ['Fully furnished', 'Partly furnished', 'Unfurnished'],
+    peoplepresent: ['Client', 'Client and agent', 'Real estate agent', 'Vendor', 'Purchaser', 'Tenant', 'No one', OTHER_TYPE_IT],
+    recentweather: ['Normal for the season', 'Prolonged dry period', 'Prolonged wet period', OTHER_TYPE_IT],
+    toolsused: ['Moisture meter', 'Moisture meter and sounding tool', 'Moisture meter, sounding tool and thermal camera', 'Moisture meter, sounding tool and movement detector', 'Moisture meter, sounding tool, thermal camera and movement detector', OTHER_TYPE_IT],
+    surroundings: ['Suburban, few trees', 'Trees close to the building', 'Next to bushland or a reserve', 'Rural', OTHER_TYPE_IT],
+    siteslope: ['Flat', 'Slopes away from the building', 'Slopes towards the building', 'Steep', OTHER_TYPE_IT],
+    termitehistory: ['None known', 'Termites reported before', 'Treated before', 'Unknown', OTHER_TYPE_IT],
     occupancystatus: [
       'Occupied — residential',
       'Owner occupied',
@@ -5580,6 +5631,7 @@ function startEdit(el, key, type) {
       'Termite Baiting System',
       'Combination System — Physical + Chemical',
       'System Present — Type Unidentified',
+      NO_SYSTEM_FOUND,
     ],
     // "What and where" boxes: pick the usual answer, or type your own.
     highrisk: [
@@ -5909,28 +5961,225 @@ function commitActive() {
 }
 
 // ── NAV ───────────────────────────────────────────────────────────────────
+// ── REPORT STEPS ──────────────────────────────────────────────────────────
+// The report's tabs. A step shows one or more sections: Areas holds the
+// areas and what couldn't be inspected, Finish holds the other photos and
+// the sign-off. Sections stay the unit for progress, voice and the PDF.
+const REPORT_STEPS = [
+  { id: 'property', sections: ['property'] },
+  { id: 'areas', sections: ['obstructions', 'restrictions'] },
+  { id: 'findings', sections: ['findings'] },
+  { id: 'conducive', sections: ['conducive'] },
+  { id: 'recommendations', sections: ['recommendations'] },
+  { id: 'finish', sections: ['photos', 'signoff'] },
+];
+const stepOf = name => REPORT_STEPS.find(st => st.id === name || st.sections.includes(name)) || REPORT_STEPS[0];
+let currentStep = 'property';
+
+// name is a section or a step. A section further down its step is scrolled
+// to, so "Go to Access" lands on it.
 function showSection(name) {
+  const step = stepOf(name);
+  const changed = step.id !== currentStep;
+  currentStep = step.id;
   Object.keys(SECTIONS).forEach(s => {
     const el = document.getElementById('section-' + s);
-    if (el) {
-      if (s === name) {
-        el.style.display = 'block';
-        // Restart animation
+    if (!el) return;
+    if (step.sections.includes(s)) {
+      el.style.display = 'block';
+      if (changed) {
         el.style.animation = 'none';
-        void el.offsetWidth; // force reflow
+        void el.offsetWidth; // restarts the animation
         el.style.animation = '';
-      } else {
-        el.style.display = 'none';
       }
+    } else {
+      el.style.display = 'none';
     }
-    const tab = document.getElementById('tab-' + s);
-    if (tab) tab.classList.toggle('active', s === name);
   });
-
-  // Scroll active tab into view
-  const activeTab = document.getElementById('tab-' + name);
-  if (activeTab) activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  REPORT_STEPS.forEach(st => {
+    const tab = document.getElementById('tab-' + st.id);
+    if (tab) {
+      tab.classList.toggle('active', st.id === step.id);
+      tab.setAttribute('aria-current', st.id === step.id ? 'step' : 'false');
+    }
+  });
+  document.getElementById('reportBody')?.setAttribute('data-step', step.id);
+  if (name !== step.id && name !== step.sections[0]) {
+    const target = document.getElementById('section-' + name);
+    if (target) setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  } else if (changed) {
+    const scroller = document.getElementById('reportBody');
+    if (scroller) scroller.scrollTop = 0;
+  }
   track('screen_viewed', { screen: 'report_' + name });
+}
+
+// A tap on a step tab or a Next button. Groups with every question
+// answered fold to their one-line summary, so what's left is in view.
+function goStep(id) {
+  showSection(id);
+  foldAnsweredGroups(id);
+}
+
+// ── QUESTION GROUPS ──
+// Long steps split their questions into groups that fold (details.fgroup).
+// The header counts the questions answered; folded, it shows the answers.
+const FGROUP_CONCERNS = {
+  moistureReadings: [['YES'], 'moisture detected'], waterLeaks: [['YES'], 'a leak'], siteDrainage: [['POOR'], 'poor site drainage'],
+  subfloorDrainage: [['POOR'], 'poor subfloor drainage'], subfloorVentilation: [['POOR'], 'poor ventilation'], mouldSeen: [['YES'], 'mould'],
+  timberSoil: [['YES'], 'timber touching soil'], slabEdge: [['OBSTRUCTED'], 'slab edge concealed'], weepHoles: [['BRIDGED'], 'weep holes bridged'],
+  antCapping: [['GAPS', 'NONE'], 'ant capping'], nonDurableTimber: [['YES'], 'non-durable timber'],
+  borerActivity: [['ACTIVE', 'INACTIVE'], v => v === 'ACTIVE' ? 'active borers' : 'old borer holes'], decayFound: [['YES'], 'wood decay'],
+  delignification: [['YES'], 'chemical delignification'], previousTreatment: [['YES'], 'signs of a past treatment'],
+};
+
+// The questions a group asks right now: hidden follow-ups (a "where" box
+// after a no, system checks with no system) don't count.
+function fgroupKeys(group) {
+  return [...group.querySelectorAll('.field-val[id^="f-"]')].filter(el => {
+    for (let n = el.closest('.field') || el; n && n !== group; n = n.parentElement) {
+      if (n.hidden || n.style.display === 'none') return false;
+    }
+    return true;
+  }).map(el => el.id.slice(2));
+}
+
+// Follow-up questions show and hide from several places, so the counts
+// are redrawn whenever anything inside a group shows or hides.
+let fgroupObserver = null, fgroupFrame = 0;
+function watchFieldGroups() {
+  if (fgroupObserver || typeof MutationObserver === 'undefined') return;
+  fgroupObserver = new MutationObserver(() => {
+    if (fgroupFrame) return;
+    fgroupFrame = requestAnimationFrame(() => { fgroupFrame = 0; renderFieldGroups(); });
+  });
+  document.querySelectorAll('#reportBody details.fgroup').forEach(group =>
+    fgroupObserver.observe(group, { subtree: true, attributes: true, attributeFilter: ['style', 'hidden'] }));
+}
+
+// Folded, a group reads as a short sentence: the answers in a comma list,
+// in sentence case, with a word of context where an answer alone would be
+// unclear ("Detached house, single storey, brick veneer walls, front faces
+// north"). Brand names and codes such as AS 3660 keep their capitals.
+const FGROUP_KEEP_CASE = new Set(['Colorbond', 'Zincalume', 'Hebel', 'Queenslander', 'Termidor', 'Sentricon', 'Exterra', 'Kordon', 'Termimesh', 'Altriset', 'Trelona', 'Biflex', 'Premise', 'Granitgard']);
+const FGROUP_LOWER = new Set(['structureType', 'height', 'wallConstruction', 'roofType', 'floorType', 'facadeDirection', 'constructionEra',
+  'siteSurroundings', 'siteSlope', 'termiteHistory', 'existingSystem', 'occupancyStatus', 'furnishing', 'peoplePresent',
+  'weatherConditions', 'recentWeather', 'toolsUsed', 'treatmentType', 'inspectionFrequency']);
+const FGROUP_PHRASES = {
+  wallConstruction: v => /wall/i.test(v) ? v : v + ' walls',
+  roofType: v => /roof/i.test(v) ? v : v + ' roof',
+  facadeDirection: v => 'front faces ' + v,
+  constructionEra: v => 'built ' + v.replace(/(\d)-(\d)/g, '$1\u2060–\u2060$2'),
+  siteSurroundings: v => v.replace(/^suburban, few trees$/, 'suburban with few trees'),
+  siteSlope: v => /^slopes/.test(v) ? 'site ' + v : /site|block|land/.test(v) ? v : v + ' site',
+  termiteHistory: v => ({ 'none known': 'no known termite history', unknown: 'termite history unknown', 'treated before': 'treated for termites before' })[v] || v,
+  peoplePresent: v => /present/.test(v) ? v : v + ' present',
+  humidity: v => /humid/i.test(v) ? v : v + ' humidity',
+  rainLast24h: v => /^(none|nil|no rain)$/i.test(v) ? 'no rain in the last 24 hours' : /rain/i.test(v) ? v : v + ' of rain in the last 24 hours',
+  recentWeather: v => /^normal/.test(v) ? 'weather ' + v : v,
+  riskLevel: v => v.toLowerCase() + ' risk',
+  inspectionFrequency: v => /^every/.test(v) ? 're-inspect ' + v : v,
+};
+function fgroupSentence(keys) {
+  const items = [];
+  keys.forEach(k => {
+    let v = String(reportData[k] ?? '').trim();
+    if (k === 'treatmentRecommended') v = { YES: 'treatment required', NO: 'no treatment required' }[v] || '';
+    if (k === 'invasiveInspection') v = { YES: 'recommended', NO: 'not recommended' }[v] || '';
+    if (!v || /^(YES|NO|N\/A)$/.test(v)) return;
+    v = v.replace(/\s+—\s+(.+)$/, ' ($1)');
+    if (FGROUP_LOWER.has(k)) v = v.replace(/\b[A-Z][a-z]+\b/g, w => FGROUP_KEEP_CASE.has(w) ? w : w.toLowerCase());
+    if (FGROUP_PHRASES[k]) v = FGROUP_PHRASES[k](v);
+    const last = items[items.length - 1];
+    if (k === 'existingSystemOther' && last && last.key === 'existingSystem') { last.text += ` (${v})`; return; }
+    items.push({ key: k, text: v });
+  });
+  const text = items.map(i => i.text).join(', ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+// Groups whose answers live in cards rather than single questions. Each
+// returns what the header shows; these groups stay open on a step tap.
+const FGROUP_CUSTOM = {
+  termites: () => {
+    const list = Array.isArray(reportData.findings) ? reportData.findings : [];
+    const acts = list.map(f => f.termiteActivity).filter(Boolean);
+    const live = acts.filter(a => a === 'ACTIVE').length, old = acts.filter(a => a === 'INACTIVE').length;
+    const found = [live && `${live} active`, old && `${old} inactive`].filter(Boolean);
+    return {
+      done: list.length > 0 && acts.length === list.length, started: acts.length > 0,
+      count: list.length ? `${list.length} finding${list.length === 1 ? '' : 's'}` : '',
+      text: found.length ? 'Found: ' + found.join(', ') : acts.length ? 'No termites found' : '', concern: found.length > 0,
+    };
+  },
+  advice: () => {
+    const lines = getRecLines().length, other = !isBlankValue(reportData.otherRecommendations);
+    return {
+      done: lines > 0 || other, started: false, count: lines ? `${lines} added` : '',
+      text: [lines && `${lines} common recommendation${lines === 1 ? '' : 's'}`, other && String(reportData.otherRecommendations).trim()].filter(Boolean).join(', '),
+    };
+  },
+};
+
+function renderFieldGroups() {
+  watchFieldGroups();
+  document.querySelectorAll('#reportBody details.fgroup').forEach(group => {
+    const custom = FGROUP_CUSTOM[group.dataset.summary];
+    if (custom) {
+      const r = custom();
+      group.classList.toggle('fgroup-done', !!r.done);
+      group.classList.toggle('fgroup-started', !!r.started && !r.done);
+      const count = group.querySelector('.fgroup-count'), sub = group.querySelector('.fgroup-sub');
+      if (count) { count.textContent = r.count; count.hidden = !r.count; }
+      if (sub) { sub.textContent = r.text || 'Not answered yet'; sub.classList.toggle('concern', !!r.concern); }
+      return;
+    }
+    // A group counts only the questions a finished report needs, so a house
+    // that doesn't call for the extras still reaches done. A group of extras
+    // only reads Optional until something goes in it.
+    const keys = fgroupKeys(group);
+    const answered = keys.filter(k => !isBlankValue(reportData[k]));
+    const needed = keys.filter(k => REQUIRED_KEYS.has(k));
+    const neededDone = needed.filter(k => !isBlankValue(reportData[k])).length;
+    const done = needed.length ? neededDone === needed.length : answered.length > 0;
+    const optional = !needed.length && !answered.length;
+    group.classList.toggle('fgroup-done', done);
+    group.classList.toggle('fgroup-started', answered.length > 0 && !done);
+    group.classList.toggle('fgroup-optional', optional);
+    const count = group.querySelector('.fgroup-count');
+    if (count) count.textContent = done ? 'Done' : optional ? 'Optional' : `${neededDone} of ${needed.length}`;
+    const sub = group.querySelector('.fgroup-sub');
+    if (!sub) return;
+    let text, concern = false;
+    if (group.dataset.summary === 'concerns') {
+      const concerns = keys.filter(k => FGROUP_CONCERNS[k] && FGROUP_CONCERNS[k][0].includes(reportData[k]))
+        .map(k => typeof FGROUP_CONCERNS[k][1] === 'function' ? FGROUP_CONCERNS[k][1](reportData[k]) : FGROUP_CONCERNS[k][1]);
+      concern = concerns.length > 0;
+      text = concern ? 'Found: ' + concerns.join(', ') : (answered.length ? 'Nothing of concern so far' : '');
+    } else {
+      text = fgroupSentence(answered);
+    }
+    sub.textContent = text || (optional ? 'Nothing added' : keys.length ? 'Not answered yet' : '');
+    sub.classList.toggle('concern', concern);
+  });
+}
+
+function foldAnsweredGroups(stepId) {
+  renderFieldGroups();
+  const step = stepOf(stepId);
+  step.sections.forEach(s => {
+    document.querySelectorAll(`#section-${s} details.fgroup`).forEach(group => {
+      if (FGROUP_CUSTOM[group.dataset.summary]) return;
+      group.open = !group.classList.contains('fgroup-done');
+    });
+  });
+}
+
+// Opens any folded group around el, so a jump to a question can show it.
+function openFieldGroups(el) {
+  for (let n = el && el.parentElement; n; n = n.parentElement) {
+    if (n.matches && n.matches('details.fgroup') && !n.open) n.open = true;
+  }
 }
 
 // ── PROGRESS ──────────────────────────────────────────────────────────────
@@ -5950,30 +6199,37 @@ function updateProgress() {
   // zero real finding data) showed up here too - now sharing one
   // definition (isFieldFilled) so this can't drift out of sync again.
   let filled = 0, total = 0;
+  const secState = {};
   Object.entries(SECTIONS).forEach(([sec, cfg]) => {
     const req = REQUIRED_FIELDS[sec] || [];
     const reqFilled = req.filter(k => isFieldFilled(k)).length;
     const any = cfg.fields.some(k => isFieldFilled(k));
     filled += reqFilled; total += req.length;
 
-    const dot = document.getElementById('dot-' + sec);
     const sts = document.getElementById('sts-' + sec);
     const nextBtn = document.getElementById('next-btn-' + sec);
+    secState[sec] = !any ? 'empty' : reqFilled < req.length ? 'partial' : 'done';
 
     if (!any) {
-      if (dot) dot.className = 'tab-dot';
       if (sts) { sts.className = 'sec-badge empty'; sts.textContent = 'Not started'; }
-      if (nextBtn) nextBtn.classList.remove('visible');
     } else if (reqFilled < req.length) {
-      if (dot) dot.className = 'tab-dot partial';
       if (sts) { sts.className = 'sec-badge partial'; sts.textContent = 'In progress'; }
-      if (nextBtn) nextBtn.classList.remove('visible');
     } else {
-      if (dot) dot.className = 'tab-dot done';
       if (sts) { sts.className = 'sec-badge done'; sts.textContent = 'Complete'; }
-      if (nextBtn) nextBtn.classList.add('visible');
     }
+    // Next always shows, so the steps can be walked in order; it stands
+    // out once the section is complete.
+    if (nextBtn) { nextBtn.classList.add('visible'); nextBtn.classList.toggle('pending', secState[sec] !== 'done'); }
   });
+  // A step's dot: done when every section in it is, started when any is.
+  REPORT_STEPS.forEach(st => {
+    const dot = document.getElementById('dot-' + st.id);
+    if (!dot) return;
+    const states = st.sections.map(s => secState[s]).filter(Boolean);
+    const counted = st.id === 'finish' ? states.slice(1) : states; // other photos are optional
+    dot.className = counted.every(v => v === 'done') ? 'tab-dot done' : states.some(v => v !== 'empty') ? 'tab-dot partial' : 'tab-dot';
+  });
+  renderFieldGroups();
 
   // A completed (locked) job reads Complete whatever the count says.
   const locked = isReportLocked();
@@ -6144,22 +6400,22 @@ const DEFAULT_AGREEMENT_TEXT = `1. The inspection
 {company} will carry out a {inspectionType} inspection of {address} for {client} on {date}, in line with {standard}.
 
 2. What is inspected
-A visual inspection of the readily accessible areas of the building and site for termites, borers of seasoned timber and wood decay fungi, and for conditions that make timber pest attack more likely. This normally covers the interior, roof space, subfloor, exterior, outbuildings, and the site within 50 m of the building, where they can be safely reached.
+A visual inspection of the readily accessible areas of the building and site for termites, borers of seasoned timber and wood decay fungi, and for conditions that make timber pest attack more likely. This normally covers the interior, roof space, subfloor, exterior, outbuildings, and the site within 50 m of the building and inside the property boundary, where they can be safely reached.
 
-3. Limits of the inspection
-The inspection is visual and non-invasive. We do not move furniture, stored goods, floor coverings, insulation or vegetation, and we do not cut, drill or remove any part of the building. Areas we cannot reach or see will be recorded in the report, and timber pests or damage may be hidden in them. The inspection cannot guarantee that the property is, or will stay, free of timber pests. It is not a building, structural, asbestos, mould or electrical inspection.
+3. How we inspect, and the limits
+The inspection is visual and non-invasive. We may tap timbers and use a moisture meter or other tools that do not damage the building. We do not move furniture, stored goods, floor coverings, insulation or vegetation, and we do not cut, drill or remove any part of the building. Areas we cannot reach or see will be recorded in the report, and timber pests or damage may be hidden in them. The inspection cannot guarantee that the property is, or will stay, free of timber pests. It is not a building, structural, asbestos, mould or electrical inspection. If we find timber damage, we may recommend that a builder or engineer assesses it.
 
 4. Invasive inspection
 An invasive inspection is not included. If one is recommended, it needs a separate written agreement and fee.
 
 5. Access
-Please arrange safe access to all areas on the day. Any area we can't get into will be noted in the report, and coming back to inspect it later may cost extra.
+Please arrange safe access to all areas on the day, including the roof space, the subfloor and any locked areas. Any area we can't get into will be noted in the report. If you would like us to come back to inspect it, we will tell you the cost before we do.
 
 6. The report
-You will receive a written report after the inspection. It is for your use only and must not be relied on by anyone else without our written consent.
+You will receive a written report by email after the inspection. It is for your use only and must not be relied on by anyone else without our written consent.
 
-7. Voice notes
-The inspector may dictate notes into a phone app as they go, and the phone may pick up conversation nearby. What it hears is turned into text to write your report. The audio is not kept.
+7. Voice notes and your details
+The inspector may speak notes into a phone app during the inspection, and the phone may pick up conversation nearby. A speech-to-text service turns what it hears into written notes for your report. The recording is not kept. If you would rather not be recorded, tell the inspector and they will type their notes instead. Your details and the report are only used and shared as needed to provide this service.
 
 8. Fee
 {fee}
@@ -6253,14 +6509,16 @@ function openAgreementSheet() {
   document.getElementById('agreementEdit').style.display = a ? 'none' : '';
   document.getElementById('agreementView').style.display = a ? '' : 'none';
   if (a) {
+    document.getElementById('agreementViewName').textContent = a.signerName;
     document.getElementById('agreementViewSummary').textContent =
-      `Signed by ${a.signerName} on ${formatAgreementSignedAt(a.signedAt)}` +
-      (a.method === 'other' ? ` · ${a.otherNote}` : ' · signed on this device');
-    document.getElementById('agreementViewText').textContent = a.text;
+      formatAgreementSignedAt(a.signedAt) + (a.method === 'other' ? ` · ${a.otherNote}` : ' · signed on this device');
+    renderAgreementDoc(document.getElementById('agreementViewText'), a.text);
     const img = document.getElementById('agreementViewSignature');
     img.style.display = a.signature ? '' : 'none';
     if (a.signature) img.src = a.signature;
   } else {
+    document.getElementById('agreementAddr').textContent = getFullAddress() || 'No address yet';
+    document.getElementById('agreementAddr').classList.toggle('empty', !getFullAddress());
     document.getElementById('agreementSignerName').value = document.getElementById('jobClient').value.trim();
     document.getElementById('agreementInspectionType').value = reportData.jobInspectionType || '';
     // Job Details may already have the inspection date and fee.
@@ -6274,6 +6532,50 @@ function openAgreementSheet() {
     refreshAgreementPreview();
   }
   document.getElementById('agreementOverlay').classList.add('open');
+  document.querySelectorAll('#agreementOverlay .page-sheet-body').forEach(b => { b.scrollTop = 0; });
+}
+
+// The agreement as a document: each "N. Heading" block becomes a numbered
+// clause, any other paragraph plain text, and a blank still to fill in is
+// marked. Works on a business's own wording as well as the default.
+function renderAgreementDoc(el, text) {
+  el.textContent = '';
+  const withBlanks = (node, str) => {
+    str.split(/(_{4,})/).forEach(part => {
+      if (!part) return;
+      if (/^_{4,}$/.test(part)) {
+        const b = document.createElement('span');
+        b.className = 'agr-blank'; b.textContent = 'not filled in';
+        node.appendChild(b);
+      } else node.appendChild(document.createTextNode(part));
+    });
+  };
+  const para = (parent, str, cls) => {
+    const p = document.createElement('p');
+    if (cls) p.className = cls;
+    withBlanks(p, str);
+    parent.appendChild(p);
+  };
+  let sawClause = false;
+  String(text || '').split(/\n\s*\n/).forEach(block => {
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return;
+    const m = lines[0].match(/^(\d+)\.\s+(.+)$/);
+    if (m) {
+      sawClause = true;
+      const sec = document.createElement('section');
+      sec.className = 'agr-clause';
+      const num = document.createElement('span');
+      num.className = 'agr-clause-num'; num.textContent = m[1];
+      const h = document.createElement('h4');
+      h.className = 'agr-clause-title'; h.textContent = m[2];
+      sec.append(num, h);
+      lines.slice(1).forEach(l => para(sec, l));
+      el.appendChild(sec);
+    } else {
+      lines.forEach(l => para(el, l, sawClause ? 'agr-doc-close' : 'agr-doc-intro'));
+    }
+  });
 }
 
 // The fee as the agreement prints it: "$440 inc GST" from "440".
@@ -6310,7 +6612,9 @@ function closeAgreementSheet() {
 }
 
 function refreshAgreementPreview() {
-  if (!reportData.agreement) document.getElementById('agreementText').textContent = agreementFormValues().text;
+  if (!reportData.agreement) renderAgreementDoc(document.getElementById('agreementText'), agreementFormValues().text);
+  const hint = document.getElementById('agreementFeeHint');
+  if (hint) hint.hidden = !!document.getElementById('agreementFee').value.trim();
   updateAgreementSignButton();
 }
 
@@ -6331,10 +6635,28 @@ function agreementTypeChosen() {
 function updateAgreementSignButton() {
   const btn = document.getElementById('agreementSignBtn');
   if (!btn) return;
-  btn.disabled = !(agreementTypeChosen()
-    && document.getElementById('agreementSignerName').value.trim()
-    && document.getElementById('agreementAgree').checked
-    && agreementSignaturePad && !agreementSignaturePad.empty);
+  const typed = agreementTypeChosen();
+  const named = !!document.getElementById('agreementSignerName').value.trim();
+  const agreed = document.getElementById('agreementAgree').checked;
+  const drawn = !!(agreementSignaturePad && !agreementSignaturePad.empty);
+  btn.disabled = !(typed && named && agreed && drawn);
+  // The side line: each step ticks off once it's done.
+  const steps = [['agreementStepJob', typed], ['agreementStepRead', agreed], ['agreementStepSign', named && drawn]];
+  let nowSet = false;
+  steps.forEach(([id, done]) => {
+    const li = document.getElementById(id);
+    if (!li) return;
+    li.classList.toggle('done', done);
+    li.classList.toggle('now', !done && !nowSet);
+    if (!done) nowSet = true;
+  });
+  const need = [!typed && 'choose the inspection type', !agreed && 'tick that the client has read it',
+    !named && "enter the client's name", !drawn && 'get their signature'].filter(Boolean);
+  const needEl = document.getElementById('agreementSignNeed');
+  if (needEl) {
+    needEl.hidden = !need.length;
+    needEl.textContent = need.length ? `To sign: ${need.join(', ')}.` : '';
+  }
 }
 
 function toggleAgreementOther() {
@@ -6416,22 +6738,59 @@ function shareAgreementPdf() {
 function drawAgreementBody(doc, a, y, { M, CW, onNewPage }) {
   const C = PDF_COLORS;
   const bottom = 281;
-  const room = (h) => { if (y + h > bottom) { doc.addPage(); y = onNewPage(); } };
-  a.text.split(/\n/).forEach(line => {
-    const isHeading = /^\d+\.\s/.test(line);
-    doc.setFont('helvetica', isHeading ? 'bold' : 'normal');
-    doc.setFontSize(isHeading ? 9.5 : 8.5);
-    doc.setTextColor(...(isHeading ? C.ink : C.inkLight));
-    if (!line.trim()) { y += 2.5; return; }
-    const wrapped = doc.splitTextToSize(line, CW);
-    wrapped.forEach(w => { room(5); doc.text(w, M, y); y += isHeading ? 4.8 : 4; });
-    if (isHeading) y += 0.4;
+  const room = (h) => { if (y + h > bottom) { doc.addPage(); y = onNewPage(); return true; } return false; };
+  const GUT = 9, LH = 4;
+  // Same blocks as the sheet: "N. Heading" clauses with a numbered gutter
+  // and a hairline between, other paragraphs plain, the closing shaded.
+  const blocks = String(a.text || '').split(/\n\s*\n/).map(b => b.split('\n').map(l => l.trim()).filter(Boolean)).filter(b => b.length);
+  let sawClause = false, first = true;
+  blocks.forEach((lines, bi) => {
+    const m = lines[0].match(/^(\d+)\.\s+(.+)$/);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+    if (m) {
+      sawClause = true;
+      const body = lines.slice(1).map(l => doc.splitTextToSize(l, CW - GUT - 3));
+      const firstH = 5 + (body[0] ? Math.min(body[0].length, 2) * LH : 0);
+      if (!room(firstH + 4) && !first) {
+        doc.setDrawColor(...C.ruleLight); doc.setLineWidth(0.2); doc.line(M + GUT, y - 1.6, M + CW, y - 1.6);
+      }
+      y += 2.2;
+      doc.setFillColor(...C.accentLight); doc.roundedRect(M, y - 3.4, 5.6, 4.6, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...C.accentDark);
+      doc.text(m[1], M + 2.8, y, { align: 'center' });
+      doc.setFontSize(9.5); doc.setTextColor(...C.ink);
+      doc.text(doc.splitTextToSize(m[2], CW - GUT - 3)[0], M + GUT, y);
+      y += 4.8;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...C.inkLight);
+      body.forEach((wrapped, i) => {
+        if (i) y += 1.5;
+        wrapped.forEach(w => { room(LH); doc.text(w, M + GUT, y); y += LH; });
+      });
+      y += 2.6;
+    } else if (sawClause) {
+      const wrapped = lines.flatMap(l => doc.splitTextToSize(l, CW - 13));
+      const h = wrapped.length * LH + 6;
+      // The last paragraph keeps the signatures company on its page.
+      room(h + 2 + (bi === blocks.length - 1 ? 34 : 0));
+      y += 1;
+      doc.setFillColor(...C.rowAlt); doc.roundedRect(M, y, CW, h, 1.5, 1.5, 'F');
+      doc.setFillColor(...C.accent); doc.rect(M, y, 0.8, h, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.ink);
+      wrapped.forEach((w, i) => doc.text(w, M + 5, y + 4.6 + i * LH));
+      y += h + 2;
+    } else {
+      doc.setTextColor(...C.inkLight);
+      lines.forEach(l => doc.splitTextToSize(l, CW).forEach(w => { room(LH); doc.text(w, M, y); y += LH; }));
+      y += 2.5;
+    }
+    first = false;
   });
   // Who agreed, how and when, as a signature block.
-  y += 3;
-  room(26);
-  doc.setFillColor(...C.accent); doc.rect(M, y, CW, 0.5, 'F');
-  y += 18;
+  y += 4;
+  room(30);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...C.accentDark);
+  pdfTracked(doc, 'AGREED AND SIGNED', M, y, { cs: 0.6 });
+  y += 20;
   const colW = (CW - 16) / 3;
   const onLine = (text, x) => {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...C.ink);
@@ -6953,12 +7312,62 @@ function renderAllSectionPhotoGrids() {
 // Re-draws the parts of the report that aren't plain fields, after a
 // report is loaded, restored or reset.
 function renderReportWidgets() {
+  renderRecLines();
   renderPhotoGrid();
   renderAllSectionPhotoGrids();
   renderAreaChecklist();
   renderMoistureTable();
   renderPendingNotes();
   renderIssueState();
+}
+
+// ── READY-MADE RECOMMENDATIONS ─────────────────────────────────────────────
+// Lines the inspector would otherwise say on most jobs, added with a tap.
+// The report stores the text as it was when added (reportData.recLines =
+// [{ id, text }]), so a later change of wording never changes a report
+// already sent. Never a structural verdict, never a risk by species.
+const REC_LINES = [
+  ['maintain', 'Maintain the system', 'Keep the termite management system on this property maintained as its installer specifies, and follow the recommendations in this report.'],
+  ['warranty', 'Keep the warranty', 'Have the termite management system inspected and serviced as its warranty requires, so any warranty or service period stays in place.'],
+  ['expired', 'System may be expired', 'The termite management system on this property may be past its service life. Have it assessed and, if needed, re-treated or replaced.'],
+  ['install', 'Install a system', 'Have a termite management system installed to AS 3660.2, such as a chemical soil treated zone or a monitoring and baiting system. A quote can be provided.'],
+  ['zone', 'Keep inspection zones clear', 'Keep the slab edge and the inspection zones around the building clear of soil, garden beds, paving and stored items, so termite entry can be seen.'],
+  ['debris', 'Clear timber and debris', 'Remove stored timber, garden debris and other materials from against the building and from the subfloor.'],
+  ['drainage', 'Keep water away', 'Keep gutters, downpipes, taps and drainage in good repair, and keep the ground around the building dry and draining away from it.'],
+  ['plumber', 'Plumber for moisture', 'Have a licensed plumber find and fix the source of the moisture noted in this report.'],
+  ['ventilation', 'Improve ventilation', 'Improve subfloor ventilation and keep the vents clear: damp subfloors attract termites and decay.'],
+  ['stumps', 'Check trees and stumps', 'Have trees and stumps on the property checked for termite nests, and remove dead stumps and old landscaping timbers.'],
+  ['declined', 'Client declined for now', 'Termite management options were discussed with the client, who chose not to go ahead at this time. A quote can be provided on request.'],
+  ['sample', 'Sample sent for ID', 'A sample was taken for identification. Further advice will follow once it has been identified.'],
+];
+
+function getRecLines() { return Array.isArray(reportData.recLines) ? reportData.recLines : []; }
+
+function renderRecLines() {
+  const el = document.getElementById('recLines');
+  if (!el) return;
+  const have = new Set(getRecLines().map(l => l.id));
+  el.innerHTML = REC_LINES.map(([id, label]) =>
+    `<button type="button" class="rec-line${have.has(id) ? ' on' : ''}" aria-pressed="${have.has(id)}" onclick="toggleRecLine('${id}')">${escapeHtml(label)}</button>`).join('');
+  const added = document.getElementById('recLinesAdded');
+  if (added) {
+    added.innerHTML = getRecLines().map(l => `<li>${escapeHtml(l.text)}</li>`).join('');
+    added.hidden = !have.size;
+  }
+  const n = have.size;
+  const count = document.getElementById('recLinesCount');
+  if (count) count.textContent = n ? `${n} added to the report` : 'Tap to add to the report';
+}
+
+function toggleRecLine(id) {
+  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  const line = REC_LINES.find(l => l[0] === id);
+  if (!line) return;
+  const list = getRecLines();
+  reportData.recLines = list.some(l => l.id === id) ? list.filter(l => l.id !== id) : [...list, { id, text: line[2] }];
+  renderRecLines();
+  renderFieldGroups();
+  saveDraft();
 }
 
 // ── LEGACY GENERAL PHOTOS (Photos tab) ─────────────────────────────────────
@@ -9076,7 +9485,7 @@ function loadDraft() {
       const count = cfg.fields.filter(k => isFieldFilled(k)).length;
       if (count > bestCount) { bestCount = count; bestSection = sec; }
     });
-    showSection(bestSection);
+    goStep(stepOf(bestSection).id);
 
     return true;
   } catch (e) {
@@ -9324,7 +9733,7 @@ function loadReport(id, quiet) {
     const count = cfg.fields.filter(k => isFieldFilled(k)).length;
     if (count > bestCount) { bestCount = count; bestSection = sec; }
   });
-  showSection(bestSection);
+  goStep(stepOf(bestSection).id);
   lastReportSig = reportSig();
   saveDraft();
 
@@ -9648,6 +10057,7 @@ function newReport() {
   saveOpenReportNow();
   track('report_started');
   startBlankReport();
+  refreshDashboardIfOpen();
   showToast('New report started', 'info');
 }
 
@@ -9730,7 +10140,14 @@ function openDashboard() {
   const search = document.getElementById('dashboardSearch');
   if (search) search.value = '';
   renderDashboard();
-  if (dashboardJobs.length && !dashboardJobs.some(j => j.group === 'todo')) setDashboardTab('all');
+  if (!dashboardJobs.some(j => j.group === 'todo')) setDashboardTab('current');
+}
+
+// Opens the dashboard on the open job's details.
+function openJobDetails() {
+  if (!document.getElementById('dashboardOverlay').classList.contains('open')) openDashboard();
+  closeDashboardDetail();
+  setDashboardTab('current');
 }
 
 function refreshDashboardIfOpen() {
@@ -9742,10 +10159,19 @@ function closeDashboard() {
   document.getElementById('dashboardOverlay').classList.remove('open');
 }
 
-// Which list the dashboard shows: 'todo' | 'waiting' | 'done' | 'all'.
+// Which tab the dashboard shows: 'current' (the open job's details) or a
+// list, 'todo' | 'waiting' | 'done'. Search looks through every job.
 let dashboardTab = 'todo';
 let dashboardJobs = [];
-const DASHBOARD_TABS = [['todo', 'Needs you'], ['waiting', 'With client'], ['done', 'Done'], ['all', 'All']];
+const DASHBOARD_TABS = [['current', 'This job'], ['todo', 'To do'], ['waiting', 'Waiting'], ['done', 'Done']];
+
+// Job details sit on the Current report tab. Before the dashboard redraws,
+// the panel goes back to its holder, so its fields survive the redraw.
+function parkJobPanel() {
+  const panel = document.getElementById('jobPanel');
+  const home = document.getElementById('jobPanelHome');
+  if (panel && home && panel.parentNode !== home) home.appendChild(panel);
+}
 
 // The day a job belongs to: its inspection date, else when it was saved.
 function dashboardJobTime(r) {
@@ -9771,34 +10197,44 @@ function dashboardJob(r, quotes) {
   const reportDone = reportSent || !!d.pdfAt || (r.completion || 0) >= 100;
   const needsQuote = d.treatmentRecommended === 'YES';
   const total = hasQuote ? quoteTotals(q).total : 0;
-  let group, status, next = null;
+  const who = (r.client || '').trim() || 'the client';
+  let group, status, hint = '', next = null;
   if (!reportDone) {
     group = 'todo'; status = 'Finish the report';
+    hint = 'Fill in the rest of the report, then make the PDF from the Sign-Off page.';
     next = { label: 'Open report', to: 'report' };
   } else if (!hasQuote && needsQuote) {
     group = 'todo'; status = 'Write the quote';
-    next = { label: 'Move to quote', to: 'quote' };
+    hint = 'The report recommends a treatment. Price the work for ' + who + '.';
+    next = { label: 'Write the quote', to: 'quote' };
   } else if (!hasQuote) {
     group = reportSent ? 'done' : 'todo';
     status = reportSent ? 'No quote needed' : 'Send the report';
+    hint = reportSent ? 'The report has gone to ' + who + ' and no treatment was recommended.' : 'The report is ready. Send it to ' + who + '.';
     if (!reportSent) next = { label: 'Open report', to: 'report' };
   } else if (!a) {
     group = q.sentAt ? 'waiting' : 'todo';
     status = q.sentAt ? `Quote sent ${dashDate(q.sentAt)}` : 'Send the quote';
-    next = { label: q.sentAt ? 'Record their answer' : 'Send quote', to: 'quote' };
+    hint = q.sentAt ? 'Waiting on ' + who + '. When they answer, record it on the quote.' : 'The quote is priced. Send it to ' + who + '.';
+    next = { label: q.sentAt ? 'Record their answer' : 'Send the quote', to: q.sentAt ? 'answer' : 'quote' };
   } else if (a.stale) {
     group = 'todo'; status = 'Quote changed, get a new answer';
+    hint = 'The quote changed after ' + who + ' answered. Send the new version and record their answer again.';
     next = { label: 'Open quote', to: 'quote' };
   } else if (a.status !== 'accepted') {
     group = 'done'; status = 'Quote declined';
+    hint = who.charAt(0).toUpperCase() + who.slice(1) + ' declined the quote, so there\'s nothing more to do.';
   } else if (!q.treatment) {
     group = 'todo'; status = 'Record the treatment';
+    hint = who.charAt(0).toUpperCase() + who.slice(1) + ' accepted the quote. Once the work is done, record what was used and where.';
     next = { label: 'Record treatment', to: 'treatment' };
-  } else if (!q.certificateSentAt) {
-    group = 'todo'; status = 'Send the certificate';
-    next = { label: 'Send certificate', to: 'quote' };
+  } else if (!certificateGiven(q)) {
+    group = 'todo'; status = 'Email the certificate';
+    hint = 'The treatment is recorded. Email ' + who + ' their treatment certificate, the PDF that records what was applied and where. You\'ll see who it goes to before it sends.';
+    next = { label: 'Email the certificate', to: 'certificate' };
   } else {
     group = 'done'; status = 'Treated';
+    hint = 'Finished. ' + who.charAt(0).toUpperCase() + who.slice(1) + ' has their treatment certificate.';
   }
 
   const answered = a && !a.stale;
@@ -9808,7 +10244,7 @@ function dashboardJob(r, quotes) {
       text: d.issue ? `Completed${sentOn ? ' ' + dashDate(sentOn) : ''}` : d.sent ? `Sent ${dashDate(d.sent.at)}`
         : d.pdfAt ? `PDF made ${dashDate(d.pdfAt)}, not sent yet`
         : reportDone ? 'Ready to send' : 'In progress' },
-    { label: 'Quote', to: 'quote', state: hasQuote && q.sentAt ? 'done' : !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
+    { label: 'Quote', to: 'quote', state: hasQuote && (q.sentAt || answered) ? 'done' : !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
       text: hasQuote ? `${formatAUD(total).replace(/\.00$/, '')} · ${q.sentAt ? 'sent ' + dashDate(q.sentAt) : 'not sent yet'}`
         : reportDone && !needsQuote ? 'Not needed' : 'Not written yet' },
     { label: 'Client\'s answer', to: 'answer', state: answered ? (a.status === 'accepted' ? 'done' : 'bad') : !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
@@ -9817,21 +10253,24 @@ function dashboardJob(r, quotes) {
         : a.status === 'accepted' ? `Accepted${a.by ? ' by ' + a.by : ''} ${dashDay(a.date)}`
         : `Declined ${dashDay(a.date)}${a.note ? ' · ' + a.note : ''}` },
     { label: 'Treatment', to: 'treatment', state: q && q.treatment ? 'done' : answered && a.status !== 'accepted' || !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
-      text: q && q.treatment ? `Done ${dashDay(q.treatment.date)} · certificate ${q.certificateSentAt ? 'sent' : 'not sent'}` : 'Not recorded yet' },
+      text: q && q.treatment ? `Done ${dashDay(q.treatment.date)} · certificate ${q.certificateSentAt ? 'sent' : q.certificateHandedAt ? 'given' : 'not sent'}` : 'Not recorded yet' },
   ];
   steps.forEach(s => { if (s.state === 'skip') s.text = 'Not needed'; });
   // Each step just says whether it's done; the preview has the detail. A declined answer keeps its wording.
   steps.forEach(s => { if (s.state === 'done' || s.state === 'todo') s.text = s.state === 'done' ? 'Completed' : 'Not completed'; });
-  if (group !== 'done') { const s = steps.find(s => s.state === 'todo'); if (s) s.state = 'now'; }
-  return { r, q, group, status, next, steps, total, time: dashboardJobTime(r) };
+  // Recorded but the certificate hasn't gone: the treatment isn't finished.
+  if (q && q.treatment && !certificateGiven(q) && steps[3].state === 'done') Object.assign(steps[3], { state: 'now', text: 'Certificate not emailed yet' });
+  if (group !== 'done' && !steps.some(s => s.state === 'now')) { const s = steps.find(s => s.state === 'todo'); if (s) s.state = 'now'; }
+  return { r, q, group, status, hint, next, steps, total, time: dashboardJobTime(r) };
 }
 
 // A ring of four arcs, one per step, filled as the job moves along.
 function dashboardRing(steps, group) {
   const C = 2 * Math.PI * 15, seg = C / 4, gap = 3.2;
   const arcs = steps.map((s, i) => `<circle cx="18" cy="18" r="15" class="${s.state}" stroke-dasharray="${(seg - gap).toFixed(2)} ${(C - seg + gap).toFixed(2)}" stroke-dashoffset="${(-(i * seg) - gap / 2).toFixed(2)}"/>`).join('');
-  const done = steps.filter(s => s.state === 'done').length;
-  const mid = group === 'done' && done === 4
+  // A step the job didn't need counts as done, so a job with no quote still fills.
+  const done = steps.filter(s => s.state === 'done' || s.state === 'skip').length;
+  const mid = group === 'done'
     ? '<path d="m12.5 18.5 3.5 3.5 7-8" class="tick"/>'
     : `<text x="18" y="18" dy="0.35em" text-anchor="middle">${done}/4</text>`;
   return `<svg class="dash-ring" width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><g transform="rotate(-90 18 18)">${arcs}</g>${mid}</svg>`;
@@ -9847,6 +10286,7 @@ function setDashboardTab(tab) {
 function renderDashboard() {
   const body = document.getElementById('dashboardBody');
   if (!body) return;
+  parkJobPanel();
   const quotes = getSavedQuotes();
   dashboardJobs = getSavedReports().map(r => dashboardJob(r, quotes)).sort((a, b) => b.time - a.time);
   const need = dashboardJobs.filter(j => j.group === 'todo').length;
@@ -9861,21 +10301,15 @@ function renderDashboard() {
       <h2 class="dash-hero-title" id="dashboardTitle">Dashboard</h2>
       <p class="dash-hero-lead">${lead}</p>
     </div>
-    ${dashboardJobs.length ? `
     <div class="dash-tabs" id="dashboardTabs" role="tablist">
       ${DASHBOARD_TABS.map(([key, label]) => `<button type="button" role="tab" class="dash-tab" data-tab="${key}" onclick="setDashboardTab('${key}')">${label} <span></span></button>`).join('')}
       <span class="dash-tab-line" aria-hidden="true"></span>
     </div>
-    <label class="dash-search">
+    <label class="dash-search" id="dashboardSearchWrap">
       <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z"/><path d="m21 21-4.3-4.3"/></svg>
       <input id="dashboardSearch" type="search" placeholder="Search address or client" autocomplete="off" oninput="renderDashboardJobs()" aria-label="Search jobs">
     </label>
-    <div id="dashboardJobs"></div>` : `
-    <div class="dash-empty">
-      ${document.getElementById('jobAddress')?.value.trim()
-        ? '<button class="job-action-btn save" onclick="saveCurrentReport(); renderDashboard()">Save this report</button>'
-        : '<button class="job-action-btn" onclick="closeDashboard()">Back to the report</button>'}
-    </div>`}
+    <div id="dashboardJobs"></div>
   `;
   renderDashboardJobs();
 }
@@ -9886,7 +10320,8 @@ function renderDashboard() {
 function renderDashboardJobs(fade) {
   const wrap = document.getElementById('dashboardJobs');
   if (!wrap) return;
-  const counts = { todo: 0, waiting: 0, done: 0, all: dashboardJobs.length };
+  parkJobPanel();
+  const counts = { current: '', todo: 0, waiting: 0, done: 0, all: dashboardJobs.length };
   dashboardJobs.forEach(j => counts[j.group]++);
   const searchEl = document.getElementById('dashboardSearch');
   const query = searchEl ? searchEl.value.trim().toLowerCase() : '';
@@ -9903,12 +10338,41 @@ function renderDashboardJobs(fade) {
       btn.setAttribute('aria-selected', on);
       btn.querySelector('span').textContent = counts[btn.dataset.tab];
     });
-    const i = DASHBOARD_TABS.findIndex(([key]) => key === dashboardTab);
-    tabs.querySelector('.dash-tab-line').style.transform = `translateX(${i * 100}%)`;
+    // The tabs are as wide as their names, so the underline is sized to the lit one.
+    const lit = tabs.querySelector('.dash-tab.active');
+    const line = tabs.querySelector('.dash-tab-line');
+    if (lit) {
+      line.style.width = lit.offsetWidth + 'px';
+      line.style.transform = `translateX(${lit.offsetLeft}px)`;
+      if (lit.scrollIntoView && tabs.scrollWidth > tabs.clientWidth) tabs.scrollTo({ left: lit.offsetLeft - 16, behavior: fade ? 'smooth' : 'auto' });
+    }
+  }
+  const searchWrap = document.getElementById('dashboardSearchWrap');
+  if (searchWrap) searchWrap.hidden = dashboardTab === 'current' && !query;
+
+  if (dashboardTab === 'current' && !query) {
+    const j = dashboardJobs.find(x => x.r.id === currentReportId);
+    wrap.innerHTML = `<div class="dash-current${fade ? ' fade-in' : ''}">
+      ${j ? `<button type="button" class="dash-row dash-current-job ${j.group}" onclick="openDashboardDetail('${j.r.id}')">
+          ${dashboardRing(j.steps, j.group)}
+          <span class="dash-row-text">
+            <span class="dash-row-addr">${escapeHtml(j.r.address || 'No address')}</span>
+            <span class="dash-row-sub"><span class="dash-row-status">${escapeHtml(j.status)}</span>${j.r.client ? ' · ' + escapeHtml(j.r.client) : ''}</span>
+          </span>
+          <svg class="icon dash-row-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+        </button>`
+        : '<p class="dash-current-new">A new job. Fill in the address and client to start its report.</p>'}
+      <div class="dash-current-head">Job details</div>
+      <div id="dashCurrentSlot"></div>
+    </div>`;
+    const panel = document.getElementById('jobPanel');
+    if (panel) document.getElementById('dashCurrentSlot').appendChild(panel);
+    return;
   }
 
   const empty = query ? `No jobs match "${escapeHtml(searchEl.value.trim())}".`
-    : { todo: 'Nothing needs you right now.', waiting: 'No quotes are waiting on a client.', done: 'No finished jobs yet.', all: '' }[dashboardTab];
+    : !dashboardJobs.length ? 'Your jobs will show up here once you save a report.'
+    : { todo: 'Nothing to do right now.', waiting: 'Nothing is waiting on a client.', done: 'No finished jobs yet.' }[dashboardTab];
   wrap.innerHTML = shown.length ? `
     <div class="dash-list${fade ? ' fade-in' : ''}">
       ${shown.map(j => `
@@ -9932,22 +10396,43 @@ function openDashboardDetail(id) {
   const j = dashboardJobs.find(x => x.r.id === id);
   const sheet = document.getElementById('dashboardDetailSheet');
   if (!j || !sheet) return;
-  const meta = [j.r.client, dashDate(j.time)].filter(Boolean).map(escapeHtml).join(' · ');
+  const group = (DASHBOARD_TABS.find(([k]) => k === j.group) || [, ''])[1];
+  const done = j.steps.filter(s => s.state === 'done' || s.state === 'skip').length;
+  const icon = (d) => `<svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const dot = (s, i) => s.state === 'done' ? icon('<path d="M20 6 9 17l-5-5"/>')
+    : s.state === 'bad' ? icon('<path d="M18 6 6 18"/><path d="M6 6l12 12"/>') : s.state === 'skip' ? '–' : i + 1;
+  const facts = [
+    ['Client', j.r.client || 'Not entered'],
+    ['Quote', j.total ? formatAUD(j.total).replace(/\.00$/, '') : 'None yet'],
+    ['Date', dashDate(j.time)],
+  ];
   sheet.innerHTML = `
     <div class="dash-detail-grab" aria-hidden="true"></div>
     <div class="dash-detail-head">
-      <div>
+      <div class="dash-detail-head-text">
+        <span class="dash-detail-chip ${j.group}">${group}</span>
         <h3 class="dash-detail-addr">${escapeHtml(j.r.address || 'No address')}</h3>
-        <div class="dash-detail-meta">${meta}</div>
       </div>
       <button type="button" class="dash-detail-close" onclick="closeDashboardDetail()" aria-label="Close">
         <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
       </button>
     </div>
+    <dl class="dash-detail-facts">
+      ${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${escapeHtml(v)}</dd></div>`).join('')}
+    </dl>
+    <section class="dash-next ${j.group}">
+      <div class="dash-next-label">${j.next ? 'Next step' : 'Where it\'s at'}</div>
+      <div class="dash-next-title">${escapeHtml(j.status)}</div>
+      ${j.hint ? `<p class="dash-next-hint">${escapeHtml(j.hint)}</p>` : ''}
+      ${j.next ? `<button type="button" class="dash-detail-primary" onclick="openDashboardJob('${j.r.id}', '${j.next.to}')">${j.next.label}</button>` : ''}
+    </section>
+    <div class="dash-detail-section">
+      <span>Progress</span><span>${done} of 4 done</span>
+    </div>
     <ol class="dash-timeline">
-      ${j.steps.map(s => `
+      ${j.steps.map((s, i) => `
         <li class="${s.state}">
-          <span class="dash-timeline-dot" aria-hidden="true"></span>
+          <span class="dash-timeline-dot" aria-hidden="true">${dot(s, i)}</span>
           <button type="button" class="dash-timeline-btn" onclick="openDashboardPeek('${j.r.id}', '${s.to}')">
             <span class="dash-timeline-label">${s.label}</span>
             <span class="dash-timeline-text">${escapeHtml(s.text)}</span>
@@ -9955,11 +10440,13 @@ function openDashboardDetail(id) {
           </button>
         </li>`).join('')}
     </ol>
-    <div class="dash-detail-actions">
-      ${j.next ? `<button type="button" class="dash-detail-primary" onclick="openDashboardJob('${j.r.id}', '${j.next.to}')">${j.next.label}</button>` : ''}
-      <button type="button" class="dash-detail-delete" onclick="closeDashboardDetail(); deleteReport('${j.r.id}')">Delete this job</button>
+    <div class="dash-detail-foot">
+      <button type="button" class="dash-detail-delete" onclick="closeDashboardDetail(); deleteReport('${j.r.id}')">
+        <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete this job
+      </button>
     </div>
   `;
+  sheet.scrollTop = 0;
   document.getElementById('dashboardDetail').classList.add('open');
 }
 
@@ -10047,7 +10534,7 @@ function dashboardPeekBody(j, to) {
     ['Work', Object.keys(t.methods || {}).map(k => (TREATMENT_METHODS[k] || {}).label || k).join(', ')],
     ['Products', (t.products || []).map(p => p.name).filter(Boolean).join(', ')],
     ['Areas', t.areas],
-    ['Certificate', q.certificateSentAt ? `Sent ${dashDate(q.certificateSentAt)}` : 'Not sent yet'],
+    ['Certificate', q.certificateSentAt ? `Sent ${dashDate(q.certificateSentAt)}` : q.certificateHandedAt ? `Given in person ${dashDate(q.certificateHandedAt)}` : 'Not sent yet'],
   ]);
 }
 
@@ -10066,9 +10553,15 @@ function openDashboardJob(id, to) {
   if (to === 'report') return;
   openQuote('app', id);
   if (to === 'treatment') openTreatmentRecord();
-  if (to === 'answer') {
-    const card = document.getElementById('quoteAnswer');
-    if (card && card.style.display !== 'none') card.scrollIntoView({ block: 'center' });
+  if (to === 'answer' || to === 'certificate') {
+    const step = document.getElementById('qgStep3');
+    if (step) step.scrollIntoView({ block: 'center' });
+  }
+  // The certificate's Email button, lit so it's the obvious next tap.
+  if (to === 'certificate') {
+    ensureJsPDFLoaded().catch(() => {});
+    const btn = document.querySelector('#quoteAnswer .qp-cert-email');
+    if (btn) { btn.scrollIntoView({ block: 'center' }); btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 2400); }
   }
 }
 
@@ -10351,6 +10844,7 @@ function reportSummary() {
   else if (reportData.antCapping === 'NONE') conducive.push('no ant capping on piers');
   if (reportData.slabEdge === 'OBSTRUCTED') conducive.push('slab edge concealed');
   if (reportData.subfloorVentilation === 'POOR') conducive.push('poor subfloor ventilation');
+  if (reportData.mouldSeen === 'YES') conducive.push(`mould growth${reportData.mouldWhere ? ` (${reportData.mouldWhere})` : ''}`);
   if (reportData.siteDrainage === 'POOR') conducive.push('poor site drainage');
   if (reportData.subfloorDrainage === 'POOR') conducive.push('poor subfloor drainage');
   if (reportData.nonDurableTimber === 'YES') conducive.push(`untreated or non-durable timber in a damp area${whatWhere(reportData.nonDurableTimberDetails, reportData.nonDurableTimberWhere) ? ` (${whatWhere(reportData.nonDurableTimberDetails, reportData.nonDurableTimberWhere)})` : ''}`);
@@ -10438,6 +10932,7 @@ function reportSummary() {
     const other = String(reportData.otherRecommendations).trim().replace(/\.$/, '');
     next.push(`Also recommended: ${other.charAt(0).toLowerCase()}${other.slice(1)}.`);
   }
+  getRecLines().forEach(l => next.push(l.text));
   if (limitedZones.length) next.push(`Provide access to ${limitedZones.map(z => OBS_ZONES[z].label.replace(/^The /, '').toLowerCase()).join(', ')} for a follow-up inspection.`);
   next.push(`Next timber pest inspection: ${reportData.inspectionFrequency || 'within 12 months'}.`);
   return { groups, limited, next, basis };
@@ -10457,7 +10952,7 @@ function reportPrepGaps() {
     `<button class="link-btn" onclick="fixSendGap('inspected')">Mark the rest as inspected</button>` +
     `<button class="link-btn" onclick="fixSendGap('na')">Mark the rest not applicable</button>`);
   const noResult = areasMissingResult();
-  if (noResult.length) push(`${noResult.length} area${noResult.length === 1 ? ' has' : 's have'} no result for what was found there (${noResult.map(z => OBS_ZONES[z].label).join(', ')})`,
+  if (noResult.length) push(`${noResult.length} area${noResult.length === 1 ? ' has' : 's have'} no result for what was found there (${noResult.map(z => OBS_ZONES[z].label.replace(/^The /, '')).join(', ')})`,
     `<button class="link-btn" onclick="fixSendGap('clear')">Mark the rest as nothing found</button>`);
   areasEvidenceUnlinked().forEach(z => push(`${OBS_ZONES[z].label}: marked "evidence found", but no finding mentions it`,
     `<button class="link-btn" onclick="closeSendReview(); addFindingForArea('${z}')">Add finding</button>`));
@@ -10730,20 +11225,20 @@ function answerDidItSend(yes) {
 }
 
 // One "Sent" line per document the job has (report, quote, certificate),
-// for the report banner and the quote screen. Each: { label, at, stale }.
+// for the report banner and the quote screen. Each: { label, at, stale, verb }.
 function sentDocs(rd, q) {
   const sent = rd && rd.sent;
   const docs = [{ label: 'Report', at: sent ? sent.at : null }];
   if (quoteHasItems(q)) {
     docs.push({ label: 'Quote', at: q.sentAt || null, stale: !!q.sentAt && q.sentHash !== quoteContentHash(q) });
-    if (q.treatment) docs.push({ label: 'Certificate', at: q.certificateSentAt || null });
+    if (q.treatment) docs.push({ label: 'Certificate', at: q.certificateSentAt || q.certificateHandedAt || null, verb: !q.certificateSentAt && q.certificateHandedAt ? 'Given' : '' });
   }
   return docs;
 }
 function renderSentLines(rd, q) {
   return `<div class="doc-sent-lines">${sentDocs(rd, q).map(d =>
     `<div class="doc-sent ${d.at ? (d.stale ? 'stale' : 'sent') : 'unsent'}"><span>${d.label}</span>` +
-    `<strong>${d.at ? `Sent ${formatIssueDate(d.at)}${d.stale ? ' · changed since' : ''}` : 'Not sent yet'}</strong></div>`).join('')}</div>`;
+    `<strong>${d.at ? `${d.verb || 'Sent'} ${formatIssueDate(d.at)}${d.stale ? ' · changed since' : ''}` : 'Not sent yet'}</strong></div>`).join('')}</div>`;
 }
 
 async function sendPdfsDirect({ files, to, subject, body }) {
@@ -11272,7 +11767,8 @@ async function buildReportPdf() {
   // ── DATA ROW ──────────────────────────────────────────────────────────────
   let _rowShade = false;
   // invert: for questions where YES is the good answer (e.g. "inspection
-  // zone visible"), so NO shows red and YES green.
+  // zone visible"), so NO shows red and YES green. 'plain' prints the
+  // answer in ink, for a fact that is neither good nor bad.
   function row(label, value, invert) {
     const v     = String(value || '');
     const isEmpty = !value && value !== 0;
@@ -11299,6 +11795,8 @@ async function buildReportPdf() {
     // Value — colour-coded
     if (isEmpty) {
       doc.setTextColor(...C.inkMuted); doc.setFont('helvetica','italic');
+    } else if (invert === 'plain') {
+      doc.setTextColor(...C.ink); doc.setFont('helvetica','bold');
     } else if (invert && (v === 'YES' || v === 'NO')) {
       doc.setTextColor(...(v === 'NO' ? C.danger : C.safe)); doc.setFont('helvetica','bold');
     } else if (['YES','HIGH','OBSTRUCTED','BRIDGED','ACTIVE'].includes(v)) {
@@ -11499,8 +11997,8 @@ async function buildReportPdf() {
   // ── NOTES BLOCK ───────────────────────────────────────────────────────────
   const FIELD_LABELS = {
     structureType:'Structure Type', wallConstruction:'Wall Construction', floorType:'Floor Type', roofType:'Roof Type',
-    height:'Height', facadeDirection:'Orientation', occupancyStatus:'Occupancy Status', weatherConditions:'Weather Conditions', temperature:'Temperature', humidity:'Humidity', rainLast24h:'Rain in the Last 24 Hours',
-    constructionEra:'Year / Period of Construction', standard:'Applicable Standard',
+    height:'Height', facadeDirection:'Orientation', occupancyStatus:'Occupancy Status', furnishing:'Furnishing', peoplePresent:'People Present', weatherConditions:'Weather Conditions', temperature:'Temperature', humidity:'Humidity', rainLast24h:'Rain in the Last 24 Hours', recentWeather:'Recent Weather', toolsUsed:'Tools Used', siteSurroundings:'Surroundings', siteSlope:'Site Slope', termiteHistory:'Known Termite History', mouldSeen:'Mould Seen', mouldWhere:'Mould: Where',
+    constructionEra:'Year or Period Built', standard:'Applicable Standard',
     hinderedAreas:'Hindered Access: Where', obstructions:'Areas Not Inspected', restrictedAccess:'Obstructions', hinderedAreasDetail:'What Hindered Access', noAccessAreas:'Restricted Access: Where & Why', highRiskAreas:'High Risk Areas',
     previousTreatment:'Evidence of Previous Treatment', previousTreatmentDetails:'Previous Treatment: What', previousTreatmentWhere:'Previous Treatment: Where', siteDrainage:'Site Drainage', subfloorDrainage:'Subfloor Drainage',
     borerActivity:'Borers of Seasoned Timber', borerDetails:'Borer Type, Location & Evidence', decayFound:'Wood Decay Fungi (Rot)', decayDetails:'Wood Decay: What', decayWhere:'Wood Decay: Where',
@@ -11508,7 +12006,7 @@ async function buildReportPdf() {
     waterLeaks:'Water Leaks', leakLocation:'Location of Moisture Ingress', moistureReadings:'Moisture Readings', timberSoil:'Timber-to-Soil Contact', slabEdge:'Slab Edge Concealed', weepHoles:'Weep Holes (Clear / Bridged)', existingSystem:'Existing System',
     durableNoticePresent:'Durable Notice Present', hardLandscaping:'Hard Landscaping Adjacent', zone25mmVisible:'25mm Inspection Zone Visible', softLandscaping:'Soft Landscaping Adjacent', zone75mmVisible:'75mm Inspection Zone Visible', antCapSoldered:'Ant Cap Joins Soldered',
     treatmentRecommended:'Treatment Recommended', treatmentType:'Treatment Type', inspectionFrequency:'Inspection Frequency', riskLevel:'Risk of Termite Attack',
-    invasiveInspection:'Invasive Inspection Recommended', invasiveInspectionDetails:'Invasive Inspection: Where, Why & When', otherRecommendations:'Other Recommendations', antCapping:'Ant Capping', antCappingDetails:'Ant Capping: Where & What',
+    invasiveInspection:'Invasive Inspection Recommended', invasiveInspectionDetails:'Invasive Inspection: Where, Why and When', otherRecommendations:'Other Recommendations', antCapping:'Ant Capping', antCappingDetails:'Ant Capping: Where and What',
     delignification:'Chemical Delignification', delignificationDetails:'Delignification: What', delignificationWhere:'Delignification: Where', subfloorVentilation:'Subfloor Ventilation', nonDurableTimber:'Non-durable Timber in Damp Areas', nonDurableTimberDetails:'Non-durable Timber: What', nonDurableTimberWhere:'Non-durable Timber: Where',
   };
 
@@ -11672,12 +12170,15 @@ async function buildReportPdf() {
   row('Property Inspected', address);
   row('Inspection Date', inspectionDate);
   row('Inspection Time', inspectionTime);
+  if (reportData.peoplePresent) row('People Present', reportData.peoplePresent);
   row('Weather Conditions', reportData.weatherConditions);
   row('Temperature', reportData.temperature);
   row('Humidity', reportData.humidity);
   row('Rain in the Last 24 Hours', reportData.rainLast24h);
+  if (reportData.recentWeather) row('Recent Weather', reportData.recentWeather);
   row('Inspection Type', inspType);
   row('Applicable Standard', standardLabel);
+  if (reportData.toolsUsed) row('Tools Used', reportData.toolsUsed);
   row('Order / Job ID', orderId);
   row('Report Reference', reportId);
   gap(4);
@@ -11786,10 +12287,19 @@ async function buildReportPdf() {
     disclaimer('Buildings from this period may contain asbestos-containing materials. This is not an asbestos inspection: nothing was tested or disturbed, and no opinion is given on whether asbestos is present. Have a licensed asbestos assessor check before any work that disturbs building materials.');
     resetRowShade();
   }
+  if (reportData.siteSurroundings) row('Surroundings', reportData.siteSurroundings);
+  if (reportData.siteSlope) row('Site Slope', reportData.siteSlope);
+  if (reportData.termiteHistory) row('Known Termite History', reportData.termiteHistory);
   row('Occupancy Status', reportData.occupancyStatus);
-  if (/occupied|tenanted|owner/i.test(reportData.occupancyStatus || '')) {
+  if (reportData.furnishing) row('Furnishing', reportData.furnishing);
+  // The furniture note follows what was recorded about furniture; without
+  // that, an occupied home is taken to be furnished, as before.
+  const furnished = reportData.furnishing
+    ? !/^unfurnished/i.test(reportData.furnishing)
+    : /occupied|tenanted|owner/i.test(reportData.occupancyStatus || '');
+  if (furnished) {
     gap(1.5);
-    disclaimer('The property was occupied and furnished at the time of inspection. Furniture, stored goods and floor coverings hid parts of the walls and floors, and timber pest activity or damage may be concealed behind them.');
+    disclaimer(`The property was ${/partly/i.test(reportData.furnishing || '') ? 'partly furnished' : (reportData.furnishing ? 'furnished' : 'occupied and furnished')} at the time of inspection. Furniture, stored goods and floor coverings hid parts of the walls and floors, and timber pest activity or damage may be concealed behind them.`);
     resetRowShade();
   }
 
@@ -11799,9 +12309,9 @@ async function buildReportPdf() {
   if (reportData.existingSystemOther) row('Specific System Name', reportData.existingSystemOther);
   row('Durable Notice Present (Meter Box)', reportData.durableNoticePresent, true);
   if (hasIdentifiedSystem(reportData.existingSystem)) {
-    row('Hard Landscaping Adjacent', reportData.hardLandscaping);
+    row('Hard Landscaping Adjacent', reportData.hardLandscaping, 'plain');
     row('25mm Inspection Zone Visible', reportData.zone25mmVisible, true);
-    row('Soft Landscaping Adjacent', reportData.softLandscaping);
+    row('Soft Landscaping Adjacent', reportData.softLandscaping, 'plain');
     row('75mm Inspection Zone Visible', reportData.zone75mmVisible, true);
     row('Ant Cap / Strip Shield Joins Soldered', reportData.antCapSoldered, true);
     const concerns = [];
@@ -11879,7 +12389,7 @@ async function buildReportPdf() {
 
   subhead('INVASIVE INSPECTION');
   row('Invasive Inspection Recommended', reportData.invasiveInspection || 'Not recorded');
-  if (reportData.invasiveInspectionDetails) row('Where, Why & When', reportData.invasiveInspectionDetails);
+  if (reportData.invasiveInspectionDetails) row('Where, Why and When', reportData.invasiveInspectionDetails);
   if (reportData.invasiveInspection === 'YES') {
     gap(3);
     disclaimer('An invasive inspection may involve cutting, drilling or removing linings, floor coverings or timbers to see inside them. It needs the owner\'s written permission and a separate agreement.');
@@ -12057,8 +12567,9 @@ async function buildReportPdf() {
     weepHoles: 'Weep holes covered by soil, paving or garden beds give termites a hidden way into the wall cavity.',
     antCapping: 'Ant caps do not stop termites, but make them build their mud leads in the open where they can be seen. Gaps or missing caps let them pass unseen.',
     nonDurableTimber: 'Untreated or non-durable timber in damp areas is readily attacked by termites and wood decay.',
+    mouldSeen: 'Mould is a sign of damp conditions, which attract termites and let wood decay start. This is not a mould inspection, and no opinion is given on the mould itself.',
   };
-  const ADVERSE = { waterLeaks: ['YES'], moistureReadings: ['YES'], siteDrainage: ['POOR'], subfloorDrainage: ['POOR'], subfloorVentilation: ['POOR'],
+  const ADVERSE = { waterLeaks: ['YES'], moistureReadings: ['YES'], siteDrainage: ['POOR'], subfloorDrainage: ['POOR'], subfloorVentilation: ['POOR'], mouldSeen: ['YES'],
     timberSoil: ['YES'], slabEdge: ['OBSTRUCTED'], weepHoles: ['BRIDGED'], antCapping: ['GAPS', 'NONE'], nonDurableTimber: ['YES'] };
   function condRow(label, key, shown) {
     const v = reportData[key];
@@ -12090,6 +12601,8 @@ async function buildReportPdf() {
   condRow('Site Drainage', 'siteDrainage');
   condRow('Subfloor Drainage', 'subfloorDrainage');
   condRow('Subfloor Ventilation', 'subfloorVentilation');
+  if (reportData.mouldSeen) condRow('Mould Seen', 'mouldSeen');
+  if (reportData.mouldWhere) row('Mould: Where', reportData.mouldWhere);
   gap(4);
 
   // ── Construction group ─────────────────────────────────────────────────
@@ -12098,7 +12611,7 @@ async function buildReportPdf() {
   condRow('Slab Edge Concealed', 'slabEdge');
   condRow('Weep Holes', 'weepHoles', reportData.weepHoles === 'NONE' ? 'None located' : '');
   condRow('Ant Capping', 'antCapping');
-  if (reportData.antCappingDetails) row('Ant Capping: Where & What', reportData.antCappingDetails);
+  if (reportData.antCappingDetails) row('Ant Capping: Where and What', reportData.antCappingDetails);
   condRow('Non-durable Timber in Damp Areas', 'nonDurableTimber');
   if (reportData.nonDurableTimberDetails) row('Non-durable Timber: What', reportData.nonDurableTimberDetails);
   if (reportData.nonDurableTimberWhere) row('Non-durable Timber: Where', reportData.nonDurableTimberWhere);
@@ -12123,6 +12636,7 @@ async function buildReportPdf() {
   row('Re-inspection Interval', reportData.inspectionFrequency);
   if (reportData.invasiveInspection === 'YES') row('Invasive Inspection', `Recommended, see Section ${REPORT_PARTS.access}`);
   if (reportData.otherRecommendations) row('Other Recommendations', reportData.otherRecommendations);
+  if (getRecLines().length) row('Also Recommended', getRecLines().map(l => `•  ${l.text}`).join('\n'));
   notesBlock('recommendations');
   renderSectionPhotosInPDF('recommendations', 'Recommendations');
   gap(4);

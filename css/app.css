@@ -1347,6 +1347,20 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   line-height: 1.5;
 }
 
+.billing-explainer {
+  padding: 12px 14px;
+  margin: 4px 0 6px;
+  border-radius: 10px;
+  background: var(--surface2, rgba(0,0,0,0.03));
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text2, var(--text));
+}
+.billing-explainer-title { font-size: 13px; font-weight: 650; color: var(--text); margin-bottom: 4px; }
+.billing-explainer p { margin: 0 0 6px; }
+.billing-explainer p:last-child { margin-bottom: 0; }
+.billing-explainer ul { margin: 0 0 6px; padding-left: 18px; }
+
 .settings-danger-btn {
   flex-shrink: 0;
   color: var(--risk) !important;

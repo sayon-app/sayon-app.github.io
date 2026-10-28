@@ -2872,7 +2872,7 @@ async function whisperSend(entry, blob, tries) {
     console.warn('Whisper listening failed, using the phone\'s speech instead:', err && err.message);
     entry.text = ''; entry.done = true;
     whisperApply();
-    whisperFallBack(status === 429 ? 'Monthly AI allowance reached. Using the phone\'s own speech for now' : 'Using the phone\'s own speech for now');
+    whisperFallBack(status === 429 ? 'This month\'s AI fills are used up. Using the phone\'s own speech for now' : 'Using the phone\'s own speech for now');
   }
 }
 
@@ -3576,7 +3576,7 @@ function extractionProblem(err) {
   switch (err && err.status) {
     case 401: return 'Your sign-in has expired. Close SAYON, open it again and sign in';
     case 402: return 'Your SAYON plan has ended. Subscribe in Menu › Billing';
-    case 429: return 'This month\'s AI notes are used up. Upgrade in Menu › Billing';
+    case 429: return 'This month\'s AI fills are used up. Your note is kept. Upgrade in Menu › Billing, or they come back on the 1st';
     case 413: return 'A note is too long for the AI in one go. Delete it and say it again in shorter parts';
   }
   if (err && err.tooLong) return 'A note is too long for the AI in one go. Delete it and say it again in shorter parts';
@@ -8356,6 +8356,23 @@ function resetBillingDisplay() {
   billingStatusCache = null;
 }
 
+// "12 of 150 AI fills used this month, about 20 inspections left. They come
+// back on 1 Nov." The Worker starts a new count each calendar month (UTC).
+// A trial ends before its count matters, so it doesn't say when they come back.
+function billingUsageText(sub, trial) {
+  const used = sub.ai_calls_used_this_period ?? 0;
+  const limit = sub.limit;
+  const period = trial ? '' : ' this month';
+  if (!limit) return `${used} AI fills used${period}.`;
+  const left = Math.max(0, limit - used);
+  const now = new Date();
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const when = next.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  const inspections = Math.floor(left / 7);
+  const leftText = left === 0 ? 'none left' : `about ${inspections} inspection${inspections === 1 ? '' : 's'} left`;
+  return `${used} of ${limit} AI fills used${period}, ${leftText}.` + (trial ? '' : ` They come back on ${when}.`);
+}
+
 async function loadBillingStatus() {
   const el = document.getElementById('billingStatusText');
   const manageBtn = document.getElementById('manageBillingBtn');
@@ -8374,9 +8391,9 @@ async function loadBillingStatus() {
     if (el) {
       if (sub.status === 'trialing') {
         const daysLeft = sub.trial_ends_at ? Math.max(0, Math.ceil((new Date(sub.trial_ends_at) - Date.now()) / 86400000)) : null;
-        el.textContent = `Free trial${daysLeft !== null ? ` — ${daysLeft} day${daysLeft === 1 ? '' : 's'} left` : ''} · ${sub.ai_calls_used_this_period ?? 0}/${sub.limit ?? '?'} AI extractions used`;
+        el.textContent = `Free trial${daysLeft !== null ? `, ${daysLeft} day${daysLeft === 1 ? '' : 's'} left` : ''}. ${billingUsageText(sub, true)}`;
       } else {
-        el.textContent = `${planLabel} plan — ${sub.ai_calls_used_this_period ?? 0}/${sub.limit ?? '?'} AI extractions used this period`;
+        el.textContent = `${planLabel} plan. ${billingUsageText(sub)}`;
       }
     }
     if (manageBtn) manageBtn.style.display = sub.stripe_customer_id ? '' : 'none';

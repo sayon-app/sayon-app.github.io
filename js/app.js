@@ -1656,7 +1656,8 @@ FIELDS (every one null unless the note gives it):
 "findings":[{"termiteActivity":"ACTIVE"|"INACTIVE"|"NONE","species":string,"damageDescription":string,"activityLocation":string,"timberAffected":string,"nestLocated":"YES"|"NO","structuralConcern":"YES"|"NO"}],
 "borerActivity":"ACTIVE"|"INACTIVE"|"NONE","borerFindings":[{"borerActivity":"ACTIVE"|"INACTIVE","borerType":string,"location":string,"timberAffected":string,"description":string,"structuralConcern":"YES"|"NO"}],"decayFound":"YES"|"NO","decayDetails":string,"decayWhere":string,"delignification":"YES"|"NO","delignificationDetails":string,"delignificationWhere":string,"previousTreatment":"YES"|"NO","previousTreatmentDetails":string,"previousTreatmentWhere":string,
 "moistureReadings":"YES"|"NO","waterLeaks":"YES"|"NO","mouldSeen":"YES"|"NO","mouldWhere":string,"leakLocation":string,"moistureMeterReadings":[{"location":string,"reading":string}],"timberSoil":"YES"|"NO","slabEdge":"CLEAR"|"OBSTRUCTED","weepHoles":"CLEAR"|"BRIDGED"|"NONE","siteDrainage":"ADEQUATE"|"POOR","subfloorDrainage":"ADEQUATE"|"POOR","antCapping":"INTACT"|"GAPS"|"NONE","antCappingDetails":string,"subfloorVentilation":"ADEQUATE"|"POOR","nonDurableTimber":"YES"|"NO","nonDurableTimberDetails":string,"nonDurableTimberWhere":string,
-"riskLevel":"LOW"|"MEDIUM"|"HIGH","treatmentRecommended":"YES"|"NO","treatmentType":string,"inspectionFrequency":string,"invasiveInspection":"YES"|"NO","invasiveInspectionDetails":string,"otherRecommendations":string}
+"riskLevel":"LOW"|"MEDIUM"|"HIGH","treatmentRecommended":"YES"|"NO","treatmentType":string,"inspectionFrequency":string,"invasiveInspection":"YES"|"NO","invasiveInspectionDetails":string,"otherRecommendations":string,
+"quote":{"items":[{"description":string,"qty":number,"unit":string,"price":number}],"exclusions":[string],"paymentTerms":string,"timeframe":string,"servicePeriod":string,"notes":string}}
 
 DROPDOWN FIELDS: the app shows these as pick-lists. Return the list value EXACTLY as written below when the inspector's words fit one; when they describe something the list cannot express, return their words instead (never a list value that adds a fact they did not state).
 - structureType: "Detached house" | "Semi-detached" | "Terrace / townhouse" | "Duplex" | "Unit / apartment" | "Granny flat" | "Commercial building". "House" or "home" with nothing more is "Detached house".
@@ -1755,6 +1756,13 @@ RECOMMENDATIONS AND RISK:
 - treatmentRecommended: "YES" when any termite treatment, colony treatment or system install is recommended, including "will need some type of treatment". "NO" when they say no treatment is needed. Builder, plumber or maintenance work (fix a tap, replace a fascia, pull back a garden bed) is not a termite treatment and does not make it YES.
 - treatmentType: WHAT was recommended, in the inspector's terms: the target first, then the method only if they named one, e.g. "Treat the active termites in the backyard tree; install a termite management system (chemical barrier or baiting system)", "Direct treatment of the active termites in the skirting, plus a Termidor chemical barrier", "Treat the colony in the stump; method to be confirmed with the owner". Never add a method word the inspector did not say (chemical, barrier, soil treatment, bait, baiting, physical, reticulation, top-up, system, or any product name): each of those becomes a priced line in the client's quote. Never put a negative here ("no treatment needed for the subfloor"): leave that out. Null when treatmentRecommended is NO or when no treatment is discussed.
 - riskLevel: the overall risk of termite attack to the property. Use the inspector's own statement when given ("overall risk is high"). Otherwise infer it ONLY from a note that sums up the property (a whole-house note or a wrap-up); a note about one area or one finding leaves it null. Judge property factors, never the species. HIGH needs termites: live termites on the property with no termite management system, activity in the building, a nest found or likely, a builder referral, or activity together with conducive conditions (timber-soil contact, a leak, high moisture, bridged slab edge or weep holes). MEDIUM for inactive evidence only, or for conducive conditions (a leak, damp timber, rot, timber on soil, a bridged slab edge) with no termites found. LOW for no termites, no evidence and little that is conducive. With no termites and no evidence anywhere, the answer is never HIGH, whatever else was found.
+
+THE QUOTE: an inspector may also dictate the quote for the job: the work they will do, prices, what is not included, payment and timing ("for the quote", "I'll charge", "price it at", "that's $2,400", "deposit"). Fill "quote" only from those words, and leave it null when the note says nothing about the quote or prices. A recommendation with no price or quote words is not a quote: it stays in the recommendation fields only.
+- quote.items: one per piece of work they price or say they'll quote, in the order said. description: the work in plain client words ("Chemical soil barrier around the full perimeter", "Colony treatment at the front porch post", "Follow-up inspection"). qty and unit: the amount said ("48 linear metres" is qty 48, unit "lm"; "12 stations" is qty 12, unit "station"); otherwise qty 1 and unit "job". price: the dollar amount for ONE unit as a plain number ("$28 a metre" is 28; "48 metres, $2,400 all up" is qty 48, unit "lm", price 50; "$450" for one job is 450). Null price when no amount was said for that line. Never invent a price.
+- quote.exclusions: each thing they say is not included, one per entry ("Repairs to the porch post", "Any work by a builder").
+- quote.paymentTerms: how the client pays, in their words ("50% deposit to book, balance on completion").
+- quote.timeframe: how long the work takes ("half a day", "1 day"). quote.servicePeriod: any warranty or free service period ("12 months"). quote.notes: anything else they want on the quote (a free follow-up visit included, access the client must give).
+- Spoken numbers become digits: "two thousand four hundred" is 2400, "four fifty" for a price is 450.
 
 HOW TO READ DICTATION:
 - Restatements: when a fact is said twice, the later statement wins ("brick veneer ... no hang on, double brick" is double brick; "22, no 32 percent" is 32%). Never record both.
@@ -4280,6 +4288,36 @@ function noteTextKey(transcript) {
   return 'n' + h.toString(36);
 }
 
+// The quote, as dictated: reportData.quoteSpoken = { items: [{ description,
+// qty, unit, price }], exclusions: [], paymentTerms, timeframe,
+// servicePeriod, notes, at }. Notes add to it: a line said again (the same
+// work in other words) replaces the earlier one, so a corrected price wins.
+// The quote builder takes it from here (see spokenQuoteItems in quote.js).
+function mergeSpokenQuote(q) {
+  const clean = v => (typeof v === 'string' ? v.trim() : '');
+  const num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v || '').replace(/[$,\s]/g, '')); return Number.isFinite(n) && n >= 0 ? n : null; };
+  const have = reportData.quoteSpoken && typeof reportData.quoteSpoken === 'object' ? reportData.quoteSpoken : { items: [], exclusions: [] };
+  const items = Array.isArray(have.items) ? have.items.slice() : [];
+  (Array.isArray(q.items) ? q.items : []).forEach(it => {
+    if (!it || !clean(it.description)) return;
+    const line = { description: clean(it.description), qty: num(it.qty) || 1, unit: clean(it.unit) || 'job', price: num(it.price) };
+    const i = items.findIndex(o => repeatsText(o.description, line.description) || repeatsText(line.description, o.description));
+    if (i < 0) items.push(line);
+    else items[i] = { ...line, price: line.price ?? items[i].price };
+  });
+  const exclusions = Array.isArray(have.exclusions) ? have.exclusions.slice() : [];
+  (Array.isArray(q.exclusions) ? q.exclusions : []).map(clean).filter(Boolean).forEach(e => {
+    if (!exclusions.some(o => repeatsText(o, e))) exclusions.push(e);
+  });
+  const next = { ...have, items, exclusions };
+  ['paymentTerms', 'timeframe', 'servicePeriod', 'notes'].forEach(k => { if (clean(q[k])) next[k] = clean(q[k]); });
+  const changed = JSON.stringify({ ...next, at: 0 }) !== JSON.stringify({ ...have, at: 0 });
+  if (!changed) return;
+  next.at = Date.now();
+  reportData.quoteSpoken = next;
+  showToast('Quote details saved. Open the quote to check them', 'success');
+}
+
 // Writes one extracted note into the report. Every value the note gives
 // replaces what was there (the inspector's later word wins), with these
 // exceptions so that one note can't wipe what another recorded:
@@ -4409,6 +4447,8 @@ function populateFields(data, transcript) {
       onInspectionTypeChange();
     }
   }
+
+  if (data.quote && typeof data.quote === 'object') mergeSpokenQuote(data.quote);
 
   // Keep the recorded facts when the note is silent about them:
   // - a leak is a moisture source, so a leak found means moisture YES;

@@ -1347,6 +1347,20 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   line-height: 1.5;
 }
 
+.billing-explainer {
+  padding: 12px 14px;
+  margin: 4px 0 6px;
+  border-radius: 10px;
+  background: var(--surface2, rgba(0,0,0,0.03));
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text2, var(--text));
+}
+.billing-explainer-title { font-size: 13px; font-weight: 650; color: var(--text); margin-bottom: 4px; }
+.billing-explainer p { margin: 0 0 6px; }
+.billing-explainer p:last-child { margin-bottom: 0; }
+.billing-explainer ul { margin: 0 0 6px; padding-left: 18px; }
+
 .settings-danger-btn {
   flex-shrink: 0;
   color: var(--risk) !important;
@@ -5191,3 +5205,14 @@ body.dark-screen .report-section.grouped > details.fgroup { border-width: 2px; b
 
 /* Other photos are optional, so they carry no status. */
 #sts-photos { display: none; }
+
+/* Say it instead: speak a sheet instead of typing it (SAY IT INSTEAD in app.js) */
+.sheet-voice { margin: 10px 0 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border, rgba(0,0,0,0.1)); background: var(--surface2); }
+.sheet-voice-btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 999px; border: 1px solid var(--accent, #1a7f6e); background: transparent; color: var(--accent2, var(--accent)); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+.sheet-voice-btn:disabled { opacity: .6; cursor: default; }
+.sheet-voice[data-state="listening"] .sheet-voice-btn { background: var(--accent, #1a7f6e); color: #fff; animation: sheetVoicePulse 1.4s ease-in-out infinite; }
+@keyframes sheetVoicePulse { 50% { box-shadow: 0 0 0 6px rgba(26,127,110,0.18); } }
+.sheet-voice-hint { margin: 8px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--text3); }
+.sheet-voice-text { margin: 8px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--text); white-space: pre-wrap; }
+.sheet-voice[data-state="listening"] .sheet-voice-hint { display: none; }
+@media (prefers-reduced-motion: reduce) { .sheet-voice[data-state="listening"] .sheet-voice-btn { animation: none; } }

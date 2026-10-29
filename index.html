@@ -217,7 +217,7 @@
         <div class="ob-check-item"><span class="ob-check-num">3</span><span>Hit Extract — AI fills the report fields automatically</span></div>
         <div class="ob-check-item"><span class="ob-check-num">4</span><span>Generate and share the PDF directly from the app</span></div>
       </div>
-      <p style="font-size:11px;color:var(--text3);line-height:1.6;margin-top:4px">Tip: Start recording, pop the phone in your pocket and talk room by room. Say <strong style="color:var(--accent2)">"Stop Sayon"</strong> when you're done and it fills the report.</p>
+      <p style="font-size:11px;color:var(--text3);line-height:1.6;margin-top:4px">Tip: Start recording, pop the phone in your pocket and talk room by room. Say <strong style="color:var(--accent2)">"Stop Sayon"</strong> when you're done and it fills the report. Say the quote too, like "48 metres of barrier at $50 a metre, 50% deposit", and it fills the quote.</p>
       <button class="auth-btn" onclick="obFinish()">Start Inspecting →</button>
     </div>
   </div>
@@ -548,6 +548,11 @@
     </div>
     <div class="page-sheet-body">
       <p class="quote-hint" style="margin:0">Fill this in once the treatment is done. It goes on the client's treatment certificate, and the boxes are ticked from the quote so you only change what was different.</p>
+      <div class="sheet-voice" id="trVoice" data-state="idle">
+        <button type="button" class="sheet-voice-btn" onclick="toggleSheetVoice('treatment')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg><span class="sheet-voice-label">Say it instead</span></button>
+        <p class="sheet-voice-hint">e.g. "Done today, 8 till 11:30, fine and 22 degrees. Trenched and rodded the perimeter, 48 metres of Termidor at the label rate, foam at the porch post. Didn't do under the rear deck, no access. New notice in the meter box."</p>
+        <p class="sheet-voice-text" hidden></p>
+      </div>
       <div class="job-row">
         <div class="job-field">
           <div class="job-field-label">Date treated</div>
@@ -905,29 +910,43 @@
             </div>
             <button class="job-action-btn settings-primary-btn" id="manageBillingBtn" onclick="openBillingPortal()" style="display:none">Manage</button>
           </div>
+          <div class="billing-explainer">
+            <div class="billing-explainer-title">How plans work</div>
+            <p>Every plan has the whole app: voice reports, quotes, treatment certificates, PDFs and sending to clients. Plans only differ in how many AI fills you get each month.</p>
+            <p><strong>One AI fill</strong> is one job the AI does for you:</p>
+            <ul>
+              <li>filling in the report and quote from what you said (each time you say "Stop Sayon" or tap Fill)</li>
+              <li>filling in the agreement or treatment record when you tap Say it instead</li>
+              <li>reading a compliance plate from a photo</li>
+              <li>checking a photo when you tap Analyze</li>
+            </ul>
+            <p>Listening while you talk is free and never counts. A typical inspection uses about 5 to 10 AI fills.</p>
+            <p><strong>If you run out,</strong> nothing is lost. Your notes stay in the report and you can keep typing it by hand. AI fills come back on the 1st of each month, and upgrading gives you the bigger number straight away.</p>
+          </div>
           <div class="settings-row">
             <div class="settings-row-text">
               <div class="settings-row-title">Starter — $49/mo <span style="font-weight:400;opacity:.65">(draft pricing)</span></div>
-              <div class="settings-row-desc">150 AI extractions / month</div>
+              <div class="settings-row-desc">About 20 inspections a month (150 AI fills). Suits a part-time inspector, or about one inspection a day.</div>
             </div>
             <button class="job-action-btn settings-primary-btn" onclick="openCheckout('starter')">Upgrade</button>
           </div>
           <div class="settings-row">
             <div class="settings-row-text">
               <div class="settings-row-title">Pro — $99/mo <span style="font-weight:400;opacity:.65">(draft pricing)</span></div>
-              <div class="settings-row-desc">400 AI extractions / month</div>
+              <div class="settings-row-desc">About 55 inspections a month (400 AI fills). Suits a full-time inspector doing 2 to 3 a day.</div>
             </div>
             <button class="job-action-btn settings-primary-btn" onclick="openCheckout('pro')">Upgrade</button>
           </div>
           <div class="settings-row">
             <div class="settings-row-text">
               <div class="settings-row-title">Business — $199/mo <span style="font-weight:400;opacity:.65">(draft pricing)</span></div>
-              <div class="settings-row-desc">2000 AI extractions / month</div>
+              <div class="settings-row-desc">About 280 inspections a month (2000 AI fills). Suits a busy business doing lots of inspections.</div>
             </div>
             <button class="job-action-btn settings-primary-btn" onclick="openCheckout('business')">Upgrade</button>
           </div>
           <div class="settings-row">
             <div class="settings-row-text">
+              <div class="settings-row-desc">Prices are monthly in Australian dollars, no GST. Cancel any time in Manage, and your plan runs to the end of the month you've paid for. The free trial is 14 days with 50 AI fills (about 7 inspections), and no card is needed.</div>
               <div class="settings-row-desc" style="font-style:italic">Pricing shown is a draft for review, not final.</div>
             </div>
           </div>
@@ -1940,6 +1959,11 @@
         <div class="agr-kicker">Before the inspection starts</div>
         <h2 class="agr-addr" id="agreementAddr"></h2>
         <p class="agr-lede">Fill in the job, read the agreement through with the client, then they sign on this screen.</p>
+      </div>
+      <div class="sheet-voice" id="agreementVoice" data-state="idle">
+        <button type="button" class="sheet-voice-btn" onclick="toggleSheetVoice('agreement')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg><span class="sheet-voice-label">Say it instead</span></button>
+        <p class="sheet-voice-hint">e.g. "Pre-purchase pest for Jo Tester, today, fee $350, she wants the back deck checked closely."</p>
+        <p class="sheet-voice-text" hidden></p>
       </div>
       <ol class="agr-steps">
         <li class="agr-step" id="agreementStepJob">

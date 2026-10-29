@@ -260,6 +260,7 @@ function openTreatmentRecord() {
   onTreatmentNoticeChange();
   document.getElementById('trNext').value = t.nextInspection || '';
   document.getElementById('trNotes').value = t.notes || '';
+  cancelSheetVoice('treatment');
   document.getElementById('treatmentOverlay').classList.add('open');
   if (!treatmentPad) {
     treatmentPad = createSignaturePad(document.getElementById('trSigCanvas'), document.getElementById('trSigPlaceholder'), updateTreatmentSaveBtn);
@@ -311,7 +312,71 @@ function treatmentSketchImage() {
 }
 
 function closeTreatmentRecord() {
+  cancelSheetVoice('treatment');
   document.getElementById('treatmentOverlay').classList.remove('open');
+}
+
+// ── SAID INSTEAD OF TYPED ──
+// What the "Say it instead" button on the record sends with the
+// technician's note (see SAY IT INSTEAD in js/app.js).
+function treatmentVoicePrompt() {
+  const methods = Object.entries(TREATMENT_METHODS).map(([k, m]) => `"${k}" (${m.label})`).join(', ');
+  return `You fill in a termite treatment record for SAYON, an app for Australian timber pest technicians. The user message is what the technician said about a treatment they did, and the date today. Return ONLY a JSON object, no markdown, with these keys, each null unless the technician said it:
+{"date":"YYYY-MM-DD","start":"HH:MM","finish":"HH:MM","technician":string,"licence":string,"supervisor":string,"supervisorLicence":string,"pest":string,"weather":string,"equipment":string,"methods":{"<method>":{"qty":number|null}},"products":[{"name":string,"rate":string,"amount":string,"batch":string,"life":string,"where":string}],"areas":string,"notTreated":string,"notice":"new"|"updated"|"none","noticeWhere":string,"nextInspectionMonths":number,"nextInspectionDate":"YYYY-MM-DD","warranty":string,"notes":string}
+- date: the day it was done. "Today" and "yesterday" count from today's date. start and finish in 24-hour time ("8 till half 11" is 08:00 and 11:30).
+- methods: only the methods they did, from: ${methods}. qty is the linear metres of barrier or the number of bait stations, when said.
+- products: each product used, with the mix or application rate, the amount used, the batch number, the life on the label and where it went, as said. Brand names as written on the drum ("termite door" is Termidor).
+- areas: where they treated, in brief. notTreated: anywhere they didn't treat and why ("Under the rear deck, no access").
+- notice: "new" when they put a new durable notice up, "updated" when they updated the existing one, "none" when none was placed. noticeWhere: where it is ("Meter box").
+- weather: as said ("Fine, 22°C"). equipment: what they used ("Rodding gun, foam rig").
+- nextInspectionMonths or nextInspectionDate: when the next inspection is due, as said.
+- Only words actually said. Never guess, and never invent a rate, an amount or a batch number.`;
+}
+
+// Fills the open record from the spoken note. Returns how many boxes changed.
+function applyTreatmentVoice(f) {
+  let n = 0;
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(f.date || '') ? f.date : '';
+  n += setSpokenBox('trDate', date);
+  const time = v => /^\d{1,2}:\d{2}$/.test(v || '') ? v.padStart(5, '0') : '';
+  n += setSpokenBox('trStart', time(f.start));
+  n += setSpokenBox('trFinish', time(f.finish));
+  ['technician:trTech', 'licence:trLicence', 'supervisor:trSupervisor', 'supervisorLicence:trSupervisorLicence', 'pest:trPest', 'weather:trWeather',
+    'equipment:trEquipment', 'areas:trAreas', 'notTreated:trNotTreated', 'noticeWhere:trNoticeWhere', 'warranty:trWarranty', 'notes:trNotes']
+    .forEach(pair => { const [k, id] = pair.split(':'); n += setSpokenBox(id, f[k]); });
+  if (TREATMENT_NOTICE[f.notice]) { n += setSpokenBox('trNotice', f.notice); onTreatmentNoticeChange(); }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(f.nextInspectionDate || '')) n += setSpokenBox('trNext', f.nextInspectionDate);
+  else if (Number(f.nextInspectionMonths) > 0) n += setSpokenBox('trNext', addMonthsIso(document.getElementById('trDate').value || todayIsoDate(), Number(f.nextInspectionMonths)));
+  const said = f.methods && typeof f.methods === 'object' ? Object.keys(f.methods).filter(k => k in TREATMENT_METHODS) : [];
+  if (said.length) {
+    // What was said replaces the ticks the quote suggested.
+    document.querySelectorAll('#trMethods input[type=checkbox]').forEach(box => {
+      const on = said.includes(box.dataset.key);
+      if (box.checked !== on) { box.checked = on; n++; }
+      onTreatmentMethodToggle(box);
+      const qty = document.querySelector(`#trMethods [data-qty="${box.dataset.key}"]`);
+      const q = on && f.methods[box.dataset.key] && Number(f.methods[box.dataset.key].qty);
+      if (qty && q > 0 && qty.value !== String(q)) { qty.value = String(q); n++; }
+    });
+  }
+  const spoken = (Array.isArray(f.products) ? f.products : []).filter(p => p && Object.values(p).some(Boolean));
+  if (spoken.length) {
+    // A product already on the record is updated; a new one is added.
+    const rows = readTreatmentProducts().filter(p => Object.values(p).some(Boolean));
+    spoken.forEach(p => {
+      const name = Object.keys(TREATMENT_PRODUCTS).find(k => k.toLowerCase() === String(p.name || '').trim().toLowerCase()) || String(p.name || '').trim();
+      const row = rows.find(r => r.name && name && r.name.toLowerCase() === name.toLowerCase()) || (rows.length === 1 && !rows[0].name ? rows[0] : null);
+      const target = row || {};
+      if (name) target.name = name;
+      if (name && TREATMENT_PRODUCTS[name] && !target.active) target.active = TREATMENT_PRODUCTS[name];
+      ['rate', 'amount', 'batch', 'life', 'where'].forEach(k => { if (p[k]) target[k] = String(p[k]).trim(); });
+      if (!row) rows.push(target);
+      n++;
+    });
+    renderTreatmentProducts(rows.length ? rows : [{}]);
+  }
+  updateTreatmentSaveBtn();
+  return n;
 }
 
 function onTreatmentMethodToggle(box) {

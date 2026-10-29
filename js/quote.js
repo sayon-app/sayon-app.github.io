@@ -366,6 +366,95 @@ function buildQuoteItemsFromReport(rd, system) {
   return items;
 }
 
+// ── SPOKEN QUOTE ──
+// What the inspector dictated for the quote (reportData.quoteSpoken, filled
+// by mergeSpokenQuote in js/app.js). Its lines replace the ones the builder
+// would guess from the report, at the prices said; a line said with no
+// price starts at the usual rate. Each line is matched to a catalogue line
+// where it plainly is one, so the price is remembered for next time.
+function spokenQuote(rd) {
+  const sq = rd && rd.quoteSpoken;
+  return sq && typeof sq === 'object' ? sq : null;
+}
+
+function spokenItemKey(desc, unit) {
+  const d = (desc || '').toLowerCase(), u = (unit || '').toLowerCase();
+  if (/monitor|servic/.test(d) && /bait|station/.test(d)) return 'bait_monitor';
+  if (/bait|station/.test(d)) return 'bait_install';
+  if (/barrier|soil treatment|perimeter|trench|reticulat/.test(d)) return /^(lm|m|metre|meter|linear)/.test(u) ? 'barrier_lm' : 'barrier_job';
+  if (/top.?up|re-?treat/.test(d)) return 'system_topup';
+  if (/borer/.test(d)) return 'borer';
+  if (/invasive/.test(d)) return 'invasive';
+  if (/follow.?up|re-?inspect|inspection/.test(d)) return 'followup';
+  if (/colony|direct|nest|workings/.test(d)) return 'direct';
+  if (/weep/.test(d)) return 'weep_holes';
+  if (/slab edge/.test(d)) return 'slab_edge';
+  if (/timber.{0,12}soil|sleeper/.test(d)) return 'timber_soil';
+  return 'custom';
+}
+
+function spokenQuoteItems(rd) {
+  const sq = spokenQuote(rd);
+  const lines = sq && Array.isArray(sq.items) ? sq.items.filter(it => it && it.description) : [];
+  return lines.map(it => {
+    const key = spokenItemKey(it.description, it.unit);
+    const priced = typeof it.price === 'number' && Number.isFinite(it.price);
+    const over = { desc: it.description, qty: it.qty || 1, unit: it.unit || 'job', source: 'Said in a voice note' };
+    if (priced) Object.assign(over, { price: it.price, priceSet: true });
+    return newQuoteItem(key, over);
+  });
+}
+
+// The spoken exclusions after the ones from the report, without repeats.
+function withSpokenExclusions(list, rd) {
+  const sq = spokenQuote(rd);
+  const out = list.slice();
+  (sq && Array.isArray(sq.exclusions) ? sq.exclusions : []).forEach(e => {
+    if (e && !out.some(o => o.toLowerCase() === e.toLowerCase())) out.push(e.replace(/\.?$/, '.'));
+  });
+  return out;
+}
+
+// A spoken "half a day" or "12 months" lands on its chip; anything else is
+// kept as said.
+function spokenPlanChoice(value, options) {
+  const v = (value || '').trim();
+  if (!v) return '';
+  return options.find(o => o.toLowerCase() === v.toLowerCase()) || v;
+}
+
+function withSpokenPlan(plan, rd) {
+  const sq = spokenQuote(rd);
+  if (!sq || !plan) return plan;
+  return {
+    ...plan,
+    time: spokenPlanChoice(sq.timeframe, QUOTE_PLAN_TIMES) || plan.time,
+    service: spokenPlanChoice(sq.servicePeriod, QUOTE_PLAN_SERVICE) || plan.service,
+  };
+}
+
+function withSpokenNotes(notes, rd) {
+  const sq = spokenQuote(rd);
+  const add = sq && (sq.notes || '').trim();
+  return add && !(notes || '').includes(add) ? [notes, add].filter(Boolean).join('\n') : notes;
+}
+
+// A quote made before the latest spoken quote details takes them in when
+// it's opened, unless the client has answered it or the job is complete.
+// Returns whether it changed.
+function applySpokenQuote(q, rd) {
+  const sq = spokenQuote(rd);
+  if (!q || !sq || !sq.at || (q.spokenAt || 0) >= sq.at || q.answer || isQuoteLocked()) return false;
+  const items = spokenQuoteItems(rd);
+  if (items.length) { q.items = items; q.systemChoice = null; }
+  q.exclusions = withSpokenExclusions((q.exclusions || '').split('\n').map(l => l.trim()).filter(Boolean), rd).join('\n');
+  if ((sq.paymentTerms || '').trim()) q.paymentTerms = sq.paymentTerms.trim();
+  q.plan = withSpokenPlan(q.plan || buildQuotePlan(rd), rd);
+  q.notes = withSpokenNotes(q.notes, rd);
+  q.spokenAt = sq.at;
+  return true;
+}
+
 // What the quote fixes, in a sentence or two for the client, from the
 // report's findings: live termites and where, past activity, live borers,
 // and the conditions that invite termites. Locations are as the inspector
@@ -656,6 +745,8 @@ function newQuoteNumber() {
 
 function createQuoteFromSource(src) {
   const rd = src.reportData || {};
+  const spoken = spokenQuoteItems(rd);
+  const sq = spokenQuote(rd);
   return {
     reportKey: src.key,
     number: newQuoteNumber(),
@@ -672,12 +763,13 @@ function createQuoteFromSource(src) {
     validDays: 30,
     gst: defaultQuoteGst(),
     problem: buildQuoteProblem(rd),
-    items: buildQuoteItemsFromReport(rd),
-    systemChoice: newSystemChoice(rd),
-    exclusions: buildQuoteExclusions(rd).join('\n'),
-    plan: buildQuotePlan(rd),
-    paymentTerms: defaultPaymentTerms(),
-    notes: QUOTE_DEFAULT_NOTES,
+    items: spoken.length ? spoken : buildQuoteItemsFromReport(rd),
+    systemChoice: spoken.length ? null : newSystemChoice(rd),
+    exclusions: withSpokenExclusions(buildQuoteExclusions(rd), rd).join('\n'),
+    plan: withSpokenPlan(buildQuotePlan(rd), rd),
+    paymentTerms: (sq && (sq.paymentTerms || '').trim()) || defaultPaymentTerms(),
+    notes: withSpokenNotes(QUOTE_DEFAULT_NOTES, rd),
+    spokenAt: sq ? sq.at || 0 : 0,
   };
 }
 
@@ -748,8 +840,10 @@ function onQuoteSourceChange() {
   if (!src) { quoteState = null; editor.style.display = 'none'; bar.style.display = 'none'; return; }
   const saved = quoteForReport(src.key, src.address);
   quoteState = saved || createQuoteFromSource(src);
-  if (!saved) persistQuote();
+  const heard = saved && applySpokenQuote(quoteState, src.key === (currentReportId || 'draft') ? reportData : src.reportData);
+  if (!saved || heard) persistQuote();
   else setQuoteSaveState('Saved');
+  if (heard) showToast('Quote updated from your voice notes', 'success');
   renderQuoteEditor();
   renderQuoteLock();
   editor.style.display = 'flex';
@@ -973,8 +1067,9 @@ function renderQuoteStartHint() {
   if (!el || !quoteState) return;
   renderQuoteWorkSummary();
   const any = quoteState.items.some(isStartingPrice);
-  el.style.display = any ? '' : 'none';
-  el.innerHTML = any ? '<b>Starting price</b> is a suggested rate. Tap a line to set your own, and new quotes start at your price.' : '';
+  el.style.display = '';
+  el.innerHTML = (any ? '<b>Starting price</b> is a suggested rate. Tap a line to set your own, and new quotes start at your price. ' : '') +
+    'You can also say the quote in your report voice notes: the work, prices, what isn\'t included and how they pay.';
 }
 
 // Grows a line's description box to fit its text, so long names wrap
@@ -1080,9 +1175,10 @@ function rebuildQuoteFromReport() {
   const src = currentQuoteSource();
   if (!src || !quoteState) return;
   if (quoteState.items.length && !confirm('Replace the line items, exclusions and the problem with fresh ones from the report? Your edits to them will be lost.')) return;
-  quoteState.items = buildQuoteItemsFromReport(src.reportData);
-  quoteState.systemChoice = newSystemChoice(src.reportData);
-  quoteState.exclusions = buildQuoteExclusions(src.reportData).join('\n');
+  const spoken = spokenQuoteItems(src.reportData);
+  quoteState.items = spoken.length ? spoken : buildQuoteItemsFromReport(src.reportData);
+  quoteState.systemChoice = spoken.length ? null : newSystemChoice(src.reportData);
+  quoteState.exclusions = withSpokenExclusions(buildQuoteExclusions(src.reportData), src.reportData).join('\n');
   quoteState.problem = buildQuoteProblem(src.reportData);
   document.getElementById('qExclusions').value = quoteState.exclusions;
   document.getElementById('qProblem').value = quoteState.problem;

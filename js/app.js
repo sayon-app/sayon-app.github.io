@@ -7770,7 +7770,14 @@ function drawAgreementBody(doc, a, y, { M, CW, onNewPage }) {
     if (m) {
       sawClause = true;
       const body = lines.slice(1).map(l => doc.splitTextToSize(l, CW - GUT - 3));
-      const firstH = 5 + (body[0] ? Math.min(body[0].length, 2) * LH : 0);
+      let firstH = 5 + (body[0] ? Math.min(body[0].length, 2) * LH : 0);
+      // The last clause goes over with the closing words and the signatures,
+      // so they never sit on a page of their own.
+      const next = blocks[bi + 1];
+      if (next && bi + 1 === blocks.length - 1 && !/^\d+\.\s/.test(next[0]) && !a.unsigned) {
+        const closingH = next.flatMap(l => doc.splitTextToSize(l, CW - 13)).length * LH + 9;
+        firstH = 7.4 + body.reduce((h, w, i) => h + w.length * LH + (i ? 1.5 : 0), 0) + 2.6 + closingH + 34;
+      }
       if (!room(firstH + 4) && !first) {
         doc.setDrawColor(...C.ruleLight); doc.setLineWidth(0.2); doc.line(M + GUT, y - 1.6, M + CW, y - 1.6);
       }
@@ -7819,10 +7826,7 @@ function drawAgreementBody(doc, a, y, { M, CW, onNewPage }) {
   pdfTracked(doc, 'AGREED AND SIGNED', M, y, { cs: 0.6 });
   y += 20;
   const colW = (CW - 16) / 3;
-  const onLine = (text, x) => {
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...C.ink);
-    doc.text(doc.splitTextToSize(text, colW - 2)[0], x + 1, y - 2);
-  };
+  const onLine = (text, x) => drawPdfOnLine(doc, text, x, y, colW);
   onLine(a.signerName, M);
   drawPdfSignature(doc, { x: M, y, w: colW, caption: 'Agreed by' });
   drawPdfSignature(doc, { x: M + colW + 8, y, w: colW, caption: a.signature ? 'Client signature' : 'How it was signed',
@@ -12614,15 +12618,23 @@ function drawPdfLetterhead(doc, company, { docLabel, date }) {
   drawPdfFadeRule(doc, 0, 0, W, 1.6);
   const markW = drawPdfCompanyMark(doc, company, M, 11, 17);
   const tx = M + markW + 5;
-  doc.setFont('helvetica','bold'); doc.setFontSize(13.5); doc.setTextColor(...C.ink);
-  doc.text(company.name || 'SAYON', tx, 17.5, { maxWidth: 112 - markW });
+  // A long business name steps down in size, then takes a second line,
+  // and the details below move down with it rather than print over it.
+  const name = company.name || 'SAYON', nameW = 112 - markW;
+  let nameSize = 13.5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(nameSize); doc.setTextColor(...C.ink);
+  while (nameSize > 11 && doc.getTextWidth(name) > nameW) doc.setFontSize(nameSize -= 0.5);
+  const nameLines = doc.splitTextToSize(name, nameW).slice(0, 2);
+  const two = nameLines.length > 1;
+  doc.text(nameLines, tx, two ? 15 : 17.5, { lineHeightFactor: 1.15 });
+  const dy = two ? 1.6 : 0;
   const sub = [];
   if (company.licence) sub.push(`Licence ${company.licence}`);
   if (company.abn) sub.push(`ABN ${company.abn}`);
   const contact = [company.phone, company.email].filter(Boolean);
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...C.inkLight);
-  if (sub.length) doc.text(sub.join('   ·   '), tx, 22.6);
-  if (contact.length) doc.text(contact.join('   ·   '), tx, 26.6);
+  if (sub.length) doc.text(sub.join('   ·   '), tx, 22.6 + dy);
+  if (contact.length) doc.text(contact.join('   ·   '), tx, 26.6 + dy);
   if (!company.name) doc.text('Intelligent Inspection Platform', tx, 22.6);
   doc.setFont('helvetica','bold'); doc.setFontSize(6.8); doc.setTextColor(...C.accentDark);
   pdfTracked(doc, (docLabel || '').toUpperCase(), W - M, 17.5, { align: 'right' });
@@ -12645,6 +12657,24 @@ function drawPdfSignature(doc, { x, y, w, image, note, caption }) {
   doc.setDrawColor(...C.ink); doc.setLineWidth(0.3); doc.line(x, y, x + w, y);
   doc.setFont('helvetica','bold'); doc.setFontSize(6.3); doc.setTextColor(...C.inkMuted);
   pdfTracked(doc, (caption || 'SIGNATURE').toUpperCase(), x, y + 4, { cs: 0.3 });
+}
+
+// Text cut to fit w at the current font, with an ellipsis when it's cut.
+function pdfFitText(doc, text, w) {
+  text = String(text || '');
+  if (doc.getTextWidth(text) <= w) return text;
+  while (text.length > 1 && doc.getTextWidth(text + '…') > w) text = text.slice(0, -1);
+  return text.trimEnd() + '…';
+}
+
+// A name or date written on a signature line (y is the line). Long names
+// step down in size to fit the line instead of losing words.
+function drawPdfOnLine(doc, text, x, y, w) {
+  if (!text) return;
+  let size = 9.5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(size); doc.setTextColor(...PDF_COLORS.ink);
+  while (size > 7 && doc.getTextWidth(String(text)) > w - 2) doc.setFontSize(size -= 0.5);
+  doc.text(pdfFitText(doc, text, w - 2), x + 1, y - 2);
 }
 
 // A labelled value, small tracked label over the value. Returns the value's
@@ -12772,7 +12802,7 @@ async function buildReportPdf() {
     const sub = [companyName ? reportKindTitle() : '', addr].filter(Boolean).join('   ·   ');
     if (sub) {
       doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);
-      doc.text(sub.length > 90 ? sub.slice(0, 89) + '…' : sub, M, 14);
+      doc.text(pdfFitText(doc, sub, CW), M, 14);
     }
     doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C.accentDark);
     doc.text(sectionLabel.toUpperCase(), W-M, 10, { align:'right' });
@@ -13177,10 +13207,15 @@ async function buildReportPdf() {
   doc.setFillColor(...C.rule); doc.rect(M, 284, CW, 0.3, 'F');
   doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);
   const footerPreparedBy = company.name ? `Prepared by ${company.name}` : 'Generated via SAYON';
-  doc.text(footerPreparedBy, M, 291);
-  doc.text('This report does not conclusively determine that the property is free of termites.', W/2, 291, { align:'center' });
+  // A long business name would run into the centred line, so then the
+  // centred line goes above the other two.
+  const coverDisclaimer = 'This report does not conclusively determine that the property is free of termites.';
+  const crowded = doc.getTextWidth(footerPreparedBy) + 4 > W/2 - doc.getTextWidth(coverDisclaimer)/2 - M;
+  const footY = crowded ? 293 : 291;
+  doc.text(coverDisclaimer, W/2, crowded ? 289 : 291, { align:'center' });
+  doc.text(pdfFitText(doc, footerPreparedBy, CW - 40), M, footY);
   doc.setFont('helvetica','bold'); doc.setTextColor(...C.inkLight);
-  doc.text(today, W-M, 291, { align:'right' });
+  doc.text(today, W-M, footY, { align:'right' });
 
   // ── CONTENTS ── its page is kept here and filled in at the end, once
   // every section's page is known.
@@ -13514,7 +13549,9 @@ async function buildReportPdf() {
     // This finding's own photos, inside its card.
     const fPhotos = card.photosId ? ((reportData.photosBySection || {})[findingPhotoSection(card.photosId)] || []) : [];
     if (fPhotos.length) {
-      if (y + 12 > 270) newPage();
+      // The label goes over with the first row of photos, never alone.
+      const firstRowH = ((bodyW - 5) / 2) * 0.72 + 12;
+      if (y + 3 + firstRowH > 280) newPage();
       doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
       doc.text('PHOTOS', bodyX, y); y += 3;
       photoGrid(fPhotos, bodyX, bodyW);
@@ -13566,7 +13603,12 @@ async function buildReportPdf() {
   }
 
   subhead('TERMITES');
-  findings.forEach((f, idx) => findingCard(f, idx));
+  // A report with nothing recorded about termites says so in a row, rather
+  // than printing an empty "Not recorded" finding card.
+  const findingRecorded = f => ['termiteActivity','species','activityLocation','timberAffected','damageDescription','nestLocated','structuralConcern']
+    .some(k => f[k] && String(f[k]).trim()) || ((reportData.photosBySection || {})[findingPhotoSection(f.id)] || []).length;
+  if (findings.some(findingRecorded)) findings.forEach((f, idx) => findingCard(f, idx));
+  else { row('Termite Activity', 'Not recorded'); gap(4); }
 
   // Borers, decay and delignification: the other timber pests AS 4349.3
   // covers. Always printed, so an unanswered field reads "Not recorded"
@@ -13847,11 +13889,7 @@ async function buildReportPdf() {
   sectionTitle('INSPECTOR DETAILS', REPORT_PARTS.inspector);
   // Signature blocks: the value sits on the line, its caption under it.
   const sigColW = (CW - 16) / 3;
-  const onSigLine = (text, x) => {
-    if (!text) return;
-    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(...C.ink);
-    doc.text(doc.splitTextToSize(String(text), sigColW - 2)[0], x + 1, y - 2);
-  };
+  const onSigLine = (text, x) => drawPdfOnLine(doc, text, x, y, sigColW);
   const provider = [co.name, co.phone, co.email].filter(Boolean).join('  ·  ');
   if (provider) {
     doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...C.inkLight);

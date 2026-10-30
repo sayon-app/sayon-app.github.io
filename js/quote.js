@@ -581,10 +581,26 @@ function buildPlanOwner(rd) {
 }
 
 function buildPlanInspections(rd) {
-  const f = ((rd && rd.inspectionFrequency) || '').trim();
+  return planInspectionsText((rd && rd.inspectionFrequency) || '');
+}
+
+// The report's re-inspection interval as the quote's "Inspections after":
+// "12 months" is "Every 12 months", but "3 months, then every 12 months"
+// is "In 3 months, then every 12 months", and wording that already reads
+// as a sentence ("Next inspection in 3 months", "Re-inspect 4 weeks after
+// treatment") is kept, not given an "Every" it doesn't fit.
+function planInspectionsText(f) {
+  f = String(f || '').trim().replace(/\s*\((annual|yearly)\)/i, '');
   if (!f) return '';
-  const every = f.replace(/\s*\((annual|yearly)\)/i, '');
-  return /^every\b/i.test(every) ? every : `Every ${every}`;
+  if (/^every\b/i.test(f)) return f;
+  if (/^\d/.test(f)) return /\bthen\b/i.test(f) ? `In ${f}` : `Every ${f}`;
+  return f.charAt(0).toUpperCase() + f.slice(1);
+}
+// An older version put "Every" before any wording ("Every Next inspection
+// in 3 months"); a quote saved then prints without it.
+function repairPlanInspections(v) {
+  const f = String(v || '').trim().replace(/^every\s+(?=(next|re-?inspect|in|within|after)\b)/i, '');
+  return f.charAt(0).toUpperCase() + f.slice(1);
 }
 
 function buildQuotePlan(rd, system) {
@@ -1605,7 +1621,7 @@ function drawPdfRunningHeader(doc, company, docName, address, number) {
   doc.text(company.name || docName, M, 10);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);
   const sub = [company.name ? docName : '', address || ''].filter(Boolean).join('   ·   ');
-  if (sub) doc.text(sub.length > 90 ? sub.slice(0, 89) + '…' : sub, M, 14);
+  if (sub) doc.text(pdfFitText(doc, sub, CW), M, 14);
   doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.accentDark);
   doc.text(number || '', W - M, 10, { align: 'right' });
   doc.setFillColor(...C.accent); doc.rect(M, 17, CW, 0.35, 'F');
@@ -1729,8 +1745,16 @@ function buildQuotePDF(q) {
   let y = 0;
 
   function pageTopBand() { y = drawPdfRunningHeader(doc, company, 'Treatment Quote', q.address, q.number); }
-  function ensure(h) { if (y + h > BOTTOM) { doc.addPage(); pageTopBand(); } }
-  function sectionTitle(title, num) { ensure(20); y = drawPdfNumberedTitle(doc, y, title, num); }
+  // A new page keeps the text style it broke in, as the header changes it.
+  function ensure(h) {
+    if (y + h <= BOTTOM) return;
+    const font = doc.getFont(), size = doc.getFontSize(), color = doc.getTextColor();
+    doc.addPage(); pageTopBand();
+    doc.setFont(font.fontName, font.fontStyle); doc.setFontSize(size); doc.setTextColor(color);
+  }
+  // keep: room for the section's first content, so a title never sits at
+  // the foot of a page with its content overleaf.
+  function sectionTitle(title, num, keep = 0) { ensure(20 + keep); y = drawPdfNumberedTitle(doc, y, title, num); }
 
   y = drawPdfDocCover(doc, company, { kicker: 'Timber pest', title: 'Treatment Quote', date: today, left: [
     ['PREPARED FOR', q.client || 'Not specified'],
@@ -1790,15 +1814,15 @@ function buildQuotePDF(q) {
   const plan = q.plan || {};
   const planLines = v => (v || '').split('\n').map(s => s.trim()).filter(Boolean);
   const we = planLines(plan.we), owner = planLines(plan.owner);
-  const facts = [['TIME ON SITE', plan.time], ['FREE SERVICE PERIOD', plan.service], ['INSPECTIONS AFTER', plan.inspections]]
+  const facts = [['TIME ON SITE', plan.time], ['FREE SERVICE PERIOD', plan.service], ['INSPECTIONS AFTER', repairPlanInspections(plan.inspections)]]
     .map(([k, v]) => [k, (v || '').trim()]).filter(([, v]) => v);
   if (we.length || owner.length || facts.length) {
-    sectionTitle('TREATMENT PLAN', sectionNum++);
+    const gap = 4, fw = facts.length ? (CW - gap * (facts.length - 1)) / facts.length : CW;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+    const wrapped = facts.map(([, v]) => doc.splitTextToSize(v, fw - 8));
+    const fh = facts.length ? 10 + Math.max(...wrapped.map(l => l.length)) * 4.4 : 0;
+    sectionTitle('TREATMENT PLAN', sectionNum++, facts.length ? fh + 6 : 18);
     if (facts.length) {
-      const gap = 4, fw = (CW - gap * (facts.length - 1)) / facts.length;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
-      const wrapped = facts.map(([, v]) => doc.splitTextToSize(v, fw - 8));
-      const fh = 10 + Math.max(...wrapped.map(l => l.length)) * 4.4;
       ensure(fh + 6);
       facts.forEach(([k], i) => {
         const x = M + i * (fw + gap);
@@ -1849,7 +1873,8 @@ function buildQuotePDF(q) {
   // ── EXCLUSIONS ──
   const exclusions = (q.exclusions || '').split('\n').map(s => s.trim()).filter(Boolean);
   if (exclusions.length) {
-    sectionTitle('EXCLUSIONS & WORK BY OTHERS', sectionNum++);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+    sectionTitle('EXCLUSIONS & WORK BY OTHERS', sectionNum++, doc.splitTextToSize(exclusions[0], CW - 8).length * 4.2 + 2);
     exclusions.forEach(ex => {
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
       const lines = doc.splitTextToSize(ex, CW - 8);
@@ -1864,7 +1889,8 @@ function buildQuotePDF(q) {
   // ── TERMS & NOTES ──
   const notes = (q.notes || '').trim();
   if (notes) {
-    sectionTitle('TERMS & NOTES', sectionNum++);
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5);
+    sectionTitle('TERMS & NOTES', sectionNum++, doc.splitTextToSize(notes.split('\n')[0], CW - 5).length * 4 + 3);
     doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); doc.setTextColor(...C.inkMuted);
     notes.split('\n').map(s => s.trim()).filter(Boolean).forEach(p => {
       const lines = doc.splitTextToSize(p, CW - 5);
@@ -1890,11 +1916,7 @@ function buildQuotePDF(q) {
   const ans = quoteAnswerState(q);
   const accepted = ans && ans.status === 'accepted' && !ans.stale ? ans : null;
   const colW = (CW - 16) / 3;
-  const valueOnLine = (text, x) => {
-    if (!text) return;
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...C.ink);
-    doc.text(text, x + 1, y - 2);
-  };
+  const valueOnLine = (text, x) => drawPdfOnLine(doc, text, x, y, colW);
   valueOnLine(accepted && accepted.by, M);
   drawPdfSignature(doc, { x: M, y, w: colW, caption: 'Client name' });
   drawPdfSignature(doc, { x: M + colW + 8, y, w: colW, caption: 'Client signature',

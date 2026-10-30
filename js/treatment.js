@@ -788,7 +788,21 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   // The list stays together, so it never starts at the foot of a page.
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
   const stepLines = steps.map(st => doc.splitTextToSize(st, CW - 7));
-  ensure(12 + stepLines.reduce((a, l) => a + l.length * 3.9 + 0.8, 0));
+  const stepsH = 12 + stepLines.reduce((a, l) => a + l.length * 3.9 + 0.8, 0);
+  // The closing words under the signature, measured now so the sign-off
+  // can keep them with it.
+  const closing = install
+    ? 'The system above was installed by this technician in line with the manufacturer\'s directions, the product label and AS 3660.2. It does not repair existing damage, and no system can guarantee termites will never return. Regular inspections are the best protection.'
+    : 'The treatment above was carried out by this technician in line with the product label directions and AS 3660.2. It does not repair existing damage, and no treatment can guarantee termites will never return. Regular inspections are the best protection.';
+  doc.setFontSize(7);
+  const signOffH = (t.supervisor ? 36 : 31) + doc.splitTextToSize(closing, CW).length * 3.2;
+  doc.setFontSize(8.5);
+  const notesLines = [t.warranty, t.notes].filter(Boolean).map(v => doc.splitTextToSize(v, t.warranty && t.notes ? (CW - 6) / 2 : CW).length);
+  const notesH = notesLines.length ? 6.5 + Math.max(...notesLines) * 4 : 0;
+  // When the sign-off won't fit under the steps, the steps go over with
+  // it, so page 2 never holds a signature on its own.
+  if (y + stepsH + notesH + signOffH > BOTTOM && 26 + stepsH + notesH + signOffH <= BOTTOM) ensure(BOTTOM);
+  ensure(stepsH);
   section(install ? 'LOOKING AFTER THE SYSTEM' : 'KEEPING THE PROPERTY PROTECTED');
   stepLines.forEach((lines, i) => {
     ensure(lines.length * 3.9 + 2);
@@ -802,17 +816,17 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
 
   // ── SIGN-OFF ── (kept together): who, licence and date on the left,
   // the signature on the right.
-  ensure(t.supervisor ? 34 : 30);
+  const pages = doc.internal.getNumberOfPages();
+  ensure(signOffH);
   y += 3;
-  doc.setFillColor(...C.accent); doc.rect(M, y, CW, 0.5, 'F');
+  // At the top of a page the running header's rule is already there.
+  if (doc.internal.getNumberOfPages() === pages) { doc.setFillColor(...C.accent); doc.rect(M, y, CW, 0.5, 'F'); }
   y += 19;
   const colW = (CW - 16) / 3;
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...C.ink);
-  doc.text(doc.splitTextToSize(t.technician || '', colW - 2)[0] || '', M + 1, y - 2);
+  drawPdfOnLine(doc, t.technician, M, y, colW);
   drawPdfSignature(doc, { x: M, y, w: colW, caption: t.licence ? `Technician · Licence ${t.licence}` : 'Technician' });
   drawPdfSignature(doc, { x: M + colW + 8, y, w: colW, caption: 'Signature', image: t.signature });
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...C.ink);
-  doc.text(formatLongDate(t.date), M + (colW + 8) * 2 + 1, y - 2);
+  drawPdfOnLine(doc, formatLongDate(t.date), M + (colW + 8) * 2, y, colW);
   drawPdfSignature(doc, { x: M + (colW + 8) * 2, y, w: colW, caption: 'Date' });
   y += 9;
   if (t.supervisor) {
@@ -820,10 +834,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     doc.text(`Supervised by ${t.supervisor}${t.supervisorLicence ? `, licence ${t.supervisorLicence}` : ''}`, M, y);
     y += 5;
   }
-  para(install
-    ? 'The system above was installed by this technician in line with the manufacturer\'s directions, the product label and AS 3660.2. It does not repair existing damage, and no system can guarantee termites will never return. Regular inspections are the best protection.'
-    : 'The treatment above was carried out by this technician in line with the product label directions and AS 3660.2. It does not repair existing damage, and no treatment can guarantee termites will never return. Regular inspections are the best protection.',
-    { size: 7, lh: 3.2, color: C.inkMuted });
+  para(closing, { size: 7, lh: 3.2, color: C.inkMuted });
 
   drawPdfDocFooters(doc, `${install ? 'Installation certificate' : 'Certificate'} ${number}${company.name ? `  ·  ${company.name}` : ''}`);
   const safe = (q.address || 'Property').replace(/[^\w]+/g, '_').substring(0, 25);

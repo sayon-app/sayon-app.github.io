@@ -79,15 +79,16 @@
   .price { max-width: 520px; background: #fff; border: 2px solid var(--teal); border-radius: 20px; padding: 32px; }
   .price h3 { font-size: 22px; margin-bottom: 6px; }
   .price .amount { font-family: 'Space Grotesk', sans-serif; font-size: 40px; font-weight: 800; margin: 10px 0 4px; }
+  .price .amount-tbc { font-size: 26px; line-height: 1.2; margin-bottom: 14px; }
   .price ul { list-style: none; margin: 20px 0 26px; }
   .price li { padding: 7px 0 7px 28px; position: relative; color: var(--ink2); }
   .price li::before { content: ''; position: absolute; left: 4px; top: 13px; width: 12px; height: 7px; border-left: 2.5px solid var(--teal-ink); border-bottom: 2.5px solid var(--teal-ink); transform: rotate(-45deg); }
 
   .faq { max-width: 760px; }
   .faq details { border-bottom: 1px solid var(--line); padding: 18px 0; }
-  .faq summary { font-weight: 600; font-size: 17px; cursor: pointer; list-style: none; }
+  .faq summary { font-weight: 600; font-size: 17px; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
   .faq summary::-webkit-details-marker { display: none; }
-  .faq summary::after { content: '+'; float: right; color: var(--teal-ink); font-weight: 700; }
+  .faq summary::after { content: '+'; flex: none; color: var(--teal-ink); font-weight: 700; }
   .faq details[open] summary::after { content: '–'; }
   .faq details p { margin-top: 10px; color: var(--ink2); }
 
@@ -195,8 +196,10 @@
       </div>
       <div class="price">
         <h3>SAYON</h3>
-        <div class="amount" id="priceAmount">Price coming soon</div>
-        <p style="color:var(--ink2)">per inspector a month, plus GST</p>
+        <!-- When the price is set: put it in the amount (e.g. $79), drop the
+             amount-tbc class and remove hidden from the line under it. -->
+        <div class="amount amount-tbc" id="priceAmount">Price coming soon</div>
+        <p style="color:var(--ink2)" hidden>per inspector a month, plus GST</p>
         <ul>
           <li>Reports, quotes, signatures and treatment certificates</li>
           <li>Photos on every finding</li>

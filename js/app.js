@@ -1771,7 +1771,7 @@ HOW TO READ DICTATION:
 - Filler and false starts ("okay so", "um", "right", "well", "like I said", a repeated word) are dropped. "Wall" or "Well" at the start of a phrase is usually filler, not a wall.
 - A sentence that names an element after a finding ("the location of that activity I'd say subfloor joists and bearers") is that finding's location.
 - Never copy raw dictation into a field. Never put the whole note into one field. Write fields as a report reads: brief, factual, in the inspector's terms.
-- Mishearings: iPhone dictation turns trade words into everyday ones. When a literal reading makes no sense for a timber pest inspection, use the sensible reading silently. Patterns seen: "Joyce and bears" / "joys and bearers" = joists and bearers; "barer" / "Easter barra" = bearer; "sub for" / "some flow" / "some floor" / "sub saw" = subfloor; "weep poles" / "wee poles" = weep holes; "skirting balls" = skirting boards; "borrowers" / "bores" / "balls" (in a pest list) = borers; "called roof" / "old roof" (as the roof type) = tiled roof; "water strains" = water stains; "batting system" = baiting system; "Tims" = timbers; "live termite scene" = live termites seen; "repairs" / "pairs" with caps = piers with ant caps; "strawberry" along a boundary = shrubbery; "insulation" before "termite management system" = installation; "access moisture" = excess moisture; "construction error" = construction era; "customers once" = customer's wants; "out of corners" = outer corners; "shed fence" = shared fence; "bats" in a roof = batts. Seen in the 12 Oct 2026 car test: "exterior wheels" / "wheels are clear" = weep holes (weeps); "peers" / "peas" = piers, and "in cut" / "and cut" / "a cat" / "in capped" right after piers = ant capped; "blood tubing" / "mud shooting" / "mud shavings" = mud tubing; "dribble notice" = durable notice; "roof oil" / "roof for" = roof void; "chemical Barry" = chemical barrier; "walls are taps" / "wars attacks sound" = walls tapped, sound; "trading a bridging" = creating a bridge.
+- Mishearings: iPhone dictation turns trade words into everyday ones. When a literal reading makes no sense for a timber pest inspection, use the sensible reading silently. Patterns seen: "Joyce and bears" / "joys and bearers" = joists and bearers; "barer" / "Easter barra" = bearer; "sub for" / "some flow" / "some floor" / "sub saw" = subfloor; "weep poles" / "wee poles" = weep holes; "skirting balls" = skirting boards; "borrowers" / "bores" / "balls" (in a pest list) = borers; "called roof" / "old roof" (as the roof type) = tiled roof; "water strains" = water stains; "batting system" = baiting system; "Tims" = timbers; "live termite scene" = live termites seen; "repairs" / "pairs" with caps = piers with ant caps; "strawberry" along a boundary = shrubbery; "insulation" before "termite management system" = installation; "access moisture" = excess moisture; "construction error" = construction era; "customers once" = customer's wants; "out of corners" = outer corners; "shed fence" = shared fence; "bats" in a roof = batts. Seen in the 12 Oct 2026 car test: "exterior wheels" / "wheels are clear" = weep holes (weeps); "peers" / "peas" = piers, and "in cut" / "and cut" / "a cat" / "in capped" right after piers = ant capped; "blood tubing" / "mud shooting" / "mud shavings" = mud tubing; "dribble notice" = durable notice; "roof oil" / "roof for" = roof void; "chemical Barry" = chemical barrier; "walls are taps" / "wars attacks sound" = walls tapped, sound; "trading a bridging" = creating a bridge. Seen across later tests: "barrel" / "bear is" near the subfloor = bearer; "bearer holes" = borer holes; "Greet" with "inspection zone" = breach; "Coto" = Coptotermes; "French bus" = fresh frass; "no time no active to my management system" = no termite management system; "roof fluid" = roof void; "Port Coast" = porch post; "we pull a clear" = weep holes clear; "Investment inspection" = invasive inspection; "garden belts" = garden beds; "stalled items" = stored items; "re-deck" / "the re" = rear deck; "Oil barrier" = soil barrier; "top floor" in a single storey house = subfloor; a clearance in "ml" or "mil" = mm; "triple O" in a phone number = 000; "Cough" = a cough, ignore it.
 - Brand names in the wrong slot are ordinary words: "active Termimesh in the tree" is active termites; "Exterra perimeter" is the exterior perimeter; "Sentricon" or "Termidor" in a sentence about the outside wall is probably "centre", "exterior" or "termite". A brand is real ONLY when the inspector says it is installed, is on the durable notice, or is what they recommend. Then it goes in existingSystemOther or treatmentType, nowhere else.
 - A Latin-sounding mangle in a species slot is a genus (see species). "Termite door" or "terminator" in a treatment slot is Termidor; "cold on" / "quote on" before "physical barrier" is Kordon.
 
@@ -2418,6 +2418,31 @@ function correctKnownMishearings(text) {
   // left narrower than the AI prompt's version since "strawberry" alone is
   // a real word that could legitimately come up (e.g. a garden bed).
   text = text.replace(/\bstrawberry\b(?=\s+(?:along|growing along|against)\s+the\s+boundary)/gi, 'shrubbery');
+  // Scan of all 59 test notes, 30 Oct 2026. Each has no sensible literal
+  // reading in an inspection, or is fixed only in the phrase it was heard in.
+  // A fix at the start of a sentence keeps its capital letter.
+  const fix = (re, to) => {
+    text = text.replace(re, (m, at, all) => /^\s*$|[.!?]\s+$/.test(all.slice(0, at)) ? to[0].toUpperCase() + to.slice(1) : to);
+  };
+  // "piers ant capped" came back four ways from Safari.
+  fix(/\b(?:peers|peas)\s+(?:are\s+)?(?:in|and|an|ant|a|currently a)\s+(?:cunt|cut|cat|capped)\b/gi, 'piers ant capped');
+  fix(/\band capping\b/gi, 'ant capping');
+  fix(/\bport coast\b/gi, 'porch post');
+  fix(/\binvestment inspection\b/gi, 'invasive inspection');
+  fix(/\bgarden belts\b/gi, 'garden beds');
+  fix(/\bstalled items\b/gi, 'stored items');
+  fix(/\bbearer holes\b/gi, 'borer holes');
+  fix(/\bre-deck\b/gi, 'rear deck');
+  fix(/\bat the re and\b/gi, 'at the rear and');
+  fix(/\bwe pull a clear\b/gi, 'weep holes clear');
+  fix(/\bfrench bus\b/gi, 'fresh frass');
+  fix(/\broof fluid\b/gi, 'roof void');
+  // "soil barrier" lost its first letter at a phrase break ("Oil barrier").
+  text = text.replace(/(^|[.!?]\s+|\bchemical\s+)oil barrier\b/gi, (m, pre) => pre + (/^\s*$|[.!?]\s*$/.test(pre) ? 'Soil' : 'soil') + ' barrier');
+  // Subfloor clearance is always millimetres; "400ml", "400 mil".
+  text = text.replace(/\b(clearance\D{0,20}?\d+)\s*(?:ml|mils?)\b/gi, '$1 mm');
+  // Whisper writes a cough as words.
+  text = text.replace(/(?:^|\s)(?:\(?cough\)?[.,]?\s*)+(?=\s|$)/gi, ' ').replace(/\s{2,}/g, ' ').trim();
   return text;
 }
 
@@ -2429,11 +2454,9 @@ function correctKnownMishearings(text) {
 // "Exterra". Brand names in the wrong slot are left to SYSTEM_PROMPT's
 // contextual reasoning, which can see the whole sentence.
 const TRANSCRIPTION_VOCAB = [
-  'Kordon', 'Termidor', 'Altriset', 'Phantom', 'Premise', 'Bifenthrin',
-  'Biflex', 'Maxxthor', 'Talstar', 'Exterra', 'Sentricon', 'Trelona',
-  'Termimesh', 'HomeGuard',
-  'Coptotermes', 'Schedorhinotermes', 'Nasutitermes', 'Microcerotermes',
-  'Heterotermes', 'Cryptotermes',
+  'Kordon', 'Termidor', 'Altriset', 'Premise', 'Bifenthrin', 'Biflex',
+  'Exterra', 'Sentricon', 'Trelona', 'Termimesh',
+  'Coptotermes', 'Schedorhinotermes', 'Nasutitermes', 'Cryptotermes',
 ];
 
 // ── AI TRANSCRIPT CLEANUP (suggest-and-confirm, never automatic) ──────────
@@ -2652,13 +2675,19 @@ function stopAudioCapture() {
 
 // Vocabulary hint sent to the transcription backend (Whisper's
 // initial_prompt biases recognition toward words it's given, without
-// forcing them). The everyday inspection words are listed alongside the
-// brand names so the hint doesn't pull "termites" or "exterior" towards a
-// similar-sounding brand.
+// forcing them). Written like an inspection note, since Whisper follows the
+// style of its prompt as well as the words. Every trade word here is one
+// Whisper or Safari has misheard in a real test (scan of 59 test notes,
+// 30 Oct 2026). The everyday words sit alongside the brand names so the hint
+// doesn't pull "termites" or "exterior" towards a similar-sounding brand.
+// Keep it under about 650 characters: Whisper only reads the last ~220
+// tokens of a prompt, and the words just spoken are added after this.
 function buildTranscriptionVocabHint() {
-  return 'Australian termite and pest inspection terms: termites, ' +
-    TRANSCRIPTION_VOCAB.join(', ') +
-    ', joists, bearers, subfloor, roof void, weep holes, exterior, shrubbery, conducive conditions, slab edge.';
+  return 'Timber pest inspection notes, Australia. Termites, subfloor, bearers and joists, brick piers ant capped, ' +
+    'ant capping, roof void, insulation, weep holes clear, slab edge, garden beds, skirting boards, porch post, ' +
+    'rear deck, stored items, exterior, shrubbery. Mud leads, borer holes, fresh frass, moisture reading 28%, ' +
+    'clearance 400 mm, durable notice, termite management system, soil barrier, invasive inspection. ' +
+    TRANSCRIPTION_VOCAB.join(', ') + '.';
 }
 
 // Uploads the captured audio to the Worker's transcription endpoint and, on

@@ -42,6 +42,7 @@
       <div class="auth-logo-name">SAYON</div>
     </div>
     <p class="auth-tagline">Timber pest reports, quotes and certificates, finished on site.</p>
+    <p class="auth-footer auth-samples">See a sample <a href="samples/sample-report.pdf" target="_blank" rel="noopener">report</a> · <a href="samples/sample-quote.pdf" target="_blank" rel="noopener">quote</a> · <a href="samples/sample-certificate.pdf" target="_blank" rel="noopener">certificate</a></p>
 
     <!-- Sign In -->
     <div class="auth-card" id="authSignIn">
@@ -1844,6 +1845,14 @@
 
     <div class="transcript-done" id="transcriptDone" hidden><div class="transcript-done-label">Filled in</div><div class="transcript-done-text"></div></div>
     <div class="transcript-box" id="transcriptBox" contenteditable="true" onfocus="rememberTranscriptAtFocus(this); clearTranscriptPlaceholderIfNeeded(this)" onblur="learnFromTranscriptEdit()" oninput="onTranscriptEdited(this)" onpaste="onTranscriptPaste(event)">Tap the mic and start speaking, or tap here to type instead.</div>
+
+    <!-- Ready-made sentences for when speaking isn't practical (a noisy roof
+         void). A tap adds the sentence to the note; Extract reads it like
+         dictation. See QUICK PHRASES in js/app.js. -->
+    <details class="quick-phrases" id="quickPhrases">
+      <summary>Quick phrases (when you can't talk)</summary>
+      <div id="quickPhrasesList"></div>
+    </details>
 
 
     <div class="low-confidence-warning" id="lowConfidenceWarning">

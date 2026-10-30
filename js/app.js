@@ -3259,6 +3259,60 @@ function onTranscriptEdited(el) {
   saveDraft();
 }
 
+// ── QUICK PHRASES ────────────────────────────────────────────────────────
+// A short, curated set of sentences to tap in when speaking isn't practical.
+// They are worded the way an inspector would say them, so Extract reads them
+// like dictation and nothing else in the chain changes. Keep them free of
+// severity words, species risk and structural verdicts.
+const QUICK_PHRASES = [
+  { group: 'Roof void', phrases: [
+    'Roof void inspected, no termite activity or damage seen in the roof void.',
+    'Roof void inspection limited by insulation.',
+    'Roof void inspection limited by low clearance at the eaves.',
+    'Sarking prevented a full inspection of the roof timbers.',
+    'No roof void access hatch found.',
+  ]},
+  { group: 'Subfloor', phrases: [
+    'Subfloor inspected, no live termites, workings or damage seen.',
+    'Subfloor inspection limited by low clearance in parts.',
+    'Ant caps missing or damaged on some piers.',
+    'Subfloor ventilation is poor.',
+  ]},
+  { group: 'Outside', phrases: [
+    'Garden beds built up against the walls above the slab edge.',
+    'Slab edge covered and unable to be inspected.',
+    'Weep holes covered by soil or paving.',
+    'Timber in contact with the ground.',
+  ]},
+  { group: 'Inside', phrases: [
+    'Interior inspected, no termite activity or damage seen.',
+    'Furniture and floor coverings limited the interior inspection.',
+    'Moisture meter readings normal throughout.',
+  ]},
+];
+
+function renderQuickPhrases() {
+  const list = document.getElementById('quickPhrasesList');
+  if (!list || list.childElementCount) return;
+  list.innerHTML = QUICK_PHRASES.map(g => `
+    <div class="quick-phrases-group">${g.group}</div>
+    <div class="quick-phrases-row">${g.phrases.map(p =>
+      `<button type="button" class="quick-phrase" onclick="addQuickPhrase(this)">${p}</button>`).join('')}</div>`).join('');
+}
+
+function addQuickPhrase(btn) {
+  const box = document.getElementById('transcriptBox');
+  if (!box) return;
+  const text = btn.textContent.trim();
+  const before = box.classList.contains('active') ? (currentTranscript || '').trim() : '';
+  box.textContent = before ? before + ' ' + text : text;
+  onTranscriptEdited(box);
+  btn.classList.add('added');
+  setTimeout(() => btn.classList.remove('added'), 900);
+}
+
+document.addEventListener('DOMContentLoaded', renderQuickPhrases);
+
 function usePrompt(el) {
   // Make sure the popover is in default (extraction) mode, not notes-dictation mode
   if (activeNotesTargetKey) resetVoicePopoverToDefault();

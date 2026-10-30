@@ -1879,6 +1879,19 @@ body.pocket-lock .voice-btn { user-select: none; -webkit-user-select: none; -web
 
 .transcript-box.active { border-color: var(--accent); color: var(--text); }
 
+/* Quick phrases: tap a ready-made sentence into the note. */
+.quick-phrases { margin-top: 8px; font-size: 13px; }
+.quick-phrases summary { cursor: pointer; color: var(--text2); min-height: 44px; display: flex; align-items: center; }
+.quick-phrases-group { margin: 6px 0 4px; font-size: 12px; font-weight: 600; color: var(--text2); }
+.quick-phrases-row { display: flex; flex-direction: column; gap: 6px; }
+.quick-phrase {
+  text-align: left; min-height: 44px; padding: 8px 12px;
+  background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+  font: inherit; cursor: pointer;
+}
+.quick-phrase.added { border-color: var(--accent); }
+
 /* Notes already sent to the report: kept to re-read, not editable. */
 .transcript-done {
   margin-bottom: 8px;

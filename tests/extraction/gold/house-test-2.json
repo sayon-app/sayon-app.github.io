@@ -381,6 +381,7 @@
           "subfloor"
         ],
         [
+          "stored items",
           "stored articles"
         ],
         [
@@ -397,7 +398,7 @@
         ]
       ],
       "weight": 1,
-      "why": "uses the reason words the app ticks: 'Subfloor: stored articles', 'Roof void: low clearance', 'Interior: furniture'"
+      "why": "uses the reason words the app ticks: 'Subfloor: Stored items', 'Roof void: Low clearance', 'Interior: Furniture or fittings' (the older 'stored articles' also passes)"
     },
     {
       "id": "high-risk-back-subfloor",

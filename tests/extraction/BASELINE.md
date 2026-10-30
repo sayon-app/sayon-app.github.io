@@ -68,3 +68,22 @@ Most weight-3 failures are where the keys depart on purpose from the literal pro
 | rambling-nest | 88.9% (3, 3, 3) | 100% (0, 0, 0) |
 
 Pass bar (every weight-3 check in 3 of 3 runs on house test 1 and the five written cases; no case's mean below its baseline): met. Every answer was valid JSON. No key was changed to make a run pass; the only key edits after drafting were made before any run (`risk-low-or-medium` on `slab-barrier` and `borers-rot` also accepts empty, because the inspector didn't state a risk; `no-hindered-areas` on `slab-barrier` lowered to weight 2; the "east" substring checks on `rambling-nest` narrowed to "eastern"/"east side" so "least" can't trip them).
+
+## 2026-10-30: first run on the real API
+
+Runner: `run-api.mjs` against `claude-sonnet-5` at effort medium (exactly what the app sends), 2 runs per case, all 14 cases. Tags `base`, `v1`, `v2` in `out/`.
+
+**Answer keys brought up to date first.** Several keys predated prompt changes the owner had already made, so they failed answers that follow today's prompt:
+- "No System Found" (2026-10-27): `no-existing-system` / `existing-system-empty` / `no-system` on borers-rot, car-test-clean, car-test-full, house-test-1, phone-full-job and skirting-active now accept "No System Found" or empty, like the newer house-test-2 and rambling-nest keys already did.
+- What / Where split (2026-10-25): `decay-details` (borers-rot) and `delig-where` (fence-workings) now read `decayWhere` / `delignificationWhere`; `previous-treatment-details` (drainage-treatment) is split into a details check and a `previousTreatmentWhere` check.
+- `moisture-readings-empty` (subfloor-followup) accepts "NO", which the prompt asks for when a reading is called normal.
+- `restricted-access-matcher-words` (house-test-2) accepts the current "Stored items" label as well as the old "stored articles".
+
+| Prompt | Mean, all 14 cases | Checks failing at least once |
+|---|---|---|
+| Before (old keys) | 97.1% (2024/2084) | 18, mostly the stale keys above |
+| Before (updated keys) | 99.3% (2070/2084) | timber-soil-no (borers-rot), risk-high (house-test-1, null once), restricted-access ×3 (house-test-2, skirting-active), no-zone-75 (house-test-2), leak-location (phone-full-job) |
+| v1: five prompt rules | 99.8% (2080/2084) | restricted-access-matcher-words (house-test-2, the stale label), interior (locked-bedroom) |
+| v2: v1 + locked room makes interior PARTIAL | 99.7% (1975/1981) | one-offs: soft-landscaping (car-test-full), restricted-access (house-test-2), roofvoid (locked-bedroom) |
+
+v2 is missing skirting-active run 2: the API credit ran out mid-round. No weight-3 check failed in v1 or v2. The v2 one-offs each passed in the other run and in v1, so they look like run-to-run noise, not a rule the prompt gets wrong.

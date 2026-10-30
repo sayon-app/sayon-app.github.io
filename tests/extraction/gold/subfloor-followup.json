@@ -243,10 +243,11 @@
     },
     {
       "id": "moisture-readings-empty",
-      "kind": "absent",
+      "kind": "equals",
       "path": "moistureReadings",
+      "values": ["NO", null],
       "weight": 1,
-      "why": "empty preferred since nothing elevated was said"
+      "why": "the reading was called normal: NO (as the prompt asks) or empty, never YES"
     },
     {
       "id": "meter-rear-bearer-18",

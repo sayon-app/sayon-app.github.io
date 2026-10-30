@@ -710,10 +710,11 @@
     },
     {
       "id": "existing-system-empty",
-      "kind": "absent",
+      "kind": "equals",
       "path": "existingSystem",
+      "values": ["No System Found", null],
       "weight": 3,
-      "why": "'No active termite management system to be found': leave it empty, never 'None' or a brand"
+      "why": "'No active termite management system to be found': \"No System Found\" (null also passes), never 'None' or a brand"
     },
     {
       "id": "treatment-recommended-yes",

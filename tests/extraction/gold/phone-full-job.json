@@ -201,8 +201,9 @@
     },
     {
       "id": "no-system",
-      "kind": "absent",
+      "kind": "equals",
       "path": "existingSystem",
+      "values": ["No System Found", null],
       "weight": 1,
       "why": "no barrier found"
     },

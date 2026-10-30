@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Sign your inspection agreement</title>
+<!-- The client's page for signing a pre-inspection agreement sent from the
+     app (supabase/remote-signing.sql). No account: the link's id is the key,
+     and the page only calls rpc/get_sign_request and rpc/submit_sign_request. -->
+<style>
+  :root {
+    --bg: #f4f6f8; --card: #ffffff; --ink: #0d1117; --ink2: #3d4a57; --ink3: #5d6b78;
+    --line: #dde3e9; --accent: #0f766e; --accent-light: #e6f6f4; --error: #b42318;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.55; font-size: 16px; }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 24px 16px 64px; }
+  .head { margin-bottom: 18px; }
+  .company { font-size: 14px; font-weight: 700; color: var(--accent); letter-spacing: 0.02em; }
+  h1 { font-size: 24px; line-height: 1.25; margin: 4px 0 6px; }
+  .meta { color: var(--ink2); font-size: 15px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+  .clause { position: relative; padding-left: 34px; margin: 0 0 16px; }
+  .clause-num { position: absolute; left: 0; top: 1px; width: 24px; height: 22px; border-radius: 6px; background: var(--accent-light); color: var(--accent); font-size: 13px; font-weight: 700; display: grid; place-items: center; }
+  .clause h2 { font-size: 16px; margin-bottom: 4px; }
+  .clause p, .intro { color: var(--ink2); font-size: 15px; margin-bottom: 6px; }
+  .close { font-weight: 600; background: var(--accent-light); border-left: 3px solid var(--accent); padding: 12px 14px; border-radius: 8px; margin-top: 8px; }
+  label.field { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  input[type=text] { width: 100%; font: inherit; padding: 12px; min-height: 48px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 16px; }
+  .check { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 16px; font-size: 15px; color: var(--ink2); }
+  .check input { width: 22px; height: 22px; margin-top: 1px; flex: none; }
+  .pad { position: relative; border: 1.5px dashed var(--line); border-radius: 10px; background: #fff; touch-action: none; }
+  .pad canvas { display: block; width: 100%; height: 160px; }
+  .pad span { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink3); pointer-events: none; }
+  .clear { background: none; border: 0; color: var(--accent); font: inherit; font-size: 14px; padding: 12px 0; min-height: 44px; cursor: pointer; }
+  .btn { width: 100%; min-height: 52px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font: inherit; font-weight: 700; font-size: 17px; cursor: pointer; margin-top: 4px; }
+  .btn:disabled { opacity: 0.45; cursor: default; }
+  .err { color: var(--error); font-size: 14px; margin-top: 10px; min-height: 1em; }
+  .state { text-align: center; padding: 40px 20px; }
+  .state h1 { margin-bottom: 8px; }
+  .state p { color: var(--ink2); }
+  .tick { width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; margin: 0 auto 16px; font-size: 28px; }
+  .foot { text-align: center; color: var(--ink3); font-size: 13px; margin-top: 24px; }
+  .foot a { color: var(--ink3); }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="card state"><p>Loading your agreement…</p></div>
+</div>
+<script>
+const SUPABASE_URL = 'https://bmjgvogxutwyeklxxeao.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtamd2b2d4dXR3eWVrbHh4ZWFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0NTczMTEsImV4cCI6MjEwNTAzMzMxMX0.Ov8xGhDMuAbUcWy7zbCiS01D6QCrlhDYxza3Fzls83U';
+const app = document.getElementById('app');
+const id = new URLSearchParams(location.search).get('id') || '';
+
+function rpc(name, body) {
+  return fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    body: JSON.stringify(body),
+  }).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+}
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+function showState(title, text, done) {
+  app.textContent = '';
+  const c = el('div', 'card state');
+  if (done) c.appendChild(el('div', 'tick', '✓'));
+  c.append(el('h1', null, title), el('p', null, text));
+  app.appendChild(c);
+}
+
+function formatDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso.length === 10 ? iso + 'T00:00:00' : iso);
+  return isNaN(d) ? iso : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+// Same blocks as the app: "N. Heading" clauses, other paragraphs plain.
+function renderText(parent, text) {
+  let sawClause = false;
+  String(text || '').split(/\n\s*\n/).forEach(block => {
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return;
+    const m = lines[0].match(/^(\d+)\.\s+(.+)$/);
+    if (m) {
+      sawClause = true;
+      const sec = el('section', 'clause');
+      sec.append(el('span', 'clause-num', m[1]), el('h2', null, m[2]));
+      lines.slice(1).forEach(l => sec.appendChild(el('p', null, l)));
+      parent.appendChild(sec);
+    } else {
+      lines.forEach(l => parent.appendChild(el('p', sawClause ? 'close' : 'intro', l)));
+    }
+  });
+}
+
+function makePad(canvas, hint, onChange) {
+  const ctx = canvas.getContext('2d');
+  let drawing = false, last = null, ink = 0;
+  function size() {
+    const r = canvas.getBoundingClientRect(), s = window.devicePixelRatio || 1;
+    canvas.width = r.width * s; canvas.height = r.height * s;
+    ctx.setTransform(s, 0, 0, s, 0, 0);
+    ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0c121c';
+  }
+  const pos = e => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  canvas.addEventListener('pointerdown', e => { drawing = true; last = pos(e); canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', e => {
+    if (!drawing) return;
+    const p = pos(e);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    ink += Math.hypot(p.x - last.x, p.y - last.y); last = p;
+    hint.style.display = 'none';
+  });
+  const end = () => { if (drawing) { drawing = false; onChange(); } };
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
+  size();
+  return {
+    // A tap or a dot doesn't count as a signature.
+    signed: () => ink >= 24,
+    clear: () => { ctx.clearRect(0, 0, canvas.width, canvas.height); ink = 0; hint.style.display = ''; onChange(); },
+    png: () => canvas.toDataURL('image/png'),
+  };
+}
+
+function renderForm(doc) {
+  app.textContent = '';
+  const head = el('div', 'head');
+  if (doc.company) head.appendChild(el('div', 'company', doc.company));
+  head.appendChild(el('h1', null, 'Pre-inspection agreement'));
+  const meta = [doc.address, doc.inspectionDate && `Inspection ${formatDate(doc.inspectionDate)}`].filter(Boolean).join(' · ');
+  if (meta) head.appendChild(el('p', 'meta', meta));
+  app.appendChild(head);
+
+  const textCard = el('div', 'card');
+  renderText(textCard, doc.text);
+  app.appendChild(textCard);
+
+  const form = el('div', 'card');
+  const nameLabel = el('label', 'field', 'Your full name');
+  nameLabel.htmlFor = 'name';
+  const name = el('input');
+  name.type = 'text'; name.id = 'name'; name.autocomplete = 'name'; name.value = doc.client || '';
+  const check = el('label', 'check');
+  const agree = el('input'); agree.type = 'checkbox';
+  check.append(agree, el('span', null, 'I have read this agreement and agree to it.'));
+  const padLabel = el('div', 'field', 'Sign here');
+  padLabel.style.cssText = 'font-size:14px;font-weight:600;margin-bottom:6px';
+  const padWrap = el('div', 'pad');
+  const canvas = el('canvas'); const hint = el('span', null, 'Sign with your finger');
+  padWrap.append(canvas, hint);
+  const clear = el('button', 'clear', 'Clear signature'); clear.type = 'button';
+  const btn = el('button', 'btn', 'Sign agreement'); btn.type = 'button'; btn.disabled = true;
+  const err = el('p', 'err');
+  form.append(nameLabel, name, check, padLabel, padWrap, clear, btn, err);
+  app.appendChild(form);
+
+  const update = () => { btn.disabled = !(name.value.trim() && agree.checked && pad.signed()); };
+  const pad = makePad(canvas, hint, update);
+  name.addEventListener('input', update);
+  agree.addEventListener('change', update);
+  clear.addEventListener('click', () => pad.clear());
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = 'Signing…'; err.textContent = '';
+    try {
+      const res = await rpc('submit_sign_request', { p_id: id, p_name: name.value.trim(), p_signature: pad.png(),
+        p_meta: { userAgent: navigator.userAgent.slice(0, 300), tz: Intl.DateTimeFormat().resolvedOptions().timeZone || '' } });
+      if (res === 'signed' || res === 'already_signed') {
+        showState('Signed, thank you', `${doc.company || 'Your inspector'} has your signed agreement. You can close this page.`, true);
+      } else if (res === 'expired') {
+        showState('This link has expired', `Please ask ${doc.company || 'your inspector'} to send a new one.`);
+      } else if (res === 'cancelled') {
+        showState('This agreement was withdrawn', `Please contact ${doc.company || 'your inspector'}.`);
+      } else {
+        throw new Error(res);
+      }
+    } catch (e) {
+      err.textContent = 'That didn’t go through. Check your connection and try again.';
+      btn.textContent = 'Sign agreement'; update();
+    }
+  });
+}
+
+(async () => {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) { showState('This link isn’t complete', 'Please open the full link you were sent.'); return; }
+  try {
+    const r = await rpc('get_sign_request', { p_id: id });
+    if (!r) showState('Agreement not found', 'Please open the full link you were sent, or ask your inspector for a new one.');
+    else if (r.status === 'signed') showState('Already signed', `Signed by ${r.signer_name} on ${formatDate(r.signed_at)}. There’s nothing more to do.`, true);
+    else if (r.status === 'expired') showState('This link has expired', `Please ask ${r.doc.company || 'your inspector'} to send a new one.`);
+    else if (r.status === 'cancelled') showState('This agreement was withdrawn', `Please contact ${r.doc.company || 'your inspector'}.`);
+    else renderForm(r.doc || {});
+  } catch (e) {
+    showState('Couldn’t load the agreement', 'Check your connection and open the link again.');
+  }
+})();
+</script>
+<div class="foot">Sent with SAYON · <a href="privacy.html">Privacy</a></div>
+</body>
+</html>

@@ -2443,7 +2443,8 @@ function correctKnownMishearings(text) {
   text = text.replace(/\b(clearance\D{0,20}?\d+)\s*(?:ml|mils?)\b/gi, '$1 mm');
   // Whisper writes a cough as words.
   text = text.replace(/(?:^|\s)(?:\(?cough\)?[.,]?\s*)+(?=\s|$)/gi, ' ').replace(/\s{2,}/g, ' ').trim();
-  return text;
+  // And the fixes this business has made twice (see LEARNED CORRECTIONS).
+  return applyLearnedWordFixes(text);
 }
 
 // Brand/product names and species genera, sent to the transcription
@@ -2683,11 +2684,13 @@ function stopAudioCapture() {
 // Keep it under about 650 characters: Whisper only reads the last ~220
 // tokens of a prompt, and the words just spoken are added after this.
 function buildTranscriptionVocabHint() {
+  // Plus the words this business has corrected to (LEARNED CORRECTIONS).
+  const learned = learnedHintWords(100);
   return 'Timber pest inspection notes, Australia. Termites, subfloor, bearers and joists, brick piers ant capped, ' +
     'ant capping, roof void, insulation, weep holes clear, slab edge, garden beds, skirting boards, porch post, ' +
     'rear deck, stored items, exterior, shrubbery. Mud leads, borer holes, fresh frass, moisture reading 28%, ' +
     'clearance 400 mm, durable notice, termite management system, soil barrier, invasive inspection. ' +
-    TRANSCRIPTION_VOCAB.join(', ') + '.';
+    TRANSCRIPTION_VOCAB.join(', ') + '.' + (learned ? ' ' + learned + '.' : '');
 }
 
 // Uploads the captured audio to the Worker's transcription endpoint and, on
@@ -3498,6 +3501,7 @@ async function callExtraction(text) {
   const noSignal = (msg) => Object.assign(new Error(msg), { noSignal: true });
   if (!navigator.onLine) throw noSignal('no signal');
 
+  const learned = learnedPromptBlock();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), EXTRACTION_TIMEOUT_MS);
   let res, rawBody;
@@ -3517,7 +3521,10 @@ async function callExtraction(text) {
         // The instructions are the same for every note, so they're cached
         // for an hour: after the first note, reading them costs a tenth.
         // The other prompts are too short for the model to cache.
-        system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral', ttl: '1h' } }],
+        // The business's own corrections follow, cached too: they change
+        // only when the inspector fixes something.
+        system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral', ttl: '1h' } }]
+          .concat(learned ? [{ type: 'text', text: learned, cache_control: { type: 'ephemeral', ttl: '1h' } }] : []),
         messages: [{ role: 'user', content: text }]
       }),
       signal: controller.signal,
@@ -3566,6 +3573,299 @@ async function callExtraction(text) {
     throw Object.assign(new Error('the answer was not a JSON object'), { badAnswer: true });
   }
   return parsed;
+}
+
+// ── LEARNED CORRECTIONS ───────────────────────────────────────────────────
+// SAYON learns from what the inspector fixes, per business:
+//   - a field the AI filled and the inspector then changed is kept with the
+//     words that were said, and later notes see it as an example;
+//   - a few words changed in the transcript box before filling ("peers are
+//     in Cunt" to "piers ant capped") are kept as a word fix. The AI and
+//     Whisper see it at once, and once the same fix has been made twice it
+//     is made in the transcript box automatically.
+// Stored as { fields: [{ id, key, label, said, ai, fixed, at }],
+// words: [{ id, heard, meant, count, at }], removed: [ids], updatedAt },
+// per business, and synced in businesses.settings.learned (business-sync.js).
+// The inspector sees and can remove them in Settings > Voice.
+const LEARNED_MAX_FIELDS = 30;
+const LEARNED_MAX_WORDS = 40;
+const LEARNED_AUTO_FIX_COUNT = 2;
+const LEARNED_PROMPT_MAX_CHARS = 8000;
+
+function learnedStorageKey() {
+  return (authBusiness && authBusiness.id) ? `korva_learned_${authBusiness.id}` : 'korva_learned';
+}
+
+function getLearned() {
+  let l = null;
+  try { l = JSON.parse(localStorage.getItem(learnedStorageKey()) || 'null'); } catch (e) { /* unreadable: start again */ }
+  if (!l || typeof l !== 'object') l = {};
+  return {
+    fields: Array.isArray(l.fields) ? l.fields : [],
+    words: Array.isArray(l.words) ? l.words : [],
+    removed: Array.isArray(l.removed) ? l.removed : [],
+    updatedAt: l.updatedAt || 0,
+  };
+}
+
+function storeLearned(l, { sync = true } = {}) {
+  l.fields = l.fields.slice(-LEARNED_MAX_FIELDS);
+  // The words fixed most often are kept, then the newest.
+  l.words = l.words.sort((a, b) => (b.count - a.count) || (b.at - a.at)).slice(0, LEARNED_MAX_WORDS);
+  l.removed = l.removed.slice(-200);
+  if (sync) l.updatedAt = Date.now();
+  try { localStorage.setItem(learnedStorageKey(), JSON.stringify(l)); } catch (e) { return; }
+  if (sync && typeof scheduleBusinessSync === 'function') scheduleBusinessSync();
+  renderLearnedList();
+}
+
+const learnedId = () => 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const learnedNorm = v => String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' ');
+const learnedClip = (v, n) => { const t = String(v || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
+
+// The sentence of a note that a field's value came from: the one sharing
+// the most words with the value and the field's name. Notes from the phone's
+// own speech have no full stops, so a long run is cut into 20-word pieces.
+function saidAbout(transcript, words) {
+  const stem = w => w.replace(/s$/, '');
+  const want = new Set(keyWords(words).map(stem));
+  if (!want.size || !transcript) return '';
+  const parts = [];
+  String(transcript).split(/(?<=[.!?])\s+/).forEach(s => {
+    const w = s.split(/\s+/).filter(Boolean);
+    for (let i = 0; i < w.length; i += 20) parts.push(w.slice(i, i + 24).join(' '));
+  });
+  let best = '', score = 0;
+  parts.forEach(p => {
+    const n = keyWords(p).filter(w => want.has(stem(w))).length;
+    if (n > score) { score = n; best = p; }
+  });
+  return learnedClip(best, 200);
+}
+
+// A field's name as the inspector sees it; "What" under a side line reads
+// as "Wood Decay Fungi (Rot): What".
+function fieldLabelText(key) {
+  const el = document.getElementById('f-' + key);
+  const label = el && getFieldLabel(el);
+  if (!label) return key;
+  const field = el.closest('.field');
+  const pairHead = field && field.closest('.field-pair')?.querySelector(':scope > .field:first-child');
+  const lead = pairHead && pairHead !== field ? pairHead.querySelector('.field-label')?.textContent.trim() + ': ' : '';
+  return learnedClip(lead + label.textContent, 80);
+}
+
+// Called by populateFields() for each field a note filled, with what this
+// note gave it (a list-like field may also hold earlier notes' words).
+function rememberAiFill(key, val, transcript) {
+  if (!transcript) return;
+  if (!reportData.aiFilled || typeof reportData.aiFilled !== 'object') reportData.aiFilled = {};
+  const label = fieldLabelText(key);
+  reportData.aiFilled[key] = { v: String(val), said: saidAbout(transcript, label + ' ' + val) };
+}
+
+// Called by commitEdit() when the inspector sets or clears a field. Adding
+// to what the AI wrote isn't a correction; changing or removing it is. A
+// second edit of the same fill updates its correction, and putting the AI's
+// answer back removes it.
+function learnFieldCorrection(key, value) {
+  const fill = reportData.aiFilled && reportData.aiFilled[key];
+  if (!fill) return;
+  const ai = learnedNorm(fill.v), fixed = learnedNorm(value);
+  const l = getLearned();
+  const i = fill.cid ? l.fields.findIndex(f => f.id === fill.cid) : -1;
+  if (fixed === ai || (ai.length >= 12 && fixed.includes(ai))) {
+    if (i >= 0) { l.fields.splice(i, 1); delete fill.cid; storeLearned(l); }
+    return;
+  }
+  const entry = { id: fill.cid || learnedId(), key, label: fieldLabelText(key), said: fill.said || '', ai: learnedClip(fill.v, 160), fixed: fixed ? learnedClip(value, 160) : '', at: Date.now() };
+  if (i >= 0) l.fields[i] = entry;
+  else {
+    // The same fix made before is replaced by this one, not kept twice.
+    l.fields = l.fields.filter(f => !(f.key === key && learnedNorm(f.ai) === learnedNorm(entry.ai) && learnedNorm(f.fixed) === learnedNorm(entry.fixed)));
+    l.fields.push(entry);
+  }
+  fill.cid = entry.id;
+  storeLearned(l);
+}
+
+// Where two transcripts differ, word by word: [{ from: [words], to: [words],
+// before, after, toStart }] (toStart: the new words begin a sentence), from a longest-common-run match on the lowercased words.
+const diffWord = w => w.toLowerCase().replace(/[^a-z0-9%'-]+/g, '');
+function wordDiffHunks(a, b) {
+  const A = String(a).split(/\s+/).filter(w => diffWord(w)), B = String(b).split(/\s+/).filter(w => diffWord(w));
+  const x = A.map(diffWord), y = B.map(diffWord);
+  if (x.length * y.length > 1500000) return [];
+  const L = Array.from({ length: x.length + 1 }, () => new Uint16Array(y.length + 1));
+  for (let i = x.length - 1; i >= 0; i--) for (let j = y.length - 1; j >= 0; j--) {
+    L[i][j] = x[i] === y[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  }
+  const hunks = [];
+  let i = 0, j = 0, cur = null;
+  const close = () => { if (cur) { cur.after = x[i] || ''; cur.afterTo = y[j] || ''; hunks.push(cur); cur = null; } };
+  while (i < x.length || j < y.length) {
+    if (i < x.length && j < y.length && x[i] === y[j]) { close(); i++; j++; continue; }
+    if (!cur) cur = { from: [], to: [], before: x[i - 1] || '', toStart: j === 0 || /[.!?]$/.test(B[j - 1]) };
+    if (j < y.length && (i >= x.length || L[i][j + 1] >= L[i + 1][j])) cur.to.push(B[j++]);
+    else cur.from.push(A[i++]);
+  }
+  close();
+  return hunks;
+}
+
+// A word fix is a few misheard words swapped for a few others. A one-word
+// fix keeps the next word with it ("bearer holes" to "borer holes"), since
+// the word on its own is usually right. Numbers changed are facts
+// corrected, not words misheard, so they're skipped.
+function wordFixesFromEdit(heardText, typedText) {
+  const fixes = [];
+  wordDiffHunks(heardText, typedText).forEach(h => {
+    if (!h.from.length || !h.to.length || h.from.length > 5 || h.to.length > 6) return;
+    const from = h.from.map(diffWord), to = h.to.map(w => w.replace(/[.,;:!?]+$/, ''));
+    if (from.join(' ') === to.map(diffWord).join(' ')) return;
+    if (from.every(w => /^\d/.test(w)) || to.every(w => /^\d/.test(w))) return;
+    // A capital that only starts a sentence isn't part of the fix; a
+    // brand or genus keeps its own.
+    if (h.toStart && !TRANSCRIPTION_VOCAB.some(v => v.toLowerCase() === diffWord(to[0]))) to[0] = to[0][0].toLowerCase() + to[0].slice(1);
+    if (from.length === 1) {
+      if (h.after && h.after === h.afterTo) { from.push(h.after); to.push(h.after); }
+      else if (h.before) { from.unshift(h.before); to.unshift(h.before); }
+      else return;
+    }
+    fixes.push({ heard: from.join(' '), meant: to.join(' ') });
+  });
+  return fixes;
+}
+
+function learnWordFixes(fixes) {
+  if (!fixes.length) return;
+  const l = getLearned();
+  fixes.forEach(f => {
+    const have = l.words.find(w => w.heard === f.heard);
+    if (have && learnedNorm(have.meant) === learnedNorm(f.meant)) { have.count++; have.at = Date.now(); }
+    else if (have) Object.assign(have, { meant: f.meant, count: 1, at: Date.now() });
+    else l.words.push({ id: learnedId(), heard: f.heard, meant: f.meant, count: 1, at: Date.now() });
+  });
+  storeLearned(l);
+}
+
+// The transcript box as it was when the inspector tapped into it. What they
+// changed is learned when they leave it, or when the note is filled.
+let transcriptAtFocus = null;
+function rememberTranscriptAtFocus(el) {
+  transcriptAtFocus = el.classList.contains('active') ? el.textContent : null;
+}
+function learnFromTranscriptEdit() {
+  if (transcriptAtFocus === null) return;
+  const heard = transcriptAtFocus;
+  transcriptAtFocus = null;
+  if (heard.trim() && currentTranscript.trim() && heard !== currentTranscript) learnWordFixes(wordFixesFromEdit(heard, currentTranscript));
+}
+
+// Word fixes made twice are made in every transcript, the way
+// correctKnownMishearings() makes its own.
+function applyLearnedWordFixes(text) {
+  if (!text) return text;
+  let words;
+  try { words = getLearned().words.filter(w => w.count >= LEARNED_AUTO_FIX_COUNT); } catch (e) { return text; }
+  words.forEach(w => {
+    const parts = String(w.heard).split(' ').filter(Boolean).map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    if (!parts.length) return;
+    const re = new RegExp('(^|[^a-z0-9])(' + parts.join('[\\s,.]+') + ')(?![a-z0-9])', 'gi');
+    text = text.replace(re, (m, pre, hit, at, all) => {
+      const start = /^\s*$|[.!?]\s+$/.test(all.slice(0, at + pre.length));
+      return pre + (start ? w.meant[0].toUpperCase() + w.meant.slice(1) : w.meant);
+    });
+  });
+  return text;
+}
+
+// The business's corrections, as a second block of instructions for the
+// extraction. Newest last, and cut to a size that keeps every call cheap.
+function learnedPromptBlock() {
+  const l = getLearned();
+  if (!l.fields.length && !l.words.length) return '';
+  const lines = [];
+  if (l.words.length) {
+    lines.push('Words the phone misheard for this business (heard → meant):');
+    l.words.forEach(w => lines.push(`- "${w.heard}" → "${w.meant}"`));
+  }
+  if (l.fields.length) {
+    lines.push('Fields the inspector corrected after you filled them (the words said, what you filled, what it should have been):');
+    l.fields.slice().reverse().forEach(f => {
+      lines.push(`- ${f.label}.${f.said ? ` Said: "${f.said}".` : ''} You filled: "${f.ai}". Corrected to: ${f.fixed ? `"${f.fixed}"` : 'left blank'}.`);
+    });
+  }
+  let body = '';
+  for (const line of lines) {
+    if (body.length + line.length + 1 > LEARNED_PROMPT_MAX_CHARS) break;
+    body += line + '\n';
+  }
+  return 'THIS BUSINESS\'S OWN CORRECTIONS\nThe inspectors at this business fixed these after earlier notes. Learn from them: they show the words the phone mishears for their voices and how they want things recorded. When this note has the same words in the same kind of sentence, follow the correction. They come from earlier jobs: take nothing from them as a fact about this note.\n' + body.trim();
+}
+
+// The words the inspector corrected to, for Whisper's word hint.
+function learnedHintWords(maxChars) {
+  let out = '';
+  getLearned().words.forEach(w => {
+    const add = (out ? ', ' : '') + w.meant;
+    if (out.length + add.length <= maxChars) out += add;
+  });
+  return out;
+}
+
+// Settings > Voice: what SAYON has learned, each with a Remove.
+function renderLearnedList() {
+  const list = document.getElementById('learnedList');
+  if (!list) return;
+  const l = getLearned();
+  const forget = document.getElementById('learnedForgetAll');
+  if (forget) forget.hidden = !(l.fields.length || l.words.length);
+  if (!l.fields.length && !l.words.length) {
+    list.innerHTML = '<div class="learned-empty">Nothing yet. Fix a word in the transcript box, or a box the AI filled, and it shows here.</div>';
+    return;
+  }
+  const row = (id, text, note) => `<div class="learned-row"><div class="learned-text">${text}${note ? `<span class="learned-note">${note}</span>` : ''}</div><button type="button" class="link-btn learned-remove" onclick="forgetLearned('${id}')" aria-label="Remove">Remove</button></div>`;
+  list.innerHTML =
+    l.words.map(w => row(w.id, `"${escapeHtml(w.heard)}" is "${escapeHtml(w.meant)}"`,
+      w.count >= LEARNED_AUTO_FIX_COUNT ? 'Fixed automatically' : 'Fix it once more and it’s fixed automatically')).join('') +
+    l.fields.slice().reverse().map(f => row(f.id, `${escapeHtml(f.label)}: "${escapeHtml(f.ai)}" is ${f.fixed ? `"${escapeHtml(f.fixed)}"` : 'left blank'}`,
+      f.said ? `When you said "${escapeHtml(learnedClip(f.said, 90))}"` : '')).join('');
+}
+
+function forgetLearned(id) {
+  const l = getLearned();
+  l.fields = l.fields.filter(f => f.id !== id);
+  l.words = l.words.filter(w => w.id !== id);
+  l.removed.push(id);
+  storeLearned(l);
+}
+
+function forgetAllLearned() {
+  if (!confirm('Forget everything SAYON has learned from your corrections?')) return;
+  const l = getLearned();
+  l.removed.push(...l.fields.map(f => f.id), ...l.words.map(w => w.id));
+  l.fields = []; l.words = [];
+  storeLearned(l);
+  showToast('Forgotten', 'info');
+}
+
+// Two copies of what was learned (the account's and this phone's) put
+// together: every correction either has, less any removed on either.
+function mergeLearned(a, b) {
+  const removed = [...new Set([...(a.removed || []), ...(b.removed || [])])];
+  const gone = new Set(removed);
+  const byId = (lists, pick) => {
+    const m = new Map();
+    lists.flat().forEach(e => { if (e && e.id && !gone.has(e.id)) { const h = m.get(e.id); m.set(e.id, h ? pick(h, e) : e); } });
+    return [...m.values()];
+  };
+  return {
+    fields: byId([a.fields || [], b.fields || []], (x, y) => (y.at > x.at ? y : x)).sort((x, y) => x.at - y.at),
+    words: byId([a.words || [], b.words || []], (x, y) => ((y.count > x.count || (y.count === x.count && y.at > x.at)) ? y : x)),
+    removed,
+    updatedAt: Math.max(a.updatedAt || 0, b.updatedAt || 0),
+  };
 }
 
 // ── TEST MODE ─────────────────────────────────────────────────────────────
@@ -3704,6 +4004,7 @@ async function processTranscript(opts) {
 async function runFill({ whileRecording = false } = {}) {
   // The last phrase may still be with Whisper.
   if (!whileRecording) await whisperSettled();
+  learnFromTranscriptEdit();
   const note = currentTranscript;
   if (!note.trim()) return false;
   setAI('thinking', 'Filling in the report from your note...');
@@ -4536,6 +4837,7 @@ function populateFields(data, transcript) {
     setTimeout(() => {
       if (reportData !== target) return;
       let val = typeof rawVal === 'string' ? rawVal.trim() : String(rawVal);
+      const own = val; // this note's words, before any are added to earlier ones
       if (key === 'hinderedAreas' && !val) {
         // "Nothing was in the way": No, unless an area says otherwise.
         setHinderedAccess(false); return;
@@ -4558,6 +4860,7 @@ function populateFields(data, transcript) {
         else if (!val.toLowerCase().includes(have)) val = prev.replace(/[.;,\s]+$/, '') + '; ' + val;
       }
       reportData[key] = val;
+      rememberAiFill(key, own, transcript);
       // FIX: apply the same cross-field cascade manual edits get (reveal/
       // hide dependent fields, clear fields that are no longer valid) - see
       // applyFieldCascade's comment for why this matters here specifically.
@@ -6165,6 +6468,7 @@ function commitEdit(el, key, value) {
     activeEditEl = null;
     if (isBlankValue(prev)) return;
     reportData[key] = null;
+    learnFieldCorrection(key, '');
     updateProgress();
     checkAsbestosFlag();
     checkSystemVerify();
@@ -6172,6 +6476,7 @@ function commitEdit(el, key, value) {
     showToast('Cleared', 'info', { label: 'Undo', run: () => {
       if (!isBlankValue(reportData[key])) return;
       reportData[key] = prev;
+      learnFieldCorrection(key, prev);
       renderField(el, key, prev);
       updateProgress();
       checkAsbestosFlag();
@@ -6182,6 +6487,7 @@ function commitEdit(el, key, value) {
   }
 
   reportData[key] = value.trim();
+  learnFieldCorrection(key, value.trim());
   if (key === 'treatmentRecommended') reportData.treatmentAutoSet = false;
   applyFieldCascade(key, value.trim(), el);
 
@@ -7976,7 +8282,7 @@ function showMenuPage(panelId) {
   // The plan can change in Stripe or with a different sign-in, so Billing
   // always shows it fresh.
   if (panelId === 'billingPanel') loadBillingStatus();
-  if (panelId === 'settingsPanel') restoreTestModeSetting();
+  if (panelId === 'settingsPanel') { restoreTestModeSetting(); renderLearnedList(); }
   if (panel) track('screen_viewed', { screen: 'menu_' + panelId });
 }
 

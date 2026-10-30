@@ -3,10 +3,13 @@
 // logo) and the quote price list belong to the business, not the phone.
 // They're kept in businesses.settings so a new phone, or a technician already
 // on the business, starts with them:
-//   settings = { company: {..., updatedAt}, prices: {..., __updatedAt} }
+//   settings = { company: {..., updatedAt}, prices: {..., __updatedAt},
+//                learned: { fields, words, removed, updatedAt } }
 // The owner's phone writes them; the team only reads (see
 // supabase/business-settings.sql). Company details and prices each go by
-// their own time, newest wins. Anything else already in settings (such as
+// their own time, newest wins. What SAYON learned from corrections (see
+// LEARNED CORRECTIONS in app.js) is put together from both copies instead,
+// so a correction made on either side is kept. Anything else already in settings (such as
 // the old invoice counter, invoiceSeq) is kept as it is.
 const BUSINESS_SYNC_DELAY_MS = 1500;
 let businessSyncTimer = null;
@@ -23,6 +26,7 @@ function localBusinessSettings() {
   return {
     company: getCompanyDetails(),
     prices: quotePriceMemory(),
+    learned: getLearned(),
   };
 }
 
@@ -38,6 +42,7 @@ function applyCloudBusinessSettings() {
     if (hasContent(cloud.prices) && (cloud.prices.__updatedAt || 0) > (local.prices.__updatedAt || 0)) {
       localStorage.setItem(quotePricesStorageKey(), JSON.stringify(takeCloudCopy(cloud.prices, local.prices, '__updatedAt')));
     }
+    if (cloud.learned && typeof cloud.learned === 'object') storeLearned(mergeLearned(cloud.learned, local.learned), { sync: false });
   } catch (e) { console.warn('Could not apply business settings:', e); }
   // Settings made on this phone before syncing existed go up now.
   if (isBusinessOwner() && localSettingsAhead(cloud)) scheduleBusinessSync();
@@ -62,7 +67,19 @@ function localSettingsAhead(cloud) {
   const local = localBusinessSettings();
   const newer = (mine, theirs, key) => hasContent(mine) && (!hasContent(theirs) || (mine[key] || 0) > (theirs[key] || 0));
   return newer(local.company, cloud.company, 'updatedAt') ||
-    newer(local.prices, cloud.prices, '__updatedAt');
+    newer(local.prices, cloud.prices, '__updatedAt') ||
+    learnedAhead(local.learned, cloud.learned);
+}
+
+// This phone has a correction (or a removal) the account copy doesn't.
+function learnedAhead(mine, theirs) {
+  const sig = l => JSON.stringify([
+    ...((l && l.fields) || []).map(f => f.id + '|' + f.fixed),
+    ...((l && l.words) || []).map(w => w.id + '|' + w.meant + '|' + w.count),
+    ...((l && l.removed) || []),
+  ].sort());
+  const has = mine.fields.length || mine.words.length || mine.removed.length;
+  return !!has && sig(mine) !== sig(theirs);
 }
 
 // Called by everything that changes a synced setting.

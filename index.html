@@ -1018,6 +1018,13 @@
             </div>
             <button type="button" class="toggle-switch" id="toggleAudioCapture" onclick="toggleAudioCaptureSetting()" aria-label="Second transcription (trial)"></button>
           </div>
+          <div class="settings-row">
+            <div class="settings-row-text">
+              <div class="settings-row-title">What SAYON has learned</div>
+              <div class="settings-row-desc">When you fix a word in the transcript box, or change a box the AI filled, SAYON remembers it for your next notes. Shared with everyone in your business. Remove anything it got wrong. <button type="button" class="link-btn settings-inline-link" id="learnedForgetAll" onclick="forgetAllLearned()" hidden>Forget all</button></div>
+              <div class="learned-list" id="learnedList"></div>
+            </div>
+          </div>
           <div class="settings-group-title">Your data</div>
           <div class="settings-row">
             <div class="settings-row-text">
@@ -1837,7 +1844,7 @@
     </div>
 
     <div class="transcript-done" id="transcriptDone" hidden><div class="transcript-done-label">Filled in</div><div class="transcript-done-text"></div></div>
-    <div class="transcript-box" id="transcriptBox" contenteditable="true" onfocus="clearTranscriptPlaceholderIfNeeded(this)" oninput="onTranscriptEdited(this)" onpaste="onTranscriptPaste(event)">Tap the mic and start speaking, or tap here to type instead.</div>
+    <div class="transcript-box" id="transcriptBox" contenteditable="true" onfocus="rememberTranscriptAtFocus(this); clearTranscriptPlaceholderIfNeeded(this)" onblur="learnFromTranscriptEdit()" oninput="onTranscriptEdited(this)" onpaste="onTranscriptPaste(event)">Tap the mic and start speaking, or tap here to type instead.</div>
 
     <!-- Ready-made sentences for when speaking isn't practical (a noisy roof
          void). A tap adds the sentence to the note; Extract reads it like

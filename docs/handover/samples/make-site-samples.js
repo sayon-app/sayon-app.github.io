@@ -1,7 +1,7 @@
 // Builds the website samples: the house-test-2 report (made-up address and
 // names), a quote from it and a treatment certificate, saved to <outDir>.
 // Usage: same setup as make-report-sample.js, then
-//   node docs/handover/samples/make-site-samples.js <jspdfDir> site/samples [PORT=8790]
+//   node docs/handover/samples/make-site-samples.js <jspdfDir> samples [PORT=8790]
 //
 // Usage, with the repo served on PORT (python3 -m http.server 8790):
 //   NODE_PATH=/opt/node-tools/node_modules node docs/handover/samples/make-report-sample.js <dir> <out.pdf> [PORT=8790]

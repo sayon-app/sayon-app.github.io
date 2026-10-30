@@ -7244,7 +7244,7 @@ async function sendAgreementLink() {
     renderAgreementBanner();
     renderAgreementRemote();
     track('agreement_link_sent');
-    shareAgreementLink();
+    sendAgreementLinkOn();
   } catch (e) {
     reportError(e, 'agreement_link');
     showToast('Could not make the link. Check your signal and try again', 'error');
@@ -7253,13 +7253,43 @@ async function sendAgreementLink() {
   }
 }
 
+// Emailed from SAYON to the client's email in Job Details, with the
+// agreement attached, when email is set up. Otherwise the share sheet.
+async function sendAgreementLinkOn() {
+  const r = reportData.agreementRequest;
+  if (!r) return;
+  const to = (document.getElementById('jobClientEmail') || {}).value?.trim() || '';
+  if (directEmail && to) {
+    try {
+      await ensureJsPDFLoaded();
+      const file = buildAgreementPdf({ ...r.values, signerName: r.signerName, unsigned: true });
+      const company = getCompanyDetails().name || 'your inspector';
+      const sent = await sendPdfsDirect({ files: [file], to,
+        subject: `Please sign: pre-inspection agreement for ${getFullAddress() || 'your inspection'}`,
+        body: `${agreementLinkMessage(r)}\n\n${agreementLinkUrl(r.id)}\n\nA copy of the agreement is attached.\n\n${company}` });
+      if (sent) {
+        r.emailedTo = to; r.emailedAt = Date.now();
+        saveDraft(); renderAgreementRemote();
+        return;
+      }
+    } catch (e) {
+      reportError(e, 'agreement_link_email');
+    }
+  }
+  shareAgreementLink();
+}
+
+function agreementLinkMessage(r) {
+  const company = getCompanyDetails().name || 'your inspector';
+  return `Hi ${r.signerName.split(' ')[0]}, here is the pre-inspection agreement from ${company} for ${getFullAddress() || 'your inspection'}. Please read it and sign on your phone before the inspection:`;
+}
+
 // The share sheet (text, email, WhatsApp), or the clipboard where there's none.
 async function shareAgreementLink() {
   const r = reportData.agreementRequest;
   if (!r) return;
-  const company = getCompanyDetails().name || 'your inspector';
   const url = agreementLinkUrl(r.id);
-  const text = `Hi ${r.signerName.split(' ')[0]}, here is the pre-inspection agreement from ${company} for ${getFullAddress() || 'your inspection'}. Please read it and sign on your phone before the inspection:`;
+  const text = agreementLinkMessage(r);
   if (navigator.share) {
     try { await navigator.share({ title: 'Pre-inspection agreement', text, url }); return; }
     catch (e) { if (e && e.name === 'AbortError') return; }
@@ -7326,7 +7356,7 @@ function renderAgreementRemote() {
   box.hidden = !r;
   if (r) {
     document.getElementById('agreementRemoteText').textContent =
-      `Link sent to ${r.signerName} on ${formatAgreementSignedAt(r.sentAt)}. It shows as signed here once they sign. You can still have them sign on this phone instead.`;
+      `Link ${r.emailedTo ? `emailed to ${r.emailedTo}` : `sent to ${r.signerName}`} on ${formatAgreementSignedAt(r.emailedAt || r.sentAt)}. It shows as signed here once they sign. You can still have them sign on this phone instead.`;
   }
 }
 
@@ -7344,6 +7374,16 @@ function removeAgreement() {
 function shareAgreementPdf() {
   const a = reportData.agreement;
   if (!a || !window.jspdf) { showToast('PDF tools are still loading — try again in a moment', 'error'); return; }
+  const { blob, fname } = buildAgreementPdf(a);
+  deliverPdfBlob(blob, fname, {
+    title: 'Pre-Inspection Agreement',
+    text: `Pre-inspection agreement — ${getFullAddress() || 'Property'}`,
+    readyToast: 'Agreement ready — choose where to save or send it',
+  });
+}
+
+// The agreement as a PDF. a.unsigned: the copy that goes with a link to sign.
+function buildAgreementPdf(a) {
   const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
   const M = 15, CW = 180;
   const company = getCompanyDetails();
@@ -7355,18 +7395,14 @@ function shareAgreementPdf() {
     ], right: [
       ['INSPECTION DATE', a.inspectionDate ? formatAgreementDate(a.inspectionDate) : ''],
       ['INSPECTION FEE', agreementFeeText(a.fee)],
-      ['AGREED', formatAgreementSignedAt(a.signedAt)],
+      ['AGREED', a.unsigned ? 'Not signed yet' : formatAgreementSignedAt(a.signedAt)],
       ['STANDARD', a.standard],
     ] });
   y += 2;
   y = drawAgreementBody(doc, a, y, { M, CW, onNewPage: header });
   drawPdfDocFooters(doc, `Pre-inspection agreement${company.name ? `  ·  ${company.name}` : ''}`);
   const fname = `Agreement_${(getFullAddress() || 'property').replace(/\s+/g, '_').substring(0, 25)}.pdf`;
-  deliverPdfBlob(doc.output('blob'), fname, {
-    title: 'Pre-Inspection Agreement',
-    text: `Pre-inspection agreement — ${getFullAddress() || 'Property'}`,
-    readyToast: 'Agreement ready — choose where to save or send it',
-  });
+  return { blob: doc.output('blob'), fname };
 }
 
 // Prints the agreed wording and who signed it, from y down. Used for the
@@ -7421,6 +7457,13 @@ function drawAgreementBody(doc, a, y, { M, CW, onNewPage }) {
     }
     first = false;
   });
+  // A copy sent to be signed online has no signature block yet.
+  if (a.unsigned) {
+    y += 4; room(14);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...C.ink);
+    doc.text('To sign, open the link in the email this came with.', M, y);
+    return y + 8;
+  }
   // Who agreed, how and when, as a signature block.
   y += 4;
   room(30);

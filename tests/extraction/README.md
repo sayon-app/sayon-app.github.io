@@ -24,7 +24,7 @@ Checks how well `SYSTEM_PROMPT` (js/app.js) turns an inspector's dictation into 
 | `gold/<case>.json` | Answer key: a list of checks (format below). Built from what the inspector said and meant, then checked by two independent reviewers. |
 | `score.mjs` | `node tests/extraction/score.mjs gold/<case>.json <answer.json> [more answers]`. Prints failures, a weighted score, and the pass rate of each check across runs. |
 | `eval-workflow.js` | Claude Code workflow: Sonnet subagents stand in for the app's model, answer each case N times, then `score.mjs` marks them. |
-| `run-api.mjs` | Sends a case to the real Anthropic API exactly as the app does (model, effort, max_tokens). Only where `ANTHROPIC_API_KEY` is set. |
+| `run-api.mjs` | Sends a case to the real Anthropic API exactly as the app does (model, effort, max_tokens). Needs `SAYON_ANTHROPIC_KEY` (or `ANTHROPIC_API_KEY`) set; in a Claude Code cloud environment use `SAYON_ANTHROPIC_KEY`, because `ANTHROPIC_*` variables don't reach the session. |
 | `BASELINE.md` | Scores of the prompt as it stood when the bench was added, per case and per check. |
 | `out/` | Answers written by the runners. Not committed (`.gitignore`). |
 
@@ -33,7 +33,7 @@ Checks how well `SYSTEM_PROMPT` (js/app.js) turns an inspector's dictation into 
 With an API key (most faithful, a few cents a run):
 
 ```
-ANTHROPIC_API_KEY=... node tests/extraction/run-api.mjs house-test-2 3 baseline
+SAYON_ANTHROPIC_KEY=... node tests/extraction/run-api.mjs house-test-2 3 baseline
 node tests/extraction/score.mjs tests/extraction/gold/house-test-2.json tests/extraction/out/baseline/house-test-2-run*.json
 ```
 

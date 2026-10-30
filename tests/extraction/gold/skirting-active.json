@@ -377,8 +377,9 @@
     },
     {
       "id": "no-existing-system",
-      "kind": "absent",
+      "kind": "equals",
       "path": "existingSystem",
+      "values": ["No System Found", null],
       "weight": 3,
       "why": "'no existing termite system'"
     },

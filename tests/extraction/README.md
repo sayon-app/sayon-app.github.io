@@ -24,7 +24,7 @@ Checks how well `SYSTEM_PROMPT` (js/app.js) turns an inspector's dictation into 
 | `gold/<case>.json` | Answer key: a list of checks (format below). Built from what the inspector said and meant, then checked by two independent reviewers. |
 | `score.mjs` | `node tests/extraction/score.mjs gold/<case>.json <answer.json> [more answers]`. Prints failures, a weighted score, and the pass rate of each check across runs. |
 | `eval-workflow.js` | Claude Code workflow: Sonnet subagents stand in for the app's model, answer each case N times, then `score.mjs` marks them. |
-| `run-api.mjs` | Sends a case to the real Anthropic API exactly as the app does (model, effort, max_tokens). Only where `ANTHROPIC_API_KEY` is set. |
+| `run-api.mjs` | Sends a case to the real Anthropic API exactly as the app does (model, effort, max_tokens). Needs `SAYON_ANTHROPIC_KEY` (or `ANTHROPIC_API_KEY`) set; in a Claude Code cloud environment use `SAYON_ANTHROPIC_KEY`, because `ANTHROPIC_*` variables don't reach the session. |
 | `BASELINE.md` | Scores of the prompt as it stood when the bench was added, per case and per check. |
 | `out/` | Answers written by the runners. Not committed (`.gitignore`). |
 
@@ -33,7 +33,7 @@ Checks how well `SYSTEM_PROMPT` (js/app.js) turns an inspector's dictation into 
 With an API key (most faithful, a few cents a run):
 
 ```
-ANTHROPIC_API_KEY=... node tests/extraction/run-api.mjs house-test-2 3 baseline
+SAYON_ANTHROPIC_KEY=... node tests/extraction/run-api.mjs house-test-2 3 baseline
 node tests/extraction/score.mjs tests/extraction/gold/house-test-2.json tests/extraction/out/baseline/house-test-2-run*.json
 ```
 
@@ -53,7 +53,7 @@ The written cases were drafted from a brief and every check was then read agains
 Browser check (not a scorer): `multi-note.playwright.js`, see the header of that file for the command. Run it after changing `populateFields`, `processTranscript`, `processPendingNotes` or `applyObstructionExtraction`.
 
 Notes on the runners:
-- `eval-workflow.js` scores only the two house tests unless you pass `cases: [...]` with every case id you want. All thirteen: `house-test-1`, `house-test-2`, `slab-barrier`, `skirting-active`, `subfloor-followup`, `borers-rot`, `rambling-nest`, `car-test-full`, `car-test-clean`, `car-test-invasive`, `phone-full-job`, `locked-bedroom`, `fence-workings`.
+- `eval-workflow.js` scores only the two house tests unless you pass `cases: [...]` with every case id you want. All fourteen: `drainage-treatment`, `house-test-1`, `house-test-2`, `slab-barrier`, `skirting-active`, `subfloor-followup`, `borers-rot`, `rambling-nest`, `car-test-full`, `car-test-clean`, `car-test-invasive`, `phone-full-job`, `locked-bedroom`, `fence-workings`.
 - To score an older prompt on new cases (a baseline), check that commit out in a separate `git worktree`, copy the new transcripts and keys into it, and point `args.repo` at the worktree.
 - Both runners read `SYSTEM_PROMPT` as plain text from `js/app.js`. Keep it a template literal with no `${}`; `run-api.mjs` refuses one that has it, and the workflow's agents would read the raw `${…}`.
 - An answer that isn't valid JSON counts as failing every check for that run, because the app can't use it either.

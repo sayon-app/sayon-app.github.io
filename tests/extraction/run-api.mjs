@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 // Sends a test transcript to the Anthropic API exactly the way the app's
 // requestExtraction() does (same model, system prompt, max_tokens and
-// effort), and saves the answer for score.mjs. Only works where an
-// ANTHROPIC_API_KEY is set; without one, use eval-workflow.js instead.
-//   ANTHROPIC_API_KEY=... node tests/extraction/run-api.mjs house-test-2 [runs] [tag]
+// effort), and saves the answer for score.mjs. Needs an API key in
+// SAYON_ANTHROPIC_KEY (or ANTHROPIC_API_KEY); without one, use
+// eval-workflow.js instead. Claude Code cloud sessions don't pass
+// ANTHROPIC_* variables through from the environment settings, and set
+// ANTHROPIC_BASE_URL to their own gateway, so save the key there as
+// SAYON_ANTHROPIC_KEY.
+//   SAYON_ANTHROPIC_KEY=... node tests/extraction/run-api.mjs house-test-2 [runs] [tag]
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -34,15 +38,17 @@ function readTemplate(file, name) {
 
 const [id, runsArg, tagArg] = process.argv.slice(2);
 if (!id) { console.error('usage: node run-api.mjs <case-id> [runs] [tag]'); process.exit(2); }
-const key = process.env.ANTHROPIC_API_KEY;
-if (!key) { console.error('ANTHROPIC_API_KEY is not set'); process.exit(2); }
+const key = process.env.SAYON_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
+if (!key) { console.error('Set SAYON_ANTHROPIC_KEY (or ANTHROPIC_API_KEY) to an Anthropic API key'); process.exit(2); }
 const runs = Number(runsArg) || 1;
 const tag = tagArg || 'api';
 const system = readTemplate('js/app.js', 'SYSTEM_PROMPT');
 const transcript = readFileSync(join(here, 'transcripts', `${id}.txt`), 'utf8').trim();
 const outDir = join(here, 'out', tag);
 mkdirSync(outDir, { recursive: true });
-const base = process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com';
+// Not ANTHROPIC_BASE_URL: in a Claude Code session that points at Claude
+// Code's own gateway, which won't take an API key.
+const base = process.env.SAYON_API_BASE || 'https://api.anthropic.com';
 
 for (let k = 1; k <= runs; k++) {
   const res = await fetch(`${base}/v1/messages`, {

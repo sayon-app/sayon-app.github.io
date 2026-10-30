@@ -64,10 +64,11 @@
     },
     {
       "id": "no-existing-system",
-      "kind": "absent",
+      "kind": "equals",
       "path": "existingSystem",
+      "values": ["No System Found", null],
       "weight": 3,
-      "why": "said no termite management system is installed; none is written as null"
+      "why": "said no termite management system is installed: \"No System Found\" (null also passes)"
     },
     {
       "id": "treatment-yes",

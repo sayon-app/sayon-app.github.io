@@ -117,7 +117,7 @@
   </div>
 
   <h1>Privacy Policy</h1>
-  <div class="updated">Last updated: 25 October 2026 · Version 3</div>
+  <div class="updated">Last updated: 30 October 2026 · Version 4</div>
 
   <p>SAYON ("Sayon," "we," "us") is a voice-to-report tool used by licensed timber pest and termite inspectors in Australia to record inspection findings and generate compliant inspection reports. This policy explains what personal information the app collects, how it is used, who it is shared with, and how you can contact us about it.</p>
 
@@ -130,7 +130,7 @@
   <h2>What information we collect</h2>
   <p>Depending on how the app is used, we may collect:</p>
   <ul>
-    <li><strong>Client and property information</strong>, including names, addresses, contact details (phone number and/or email address), and details about the property being inspected, as well as job and billing details such as inspection type, fee, invoice number, payment status, referral source, and any access notes (for example, gate codes) the technician records, as captured by the technician during an inspection.</li>
+    <li><strong>Client and property information</strong>, including names, addresses, contact details (phone number and/or email address), and details about the property being inspected, as well as job details such as inspection type, quote lines and prices, the client's answer to a quote, treatment records, and any access notes (for example, gate codes) the technician records, as captured by the technician during an inspection.</li>
     <li><strong>Voice recordings and transcripts</strong> of the technician's spoken observations during an inspection, which may reference the client's name, property address, and details about the condition of the property.</li>
     <li><strong>Inspection findings</strong>, including descriptions of termite or pest activity, damage observations, conducive conditions, and recommendations, as entered or dictated by the technician.</li>
     <li><strong>Photographs of the property</strong>, where the photo capture feature is in use, which may incidentally include identifiable people, vehicles, or other personal property.</li>
@@ -151,8 +151,8 @@
   <p>We collect this information to generate an accurate, structured pest inspection report for the client, allow the technician to review and finalise findings before the report is issued, maintain a record of past inspections for the technician's own reference, and support compliance with the relevant Australian Standards governing timber pest inspections (AS 3660.2 and AS 4349.3).</p>
 
   <h2>How your information is processed, including by AI</h2>
-  <p><strong>Speech to text.</strong> SAYON is a web app that runs in the device's browser. When the technician dictates, the browser's built-in speech recognition turns the audio into text. In Safari (iPhone and iPad) this is Apple's speech recognition, and in Chrome it is Google's. Depending on the device, the audio may be sent to Apple's or Google's servers for this. That step is covered by Apple's or Google's own privacy policy, not this one.</p>
-  <p><strong>Optional audio transcription.</strong> If the technician turns on "Experimental: AI Audio Transcription" (off by default), a copy of the recorded audio is also sent through our server to Cloudflare Workers AI, which runs a speech-to-text model and returns a transcript. We don't store the audio.</p>
+  <p><strong>Speech to text.</strong> SAYON is a web app that runs in the device's browser. When the technician is online and signed in, the app records the dictation itself and sends each spoken phrase through our server to Cloudflare Workers AI, which runs a speech-to-text model and returns the text. We don't store the audio.</p>
+  <p><strong>Speech to text without a connection.</strong> When that can't be used (for example, with no signal when recording starts), the browser's built-in speech recognition turns the audio into text instead. In Safari (iPhone and iPad) this is Apple's speech recognition, and in Chrome it is Google's. Depending on the device, the audio may be sent to Apple's or Google's servers for this. That step is covered by Apple's or Google's own privacy policy, not this one.</p>
   <p><strong>Turning notes into a report.</strong> The text transcript is sent to a server we operate on Cloudflare, which forwards it to Anthropic's Claude API. Claude turns it into report fields and suggested wording, and the result comes back to the app. We don't store transcripts on that server.</p>
   <p><strong>The inspector decides.</strong> AI only drafts. The technician reviews every field, can change anything, and signs the report. No decision about a client is made by software alone.</p>
   <p>Data sent to the Claude API under Anthropic's commercial terms is <strong>not used to train Anthropic's AI models</strong>. Anthropic keeps API data for a limited time for safety and operational purposes, then deletes it.</p>
@@ -165,13 +165,15 @@
   <ul>
     <li><strong>Supabase</strong> (database and photo storage, hosted in Sydney, Australia), to store and sync inspection data.</li>
     <li><strong>Anthropic</strong> (United States), to turn dictated transcripts into report fields.</li>
-    <li><strong>Cloudflare</strong> (global network, including the United States), which hosts our server and, when it's turned on, the optional audio transcription.</li>
-    <li><strong>Apple</strong> or <strong>Google</strong> (United States), through the browser's built-in speech recognition, to turn spoken audio into text.</li>
+    <li><strong>Cloudflare</strong> (global network, including the United States), which hosts our server and turns recorded dictation into text.</li>
+    <li><strong>Apple</strong> or <strong>Google</strong> (United States), through the browser's built-in speech recognition, to turn spoken audio into text when the app's own speech to text can't be used.</li>
+    <li><strong>Google</strong> (United States), to suggest full addresses as the technician types a property address. Google receives the typed address text, not the rest of the report.</li>
+    <li><strong>Resend</strong> (United States), to email reports, quotes and certificates to the client when the technician sends them from the app. Resend receives the email, its PDF attachments and the client's email address.</li>
     <li><strong>Stripe</strong> (United States and other countries), to process plan payments. Stripe receives the account holder's billing details, not client or inspection information.</li>
     <li><strong>Sentry</strong> (United States), to tell us when the app breaks, and <strong>PostHog</strong> (United States), to show us which parts of the app get used. They receive the app usage and error information described above, not client or inspection information.</li>
     <li><strong>The client</strong>, who receives the finished report containing their own property and contact information.</li>
   </ul>
-  <p>Because Anthropic, Cloudflare, Apple, Google, Stripe, Sentry and PostHog may process data outside Australia, mainly in the United States, using the app involves disclosing personal information overseas.</p>
+  <p>Because Anthropic, Cloudflare, Apple, Google, Resend, Stripe, Sentry and PostHog may process data outside Australia, mainly in the United States, using the app involves disclosing personal information overseas.</p>
   <p>We do not sell personal information, and we do not share it with anyone for marketing.</p>
 
   <h2>How long we keep information</h2>

@@ -87,3 +87,12 @@ Runner: `run-api.mjs` against `claude-sonnet-5` at effort medium (exactly what t
 | v2: v1 + locked room makes interior PARTIAL | 99.7% (1975/1981) | one-offs: soft-landscaping (car-test-full), restricted-access (house-test-2), roofvoid (locked-bedroom) |
 
 v2 is missing skirting-active run 2: the API credit ran out mid-round. No weight-3 check failed in v1 or v2. The v2 one-offs each passed in the other run and in v1, so they look like run-to-run noise, not a rule the prompt gets wrong.
+
+### Round 2 (same day, after more credit)
+
+| Prompt | Mean, all 14 cases | Checks failing at least once |
+|---|---|---|
+| v3: v2 re-run complete (what #247 merged) | 99.8% (2080/2084) | restricted-access + matcher words (house-test-2, null once), roofvoid (locked-bedroom, INSPECTED once) |
+| v4: restrictedAccess never null when an area is PARTIAL or NOT; a limit said right after "inspected" still makes the area PARTIAL | 99.9% (2082/2084) | subfloor-finding-detail (house-test-2, once) |
+
+The two v3 failures were the same ones v2 had, so they were a real gap, not noise; v4 fixes both. No weight-3 check failed in either round.

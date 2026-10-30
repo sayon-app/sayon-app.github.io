@@ -2684,6 +2684,9 @@ body.report-locked #micDock { opacity: 0.4; }
 .agreement-other-toggle { align-self: center; }
 .agreement-other { display: flex; gap: 8px; }
 .agreement-other .job-input { flex: 1; min-width: 0; }
+.agr-remote { margin: 0 0 16px; padding: 14px; border-radius: 10px; border-left: 3px solid var(--accent); background: var(--bg); }
+.agr-remote-text { font-size: 14px; line-height: 1.5; margin-bottom: 10px; }
+.agr-remote-btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .agreement-view-signature {
   display: block; max-width: 240px; width: 100%; margin-top: 14px;
   background: #fff;

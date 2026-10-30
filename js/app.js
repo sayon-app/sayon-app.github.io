@@ -7331,9 +7331,11 @@ function renderAgreementBanner() {
   if (!banner) return;
   const a = reportData.agreement;
   banner.classList.toggle('signed', !!a);
+  const sent = !a && reportData.agreementRequest;
   document.getElementById('agreementBannerText').textContent = a
     ? `Agreement signed by ${a.signerName} · ${formatAgreementSignedAt(a.signedAt)}`
-    : 'Pre-inspection agreement not signed yet';
+    : sent ? `Link sent to ${sent.signerName}, waiting for them to sign` : 'Pre-inspection agreement not signed yet';
+  if (sent) checkAgreementLink(false);
   document.getElementById('agreementBannerBtn').textContent = a ? 'View' : 'Get it signed';
   const so = document.getElementById('signoffAgreementStatus');
   if (so) {
@@ -7352,7 +7354,7 @@ function openAgreementSheet() {
   if (a) {
     document.getElementById('agreementViewName').textContent = a.signerName;
     document.getElementById('agreementViewSummary').textContent =
-      formatAgreementSignedAt(a.signedAt) + (a.method === 'other' ? ` · ${a.otherNote}` : ' · signed on this device');
+      formatAgreementSignedAt(a.signedAt) + (a.method === 'other' ? ` · ${a.otherNote}` : a.method === 'remote' ? ' · signed on their phone from a link' : ' · signed on this device');
     renderAgreementDoc(document.getElementById('agreementViewText'), a.text);
     const img = document.getElementById('agreementViewSignature');
     img.style.display = a.signature ? '' : 'none';
@@ -7372,6 +7374,8 @@ function openAgreementSheet() {
     if (agreementSignaturePad) agreementSignaturePad.clear();
     refreshAgreementPreview();
   }
+  renderAgreementRemote();
+  checkAgreementLink(false);
   cancelSheetVoice('agreement');
   document.getElementById('agreementOverlay').classList.add('open');
   document.querySelectorAll('#agreementOverlay .page-sheet-body').forEach(b => { b.scrollTop = 0; });
@@ -7525,6 +7529,13 @@ function signAgreement(method) {
     if (!agreement.otherNote) { showToast('Say how it was signed, e.g. "Signed on paper"', 'error'); return; }
   }
   reportData.agreement = agreement;
+  if (reportData.agreementRequest) {
+    const id = reportData.agreementRequest.id;
+    if (authSession) fetch(`${SUPABASE_URL}/rest/v1/sign_requests?id=eq.${encodeURIComponent(id)}&status=eq.pending`, {
+      method: 'PATCH', headers: getAuthHeaders(), body: JSON.stringify({ status: 'cancelled' }),
+    }).catch(() => {});
+    delete reportData.agreementRequest;
+  }
   if (!document.getElementById('jobClient').value.trim()) {
     document.getElementById('jobClient').value = signerName;
     updateJob();
@@ -7535,6 +7546,136 @@ function signAgreement(method) {
   closeAgreementSheet();
   showToast('Agreement signed', 'success');
   track('agreement_signed', { method });
+}
+
+// ── REMOTE SIGNING ───────────────────────────────────────────────────────
+// When the client isn't on site, the inspector sends a link instead. The
+// exact wording goes to Supabase sign_requests (supabase/remote-signing.sql)
+// and the client signs it on sign.html with no account. The report keeps
+//   reportData.agreementRequest = { id, signerName, sentAt, values }
+// until the signed row is read back, which then becomes reportData.agreement
+// with method 'remote', just as if they had signed on this phone.
+const AGREEMENT_LINK_CHECK_MS = 60000;
+let agreementLinkCheckedAt = 0;
+
+function agreementLinkUrl(id) {
+  return new URL(`sign.html?id=${encodeURIComponent(id)}`, location.href).href;
+}
+
+async function sendAgreementLink() {
+  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  const signerName = document.getElementById('agreementSignerName').value.trim();
+  if (!agreementTypeChosen()) { showToast('Choose the inspection type first: it sets the standard the agreement names', 'error'); return; }
+  if (!signerName) { showToast('Enter the name of the person signing', 'error'); return; }
+  if (!authSession) { showToast('Sign in to send a link', 'error'); return; }
+  if (!navigator.onLine) { showToast('Sending a link needs signal. Try again when you have it', 'error'); return; }
+  const values = agreementFormValues();
+  const company = getCompanyDetails();
+  const doc = { company: company.name || '', client: signerName, address: getFullAddress(),
+    inspectionDate: values.inspectionDate, standard: values.standard, text: values.text };
+  const btn = document.getElementById('agreementLinkBtn');
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/sign_requests?select=id`, {
+      method: 'POST',
+      headers: getAuthHeaders({ 'Prefer': 'return=representation' }),
+      body: JSON.stringify({ user_id: authUser.id, report_id: currentReportId || 'draft', doc }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const [row] = await res.json();
+    reportData.agreementRequest = { id: row.id, signerName, sentAt: Date.now(), values };
+    if (!document.getElementById('jobClient').value.trim()) {
+      document.getElementById('jobClient').value = signerName;
+      updateJob();
+    }
+    saveDraft();
+    renderAgreementBanner();
+    renderAgreementRemote();
+    track('agreement_link_sent');
+    shareAgreementLink();
+  } catch (e) {
+    reportError(e, 'agreement_link');
+    showToast('Could not make the link. Check your signal and try again', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// The share sheet (text, email, WhatsApp), or the clipboard where there's none.
+async function shareAgreementLink() {
+  const r = reportData.agreementRequest;
+  if (!r) return;
+  const company = getCompanyDetails().name || 'your inspector';
+  const url = agreementLinkUrl(r.id);
+  const text = `Hi ${r.signerName.split(' ')[0]}, here is the pre-inspection agreement from ${company} for ${getFullAddress() || 'your inspection'}. Please read it and sign on your phone before the inspection:`;
+  if (navigator.share) {
+    try { await navigator.share({ title: 'Pre-inspection agreement', text, url }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  try {
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    showToast('Link copied. Paste it into a text or email to the client', 'success');
+  } catch (e) {
+    prompt('Copy this link and send it to the client:', url);
+  }
+}
+
+async function checkAgreementLink(byTap) {
+  const r = reportData.agreementRequest;
+  if (!r || reportData.agreement || !authSession) return;
+  if (!byTap && Date.now() - agreementLinkCheckedAt < AGREEMENT_LINK_CHECK_MS) return;
+  agreementLinkCheckedAt = Date.now();
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/sign_requests?id=eq.${encodeURIComponent(r.id)}&select=status,signer_name,signature,signed_at`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const [row] = await res.json();
+    // The report may have moved on while the request was out.
+    if (reportData.agreementRequest !== r) return;
+    if (row && row.status === 'signed') {
+      const v = r.values;
+      reportData.agreement = { method: 'remote', signerName: row.signer_name, signature: row.signature,
+        signedAt: new Date(row.signed_at).getTime(), inspectionDate: v.inspectionDate, fee: v.fee,
+        notes: v.notes, standard: v.standard, text: v.text };
+      delete reportData.agreementRequest;
+      saveDraft();
+      updateProgress();
+      renderAgreementBanner();
+      if (document.getElementById('agreementOverlay').classList.contains('open')) openAgreementSheet();
+      showToast(`${row.signer_name} signed the agreement`, 'success');
+      track('agreement_signed', { method: 'remote' });
+    } else if (byTap) {
+      showToast(row && row.status === 'cancelled' ? 'That link was cancelled' : 'Not signed yet', 'info');
+    }
+  } catch (e) {
+    if (byTap) showToast('Could not check. Try again when you have signal', 'error');
+  }
+}
+
+async function cancelAgreementLink() {
+  const r = reportData.agreementRequest;
+  if (!r || !confirm('Cancel this link? The client won\'t be able to sign with it.')) return;
+  if (authSession) {
+    fetch(`${SUPABASE_URL}/rest/v1/sign_requests?id=eq.${encodeURIComponent(r.id)}&status=eq.pending`, {
+      method: 'PATCH', headers: getAuthHeaders(), body: JSON.stringify({ status: 'cancelled' }),
+    }).catch(() => {});
+  }
+  delete reportData.agreementRequest;
+  saveDraft();
+  renderAgreementBanner();
+  renderAgreementRemote();
+}
+
+function renderAgreementRemote() {
+  const box = document.getElementById('agreementRemote');
+  if (!box) return;
+  const r = !reportData.agreement && reportData.agreementRequest;
+  box.hidden = !r;
+  if (r) {
+    document.getElementById('agreementRemoteText').textContent =
+      `Link sent to ${r.signerName} on ${formatAgreementSignedAt(r.sentAt)}. It shows as signed here once they sign. You can still have them sign on this phone instead.`;
+  }
 }
 
 function removeAgreement() {

@@ -1976,6 +1976,16 @@
         <h2 class="agr-addr" id="agreementAddr"></h2>
         <p class="agr-lede">Fill in the job, read the agreement through with the client, then they sign on this screen.</p>
       </div>
+      <!-- Sent for the client to sign on their own phone: waiting on them.
+           See REMOTE SIGNING in js/app.js. -->
+      <div class="agr-remote" id="agreementRemote" hidden>
+        <div class="agr-remote-text" id="agreementRemoteText"></div>
+        <div class="agr-remote-btns">
+          <button class="agreement-banner-btn" onclick="checkAgreementLink(true)">Check now</button>
+          <button class="agreement-banner-btn" onclick="shareAgreementLink()">Send link again</button>
+          <button class="link-btn" onclick="cancelAgreementLink()">Cancel link</button>
+        </div>
+      </div>
       <div class="sheet-voice" id="agreementVoice" data-state="idle">
         <button type="button" class="sheet-voice-btn" onclick="toggleSheetVoice('agreement')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg><span class="sheet-voice-label">Say it instead</span></button>
         <p class="sheet-voice-hint">e.g. "Pre-purchase pest for Jo Tester, today, fee $350, she wants the back deck checked closely."</p>
@@ -2047,6 +2057,7 @@
             <input class="job-input" id="agreementOtherNote" placeholder="e.g. Signed on paper, agreed by email">
             <button class="agreement-banner-btn" onclick="signAgreement('other')">Record it</button>
           </div>
+          <button class="link-btn agreement-other-toggle" id="agreementLinkBtn" onclick="sendAgreementLink()">Client not here? Send them a link to sign</button>
         </li>
       </ol>
     </div>

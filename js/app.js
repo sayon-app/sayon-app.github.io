@@ -2742,7 +2742,9 @@ function dismissServerTranscript() {
 // moment after each pause, in order. Only one thing uses the mic at a time:
 // Web Speech is the fallback when Whisper can't be used, never alongside it.
 const WHISPER_PAUSE_MS = 1200;       // a pause this long ends a phrase
-const WHISPER_MAX_SEGMENT_MS = 25000; // a phrase is cut here even mid-flow
+const WHISPER_MAX_SEGMENT_MS = 15000; // a phrase is cut here even mid-flow
+const WHISPER_LONG_SEGMENT_MS = 8000;  // after this, a short breath ends the phrase
+const WHISPER_SHORT_PAUSE_MS = 500;
 const WHISPER_MIN_SPEECH_MS = 300;    // less than this is a cough or a bump
 const WHISPER_POLL_MS = 100;
 // What Whisper is known to "hear" in near-silence.
@@ -2832,7 +2834,10 @@ function whisperTick(s) {
   }
   if (s.speechMs >= WHISPER_MIN_SPEECH_MS && s.speechMs < WHISPER_MIN_SPEECH_MS + WHISPER_POLL_MS) whisperShowPending();
   const age = Date.now() - s.startedAt;
-  if ((s.speechMs >= WHISPER_MIN_SPEECH_MS && s.quietMs >= WHISPER_PAUSE_MS) || age >= WHISPER_MAX_SEGMENT_MS) whisperCutSegment(s);
+  // Someone reading straight through barely pauses, so a long phrase ends
+  // at the next breath rather than being cut mid-word at the limit.
+  const pause = age >= WHISPER_LONG_SEGMENT_MS ? WHISPER_SHORT_PAUSE_MS : WHISPER_PAUSE_MS;
+  if ((s.speechMs >= WHISPER_MIN_SPEECH_MS && s.quietMs >= pause) || age >= WHISPER_MAX_SEGMENT_MS) whisperCutSegment(s);
 }
 
 // Ends the current phrase and starts the next one straight away, so no
@@ -2877,10 +2882,18 @@ async function whisperSend(entry, blob, tries) {
       else setTimeout(() => whisperSend(entry, blob, tries + 1), wait);
       return;
     }
+    // Whisper on the server sometimes fails one phrase and answers the
+    // next: try a failed phrase twice more before giving up on it.
+    if (status >= 500 && status !== 501 && (entry.serverTries || 0) < 2) {
+      entry.serverTries = (entry.serverTries || 0) + 1;
+      setTimeout(() => whisperSend(entry, blob, tries), 1500 * entry.serverTries);
+      return;
+    }
     console.warn('Whisper listening failed, using the phone\'s speech instead:', err && err.message);
     entry.text = ''; entry.done = true;
     whisperApply();
-    whisperFallBack(status === 429 ? 'This month\'s AI fills are used up. Using the phone\'s own speech for now' : 'Using the phone\'s own speech for now');
+    // The phrase that failed is lost, so say so: the inspector can repeat it.
+    whisperFallBack(status === 429 ? 'This month\'s AI fills are used up. The last few words were missed, so say them again' : 'The last few words were missed. Say them again, the phone\'s own speech is listening now');
   }
 }
 

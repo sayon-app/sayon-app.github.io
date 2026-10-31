@@ -22,3 +22,7 @@ for f in /tmp/vr/pdf/*.pdf; do pdftoppm -r 50 -png "$f" "${f%.pdf}"; done
 Then look at the images. `screens.js` also writes `probe.json`, which flags a page that scrolls sideways and page errors; its OFFSCREEN lines for the closed drawer and CLIPPED lines for long text inside an input are expected. `ONLY=heavy` limits `pdfs.js` to one job.
 
 Things the 2026-10-30 review found, to check again after PDF or layout changes: a section title left at the foot of a page, text style leaking across a page break, long business names in the letterhead, names on signature lines, a signature or the closing words alone on the last page, and answer buttons at 375 px wide.
+
+## Client link
+
+`tests/client-link/e2e.js <outDir>` runs the quote link end to end against canned Supabase and Worker routes: Send from the quote screen makes the link and emails it, the check sheet reuses it, the client accepts (and another declines) on `sign.html`, and the app reads the answer back. Same setup as above (`setup.sh`, the server on :8765). It writes screenshots and the accepted quote PDF to `<outDir>`.

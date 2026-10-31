@@ -1513,6 +1513,10 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   color: var(--yellow-text);
   font-weight: 700;
 }
+.auth-inline-link { border: none; background: none; padding: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
+.drawer-help { text-decoration: none; }
+.settings-row.current-plan { background: rgba(var(--accent-rgb), 0.08); border-radius: 10px; }
+.settings-row.current-plan .settings-primary-btn:disabled { opacity: 1; background: transparent; color: var(--accent2); border-color: transparent; box-shadow: none; }
 .saved-item-unsynced { color: var(--yellow-text); font-weight: 700; }
 .saved-archived { padding: 12px 14px; font-size: 13px; line-height: 1.5; color: var(--text2); }
 .saved-archived .link-btn { display: inline; min-height: 0; padding: 0; font-size: inherit; font-weight: 700; }

@@ -1815,6 +1815,9 @@ body.pocket-lock .voice-btn { user-select: none; -webkit-user-select: none; -web
 
 .mic-fab.open { background: linear-gradient(145deg, var(--surface3) 0%, var(--surface2) 100%); color: var(--text); animation: none; box-shadow: 0 8px 24px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.06), inset 0 -2px 4px rgba(0,0,0,0.3); }
 
+.voice-photo-btn { width: 100%; min-height: 44px; margin: -4px 0 10px; padding: 11px 12px; border-radius: 10px; border: 1.5px dashed var(--border); background: transparent; color: var(--text2); font: inherit; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
+.voice-photo-btn:active { background: var(--surface2); }
+.voice-photo-btn.has-photos { border-style: solid; color: var(--accent2); border-color: rgba(var(--accent-rgb), 0.5); }
 .voice-btn {
   width: 100%;
   padding: 14px;

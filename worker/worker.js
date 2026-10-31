@@ -4,6 +4,20 @@
  * The API keys are stored as Cloudflare secrets and never exposed to the
  * browser or public repo. See worker/README.md for setup and deploy steps.
  *
+ * CHANGES FROM v9.5 -> v9.6:
+ * - An Anthropic-side rate limit or outage (429, 529, 5xx) comes back to
+ *   the app as the Worker's own 502 upstream_error, so the app's 429
+ *   message ("this month's AI fills are used up") is only ever the plan
+ *   gate's. The note is kept either way.
+ * - /stripe/create-checkout-session: a business with a Stripe customer but
+ *   no subscription recorded yet (the webhook after checkout hasn't landed)
+ *   is checked against Stripe before a new Checkout is created. A live
+ *   subscription there goes to the Billing Portal instead, so nobody can
+ *   pay twice by tapping Upgrade again.
+ * - /stripe/subscription-status also returns `subscribed` (whether a Stripe
+ *   subscription is recorded), so the app can tell a trial from a payment
+ *   still being confirmed.
+ *
  * CHANGES FROM v9.4 -> v9.5:
  * - /transcribe no longer counts against the monthly AI allowance. The app
  *   now sends each spoken phrase to Whisper as it's said, so counting them
@@ -429,6 +443,13 @@ async function handleMessages(request, origin, env) {
     return upstreamError(origin);
   }
 
+  // Anthropic's own rate limit or outage is not the caller's plan: the
+  // app reads a 429 as "this month's AI fills are used up".
+  if (anthropicResponse.status === 429 || anthropicResponse.status >= 500) {
+    console.error(`Anthropic answered HTTP ${anthropicResponse.status}: ${JSON.stringify(data).slice(0, 300)}`);
+    return jsonResponse(502, { error: { type: 'upstream_error', message: 'The AI service is busy right now. Your note is kept; try again in a minute' } }, origin);
+  }
+
   return new Response(JSON.stringify(data), {
     status: anthropicResponse.status,
     headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
@@ -707,6 +728,7 @@ async function handleStripeRoute(pathname, request, user, env, origin) {
         ai_calls_used_this_period: effectiveUsed,
         limit: PLAN_LIMITS[sub.plan] ?? DEFAULT_PLAN_LIMIT,
         stripe_customer_id: sub.stripe_customer_id || null,
+        subscribed: !!sub.stripe_subscription_id,
       });
     }
 
@@ -729,7 +751,18 @@ async function handleStripeRoute(pathname, request, user, env, origin) {
 
       // Already paying: a second Checkout would start a second, parallel
       // subscription. Send them to the Billing Portal to switch plans instead.
-      if (sub.stripe_subscription_id && sub.status !== 'canceled' && sub.stripe_customer_id) {
+      let alreadyPaying = !!(sub.stripe_subscription_id && sub.status !== 'canceled' && sub.stripe_customer_id);
+      // Just paid, webhook not landed yet: the row has the customer but no
+      // subscription. Ask Stripe before starting another Checkout.
+      if (!alreadyPaying && sub.stripe_customer_id) {
+        try {
+          const live = await stripeRequest(env, 'GET', `/subscriptions?customer=${encodeURIComponent(sub.stripe_customer_id)}&status=all&limit=10`);
+          alreadyPaying = (live.data || []).some(s => ['active', 'trialing', 'past_due', 'unpaid', 'incomplete'].includes(s.status));
+        } catch (err) {
+          console.error('Stripe subscriptions lookup failed: ' + (err && err.message ? err.message : String(err)));
+        }
+      }
+      if (alreadyPaying) {
         const portal = await stripeRequest(env, 'POST', '/billing_portal/sessions', {
           customer: sub.stripe_customer_id,
           return_url: safeReturnUrl(body.cancelUrl, 'updated'),

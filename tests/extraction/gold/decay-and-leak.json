@@ -1,0 +1,611 @@
+{
+  "id": "decay-and-leak",
+  "transcript": "transcripts/decay-and-leak.txt",
+  "about": "Written case (2026-10-31): pre-purchase on a weatherboard house with a leaking shower, fungal decay in the joist and floorboards under the bathroom, mould on the subfloor timbers, and no termites. The inspector says 'pretty severe rot' and 'the joist is stuffed': the key expects the place and what was seen, bans severity words and slang, and expects a plumber and a builder referral with no structural verdict.",
+  "checks": [
+    {
+      "id": "inspection-type",
+      "kind": "equals",
+      "path": "inspectionType",
+      "values": [
+        "Pre-Purchase — Timber Pest"
+      ],
+      "weight": 2,
+      "why": "'pre-purchased timber pest inspection' for the buyer"
+    },
+    {
+      "id": "client-name",
+      "kind": "mentions",
+      "path": "clientName",
+      "all": [
+        [
+          "grant"
+        ],
+        [
+          "pedersen"
+        ]
+      ],
+      "weight": 1,
+      "why": "said 'Grant Pedersen that's the buyer'"
+    },
+    {
+      "id": "address",
+      "kind": "mentions",
+      "path": "propertyStreetAddress",
+      "all": [
+        [
+          "8",
+          "eight"
+        ],
+        [
+          "corella"
+        ]
+      ],
+      "weight": 1,
+      "why": "said '8 Corella Court'"
+    },
+    {
+      "id": "walls-weatherboard",
+      "kind": "mentions",
+      "path": "wallConstruction",
+      "all": [
+        [
+          "weatherboard",
+          "weather board"
+        ]
+      ],
+      "none": [
+        "brick",
+        "fibro"
+      ],
+      "weight": 2,
+      "why": "'whether board house' (weatherboard)"
+    },
+    {
+      "id": "floor-suspended-timber",
+      "kind": "mentions",
+      "path": "floorType",
+      "all": [
+        [
+          "suspended",
+          "timber"
+        ]
+      ],
+      "none": [
+        "slab",
+        "concrete"
+      ],
+      "weight": 2,
+      "why": "'timber suspended floor'"
+    },
+    {
+      "id": "roof-colorbond",
+      "kind": "mentions",
+      "path": "roofType",
+      "all": [
+        [
+          "colorbond",
+          "colourbond",
+          "metal",
+          "steel"
+        ]
+      ],
+      "none": [
+        "tile"
+      ],
+      "weight": 1,
+      "why": "'colour bond roof' (Colorbond)"
+    },
+    {
+      "id": "era-not-guessed",
+      "kind": "absent",
+      "path": "constructionEra",
+      "weight": 2,
+      "why": "no age, year or era material was said; weatherboard alone never dates a house"
+    },
+    {
+      "id": "decay-yes",
+      "kind": "equals",
+      "path": "decayFound",
+      "values": [
+        "YES"
+      ],
+      "weight": 3,
+      "why": "'fungal decay pretty severe rot', 'the Joyce (joist) directly under the shower is stuffed'"
+    },
+    {
+      "id": "decay-where",
+      "kind": "mentions",
+      "path": "decayWhere",
+      "all": [
+        [
+          "bathroom",
+          "shower"
+        ],
+        [
+          "joist",
+          "floorboard",
+          "floor board",
+          "flooring",
+          "subfloor"
+        ]
+      ],
+      "none": [
+        "minor",
+        "moderate",
+        "severe",
+        "extensive",
+        "significant",
+        "extreme",
+        "major",
+        "heavy",
+        "stuffed",
+        "bad"
+      ],
+      "weight": 3,
+      "why": "the joist under the shower and the floorboards around it, seen from the subfloor under the bathroom"
+    },
+    {
+      "id": "decay-details-what-seen",
+      "kind": "mentions",
+      "path": "decayDetails",
+      "all": [
+        [
+          "soft",
+          "screwdriver",
+          "fungal",
+          "rot",
+          "decay"
+        ]
+      ],
+      "none": [
+        "minor",
+        "moderate",
+        "severe",
+        "extensive",
+        "significant",
+        "extreme",
+        "major",
+        "heavy",
+        "stuffed",
+        "bad"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "'soft the whole way through I could push the screwdriver straight into it' is the observation; 'pretty severe' and 'stuffed' are dropped"
+    },
+    {
+      "id": "leaks-yes",
+      "kind": "equals",
+      "path": "waterLeaks",
+      "values": [
+        "YES"
+      ],
+      "weight": 3,
+      "why": "'so that's a water leak yes the shower'"
+    },
+    {
+      "id": "leak-location-shower",
+      "kind": "mentions",
+      "path": "leakLocation",
+      "all": [
+        [
+          "shower",
+          "bathroom"
+        ]
+      ],
+      "none": [
+        "lounge",
+        "subfloor"
+      ],
+      "weight": 3,
+      "why": "'the shower reset (recess) in the bathroom... is leaking'; the subfloor is where the water ends up, not the leak"
+    },
+    {
+      "id": "mould-yes",
+      "kind": "equals",
+      "path": "mouldSeen",
+      "values": [
+        "YES"
+      ],
+      "weight": 2,
+      "why": "'black mould all over the underside of the floor boards and on the Joyce under the bathroom'"
+    },
+    {
+      "id": "mould-where",
+      "kind": "mentions",
+      "path": "mouldWhere",
+      "all": [
+        [
+          "bathroom",
+          "subfloor",
+          "floorboard",
+          "floor board",
+          "joist"
+        ]
+      ],
+      "weight": 2,
+      "why": "under the bathroom floor, on the floorboards and joists"
+    },
+    {
+      "id": "moisture-yes",
+      "kind": "equals",
+      "path": "moistureReadings",
+      "values": [
+        "YES"
+      ],
+      "weight": 2,
+      "why": "38% on the bathroom floor beside the shower and a leak found"
+    },
+    {
+      "id": "meter-bathroom-38",
+      "kind": "mentions",
+      "path": "moistureMeterReadings",
+      "all": [
+        [
+          "bathroom",
+          "shower"
+        ],
+        [
+          "38"
+        ]
+      ],
+      "weight": 2,
+      "why": "'bathroom floor just outside the shower 38%'"
+    },
+    {
+      "id": "meter-lounge-11",
+      "kind": "mentions",
+      "path": "moistureMeterReadings",
+      "all": [
+        [
+          "lounge"
+        ],
+        [
+          "11"
+        ]
+      ],
+      "weight": 1,
+      "why": "'lounge room floor for comparison 11%': a normal reading is still a row"
+    },
+    {
+      "id": "findings-count",
+      "kind": "count",
+      "path": "findings",
+      "min": 0,
+      "max": 1,
+      "weight": 2,
+      "why": "'no termites anywhere on the property', at most one NONE card"
+    },
+    {
+      "id": "findings-all-none",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "termiteActivity",
+          "values": [
+            "NONE"
+          ]
+        },
+        {
+          "kind": "absent",
+          "path": "species"
+        },
+        {
+          "kind": "absent",
+          "path": "damageDescription"
+        },
+        {
+          "kind": "absent",
+          "path": "activityLocation"
+        },
+        {
+          "kind": "absent",
+          "path": "nestLocated"
+        },
+        {
+          "kind": "absent",
+          "path": "structuralConcern"
+        }
+      ],
+      "weight": 3,
+      "why": "rot and mould never go in findings[]"
+    },
+    {
+      "id": "no-live-termites",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "live termites",
+        "active termites",
+        "termite damage"
+      ],
+      "weight": 3,
+      "why": "no termites were found"
+    },
+    {
+      "id": "no-species",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "coptotermes",
+        "schedorhinotermes",
+        "nasutitermes",
+        "heterotermes",
+        "microcerotermes",
+        "cryptotermes",
+        "mastotermes",
+        "porotermes"
+      ],
+      "weight": 3,
+      "why": "no species named, no termites"
+    },
+    {
+      "id": "borers-none",
+      "kind": "equals",
+      "path": "borerActivity",
+      "values": [
+        "NONE",
+        null
+      ],
+      "weight": 1,
+      "why": "'no borers' inside and in the roof"
+    },
+    {
+      "id": "no-existing-system",
+      "kind": "equals",
+      "path": "existingSystem",
+      "values": [
+        "No System Found",
+        null
+      ],
+      "weight": 2,
+      "why": "'no termite management system'"
+    },
+    {
+      "id": "timber-soil-no",
+      "kind": "equals",
+      "path": "timberSoil",
+      "values": [
+        "NO",
+        null
+      ],
+      "weight": 1,
+      "why": "'no timber on the soil under there'"
+    },
+    {
+      "id": "treatment-not-recommended",
+      "kind": "equals",
+      "path": "treatmentRecommended",
+      "values": [
+        "NO"
+      ],
+      "weight": 3,
+      "why": "'no termite treatment needed'; the plumber and builder are not termite treatment"
+    },
+    {
+      "id": "treatment-type-empty",
+      "kind": "mentions",
+      "path": "treatmentType",
+      "none": [
+        "barrier",
+        "bait",
+        "chemical",
+        "termite",
+        "plumber",
+        "builder"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "no termite treatment; repairs are otherRecommendations"
+    },
+    {
+      "id": "other-recs-plumber-and-builder",
+      "kind": "mentions",
+      "path": "otherRecommendations",
+      "all": [
+        [
+          "plumber"
+        ],
+        [
+          "builder"
+        ]
+      ],
+      "weight": 3,
+      "why": "'get a plumber in to fix the shower first and a builder needs to look at that Joyce and the flooring'"
+    },
+    {
+      "id": "other-recs-clean",
+      "kind": "mentions",
+      "path": "otherRecommendations",
+      "none": [
+        "minor",
+        "moderate",
+        "severe",
+        "extensive",
+        "significant",
+        "extreme",
+        "major",
+        "heavy",
+        "stuffed",
+        "structural"
+      ],
+      "weight": 2,
+      "why": "the referral carries no grade and no verdict"
+    },
+    {
+      "id": "frequency-12-months",
+      "kind": "mentions",
+      "path": "inspectionFrequency",
+      "all": [
+        [
+          "12 month",
+          "twelve month",
+          "annual",
+          "yearly",
+          "every year"
+        ]
+      ],
+      "weight": 1,
+      "why": "'re inspect in 12 months'"
+    },
+    {
+      "id": "risk-not-high",
+      "kind": "equals",
+      "path": "riskLevel",
+      "values": [
+        "LOW",
+        "MEDIUM",
+        null
+      ],
+      "weight": 3,
+      "why": "no termites and no evidence anywhere, so never HIGH whatever the rot"
+    },
+    {
+      "id": "risk-medium",
+      "kind": "equals",
+      "path": "riskLevel",
+      "values": [
+        "MEDIUM"
+      ],
+      "weight": 1,
+      "why": "a whole-house note with a leak, damp timber and rot is MEDIUM by the prompt's own rule"
+    },
+    {
+      "id": "area-subfloor",
+      "kind": "equals",
+      "path": "areaStatus.subfloor",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 2,
+      "why": "'subfloor inspected the whole thing fully'"
+    },
+    {
+      "id": "area-interior",
+      "kind": "equals",
+      "path": "areaStatus.interior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'interior inspected all the rooms'"
+    },
+    {
+      "id": "area-exterior",
+      "kind": "equals",
+      "path": "areaStatus.exterior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'exterior inspected all the way around'"
+    },
+    {
+      "id": "area-roofvoid",
+      "kind": "equals",
+      "path": "areaStatus.roofvoid",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'roof void inspected fully'"
+    },
+    {
+      "id": "no-partial-or-not",
+      "kind": "mentions",
+      "path": "areaStatus",
+      "none": [
+        "partial",
+        "not"
+      ],
+      "nullOk": true,
+      "weight": 2,
+      "why": "everything was fully inspected"
+    },
+    {
+      "id": "result-subfloor-found",
+      "kind": "equals",
+      "path": "areaResult.subfloor",
+      "values": [
+        "FOUND"
+      ],
+      "weight": 1,
+      "why": "wood decay in the subfloor timbers is timber pest evidence under AS 4349.3"
+    },
+    {
+      "id": "no-hindered-areas",
+      "kind": "absent",
+      "path": "hinderedAreas",
+      "weight": 2,
+      "why": "nothing restricted"
+    },
+    {
+      "id": "no-high-risk-areas",
+      "kind": "absent",
+      "path": "highRiskAreas",
+      "weight": 2,
+      "why": "nothing inaccessible; the bathroom is a finding, not a place to check"
+    },
+    {
+      "id": "no-severity",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "minor",
+        "moderate",
+        "severe",
+        "extensive",
+        "significant",
+        "extreme",
+        "major",
+        "heavy"
+      ],
+      "weight": 3,
+      "why": "'pretty severe rot' loses the grade and keeps the rot"
+    },
+    {
+      "id": "no-slang",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "stuffed"
+      ],
+      "weight": 2,
+      "why": "'the Joyce is stuffed' is not report wording; the observation is soft timber"
+    },
+    {
+      "id": "no-structural",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "structural",
+        "compromised",
+        "structurally",
+        "unsound"
+      ],
+      "weight": 3,
+      "why": "'whether it needs replacing is a builders call not mine': a referral, never a verdict"
+    },
+    {
+      "id": "no-mishearings",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "whether board",
+        "joyce",
+        "shower reset",
+        "colour bond",
+        "man hole"
+      ],
+      "weight": 3,
+      "why": "dictation slips are corrected: weatherboard, joist, shower recess, Colorbond, manhole"
+    },
+    {
+      "id": "builder-is-referral-only",
+      "kind": "manual",
+      "description": "The builder referral is advice to have the joist and flooring looked at; nothing says the floor is or is not sound, safe or compromised."
+    },
+    {
+      "id": "plumber-not-treatment",
+      "kind": "manual",
+      "description": "The plumber and builder work is not turned into treatmentRecommended YES or any treatmentType."
+    }
+  ]
+}

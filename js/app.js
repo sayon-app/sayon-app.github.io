@@ -8717,8 +8717,166 @@ function updateJob() {
   }
 
   syncAllSelectCards();
+  renderLastVisitBanner();
   saveDraft();
 }
+
+// ── LAST VISIT ──────────────────────────────────────────────────────────
+// An address this account has inspected before. The inspector can start
+// from that report: the property details that don't change from year to
+// year are copied in, the known termite history is written from what was
+// found then, and a sheet shows what changed since. Nothing about this
+// visit's findings is copied: those are inspected afresh.
+//   reportData.lastVisit = { id, date, copied }   once started from
+//   reportData.lastVisitDismissed = <id>          when the inspector said not now
+const LAST_VISIT_KEYS = ['structureType', 'height', 'wallConstruction', 'roofType', 'floorType', 'facadeDirection', 'constructionEra',
+  'siteSurroundings', 'siteSlope', 'existingSystem', 'existingSystemOther', 'standard', 'toolsUsed'];
+
+// "7 Banksia Dr, Epping" and "7 Banksia Drive EPPING" are the same place.
+function addressKey(street, suburb) {
+  const norm = v => String(v || '').toLowerCase()
+    .replace(/[^a-z0-9/ ]+/g, ' ')
+    .replace(/\b(unit|apartment|apt|flat|lot|shop|suite)\s+/g, '')
+    .replace(/\b(street|st|road|rd|avenue|ave|av|drive|dr|dve|place|pl|court|ct|crescent|cres|cr|parade|pde|lane|ln|highway|hwy|boulevard|bvd|blvd|terrace|tce|close|cl|way|circuit|cct|grove|gr|esplanade|esp|square|sq)\b/g, '')
+    .replace(/\s+/g, ' ').trim();
+  const a = norm(street), b = norm(suburb);
+  return a && b ? `${a}|${b}` : '';
+}
+
+function previousVisitFor() {
+  const key = addressKey(document.getElementById('jobAddress').value, document.getElementById('jobSuburb').value);
+  if (!key) return null;
+  const list = getSavedReports().filter(r => r && r.id !== currentReportId && r.reportData && addressKey(r.jobAddress, r.jobSuburb) === key);
+  if (!list.length) return null;
+  // A completed report over a draft, then the most recent.
+  list.sort((a, b) => ((b.reportData.issue ? 1 : 0) - (a.reportData.issue ? 1 : 0)) || ((b.savedAt || 0) - (a.savedAt || 0)));
+  return list[0];
+}
+
+function visitDate(entry) {
+  const rd = entry.reportData || {};
+  return (rd.issue && rd.issue.completedAt) || (rd.agreement && rd.agreement.inspectionDate && new Date(rd.agreement.inspectionDate + 'T00:00:00').getTime()) || entry.savedAt || Date.now();
+}
+
+// The answers a client asks about, from any report, for last time against now.
+function visitFacts(rd) {
+  rd = rd || {};
+  const fs = (rd.findings || []).filter(f => f && f.termiteActivity);
+  const where = list => list.map(f => f.activityLocation).filter(Boolean).join('; ');
+  const live = fs.filter(f => f.termiteActivity === 'ACTIVE'), old = fs.filter(f => f.termiteActivity === 'INACTIVE');
+  const conducive = conduciveConditions(rd);
+  const conduciveAnswered = ['waterLeaks', 'timberSoil', 'weepHoles', 'antCapping', 'slabEdge', 'subfloorVentilation', 'mouldSeen', 'siteDrainage', 'subfloorDrainage', 'nonDurableTimber'].some(k => !isBlankValue(rd[k]));
+  const yn = v => ({ YES: 'Yes', NO: 'No' })[v] || '';
+  return [
+    ['Live termites', live.length ? `Yes: ${where(live) || 'see findings'}` : fs.length ? 'No' : ''],
+    ['Workings or damage', old.length ? `Yes: ${where(old) || 'see findings'}` : fs.length ? 'No' : ''],
+    ['Borers', { ACTIVE: 'Active', INACTIVE: 'Old damage', NONE: 'No' }[rd.borerActivity] || ''],
+    ['Wood decay', yn(rd.decayFound)],
+    ['Conducive conditions', conducive.length ? conducive.join('; ').replace(/^./, c => c.toUpperCase()) : conduciveAnswered ? 'None' : ''],
+    ['Termite management system', rd.existingSystem || ''],
+    ['Treatment recommended', yn(rd.treatmentRecommended)],
+    ['Risk of termite attack', rd.riskLevel || ''],
+    ['Next inspection', rd.inspectionFrequency || ''],
+  ];
+}
+
+// What the last report found, in the words the Known Termite History field uses.
+function termiteHistoryFrom(entry) {
+  const rd = entry.reportData || {};
+  const when = formatIssueDate(visitDate(entry));
+  const fs = (rd.findings || []).filter(f => f && f.termiteActivity);
+  const live = fs.filter(f => f.termiteActivity === 'ACTIVE'), old = fs.filter(f => f.termiteActivity === 'INACTIVE');
+  const where = list => list.map(f => f.activityLocation).filter(Boolean).slice(0, 2).join('; ');
+  const t = entry.quote && entry.quote.treatment;
+  const treatedOn = t && t.date ? formatIssueDate(new Date(t.date + 'T00:00:00')) : '';
+  if (treatedOn) return `Treated before (${treatedOn}, after our inspection on ${when}${live.length ? `: live termites, ${where(live)}` : ''})`;
+  if (live.length) return `Termites reported before (our inspection on ${when}: live termites, ${where(live)})`;
+  if (old.length) return `Termites reported before (our inspection on ${when}: workings or damage, ${where(old)})`;
+  if (fs.length) return `None known (our inspection on ${when} found no termite activity)`;
+  return '';
+}
+
+function renderLastVisitBanner() {
+  const banner = document.getElementById('lastVisitBanner');
+  if (!banner) return;
+  const text = document.getElementById('lastVisitText');
+  const btn = document.getElementById('lastVisitBtn');
+  const skip = document.getElementById('lastVisitSkip');
+  const started = reportData.lastVisit;
+  const prev = started ? null : previousVisitFor();
+  if (started) {
+    banner.hidden = false;
+    text.textContent = `Started from the ${formatIssueDate(started.date)} inspection here.`;
+    btn.textContent = 'What changed';
+    skip.hidden = true;
+  } else if (prev && reportData.lastVisitDismissed !== prev.id) {
+    banner.hidden = false;
+    text.textContent = `Inspected here before, on ${formatIssueDate(visitDate(prev))}.`;
+    btn.textContent = 'Start from it';
+    skip.hidden = false;
+  } else banner.hidden = true;
+}
+
+function lastVisitAction() {
+  if (reportData.lastVisit) openLastVisitChanges();
+  else startFromLastVisit();
+}
+
+function dismissLastVisit() {
+  const prev = previousVisitFor();
+  if (prev) reportData.lastVisitDismissed = prev.id;
+  saveDraft();
+  renderLastVisitBanner();
+}
+
+// Copies what doesn't change about the property, and only into blank
+// fields, so nothing the inspector has already said is overwritten.
+function startFromLastVisit() {
+  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  const prev = previousVisitFor();
+  if (!prev) { renderLastVisitBanner(); return; }
+  const pr = prev.reportData || {};
+  let copied = 0;
+  const put = (k, v) => {
+    reportData[k] = v;
+    const el = document.getElementById('f-' + k);
+    if (el) renderField(el, k, v);
+    copied++;
+  };
+  LAST_VISIT_KEYS.forEach(k => { if (isBlankValue(reportData[k]) && !isBlankValue(pr[k])) put(k, pr[k]); });
+  const history = termiteHistoryFrom(prev);
+  if (history && isBlankValue(reportData.termiteHistory)) put('termiteHistory', history);
+  reportData.lastVisit = { id: prev.id, date: visitDate(prev), copied };
+  delete reportData.lastVisitDismissed;
+  updateProgress();
+  checkAsbestosFlag();
+  checkSystemVerify();
+  saveDraft();
+  renderLastVisitBanner();
+  showToast(copied ? `${copied} detail${copied === 1 ? '' : 's'} copied from the ${formatIssueDate(visitDate(prev))} inspection. Check them as you go` : 'Nothing to copy from the last report', copied ? 'success' : 'info');
+  track('last_visit_started', { copied });
+}
+
+// Last time against now, the answers a client asks about first.
+function openLastVisitChanges() {
+  const lv = reportData.lastVisit;
+  const prev = lv && getSavedReports().find(r => r.id === lv.id);
+  if (!prev) { showToast('The earlier report is no longer on this phone', 'info'); return; }
+  const esc = escapeHtml;
+  const rows = visitFacts(prev.reportData).map(([label, before], i) => {
+    const now = visitFacts(reportData)[i][1];
+    // Marked only once this visit has an answer: a blank isn't a change yet.
+    const changed = !!before && !!now && before !== now;
+    return `<div class="last-visit-row${changed ? ' changed' : ''}"><div class="last-visit-label">${esc(label)}</div>` +
+      `<div class="last-visit-cols"><div><small>Last time</small>${esc(before || 'Not recorded')}</div><div><small>Now</small>${esc(now || 'Not yet')}</div></div></div>`;
+  });
+  document.getElementById('lastVisitSheetSub').textContent =
+    `Inspected ${formatIssueDate(visitDate(prev))}${prev.inspector ? ` by ${prev.inspector}` : ''}. ${lv.copied ? `${lv.copied} property detail${lv.copied === 1 ? '' : 's'} were copied from it.` : ''}`;
+  document.getElementById('lastVisitRows').innerHTML = rows.join('');
+  document.getElementById('lastVisitOverlay').classList.add('open');
+  track('screen_viewed', { screen: 'last_visit_changes' });
+}
+function closeLastVisitChanges() { document.getElementById('lastVisitOverlay').classList.remove('open'); }
 
 // ── ADDRESS SUGGESTIONS ──────────────────────────────────────────────────
 // As the street address is typed, real addresses are listed under it; tapping
@@ -11948,6 +12106,24 @@ const OBS_ZONES_BY_LABEL = Object.fromEntries(Object.entries(OBS_ZONES).map(([z,
 // The headline results, shared by the PDF's summary page and the review
 // screen before sending. Tiles are [label, value, tone (bad | warn | good |
 // none), detail].
+// The conducive conditions a report records, as short phrases.
+function conduciveConditions(rd) {
+  const conducive = [];
+  if (rd.waterLeaks === 'YES') conducive.push(`water leak${rd.leakLocation ? ` (${rd.leakLocation})` : ''}`);
+  else if (rd.moistureReadings === 'YES') conducive.push('elevated moisture');
+  if (rd.timberSoil === 'YES') conducive.push('timber in contact with soil');
+  if (rd.weepHoles === 'BRIDGED') conducive.push('weep holes bridged');
+  if (rd.antCapping === 'GAPS') conducive.push('gaps in the ant capping');
+  else if (rd.antCapping === 'NONE') conducive.push('no ant capping on piers');
+  if (rd.slabEdge === 'OBSTRUCTED') conducive.push('slab edge concealed');
+  if (rd.subfloorVentilation === 'POOR') conducive.push('poor subfloor ventilation');
+  if (rd.mouldSeen === 'YES') conducive.push(`mould growth${rd.mouldWhere ? ` (${rd.mouldWhere})` : ''}`);
+  if (rd.siteDrainage === 'POOR') conducive.push('poor site drainage');
+  if (rd.subfloorDrainage === 'POOR') conducive.push('poor subfloor drainage');
+  if (rd.nonDurableTimber === 'YES') conducive.push(`untreated or non-durable timber in a damp area${whatWhere(rd.nonDurableTimberDetails, rd.nonDurableTimberWhere) ? ` (${whatWhere(rd.nonDurableTimberDetails, rd.nonDurableTimberWhere)})` : ''}`);
+  return conducive;
+}
+
 function reportSummary() {
   const fs = (reportData.findings || []).filter(f => f && f.termiteActivity);
   const live = fs.filter(f => f.termiteActivity === 'ACTIVE');
@@ -11958,19 +12134,7 @@ function reportSummary() {
   const borerReferral = shownBorerFindings().some(b => b.structuralConcern === 'YES');
   const structural = termiteReferral || borerReferral;
   const unanswered = findingsMissingReferral();
-  const conducive = [];
-  if (reportData.waterLeaks === 'YES') conducive.push(`water leak${reportData.leakLocation ? ` (${reportData.leakLocation})` : ''}`);
-  else if (reportData.moistureReadings === 'YES') conducive.push('elevated moisture');
-  if (reportData.timberSoil === 'YES') conducive.push('timber in contact with soil');
-  if (reportData.weepHoles === 'BRIDGED') conducive.push('weep holes bridged');
-  if (reportData.antCapping === 'GAPS') conducive.push('gaps in the ant capping');
-  else if (reportData.antCapping === 'NONE') conducive.push('no ant capping on piers');
-  if (reportData.slabEdge === 'OBSTRUCTED') conducive.push('slab edge concealed');
-  if (reportData.subfloorVentilation === 'POOR') conducive.push('poor subfloor ventilation');
-  if (reportData.mouldSeen === 'YES') conducive.push(`mould growth${reportData.mouldWhere ? ` (${reportData.mouldWhere})` : ''}`);
-  if (reportData.siteDrainage === 'POOR') conducive.push('poor site drainage');
-  if (reportData.subfloorDrainage === 'POOR') conducive.push('poor subfloor drainage');
-  if (reportData.nonDurableTimber === 'YES') conducive.push(`untreated or non-durable timber in a damp area${whatWhere(reportData.nonDurableTimberDetails, reportData.nonDurableTimberWhere) ? ` (${whatWhere(reportData.nonDurableTimberDetails, reportData.nonDurableTimberWhere)})` : ''}`);
+  const conducive = conduciveConditions(reportData);
   const places = list => list.map(f => f.activityLocation).filter(Boolean).join('; ');
   const NR = 'NOT RECORDED';
   const limitedZones = areasNotFullyInspected();

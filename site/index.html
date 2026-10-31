@@ -8,6 +8,11 @@
 <title>SAYON · Timber pest reports finished on site</title>
 <meta name="description" content="SAYON turns a timber pest inspector's voice notes into a finished AS 4349.3 report, then carries the job through quote, signature and treatment certificate.">
 <link rel="icon" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<meta property="og:title" content="SAYON · Timber pest reports finished on site">
+<meta property="og:description" content="Talk through the inspection. Leave with the AS 4349.3 report, quote, signature and treatment certificate done.">
+<meta property="og:image" content="https://sayon-app.github.io/icon-512.png">
+<meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -125,10 +130,11 @@
         <h1>Talk through the inspection. Leave with the report done.</h1>
         <p class="lead">SAYON turns what you say on site into a finished AS 4349.3 timber pest report, then carries the job through the quote, the client's signature and the treatment certificate.</p>
         <div class="cta-row">
-          <a class="btn btn-main" href="https://sayon-app.github.io/">Start your free trial</a>
+          <a class="btn btn-main" href="https://sayon-app.github.io/?signup=1">Start your free trial</a>
           <a class="btn btn-ghost" href="#how">See how it works</a>
         </div>
-        <p class="hero-note">14 days free. Works on any phone or tablet, straight from the browser.</p>
+        <p class="hero-note">14 days free, no card needed. Works on any phone or tablet, straight from the browser.</p>
+        <p class="hero-note">See a sample <a href="../samples/sample-report.pdf" target="_blank" rel="noopener">report</a>, <a href="../samples/sample-quote.pdf" target="_blank" rel="noopener">quote</a> and <a href="../samples/sample-certificate.pdf" target="_blank" rel="noopener">certificate</a>.</p>
       </div>
 
       <div class="phone" aria-hidden="true">
@@ -180,11 +186,10 @@
         <p>Most inspectors spend 45 to 90 minutes writing up each report. With SAYON, what's left is a quick check and send.</p>
       </div>
       <div class="stats">
-        <div class="stat"><div class="big">45 min</div><p>saved on a typical report</p></div>
-        <div class="stat"><div class="big">22 hours</div><p>back each month for an inspector doing 30 jobs</p></div>
+        <div class="stat"><div class="big">On site</div><p>the report is written while you walk the house, not at the kitchen table that night</p></div>
         <div class="stat"><div class="big">Same day</div><p>reports, which pre-purchase clients now expect</p></div>
+        <div class="stat"><div class="big">One app</div><p>report, quote, the client's signature and the treatment certificate</p></div>
       </div>
-      <p class="fine">Estimates based on inspectors' reported write-up times. Your time saved depends on your jobs.</p>
     </div>
   </section>
 
@@ -192,20 +197,21 @@
     <div class="wrap">
       <div class="section-head">
         <h2>Simple pricing</h2>
-        <p>One plan with everything in it, priced per inspector.</p>
+        <p>Every plan has the whole app. Plans only differ in how many AI fills you get a month: one fill is one job the AI does for you, such as filling in the report and quote from what you said. A typical inspection uses 5 to 10.</p>
       </div>
       <div class="price">
-        <h3>SAYON</h3>
-        <!-- When the price is set: put it in the amount (e.g. $79), drop the
-             amount-tbc class and remove hidden from the line under it. -->
-        <div class="amount amount-tbc" id="priceAmount">Price coming soon</div>
-        <p style="color:var(--ink2)" hidden>per inspector a month, plus GST</p>
+        <h3>Starter, Pro or Business</h3>
+        <!-- When the prices are set: put them in the amount line (e.g. $49 · $99 · $199 a month),
+             drop the amount-tbc class and remove hidden from the line under it. -->
+        <div class="amount amount-tbc" id="priceAmount">Prices coming soon</div>
+        <p style="color:var(--ink2)" hidden>a month, in Australian dollars, no GST</p>
         <ul>
-          <li>Reports, quotes, signatures and treatment certificates</li>
-          <li>Photos on every finding</li>
-          <li>Email to your clients from the app</li>
+          <li>Starter: about 20 inspections a month. Pro: about 55. Business: about 280.</li>
+          <li>Reports, quotes, signatures and treatment certificates, with photos on every finding</li>
+          <li>Email to your clients from the app, and a link for them to accept the quote on their phone</li>
+          <li>Cancel any time; your plan runs to the end of the month you've paid for</li>
         </ul>
-        <a class="btn btn-main" href="https://sayon-app.github.io/">Start your 14-day free trial</a>
+        <a class="btn btn-main" href="https://sayon-app.github.io/?signup=1">Start your 14-day free trial</a>
       </div>
     </div>
   </section>
@@ -218,7 +224,10 @@
         <details><summary>What if there's no signal under the house?</summary><p>Record your notes anyway. They wait on your phone and go through as soon as you have signal again, in the order you recorded them.</p></details>
         <details><summary>Which standard do the reports follow?</summary><p>Reports are laid out for timber pest inspections under AS 4349.3, including the areas you couldn't inspect and why.</p></details>
         <details><summary>Does SAYON decide what's wrong with the house?</summary><p>No. You're the inspector. SAYON writes up what you say and you check every answer before it's sent. Anything structural is referred to a builder or engineer.</p></details>
-        <details><summary>Can my whole team use it?</summary><p>Yes. Your company details and quote prices are shared across your team, and each inspector signs in with their own account.</p></details>
+        <details><summary>Can my whole team use it?</summary><p>One account per business for now. If you have a second inspector, email us and we'll link them to your business so they share your company details and prices.</p></details>
+        <details><summary>Who owns my reports?</summary><p>You do. SAYON stores them so they follow you between phones, and never uses them for anything else. You can download every report and quote from the app at any time.</p></details>
+        <details><summary>Where is my data kept?</summary><p>On your phone, and in your account in a Supabase database. Your voice notes go to Anthropic's AI only to fill in the report, and emails go through Resend. The <a href="../privacy.html">privacy policy</a> names every provider.</p></details>
+        <details><summary>How do I cancel?</summary><p>In the app: tap your initials, then Billing, then Manage. Your plan runs to the end of the month you've paid for, and your reports stay in your account afterwards.</p></details>
       </div>
     </div>
   </section>
@@ -227,7 +236,7 @@
     <div class="wrap">
       <h2>Finish your next report before you leave the driveway.</h2>
       <p>Try SAYON free for 14 days.</p>
-      <a class="btn btn-main" href="https://sayon-app.github.io/">Start your free trial</a>
+      <a class="btn btn-main" href="https://sayon-app.github.io/?signup=1">Start your free trial</a>
     </div>
   </section>
 </main>
@@ -235,7 +244,7 @@
 <footer>
   <div class="wrap">
     <span>© SAYON</span>
-    <span><a href="../terms.html">Terms</a><a href="../privacy.html">Privacy</a></span>
+    <span><a href="../terms.html">Terms</a><a href="../privacy.html">Privacy</a><a href="mailto:sayon.application@gmail.com">Contact</a></span>
   </div>
 </footer>
 

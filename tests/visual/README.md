@@ -30,3 +30,7 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 ## After-extract sheet
 
 `tests/extract-sheet/e2e.js <outDir>` checks the "From your note" sheet: the Before you leave gaps with their one-tap fixes, the Record and Get it signed buttons, the read-back text, and that the send sheet's fixes still work. Screenshots at 390 and 320.
+
+## Last visit
+
+`tests/last-visit/e2e.js <outDir>` saves a report, starts a new job at the same address typed differently, and checks the offer, Not now, Start from it (property details copied, findings and risk not, termite history written) and the Since last visit sheet.

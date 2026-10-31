@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>Sign your inspection agreement</title>
-<!-- The client's page for signing a pre-inspection agreement sent from the
-     app (supabase/remote-signing.sql). No account: the link's id is the key,
-     and the page only calls rpc/get_sign_request and rpc/submit_sign_request. -->
+<!-- The client's page for a link sent from the app: a pre-inspection
+     agreement to sign (supabase/remote-signing.sql), or a treatment quote to
+     accept or decline (supabase/client-link.sql). No account: the link's id
+     is the key, and the page only calls rpc/get_sign_request,
+     rpc/submit_sign_request and rpc/decline_sign_request. -->
 <style>
   :root {
     --bg: #f4f6f8; --card: #ffffff; --ink: #0d1117; --ink2: #3d4a57; --ink3: #5d6b78;
@@ -42,12 +44,40 @@
   .state p { color: var(--ink2); }
   .tick { width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; margin: 0 auto 16px; font-size: 28px; }
   .foot { text-align: center; color: var(--ink3); font-size: 13px; margin-top: 24px; }
+  /* Quote */
+  .card h2.sec { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
+  .purpose { background: var(--accent-light); border-left: 3px solid var(--accent); padding: 12px 14px; border-radius: 8px; color: var(--ink2); font-size: 15px; }
+  .item { display: flex; justify-content: space-between; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .item:last-of-type { border-bottom: 0; }
+  .item-desc { font-weight: 600; font-size: 15px; }
+  .item-detail { color: var(--ink2); font-size: 14px; margin-top: 2px; }
+  .item-qty { color: var(--ink3); font-size: 13px; margin-top: 2px; }
+  .item-amt { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .totals { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .totals div { display: flex; justify-content: space-between; color: var(--ink2); font-size: 14px; padding: 2px 0; font-variant-numeric: tabular-nums; }
+  .totals .grand { color: var(--ink); font-weight: 700; font-size: 18px; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .fact { background: var(--accent-light); border-radius: 8px; padding: 10px 12px; }
+  .fact small { display: block; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); font-weight: 700; margin-bottom: 2px; }
+  .fact b { font-size: 14px; }
+  .sub { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3); font-weight: 700; margin: 12px 0 6px; }
+  ol.steps, ul.steps { padding-left: 22px; color: var(--ink2); font-size: 15px; }
+  ol.steps li, ul.steps li { margin-bottom: 6px; }
+  .note { color: var(--ink3); font-size: 13.5px; margin-top: 10px; }
+  .docs a { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 0; color: var(--accent); font-weight: 600; text-decoration: none; border-bottom: 1px solid var(--line); }
+  .docs a:last-child { border-bottom: 0; }
+  .accept-text { font-size: 15px; color: var(--ink2); margin-bottom: 14px; }
+  .btn.secondary { background: none; color: var(--ink2); border: 1px solid var(--line); margin-top: 10px; font-weight: 600; }
+  textarea { width: 100%; font: inherit; padding: 12px; min-height: 96px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; resize: vertical; }
+  .decline { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 16px; }
+  .decline p { color: var(--ink2); font-size: 15px; margin-bottom: 10px; }
+  .btn.danger { background: #fff; color: var(--error); border: 1.5px solid var(--error); }
   .foot a { color: var(--ink3); }
 </style>
 </head>
 <body>
 <div class="wrap" id="app">
-  <div class="card state"><p>Loading your agreement…</p></div>
+  <div class="card state"><p>Loading…</p></div>
 </div>
 <script>
 const SUPABASE_URL = 'https://bmjgvogxutwyeklxxeao.supabase.co';
@@ -70,12 +100,18 @@ function el(tag, cls, text) {
   return n;
 }
 
-function showState(title, text, done) {
+function showState(title, text, done, more) {
   app.textContent = '';
   const c = el('div', 'card state');
   if (done) c.appendChild(el('div', 'tick', '✓'));
   c.append(el('h1', null, title), el('p', null, text));
+  if (more) { const m = el('p', 'note', more); m.style.marginTop = '12px'; c.appendChild(m); }
   app.appendChild(c);
+}
+
+function formatAUD(n) {
+  const v = isFinite(n) ? +n : 0;
+  return v.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' });
 }
 
 function formatDate(iso) {
@@ -192,17 +228,169 @@ function renderForm(doc) {
   });
 }
 
+
+// ── The quote ─────────────────────────────────────────────────────────────
+// doc = { kind:'quote', company, client, address, number, date, validUntil,
+//   inspector, gst, items:[{desc, detail, qty, unit, price, total}],
+//   subtotal, gstAmount, total, problem, plan:{time, service, inspections,
+//   we:[], owner:[]}, exclusions:[], notes:[], paymentTerms, files:{report,
+//   quote}, acceptText }. Everything the quote PDF says, laid out for a phone.
+function renderQuote(doc) {
+  document.title = 'Your treatment quote';
+  app.textContent = '';
+  const head = el('div', 'head');
+  if (doc.company) head.appendChild(el('div', 'company', doc.company));
+  head.appendChild(el('h1', null, 'Treatment quote'));
+  const meta = [doc.address, doc.number && `Quote ${doc.number}`, doc.validUntil && `Valid until ${formatDate(doc.validUntil)}`].filter(Boolean).join(' · ');
+  if (meta) head.appendChild(el('p', 'meta', meta));
+  app.appendChild(head);
+
+  const card = (title) => { const c = el('div', 'card'); if (title) c.appendChild(el('h2', 'sec', title)); app.appendChild(c); return c; };
+
+  if (doc.problem) card().appendChild(el('p', 'purpose', doc.problem));
+
+  const scope = card('Scope of works');
+  (doc.items || []).forEach(it => {
+    const row = el('div', 'item');
+    const left = el('div');
+    left.appendChild(el('div', 'item-desc', it.desc || 'Work'));
+    if (it.detail) left.appendChild(el('div', 'item-detail', it.detail));
+    const qty = [it.qty, it.unit].filter(v => v != null && String(v).trim() !== '').join(' ');
+    if (qty && !(String(it.qty) === '1' && !it.unit)) left.appendChild(el('div', 'item-qty', `${qty} × ${formatAUD(it.price)}`));
+    row.append(left, el('div', 'item-amt', formatAUD(it.total)));
+    scope.appendChild(row);
+  });
+  const totals = el('div', 'totals');
+  const line = (k, v, cls) => { const d = el('div', cls); d.append(el('span', null, k), el('span', null, v)); totals.appendChild(d); };
+  if (doc.gst !== false) { line('Subtotal (ex GST)', formatAUD(doc.subtotal)); line('GST (10%)', formatAUD(doc.gstAmount)); }
+  line(doc.gst !== false ? 'Total inc GST' : 'Total', formatAUD(doc.total), 'grand');
+  scope.appendChild(totals);
+  if (doc.paymentTerms) { const n = el('p', 'note', doc.paymentTerms); n.style.whiteSpace = 'pre-line'; scope.appendChild(n); }
+
+  const plan = doc.plan || {};
+  const facts = [['Time on site', plan.time], ['Free service period', plan.service], ['Inspections after', plan.inspections]].filter(([, v]) => v);
+  if (facts.length || (plan.we || []).length || (plan.owner || []).length) {
+    const c = card('Treatment plan');
+    if (facts.length) {
+      const grid = el('div', 'facts');
+      facts.forEach(([k, v]) => { const f = el('div', 'fact'); f.append(el('small', null, k), el('b', null, v)); grid.appendChild(f); });
+      c.appendChild(grid);
+    }
+    const steps = (label, list, ordered) => {
+      if (!list || !list.length) return;
+      c.appendChild(el('div', 'sub', label));
+      const ul = el(ordered ? 'ol' : 'ul', 'steps');
+      list.forEach(t => ul.appendChild(el('li', null, t)));
+      c.appendChild(ul);
+    };
+    steps('What we will do', plan.we, true);
+    steps('What we ask you to do', plan.owner, false);
+    if (plan.service && !/^none$/i.test(plan.service.trim())) {
+      c.appendChild(el('p', 'note', 'During the free service period, if termites return to the treated areas we will come back and treat them at no charge. This only applies while the recommended timber pest inspections are carried out and the steps asked of you above are done.'));
+    }
+  }
+  if ((doc.exclusions || []).length) {
+    const c = card('Exclusions and work by others');
+    const ul = el('ul', 'steps'); doc.exclusions.forEach(t => ul.appendChild(el('li', null, t))); c.appendChild(ul);
+  }
+  if ((doc.notes || []).length) {
+    const c = card('Terms and notes');
+    doc.notes.forEach(t => c.appendChild(el('p', 'note', t)));
+  }
+  const files = doc.files || {};
+  if (files.report || files.quote) {
+    const c = card('Your documents');
+    const docs = el('div', 'docs');
+    const link = (href, text) => { const a = el('a', null, '⬇  ' + text); a.href = href; a.target = '_blank'; a.rel = 'noopener'; docs.appendChild(a); };
+    if (files.report) link(files.report, 'Inspection report (PDF)');
+    if (files.quote) link(files.quote, 'Treatment quote (PDF)');
+    c.appendChild(docs);
+  }
+
+  // Accept, or decline.
+  const form = card('Your answer');
+  const acceptText = doc.acceptText || `I accept this quote of ${formatAUD(doc.total)}${doc.gst !== false ? ' (inc GST)' : ''} and authorise the work described above.`;
+  const nameLabel = el('label', 'field', 'Your full name'); nameLabel.htmlFor = 'name';
+  const name = el('input'); name.type = 'text'; name.id = 'name'; name.autocomplete = 'name'; name.value = doc.client || '';
+  const check = el('label', 'check');
+  const agree = el('input'); agree.type = 'checkbox';
+  check.append(agree, el('span', null, acceptText));
+  const padLabel = el('div', 'field', 'Sign here');
+  const padWrap = el('div', 'pad');
+  const canvas = el('canvas'); const hint = el('span', null, 'Sign with your finger');
+  padWrap.append(canvas, hint);
+  const clear = el('button', 'clear', 'Clear signature'); clear.type = 'button';
+  const btn = el('button', 'btn', 'Accept quote'); btn.type = 'button'; btn.disabled = true;
+  const err = el('p', 'err');
+  const declineBtn = el('button', 'btn secondary', 'I don’t want to go ahead'); declineBtn.type = 'button';
+  form.append(nameLabel, name, check, padLabel, padWrap, clear, btn, err, declineBtn);
+
+  const decline = el('div', 'decline'); decline.hidden = true;
+  decline.appendChild(el('p', null, `Let ${doc.company || 'your inspector'} know you’re not going ahead. A reason helps, but isn’t needed.`));
+  const noteLabel = el('label', 'field', 'Reason (optional)'); noteLabel.htmlFor = 'declineNote';
+  const note = el('textarea'); note.id = 'declineNote'; note.placeholder = 'e.g. Going with another company';
+  const sendDecline = el('button', 'btn danger', 'Decline quote'); sendDecline.type = 'button';
+  const derr = el('p', 'err');
+  decline.append(noteLabel, note, sendDecline, derr);
+  form.appendChild(decline);
+
+  const update = () => { btn.disabled = !(name.value.trim() && agree.checked && pad.signed()); };
+  const pad = makePad(canvas, hint, update);
+  name.addEventListener('input', update);
+  agree.addEventListener('change', update);
+  clear.addEventListener('click', () => pad.clear());
+  declineBtn.addEventListener('click', () => { decline.hidden = !decline.hidden; if (!decline.hidden) note.focus(); });
+  const meta_ = () => ({ userAgent: navigator.userAgent.slice(0, 300), tz: Intl.DateTimeFormat().resolvedOptions().timeZone || '' });
+  const who = doc.company || 'Your inspector';
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = 'Sending…'; err.textContent = '';
+    try {
+      const res = await rpc('submit_sign_request', { p_id: id, p_name: name.value.trim(), p_signature: pad.png(), p_meta: meta_() });
+      if (res === 'signed' || res === 'already_signed') {
+        showState('Quote accepted, thank you', `${who} has your acceptance and will be in touch to arrange the work. You can close this page.`, true);
+      } else if (res === 'expired') showState('This link has expired', `Please ask ${who} to send a new one.`);
+      else if (res === 'cancelled') showState('This quote was withdrawn', `Please contact ${who}.`);
+      else throw new Error(res);
+    } catch (e) {
+      err.textContent = 'That didn’t go through. Check your connection and try again.';
+      btn.textContent = 'Accept quote'; update();
+    }
+  });
+  sendDecline.addEventListener('click', async () => {
+    if (!name.value.trim()) { derr.textContent = 'Enter your name above first.'; name.focus(); return; }
+    sendDecline.disabled = true; sendDecline.textContent = 'Sending…'; derr.textContent = '';
+    try {
+      const res = await rpc('decline_sign_request', { p_id: id, p_name: name.value.trim(), p_note: note.value.trim() || null, p_meta: meta_() });
+      if (res === 'declined') showState('Thanks for letting us know', `${who} has your answer. You can close this page.`, true);
+      else if (res === 'already_signed') showState('Already accepted', 'This quote was already accepted from this link.', true);
+      else if (res === 'expired') showState('This link has expired', `Please ask ${who} to send a new one.`);
+      else if (res === 'cancelled') showState('This quote was withdrawn', `Please contact ${who}.`);
+      else throw new Error(res);
+    } catch (e) {
+      derr.textContent = 'That didn’t go through. Check your connection and try again.';
+      sendDecline.disabled = false; sendDecline.textContent = 'Decline quote';
+    }
+  });
+}
+
 (async () => {
   if (!/^[0-9a-f-]{36}$/i.test(id)) { showState('This link isn’t complete', 'Please open the full link you were sent.'); return; }
   try {
     const r = await rpc('get_sign_request', { p_id: id });
-    if (!r) showState('Agreement not found', 'Please open the full link you were sent, or ask your inspector for a new one.');
-    else if (r.status === 'signed') showState('Already signed', `Signed by ${r.signer_name} on ${formatDate(r.signed_at)}. There’s nothing more to do.`, true);
-    else if (r.status === 'expired') showState('This link has expired', `Please ask ${r.doc.company || 'your inspector'} to send a new one.`);
-    else if (r.status === 'cancelled') showState('This agreement was withdrawn', `Please contact ${r.doc.company || 'your inspector'}.`);
-    else renderForm(r.doc || {});
+    const doc = (r && r.doc) || {};
+    const quote = doc.kind === 'quote';
+    const thing = quote ? 'quote' : 'agreement';
+    const who = doc.company || 'your inspector';
+    if (!r) showState(`${quote ? 'Quote' : 'Agreement'} not found`, 'Please open the full link you were sent, or ask your inspector for a new one.');
+    else if (r.status === 'signed') showState(quote ? 'Quote accepted' : 'Already signed', `${quote ? 'Accepted' : 'Signed'} by ${r.signer_name} on ${formatDate(r.signed_at)}. There’s nothing more to do.`, true);
+    else if (r.status === 'declined') showState('Quote declined', `You let ${who} know on ${formatDate(r.signed_at)} that you’re not going ahead.`, false, r.note ? `Your note: ${r.note}` : '');
+    else if (r.status === 'expired') showState('This link has expired', `Please ask ${who} to send a new one.`);
+    else if (r.status === 'cancelled') showState(`This ${thing} was withdrawn`, `Please contact ${who}.`);
+    else if (quote) renderQuote(doc);
+    else renderForm(doc);
   } catch (e) {
-    showState('Couldn’t load the agreement', 'Check your connection and open the link again.');
+    showState('Couldn’t load it', 'Check your connection and open the link again.');
   }
 })();
 </script>

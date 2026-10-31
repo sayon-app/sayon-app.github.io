@@ -1136,6 +1136,14 @@
           <button class="agreement-banner-btn" id="agreementBannerBtn" onclick="openAgreementSheet()">Get it signed</button>
         </div>
 
+        <!-- Last visit: an address this account has inspected before (LAST VISIT in js/app.js) -->
+        <div class="agreement-banner last-visit-banner" id="lastVisitBanner" hidden>
+          <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></svg>
+          <span class="agreement-banner-text" id="lastVisitText"></span>
+          <button class="link-btn last-visit-skip" id="lastVisitSkip" onclick="dismissLastVisit()">Not now</button>
+          <button class="agreement-banner-btn" id="lastVisitBtn" onclick="lastVisitAction()">Start from it</button>
+        </div>
+
         <!-- PROPERTY -->
         <div class="report-section grouped" id="section-property">
           <div class="section-header">
@@ -2113,7 +2121,27 @@
       <div class="extract-summary-filled" id="extractSummaryFilled"></div>
       <div class="extract-summary-label" id="extractSummaryBlankLabel">Left blank</div>
       <div class="extract-summary-list" id="extractSummaryBlanks"></div>
-      <button class="extract-btn" onclick="closeExtractSummary()">Done</button>
+      <div class="extract-summary-label">Before you leave</div>
+      <div class="extract-summary-gaps" id="extractSummaryGaps"></div>
+      <div class="extract-summary-actions">
+        <button class="extract-btn" onclick="closeExtractSummary()">Done</button>
+        <button class="link-btn extract-readback-btn" id="extractReadBackBtn" onclick="toggleReadBack()" hidden>Read it back</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LAST VISIT: last time against now -->
+<div class="page-sheet-overlay" id="lastVisitOverlay" onclick="if(event.target===this)closeLastVisitChanges()">
+  <div class="page-sheet extract-summary-sheet" role="dialog" aria-modal="true" aria-labelledby="lastVisitTitle">
+    <div class="page-sheet-header">
+      <span class="page-sheet-title" id="lastVisitTitle">Since last visit</span>
+      <button class="voice-popover-close" onclick="closeLastVisitChanges()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+    </div>
+    <div class="page-sheet-body">
+      <div class="extract-summary-done" id="lastVisitSheetSub"></div>
+      <div class="last-visit-rows" id="lastVisitRows"></div>
+      <button class="extract-btn" onclick="closeLastVisitChanges()">Done</button>
     </div>
   </div>
 </div>

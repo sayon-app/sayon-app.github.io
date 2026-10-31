@@ -26,3 +26,7 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 ## Client link
 
 `tests/client-link/e2e.js <outDir>` runs the quote link end to end against canned Supabase and Worker routes: Send from the quote screen makes the link and emails it, the check sheet reuses it, the client accepts (and another declines) on `sign.html`, and the app reads the answer back. Same setup as above (`setup.sh`, the server on :8765). It writes screenshots and the accepted quote PDF to `<outDir>`.
+
+## After-extract sheet
+
+`tests/extract-sheet/e2e.js <outDir>` checks the "From your note" sheet: the Before you leave gaps with their one-tap fixes, the Record and Get it signed buttons, the read-back text, and that the send sheet's fixes still work. Screenshots at 390 and 320.

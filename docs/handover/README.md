@@ -109,7 +109,7 @@ iPhone browser / home-screen PWA
 
 - **Worker:** live is v8.1 (v8 Stripe billing + the 16000 cap + effort passthrough; confirmed on Cloudflare 2026-10-05). `worker/worker.js`, the same on `main` and `live`, is v9 = v8.1 + `/send-email` (secrets `RESEND_API_KEY`, `MAIL_FROM`). It waits on the business's own email domain being verified in Resend (steps in `worker/README.md`); until then the app opens the phone's mail app.
 - **Stripe:** test mode only. Live mode is parked.
-- **Supabase:** the base schema and RLS policies are not in the repo; read them (`list_tables`, read-only) before you change sync code. `supabase/` holds later additions (`business-settings.sql`, `delete-account.sql`, `report-photos.sql`, `remote-signing.sql`), all already applied: don't re-run them. `client-link.sql` (the quote link) is pending until baz applies it; check `docs/handover/state.md`. A new change goes in a new file, applied after baz has seen it.
+- **Supabase:** the base schema and RLS policies are not in the repo; read them (`list_tables`, read-only) before you change sync code. `supabase/` holds later additions (`business-settings.sql`, `delete-account.sql`, `report-photos.sql`, `remote-signing.sql`), all already applied: don't re-run them. `client-link.sql` (the quote link) was applied on 2026-10-31. A new change goes in a new file, applied after baz has seen it.
 
 ## 5. Testing, and checking what's live
 

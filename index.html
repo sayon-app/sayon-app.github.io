@@ -2113,7 +2113,12 @@
       <div class="extract-summary-filled" id="extractSummaryFilled"></div>
       <div class="extract-summary-label" id="extractSummaryBlankLabel">Left blank</div>
       <div class="extract-summary-list" id="extractSummaryBlanks"></div>
-      <button class="extract-btn" onclick="closeExtractSummary()">Done</button>
+      <div class="extract-summary-label">Before you leave</div>
+      <div class="extract-summary-gaps" id="extractSummaryGaps"></div>
+      <div class="extract-summary-actions">
+        <button class="extract-btn" onclick="closeExtractSummary()">Done</button>
+        <button class="link-btn extract-readback-btn" id="extractReadBackBtn" onclick="toggleReadBack()" hidden>Read it back</button>
+      </div>
     </div>
   </div>
 </div>

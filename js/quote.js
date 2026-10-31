@@ -1215,6 +1215,7 @@ function rebuildQuoteFromReport() {
 // works on a completed (locked) job.
 const QUOTE_ANSWER_METHODS = {
   signed: 'signed on the phone',
+  link: 'signed on their phone from the link',
   email: 'by email',
   phone: 'by phone',
   paper: 'on paper',
@@ -1237,7 +1238,8 @@ function formatAnswerDate(iso) {
 function quoteAnswerSummary(q) {
   if (!quoteHasItems(q)) return null;
   const a = quoteAnswerState(q);
-  if (!a) return q.sentAt ? { short: 'Quote sent', text: 'Waiting on the client\'s answer to the quote', tone: 'wait' } : null;
+  if (!a && q.linkRequest) checkQuoteLink(q, false);
+  if (!a) return q.sentAt ? { short: 'Quote sent', text: quoteLinkCurrent(q) ? 'Quote sent with a link to accept it. Waiting on the client' : 'Waiting on the client\'s answer to the quote', tone: 'wait' } : null;
   if (a.stale) return { short: 'Quote changed', text: 'The quote changed after the client answered. Get their answer on the new version', tone: 'warn' };
   if (a.status === 'accepted' && q.treatment) return { short: 'Treatment done', text: `Treatment done on ${formatAnswerDate(q.treatment.date)}. ${certificateGiven(q) ? 'Certificate given' : 'Send the client the certificate'}`, tone: 'good' };
   if (a.status === 'accepted') return { short: 'Quote accepted', text: `Quote accepted by ${a.by} on ${formatAnswerDate(a.date)}. Record the treatment once it's done`, tone: 'good' };
@@ -1270,7 +1272,22 @@ function renderQuoteAnswer() {
     : { title: 'Sent to the client', state: 'warn', text: `Sent ${esc(formatIssueDate(q.sentAt))}. You've changed the quote since, so send the new version.` };
 
   let answer;
-  if (!a) {
+  const link = quoteLinkCurrent(q);
+  if (!a && link && sentNow) {
+    checkQuoteLink(q, false);
+    answer = {
+      title: 'Client\'s answer', state: 'now',
+      text: `The quote went with a link. When ${esc((q.client || 'the client').split(/\s+/)[0])} taps Accept or Decline on their phone, it shows here. Heard back another way? Record it below.`,
+      extra: `<div class="qp-links">
+          <button class="quote-text-btn" onclick="checkQuoteLink(quoteState, true)">Check now</button>
+          <button class="quote-text-btn" onclick="shareQuoteLink(quoteState)">Share the link</button>
+        </div>
+        <div class="quote-answer-btns">
+          <button class="quote-btn" onclick="openQuoteAnswer('accepted')">Accepted</button>
+          <button class="quote-btn" onclick="openQuoteAnswer('declined')">Declined</button>
+        </div>`,
+    };
+  } else if (!a) {
     answer = {
       title: 'Client\'s answer', state: sentNow ? 'now' : 'todo',
       text: q.sentAt ? 'Waiting on the client. Record their answer when it comes.' : 'Already answered on the spot or by phone? Record it here.',
@@ -1285,7 +1302,7 @@ function renderQuoteAnswer() {
           </div>`,
     };
   } else {
-    const how = a.status === 'accepted' ? (QUOTE_ANSWER_METHODS[a.method] || '') : '';
+    const how = a.status === 'accepted' ? (QUOTE_ANSWER_METHODS[a.method] || '') : a.method === 'link' ? 'from the link on their phone' : '';
     answer = {
       title: 'Client\'s answer', state: a.stale ? 'warn' : a.status === 'accepted' ? 'done' : 'bad',
       text: `<strong>${a.status === 'accepted' ? 'Accepted' : 'Declined'}</strong> by ${esc(a.by)} on ${esc(formatAnswerDate(a.date))}${how ? `, ${esc(how)}` : ''}`,
@@ -1469,7 +1486,7 @@ function quoteContentHash(q) {
   // 'booking' and 'invoice' are left over from features that were removed;
   // older quotes may still carry them, and they never counted as content.
   ['updatedAt', 'createdAt', 'sentAt', 'sentHash', 'certificateSentAt', 'certificateHandedAt', 'reportKey', 'answer', 'booking', 'treatment', 'invoice',
-    'sourceAddress', 'issuedAt', 'issuedHash'].forEach(k => delete content[k]);
+    'sourceAddress', 'issuedAt', 'issuedHash', 'linkRequest'].forEach(k => delete content[k]);
   return sha256Hex(stableJson(content));
 }
 // The day this version of the quote was first given to the client. The PDF
@@ -1510,7 +1527,9 @@ function certificateGiven(q) { return !!(q && (q.certificateSentAt || q.certific
 // takes the same times.
 function storeSentQuote(q) {
   if (quoteState && quoteState !== q && quoteState.reportKey === q.reportKey) {
-    ['sentAt', 'sentHash', 'certificateSentAt', 'certificateHandedAt', 'issuedAt', 'issuedHash'].forEach(k => { if (q[k]) quoteState[k] = q[k]; else if (k === 'certificateHandedAt') delete quoteState[k]; });
+    ['sentAt', 'sentHash', 'certificateSentAt', 'certificateHandedAt', 'issuedAt', 'issuedHash', 'linkRequest', 'answer'].forEach(k => {
+      if (q[k]) quoteState[k] = q[k]; else if (k === 'certificateHandedAt' || k === 'linkRequest' || k === 'answer') delete quoteState[k];
+    });
   }
   const all = readJSON(quotesStorageKey(), {});
   all[q.reportKey] = q;
@@ -1560,12 +1579,185 @@ function emailQuoteToClient() {
     return;
   }
   const q = quoteState;
-  sendPdfsToClient({
-    files: [buildQuotePDF(q)],
-    to: (q.clientEmail || '').trim(),
-    subject: `Quote ${q.number || ''} — ${q.address || 'your property'}`.replace('  ', ' '),
-    body: clientMessage({ client: q.client, address: q.address, docs: 'treatment quote', signOff: q.inspector }),
-  }).then(sent => { if (sent) { markQuoteSent(q); track('quote_sent'); } });
+  const btn = document.getElementById('quoteEmailBtn');
+  (async () => {
+    // The link the client accepts from goes in the message. Making it needs
+    // signal and a moment; without either the quote still goes as before.
+    let link = null;
+    if (authSession && navigator.onLine && !quoteLinkCurrent(q)) {
+      btn.disabled = true;
+      document.getElementById('quoteSendLabel').textContent = 'Making the link…';
+      const files = { quote: buildQuotePDF(q) };
+      if (q.reportKey === (currentReportId || 'draft')) {
+        try { files.report = await buildReportPdf(); } catch (e) { reportError(e, 'quote_link_report'); }
+      }
+      link = await ensureQuoteLink(q, files);
+      btn.disabled = false;
+      renderQuoteSendLabel();
+    } else link = quoteLinkCurrent(q);
+    const sent = await sendPdfsToClient({
+      files: [buildQuotePDF(q)],
+      to: (q.clientEmail || '').trim(),
+      subject: `Quote ${q.number || ''} — ${q.address || 'your property'}`.replace('  ', ' '),
+      body: clientMessage({ client: q.client, address: q.address, docs: 'treatment quote', signOff: q.inspector, link: link ? quoteLinkUrl(link.id) : '' }),
+    });
+    if (sent) { markQuoteSent(q); track('quote_sent', { with_link: !!link }); }
+  })();
+}
+
+// ── CLIENT LINK ─────────────────────────────────────────────────────────────
+// The quote goes to the client with a link to sign.html, the same page as
+// the agreement link (supabase/client-link.sql). The client reads the quote
+// there and taps Accept, with a signature, or Decline, with a note. The
+// quote keeps
+//   q.linkRequest = { id, sentAt, hash, files }
+// for this version of the quote (hash), and polls the row until it is
+// answered, which becomes q.answer with method 'link', just as if the
+// inspector had recorded it. A changed quote gets a new link.
+const QUOTE_LINK_CHECK_MS = 60000;
+const quoteLinkChecked = {};
+const CLIENT_DOCS_BUCKET = 'client-docs';
+
+function quoteLinkUrl(id) { return agreementLinkUrl(id); }
+function quoteLinkCurrent(q) {
+  const r = q && q.linkRequest;
+  return r && r.hash === quoteContentHash(q) ? r : null;
+}
+
+// What the client's page shows: everything the quote PDF says.
+function quoteLinkDoc(q, files) {
+  const company = getCompanyDetails();
+  const totals = quoteTotals(q);
+  const issued = quoteIssuedAt(q);
+  const validDays = parseInt(q.validDays, 10) || 30;
+  const plan = q.plan || {};
+  const lines = v => (v || '').split('\n').map(s => s.trim()).filter(Boolean);
+  return {
+    kind: 'quote', company: company.name || '', client: (q.client || '').trim(), address: q.address || '', number: q.number || '',
+    date: isoDate(new Date(issued)), validUntil: isoDate(new Date(issued + validDays * 86400000)), inspector: q.inspector || '',
+    gst: q.gst !== false,
+    items: q.items.map(it => ({ desc: it.desc || '', detail: it.detail || '', qty: it.qty, unit: pluralUnit(it.unit, it.qty),
+      price: parseFloat(it.price) || 0, total: lineTotal(it) })),
+    subtotal: totals.subtotal, gstAmount: totals.gst, total: totals.total,
+    problem: quoteProblem(q).trim(),
+    plan: { time: (plan.time || '').trim(), service: (plan.service || '').trim(), inspections: repairPlanInspections(plan.inspections),
+      we: lines(plan.we), owner: lines(plan.owner) },
+    exclusions: lines(q.exclusions), notes: lines(q.notes), paymentTerms: (q.paymentTerms || '').trim(),
+    files: files || {},
+    acceptText: `I accept quote ${q.number || ''} for ${formatAUD(totals.total)}${q.gst !== false ? ' (inc GST)' : ''} and authorise the work described in it.`,
+  };
+}
+
+// Puts the PDFs where the client's page can offer them, under a folder only
+// the link knows. Best effort: without the bucket the page shows the quote
+// without downloads. Returns { report?, quote? } urls.
+async function uploadClientDocs(folder, files) {
+  const out = {};
+  for (const [key, f] of Object.entries(files || {})) {
+    if (!f || !f.blob) continue;
+    const path = `${folder}/${key === 'report' ? 'inspection-report' : 'treatment-quote'}.pdf`;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${CLIENT_DOCS_BUCKET}/${path}`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${getAuthToken()}`, 'Content-Type': 'application/pdf', 'x-upsert': 'true' },
+        body: f.blob,
+      });
+      if (res.ok) out[key] = `${SUPABASE_URL}/storage/v1/object/public/${CLIENT_DOCS_BUCKET}/${path}`;
+    } catch (e) { /* no signal: the page does without the file */ }
+  }
+  return out;
+}
+
+// The link for this version of the quote, made now if there isn't one.
+// Resolves to the request, or null when it can't be made (signed out, no
+// signal, or the table isn't set up yet), so sending carries on without it.
+async function ensureQuoteLink(q, files) {
+  if (!authSession || !authUser || !navigator.onLine || !quoteHasItems(q)) return null;
+  const current = quoteLinkCurrent(q);
+  if (current) return current;
+  stampQuoteIssued(q);
+  const old = q.linkRequest;
+  if (old) cancelQuoteLinkRow(old.id);
+  try {
+    const folder = `${authUser.id}/${(crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2))}`;
+    const uploaded = await uploadClientDocs(folder, files);
+    const doc = quoteLinkDoc(q, uploaded);
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/sign_requests?select=id`, {
+      method: 'POST',
+      headers: getAuthHeaders({ 'Prefer': 'return=representation' }),
+      body: JSON.stringify({ user_id: authUser.id, report_id: q.reportKey || 'draft', doc }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const [row] = await res.json();
+    q.linkRequest = { id: row.id, sentAt: Date.now(), hash: quoteContentHash(q), files: uploaded };
+    storeSentQuote(q);
+    track('quote_link_made', { with_report: !!uploaded.report });
+    return q.linkRequest;
+  } catch (e) {
+    reportError(e, 'quote_link');
+    return null;
+  }
+}
+
+function cancelQuoteLinkRow(id) {
+  if (!authSession || !id) return;
+  fetch(`${SUPABASE_URL}/rest/v1/sign_requests?id=eq.${encodeURIComponent(id)}&status=eq.pending`, {
+    method: 'PATCH', headers: getAuthHeaders(), body: JSON.stringify({ status: 'cancelled' }),
+  }).catch(() => {});
+}
+
+function quoteLinkMessage(q) {
+  const company = getCompanyDetails().name || 'your inspector';
+  return `Hi ${(q.client || '').trim().split(/\s+/)[0] || 'there'}, here is the treatment quote from ${company} for ${q.address || 'your property'}. Open it to read it and accept or decline on your phone:`;
+}
+
+// The share sheet (text, email, WhatsApp), or the clipboard where there's none.
+async function shareQuoteLink(q) {
+  const r = quoteLinkCurrent(q);
+  if (!r) { showToast('Send the quote first: that makes the link', 'info'); return; }
+  const url = quoteLinkUrl(r.id);
+  const text = quoteLinkMessage(q);
+  if (navigator.share) {
+    try { await navigator.share({ title: 'Treatment quote', text, url }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  try {
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    showToast('Link copied. Paste it into a text or email to the client', 'success');
+  } catch (e) {
+    prompt('Copy this link and send it to the client:', url);
+  }
+}
+
+// Reads the row back. An accepted or declined quote becomes q.answer.
+async function checkQuoteLink(q, byTap) {
+  const r = q && q.linkRequest;
+  if (!r || q.answer || !authSession) return;
+  if (!byTap && Date.now() - (quoteLinkChecked[r.id] || 0) < QUOTE_LINK_CHECK_MS) return;
+  quoteLinkChecked[r.id] = Date.now();
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/sign_requests?id=eq.${encodeURIComponent(r.id)}&select=status,signer_name,signature,signed_at,note`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const [row] = await res.json();
+    if (q.linkRequest !== r || q.answer) return;
+    if (row && (row.status === 'signed' || row.status === 'declined')) {
+      const accepted = row.status === 'signed';
+      q.answer = { status: accepted ? 'accepted' : 'declined', by: row.signer_name || q.client || '', date: isoDate(new Date(row.signed_at)),
+        method: 'link', note: (row.note || '').trim(), at: Date.now(), hash: r.hash };
+      if (accepted && isSignatureImage(row.signature)) q.answer.signature = row.signature;
+      delete q.linkRequest;
+      storeSentQuote(q);
+      if (typeof renderSavedList === 'function') renderSavedList();
+      showToast(accepted ? `${q.answer.by} accepted the quote` : `${q.answer.by} declined the quote`, accepted ? 'success' : 'info');
+      track('quote_answered', { answer: q.answer.status, method: 'link' });
+    } else if (byTap) {
+      showToast(row && row.status === 'cancelled' ? 'That link was cancelled' : 'No answer yet', 'info');
+    }
+  } catch (e) {
+    if (byTap) showToast('Could not check. Try again when you have signal', 'error');
+  }
 }
 
 // ── SHARED PDF PARTS (quote and treatment certificate) ──────────────────────

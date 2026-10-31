@@ -12190,7 +12190,7 @@ function installReportLockGuard() {
 // Browsers that can't share files (desktop) download the PDFs and open a
 // new email to the client instead. The share sheet only opens straight
 // from a tap, so the PDFs must already be built when this is called.
-function clientMessage({ client, address, docs, signOff }) {
+function clientMessage({ client, address, docs, signOff, link }) {
   const company = getCompanyDetails();
   const firstName = (client || '').trim().split(/\s+/)[0];
   return [
@@ -12198,6 +12198,8 @@ function clientMessage({ client, address, docs, signOff }) {
     '',
     `Please find attached your ${docs} for ${address || 'the property'}.`,
     '',
+    // The client link: read the quote and accept or decline it on a phone.
+    ...(link ? ['You can read the quote and accept or decline it on your phone here:', link, ''] : []),
     `If you have any questions, just reply to this email${company.phone ? ` or call us on ${company.phone}` : ''}.`,
     '',
     'Kind regards,',
@@ -12390,11 +12392,14 @@ function openSendReview() {
 
   document.getElementById('sendReviewSubject').value =
     `${withQuote ? 'Timber pest inspection report and quote' : 'Timber pest inspection report'} — ${address || 'your property'}`;
-  document.getElementById('sendReviewBody').value = clientMessage({
+  sendReview.message = {
     client, address,
     docs: withQuote ? 'timber pest inspection report and treatment quote' : 'timber pest inspection report',
     signOff: document.getElementById('jobInspector').value.trim(),
-  });
+  };
+  sendReview.defaultBody = clientMessage(sendReview.message);
+  document.getElementById('sendReviewBody').value = sendReview.defaultBody;
+  if (withQuote) prepareSendReviewLink(sendReview);
   sendReview.label = gaps.length ? 'Send anyway'
     : directEmail && email ? `Send to ${email}` : 'Open email to send';
   const btn = document.getElementById('sendReviewBtn');
@@ -12403,6 +12408,30 @@ function openSendReview() {
   document.getElementById('sendReviewOverlay').classList.add('open');
   const body = document.querySelector('#sendReviewOverlay .page-sheet-body');
   if (body) body.scrollTop = 0;
+}
+
+// The client link for the quote (see CLIENT LINK in js/quote.js): made
+// while the inspector reads the sheet, then added to the message and the
+// Attached list. The PDFs are built now so the page can offer them; they
+// are the same files the send then uses.
+async function prepareSendReviewLink(r) {
+  if (!authSession || !navigator.onLine) return;
+  let link = null;
+  try {
+    const files = await sendReviewFiles(r);
+    link = await ensureQuoteLink(r.quote, { report: files[0], quote: files[1] });
+  } catch (e) {
+    reportError(e, 'send_review_link');
+  }
+  if (!link || sendReview !== r) return;
+  r.link = quoteLinkUrl(link.id);
+  const body = document.getElementById('sendReviewBody');
+  const withLink = clientMessage(Object.assign({}, r.message, { link: r.link }));
+  if (body.value === r.defaultBody) body.value = withLink;
+  r.defaultBody = withLink;
+  const files = document.getElementById('sendReviewFiles');
+  files.insertAdjacentHTML('beforeend', `<div class="send-review-file"><div><div class="send-review-file-name">Link to accept the quote</div>` +
+    `<div class="send-review-file-meta">In the message. The client reads the quote and accepts or declines it on their phone</div></div></div>`);
 }
 
 // Saves the email typed on the check sheet to the job, then redraws the
@@ -12492,7 +12521,7 @@ async function confirmSendReview() {
     });
     if (!sent || sendReview !== r) return;
     closeSendReview();
-    track('report_sent', { documents: files.length, with_quote: !!r.quote });
+    track('report_sent', { documents: files.length, with_quote: !!r.quote, with_link: !!r.link });
     if (r.quote) markQuoteSent(r.quote);
     recordReportSent(r.report.fingerprint, r.report.version);
   } finally {

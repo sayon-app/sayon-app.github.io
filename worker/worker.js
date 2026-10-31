@@ -207,7 +207,7 @@ const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
 // fair-use capped here - see the pricing doc's rationale.
 const PLAN_LIMITS = {
   trial: 50,
-  starter: 150,
+  starter: 800,
   pro: 400,
   business: 2000,
 };

@@ -96,3 +96,19 @@ v2 is missing skirting-active run 2: the API credit ran out mid-round. No weight
 | v4: restrictedAccess never null when an area is PARTIAL or NOT; a limit said right after "inspected" still makes the area PARTIAL | 99.9% (2082/2084) | subfloor-finding-detail (house-test-2, once) |
 
 The two v3 failures were the same ones v2 had, so they were a real gap, not noise; v4 fixes both. No weight-3 check failed in either round.
+
+## 2026-10-30/31: 14 more cases, pushing toward a sellable standard
+
+Two agents each wrote seven new cases independently (different trades and edge cases: borers-only, a leaking shower with decay, an existing baiting system, treated old damage, a tenant refusing access, a genus-only termite ID, an obstructed slab edge; and a highset Queenslander, a strata townhouse, a rural block with sheds and a paddock mound, dictation given out of order, corrected numbers, an all-clear inspection, and a wet-weather partial). Real run-on dictation, mishearings, self-corrections, invented addresses. 1291 points across 597 checks.
+
+All 14 original cases were also re-run on the current prompt (2 runs each): every case scored 100% except `car-test-full`, which missed one weight-2 check (`soft-landscaping`) in one of two runs — the same single-run flicker noted before, not chased further.
+
+Of the 14 new cases, 12 scored 100% on both runs straight away. Two needed work:
+
+- **A garden bed, paving or soil covering the slab edge or weep holes was sometimes logged as an obstruction** (`obstructions`, `hinderedAreas`, `highRiskAreas`) instead of a conducive condition (`slabEdge`, `weepHoles`, `softLandscaping`/`hardLandscaping`, `zone75mmVisible`/`zone25mmVisible`), even though the inspector walked and saw that stretch of the exterior fully. Seen in `townhouse-strata` (1 of 2 runs) and `backwards-order` (1 of 2 runs). Added one sentence to `SYSTEM_PROMPT` after the `highRiskAreas` rule making the distinction explicit (a cover that was seen and assessed is not an obstruction). Re-ran all three affected cases (`townhouse-strata`, `backwards-order`, `clear-but-conducive`, which had the same category of exterior-field slip) twice each on the updated prompt: all six runs scored 100%.
+- **`piers-paving-pool`'s `no-live-termites` check was a false positive**, not a model problem: the correct, prompt-compliant answer legitimately contains the substring "live termites" inside "no live termites moving" (from the transcript's own words), and `termiteActivity` was already correctly `INACTIVE` with a separate `findingMatch` check covering that. Deleted the redundant text check.
+- `deck-schedorhinotermes` had three test-writing bugs, not prompt bugs, now fixed: three `findingMatch` checks all needed to match the same one or two findings, which the scorer's "each finding used once" rule can't do (merged them into the deck and pergola `findingMatch` checks); `nestLocated` was required to be empty for a hedged "probably in the retaining wall... I didn't locate a nest", but the transcript's explicit "I didn't locate a nest" is exactly what the prompt's own rule calls `NO` (now accepts `NO` or null); and a subfloor status of `NA` was expected on a slab-on-ground house where the note never raises the subfloor, when the prompt says to leave an unmentioned area out of `areaStatus` altogether (removed the check).
+
+One known minor gap, not chased: `deck-schedorhinotermes`'s `nest-hedge-kept` (weight 1) — a hedged nest location not tied to any finding (the retaining wall itself is clear) doesn't reliably survive anywhere in `damageDescription`, failing 2 of 2 runs. Worth a look if it recurs in real reports.
+
+No weight-3 check failed on the final runs of any of the 28 cases (14 old + 14 new).

@@ -1,0 +1,637 @@
+{
+  "id": "borer-only",
+  "transcript": "transcripts/borer-only.txt",
+  "about": "Written case (2026-10-31): annual inspection of a brick veneer house on a suspended timber floor with active Anobium borer in the hall floorboards (fresh frass, bright holes) and no termites anywhere. Tests that borers never become a termite finding, ACTIVE borer wording, a borer treatment recommendation with no method word invented, and that no termite treatment or system appears.",
+  "checks": [
+    {
+      "id": "inspection-type",
+      "kind": "equals",
+      "path": "inspectionType",
+      "values": [
+        "Annual — Existing Building"
+      ],
+      "weight": 2,
+      "why": "'annual inspection'"
+    },
+    {
+      "id": "client-name",
+      "kind": "mentions",
+      "path": "clientName",
+      "all": [
+        [
+          "helen"
+        ],
+        [
+          "marsh"
+        ]
+      ],
+      "weight": 1,
+      "why": "said 'Helen Marsh'"
+    },
+    {
+      "id": "address",
+      "kind": "mentions",
+      "path": "propertyStreetAddress",
+      "all": [
+        [
+          "47",
+          "forty"
+        ],
+        [
+          "banksia"
+        ]
+      ],
+      "weight": 1,
+      "why": "said '47 Banksia Street'"
+    },
+    {
+      "id": "walls-brick-veneer",
+      "kind": "mentions",
+      "path": "wallConstruction",
+      "all": [
+        [
+          "veneer"
+        ]
+      ],
+      "none": [
+        "double",
+        "weatherboard"
+      ],
+      "weight": 2,
+      "why": "'brick veneer'"
+    },
+    {
+      "id": "floor-suspended-timber",
+      "kind": "mentions",
+      "path": "floorType",
+      "all": [
+        [
+          "suspended",
+          "timber"
+        ]
+      ],
+      "none": [
+        "slab",
+        "concrete",
+        "stump"
+      ],
+      "weight": 2,
+      "why": "'timber suspended floor Joyce and bearers' (joists and bearers)"
+    },
+    {
+      "id": "roof-terracotta",
+      "kind": "mentions",
+      "path": "roofType",
+      "all": [
+        [
+          "terracotta",
+          "tile"
+        ]
+      ],
+      "none": [
+        "concrete",
+        "colorbond",
+        "metal"
+      ],
+      "weight": 1,
+      "why": "'tiled roof terror cotta tiles' (terracotta)"
+    },
+    {
+      "id": "era",
+      "kind": "equals",
+      "path": "constructionEra",
+      "values": [
+        "1945-1965"
+      ],
+      "weight": 2,
+      "why": "'built about 1962'"
+    },
+    {
+      "id": "borer-active",
+      "kind": "equals",
+      "path": "borerActivity",
+      "values": [
+        "ACTIVE"
+      ],
+      "weight": 3,
+      "why": "'fresh frost (frass) on the plastic... holes are bright and clean so that is active borer'"
+    },
+    {
+      "id": "borer-findings-one",
+      "kind": "count",
+      "path": "borerFindings",
+      "min": 1,
+      "max": 1,
+      "weight": 2,
+      "why": "'it's only in the hall boards', nothing in the joists, bearers or roof"
+    },
+    {
+      "id": "borer-finding-active",
+      "kind": "every",
+      "path": "borerFindings",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "borerActivity",
+          "values": [
+            "ACTIVE"
+          ]
+        }
+      ],
+      "weight": 3,
+      "why": "the one borer entry is active"
+    },
+    {
+      "id": "borer-type-anobium",
+      "kind": "every",
+      "path": "borerFindings",
+      "checks": [
+        {
+          "kind": "mentions",
+          "path": "borerType",
+          "all": [
+            [
+              "anobium",
+              "furniture beetle"
+            ]
+          ],
+          "none": [
+            "lyctus",
+            "powderpost",
+            "powder post",
+            "pine beetle",
+            "house borer"
+          ]
+        }
+      ],
+      "weight": 3,
+      "why": "'Anna beum the furniture beetle' is Anobium (furniture beetle)"
+    },
+    {
+      "id": "borer-location-hall",
+      "kind": "every",
+      "path": "borerFindings",
+      "checks": [
+        {
+          "kind": "mentions",
+          "path": "location",
+          "all": [
+            [
+              "hall"
+            ]
+          ]
+        }
+      ],
+      "weight": 2,
+      "why": "'under the hall way the floor balls' (floorboards under the hallway)"
+    },
+    {
+      "id": "borer-timber-floorboards",
+      "kind": "every",
+      "path": "borerFindings",
+      "checks": [
+        {
+          "kind": "mentions",
+          "path": "timberAffected",
+          "all": [
+            [
+              "floorboard",
+              "floor board",
+              "flooring"
+            ]
+          ],
+          "none": [
+            "joist",
+            "bearer"
+          ]
+        }
+      ],
+      "weight": 2,
+      "why": "'floor balls' are the floorboards; joists and bearers were clear"
+    },
+    {
+      "id": "borer-description-clean",
+      "kind": "every",
+      "path": "borerFindings",
+      "checks": [
+        {
+          "kind": "mentions",
+          "path": "description",
+          "all": [
+            [
+              "frass",
+              "exit hole",
+              "holes"
+            ]
+          ],
+          "none": [
+            "minor",
+            "moderate",
+            "severe",
+            "extensive",
+            "significant",
+            "extreme",
+            "major",
+            "heavy",
+            "dark",
+            "old holes",
+            "inactive"
+          ],
+          "nullOk": true
+        }
+      ],
+      "weight": 3,
+      "why": "fresh frass and bright exit holes were seen; nothing old, dark or graded"
+    },
+    {
+      "id": "borer-no-structural",
+      "kind": "every",
+      "path": "borerFindings",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "structuralConcern",
+          "values": [
+            null,
+            "NO"
+          ]
+        }
+      ],
+      "weight": 1,
+      "why": "no builder or engineer was mentioned"
+    },
+    {
+      "id": "findings-count",
+      "kind": "count",
+      "path": "findings",
+      "min": 0,
+      "max": 1,
+      "weight": 2,
+      "why": "no termites anywhere, at most one NONE card"
+    },
+    {
+      "id": "findings-all-none",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "termiteActivity",
+          "values": [
+            "NONE"
+          ]
+        },
+        {
+          "kind": "absent",
+          "path": "species"
+        },
+        {
+          "kind": "absent",
+          "path": "damageDescription"
+        },
+        {
+          "kind": "absent",
+          "path": "activityLocation"
+        },
+        {
+          "kind": "absent",
+          "path": "nestLocated"
+        },
+        {
+          "kind": "absent",
+          "path": "structuralConcern"
+        }
+      ],
+      "weight": 3,
+      "why": "'no termites anywhere on this one'; the borer in the hall is never a termite finding"
+    },
+    {
+      "id": "no-live-termites",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "live termites",
+        "active termites",
+        "termite damage",
+        "termites in the hall",
+        "termites in the floor"
+      ],
+      "weight": 3,
+      "why": "the active pest is borer, not termites"
+    },
+    {
+      "id": "no-species",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "coptotermes",
+        "schedorhinotermes",
+        "nasutitermes",
+        "heterotermes",
+        "microcerotermes",
+        "cryptotermes",
+        "mastotermes",
+        "porotermes",
+        "acinaciformis",
+        "frenchi",
+        "exitiosus"
+      ],
+      "weight": 3,
+      "why": "no termite genus was named"
+    },
+    {
+      "id": "no-other-borer",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "lyctus",
+        "powderpost",
+        "powder post",
+        "queensland pine",
+        "european house borer"
+      ],
+      "weight": 3,
+      "why": "he named Anobium only"
+    },
+    {
+      "id": "decay-no",
+      "kind": "equals",
+      "path": "decayFound",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'no rot' inside, 'no decay in the roof timbers'"
+    },
+    {
+      "id": "leaks-no",
+      "kind": "equals",
+      "path": "waterLeaks",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'no leaks anywhere all dry'"
+    },
+    {
+      "id": "moisture-not-yes",
+      "kind": "equals",
+      "path": "moistureReadings",
+      "values": [
+        "NO",
+        null
+      ],
+      "weight": 2,
+      "why": "14% called normal, everything dry"
+    },
+    {
+      "id": "no-existing-system",
+      "kind": "equals",
+      "path": "existingSystem",
+      "values": [
+        "No System Found",
+        null
+      ],
+      "weight": 3,
+      "why": "'no termite management system on the property'"
+    },
+    {
+      "id": "durable-notice-no",
+      "kind": "equals",
+      "path": "durableNoticePresent",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'meter box no durable notice'"
+    },
+    {
+      "id": "ant-capping-intact",
+      "kind": "equals",
+      "path": "antCapping",
+      "values": [
+        "INTACT"
+      ],
+      "weight": 2,
+      "why": "'ant caps on the piers all in place and in good nick'"
+    },
+    {
+      "id": "ventilation-adequate",
+      "kind": "equals",
+      "path": "subfloorVentilation",
+      "values": [
+        "ADEQUATE"
+      ],
+      "weight": 1,
+      "why": "'ventilation is good plenty of vents'"
+    },
+    {
+      "id": "area-subfloor",
+      "kind": "equals",
+      "path": "areaStatus.subfloor",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 2,
+      "why": "'got right through the whole subfloor fully'"
+    },
+    {
+      "id": "area-exterior",
+      "kind": "equals",
+      "path": "areaStatus.exterior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'walked all the way around inspected fully'"
+    },
+    {
+      "id": "area-interior",
+      "kind": "equals",
+      "path": "areaStatus.interior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'interior inspected every room'"
+    },
+    {
+      "id": "area-roofvoid",
+      "kind": "equals",
+      "path": "areaStatus.roofvoid",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'inspected fully'"
+    },
+    {
+      "id": "no-partial-or-not",
+      "kind": "mentions",
+      "path": "areaStatus",
+      "none": [
+        "partial",
+        "not"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "every area was fully inspected"
+    },
+    {
+      "id": "result-subfloor-found",
+      "kind": "equals",
+      "path": "areaResult.subfloor",
+      "values": [
+        "FOUND"
+      ],
+      "weight": 2,
+      "why": "active borer in the floorboards seen from the subfloor is timber pest evidence"
+    },
+    {
+      "id": "no-hindered-areas",
+      "kind": "absent",
+      "path": "hinderedAreas",
+      "weight": 2,
+      "why": "nothing restricted"
+    },
+    {
+      "id": "no-high-risk-areas",
+      "kind": "absent",
+      "path": "highRiskAreas",
+      "weight": 2,
+      "why": "nothing inaccessible; the hall is a finding, not a place to check"
+    },
+    {
+      "id": "treatment-type-no-method",
+      "kind": "mentions",
+      "path": "treatmentType",
+      "none": [
+        "termite",
+        "barrier",
+        "bait",
+        "chemical",
+        "spray",
+        "fumig",
+        "inject",
+        "surface treatment",
+        "borax",
+        "permethrin",
+        "boron",
+        "reticulation"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "'need treating I'll quote that up separately': no method or product was named and no termite treatment is wanted"
+    },
+    {
+      "id": "other-recs-no-method",
+      "kind": "mentions",
+      "path": "otherRecommendations",
+      "none": [
+        "barrier",
+        "bait",
+        "chemical",
+        "spray",
+        "fumig",
+        "inject",
+        "borax",
+        "permethrin",
+        "boron"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "no method word was said for the borer treatment"
+    },
+    {
+      "id": "borer-treatment-recorded",
+      "kind": "mentions",
+      "all": [
+        [
+          "treat"
+        ],
+        [
+          "borer",
+          "anobium",
+          "furniture beetle"
+        ]
+      ],
+      "weight": 2,
+      "why": "'the borers in the hall are active and need treating' must land somewhere (treatmentType or otherRecommendations)"
+    },
+    {
+      "id": "frequency-12-months",
+      "kind": "mentions",
+      "path": "inspectionFrequency",
+      "all": [
+        [
+          "12 month",
+          "twelve month",
+          "annual",
+          "yearly",
+          "every year"
+        ]
+      ],
+      "weight": 2,
+      "why": "'re inspect in 12 months'"
+    },
+    {
+      "id": "risk-not-high",
+      "kind": "equals",
+      "path": "riskLevel",
+      "values": [
+        "LOW",
+        "MEDIUM",
+        null
+      ],
+      "weight": 3,
+      "why": "no termites and no evidence anywhere, so never HIGH"
+    },
+    {
+      "id": "no-severity",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "minor",
+        "moderate",
+        "severe",
+        "extensive",
+        "significant",
+        "extreme",
+        "major",
+        "heavy"
+      ],
+      "weight": 3,
+      "why": "no severity wording was said"
+    },
+    {
+      "id": "no-structural",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "structural",
+        "compromised",
+        "structurally"
+      ],
+      "weight": 3,
+      "why": "no builder referral and no structural opinion"
+    },
+    {
+      "id": "no-mishearings",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "anna beum",
+        "fresh frost",
+        "floor balls",
+        "joyce",
+        "terror cotta"
+      ],
+      "weight": 3,
+      "why": "dictation slips are corrected: Anobium, fresh frass, floorboards, joists, terracotta"
+    },
+    {
+      "id": "no-termite-claims",
+      "kind": "manual",
+      "description": "No field states or implies termite activity or termite evidence anywhere; the borer is only in borerActivity/borerFindings and the recommendations."
+    },
+    {
+      "id": "borer-treatment-not-termite-treatment",
+      "kind": "manual",
+      "description": "The borer treatment recommendation is not turned into a termite barrier, baiting or any named method or product."
+    }
+  ]
+}

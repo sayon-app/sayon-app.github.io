@@ -1,0 +1,623 @@
+{
+  "id": "rural-sheds",
+  "transcript": "transcripts/rural-sheds.txt",
+  "about": "Annual inspection of a rural property: slab brick veneer house, two sheds and a timber stockyard all clear, firewood stacked on the ground against the back wall, tank stand posts in the dirt, old workings in two split fence posts, and a live Nasutitermes mound 30 metres out in a paddock that the inspector names for identification only. Tests outbuildings and fences as areas, the distance from the house kept in the finding, genus-only species with no risk attached, two findings with no structural flag, treatment with no method word, no quote, and four mishearings.",
+  "checks": [
+    {
+      "id": "inspection-type",
+      "kind": "equals",
+      "path": "inspectionType",
+      "values": [
+        "Annual — Existing Building"
+      ],
+      "weight": 2,
+      "why": "'this is the annual'"
+    },
+    {
+      "id": "client-name",
+      "kind": "mentions",
+      "path": "clientName",
+      "all": [
+        [
+          "tennant"
+        ]
+      ],
+      "weight": 1,
+      "why": "said 'Bruce and Carol Tennant' (extra)"
+    },
+    {
+      "id": "address",
+      "kind": "mentions",
+      "path": "propertyStreetAddress",
+      "all": [
+        [
+          "1180"
+        ],
+        [
+          "stringybark"
+        ]
+      ],
+      "weight": 1,
+      "why": "said '1180 Stringybark Road' (extra)"
+    },
+    {
+      "id": "surroundings-rural",
+      "kind": "equals",
+      "path": "siteSurroundings",
+      "values": [
+        "Rural"
+      ],
+      "weight": 2,
+      "why": "'it's a farm so surroundings are rural paddocks all round'"
+    },
+    {
+      "id": "walls-brick-veneer",
+      "kind": "mentions",
+      "path": "wallConstruction",
+      "all": [
+        [
+          "veneer"
+        ]
+      ],
+      "none": [
+        "double brick",
+        "weatherboard"
+      ],
+      "weight": 2,
+      "why": "'brick veneer house'"
+    },
+    {
+      "id": "floor-slab",
+      "kind": "mentions",
+      "path": "floorType",
+      "all": [
+        [
+          "slab",
+          "concrete"
+        ]
+      ],
+      "none": [
+        "suspend",
+        "stump",
+        "timber floor"
+      ],
+      "weight": 2,
+      "why": "'on a slab'"
+    },
+    {
+      "id": "area-subfloor-na",
+      "kind": "equals",
+      "path": "areaStatus.subfloor",
+      "values": [
+        "NA"
+      ],
+      "weight": 2,
+      "why": "'no subfloor it's a slab so not applicable'"
+    },
+    {
+      "id": "area-interior",
+      "kind": "equals",
+      "path": "areaStatus.interior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 2,
+      "why": "'interior all rooms inspected'"
+    },
+    {
+      "id": "area-roofvoid",
+      "kind": "equals",
+      "path": "areaStatus.roofvoid",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 2,
+      "why": "'roof void inspected full access clear'"
+    },
+    {
+      "id": "area-exterior",
+      "kind": "equals",
+      "path": "areaStatus.exterior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'exterior all the way around'"
+    },
+    {
+      "id": "area-outbuildings",
+      "kind": "equals",
+      "path": "areaStatus.outbuildings",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 3,
+      "why": "'both sheds inspected and clear'"
+    },
+    {
+      "id": "area-fences",
+      "kind": "equals",
+      "path": "areaStatus.fences",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 2,
+      "why": "the house yard fence posts were looked at and workings found"
+    },
+    {
+      "id": "no-partial-or-not",
+      "kind": "mentions",
+      "path": "areaStatus",
+      "none": [
+        "partial",
+        "not"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "nothing was limited anywhere"
+    },
+    {
+      "id": "result-outbuildings-clear",
+      "kind": "equals",
+      "path": "areaResult.outbuildings",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 2,
+      "why": "'both sheds inspected and clear'"
+    },
+    {
+      "id": "result-fences-found",
+      "kind": "equals",
+      "path": "areaResult.fences",
+      "values": [
+        "FOUND"
+      ],
+      "weight": 3,
+      "why": "'old workings in two of the strainer posts'"
+    },
+    {
+      "id": "result-interior-clear",
+      "kind": "equals",
+      "path": "areaResult.interior",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 2,
+      "why": "'nothing no activity no workings'"
+    },
+    {
+      "id": "result-roofvoid-clear",
+      "kind": "equals",
+      "path": "areaResult.roofvoid",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 1,
+      "why": "'roof void inspected full access clear'"
+    },
+    {
+      "id": "findings-count-two",
+      "kind": "count",
+      "path": "findings",
+      "min": 2,
+      "max": 2,
+      "weight": 3,
+      "why": "two places: the fence posts and the mound; the clear sheds and stockyard never make cards"
+    },
+    {
+      "id": "finding-mound-active",
+      "kind": "findingMatch",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "termiteActivity",
+          "values": [
+            "ACTIVE"
+          ]
+        },
+        {
+          "kind": "mentions",
+          "path": "activityLocation",
+          "all": [
+            [
+              "mound",
+              "paddock"
+            ],
+            [
+              "30"
+            ]
+          ],
+          "none": [
+            "fence",
+            "shed",
+            "house wall"
+          ]
+        },
+        {
+          "kind": "mentions",
+          "path": "species",
+          "all": [
+            [
+              "nasutitermes"
+            ]
+          ],
+          "none": [
+            "exitiosus",
+            "walkeri",
+            "nasty"
+          ]
+        },
+        {
+          "kind": "equals",
+          "path": "nestLocated",
+          "values": [
+            "YES",
+            null
+          ]
+        },
+        {
+          "kind": "equals",
+          "path": "structuralConcern",
+          "values": [
+            "NO",
+            null
+          ]
+        }
+      ],
+      "weight": 3,
+      "why": "'it's live full of soldiers so active termites in the mound 30 metres out in the paddock'; 'nasty termites mound Nasutitermes' is Nasutitermes spp.; a mound may be called a located nest or left null"
+    },
+    {
+      "id": "finding-fence-inactive",
+      "kind": "findingMatch",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "termiteActivity",
+          "values": [
+            "INACTIVE"
+          ]
+        },
+        {
+          "kind": "mentions",
+          "path": "activityLocation",
+          "all": [
+            [
+              "fence",
+              "post"
+            ]
+          ],
+          "none": [
+            "mound",
+            "paddock"
+          ]
+        },
+        {
+          "kind": "absent",
+          "path": "species"
+        },
+        {
+          "kind": "equals",
+          "path": "nestLocated",
+          "values": [
+            null,
+            "NO"
+          ]
+        },
+        {
+          "kind": "equals",
+          "path": "structuralConcern",
+          "values": [
+            "NO",
+            null
+          ]
+        }
+      ],
+      "weight": 3,
+      "why": "'old workings in two of the strainer posts dry galleries nothing live in them... inactive termites in the fence posts'; no species was said for the posts"
+    },
+    {
+      "id": "findings-no-builder",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "structuralConcern",
+          "values": [
+            null,
+            "NO"
+          ]
+        }
+      ],
+      "weight": 3,
+      "why": "neither finding is on a building: 'not touching any building', 'not touching anything'"
+    },
+    {
+      "id": "findings-damage-no-severity",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "mentions",
+          "path": "damageDescription",
+          "none": [
+            "minor",
+            "moderate",
+            "severe",
+            "extensive",
+            "significant",
+            "extreme",
+            "major",
+            "heavy",
+            "structural"
+          ],
+          "nullOk": true
+        }
+      ],
+      "weight": 2,
+      "why": "nothing graded"
+    },
+    {
+      "id": "mound-distance-kept",
+      "kind": "mentions",
+      "path": "findings",
+      "all": [
+        [
+          "30 m",
+          "30 metre",
+          "30m",
+          "thirty metre"
+        ]
+      ],
+      "weight": 3,
+      "why": "'about 30 metres from the house' must stay with the finding"
+    },
+    {
+      "id": "high-risk-not-findings",
+      "kind": "mentions",
+      "path": "highRiskAreas",
+      "none": [
+        "mound",
+        "paddock",
+        "fence",
+        "post",
+        "shed",
+        "firewood",
+        "tank"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "every area was inspected; the mound and posts are findings, not high risk areas"
+    },
+    {
+      "id": "no-hindered-areas",
+      "kind": "absent",
+      "path": "hinderedAreas",
+      "weight": 2,
+      "why": "nothing restricted"
+    },
+    {
+      "id": "timber-soil-yes",
+      "kind": "equals",
+      "path": "timberSoil",
+      "values": [
+        "YES"
+      ],
+      "weight": 3,
+      "why": "'fire would stacked against the house on the ground... timber on the soil against the building' and 'tank stand... sitting in the dirt'"
+    },
+    {
+      "id": "slab-edge-clear",
+      "kind": "equals",
+      "path": "slabEdge",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 2,
+      "why": "'slab edge visible'"
+    },
+    {
+      "id": "weep-holes-clear",
+      "kind": "equals",
+      "path": "weepHoles",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 2,
+      "why": "'weep holes clear'"
+    },
+    {
+      "id": "borers-none",
+      "kind": "equals",
+      "path": "borerActivity",
+      "values": [
+        "NONE"
+      ],
+      "weight": 2,
+      "why": "'no borers'"
+    },
+    {
+      "id": "decay-no",
+      "kind": "equals",
+      "path": "decayFound",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'no rot'"
+    },
+    {
+      "id": "no-existing-system",
+      "kind": "equals",
+      "path": "existingSystem",
+      "values": [
+        "No System Found",
+        null
+      ],
+      "weight": 3,
+      "why": "'no termite system'"
+    },
+    {
+      "id": "durable-notice-no",
+      "kind": "equals",
+      "path": "durableNoticePresent",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'no durable notice'"
+    },
+    {
+      "id": "treatment-yes",
+      "kind": "equals",
+      "path": "treatmentRecommended",
+      "values": [
+        "YES"
+      ],
+      "weight": 3,
+      "why": "'treat the mound and the fence posts'"
+    },
+    {
+      "id": "treatment-type-target",
+      "kind": "mentions",
+      "path": "treatmentType",
+      "all": [
+        [
+          "mound",
+          "colony"
+        ],
+        [
+          "fence",
+          "post"
+        ]
+      ],
+      "weight": 2,
+      "why": "both targets were named"
+    },
+    {
+      "id": "treatment-type-no-method",
+      "kind": "mentions",
+      "path": "treatmentType",
+      "none": [
+        "barrier",
+        "bait",
+        "chemical",
+        "reticulation",
+        "termidor",
+        "physical",
+        "top-up",
+        "top up"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "no method or product was said; 'I'll quote that separately'"
+    },
+    {
+      "id": "no-quote",
+      "kind": "absent",
+      "path": "quote",
+      "weight": 2,
+      "why": "'I'll quote that separately': no price or quote words in this note"
+    },
+    {
+      "id": "other-recs",
+      "kind": "mentions",
+      "path": "otherRecommendations",
+      "all": [
+        [
+          "firewood",
+          "fire wood"
+        ],
+        [
+          "tank stand",
+          "tank"
+        ]
+      ],
+      "weight": 3,
+      "why": "move the firewood off the wall; tank stand onto pads out of the soil ('fire would' = firewood)"
+    },
+    {
+      "id": "frequency-12-months",
+      "kind": "mentions",
+      "path": "inspectionFrequency",
+      "all": [
+        [
+          "12 month",
+          "twelve month",
+          "annual"
+        ]
+      ],
+      "weight": 2,
+      "why": "'annual inspection 12 months'"
+    },
+    {
+      "id": "risk-medium",
+      "kind": "equals",
+      "path": "riskLevel",
+      "values": [
+        "MEDIUM"
+      ],
+      "weight": 3,
+      "why": "'risk medium there's activity on the property but nothing in the house'"
+    },
+    {
+      "id": "no-wrong-species",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "exitiosus",
+        "walkeri",
+        "coptotermes",
+        "schedorhinotermes",
+        "mastotermes"
+      ],
+      "weight": 3,
+      "why": "genus only was said, and only for the mound"
+    },
+    {
+      "id": "no-severity",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "minor",
+        "moderate",
+        "severe",
+        "extensive",
+        "significant",
+        "extreme",
+        "major",
+        "heavy"
+      ],
+      "weight": 3,
+      "why": "no severity word was said"
+    },
+    {
+      "id": "no-structural",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "structural",
+        "compromised"
+      ],
+      "weight": 3,
+      "why": "nothing is on a building"
+    },
+    {
+      "id": "no-mishearings",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "nasty termite",
+        "nasturtium",
+        "strain of post",
+        "fire would",
+        "colour bond"
+      ],
+      "weight": 2,
+      "why": "'nasty termites' = Nasutitermes, 'strain of posts' = strainer posts, 'fire would' = firewood, 'colour bond' = Colorbond"
+    },
+    {
+      "id": "species-for-id-only",
+      "kind": "manual",
+      "description": "Nasutitermes appears only as the mound's species; no field says the species raises or lowers the risk, and the risk reasoning rests on distance and the clear house."
+    }
+  ]
+}

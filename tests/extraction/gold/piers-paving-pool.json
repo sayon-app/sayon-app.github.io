@@ -1,0 +1,601 @@
+{
+ "id": "piers-paving-pool",
+ "transcript": "transcripts/piers-paving-pool.txt",
+ "about": "Written case (2026-10-31): annual inspection of a 2008 brick veneer house, slab on ground with a rear extension on brick piers: dry shelter tubes up two piers with no live termites and squashed ant caps, a slab edge hidden by paving and a pool surround, a Termguard reticulation system on the durable notice with no recharge dates so the inspector cannot say it was ever charged. Tests slabEdge OBSTRUCTED, the combination floor, existingSystem with the charge uncertainty kept, antCapping GAPS on piers, INACTIVE with no timber named, and a recommendation to lift the paving and expose the slab edge.",
+ "checks": [
+  {
+   "id": "inspection-type",
+   "kind": "equals",
+   "path": "inspectionType",
+   "values": [
+    "Annual — Existing Building"
+   ],
+   "weight": 2,
+   "why": "'annual inspection'"
+  },
+  {
+   "id": "client-name",
+   "kind": "mentions",
+   "path": "clientName",
+   "all": [
+    [
+     "dev"
+    ],
+    [
+     "raman"
+    ]
+   ],
+   "weight": 1,
+   "why": "said 'Dev Raman'"
+  },
+  {
+   "id": "address",
+   "kind": "mentions",
+   "path": "propertyStreetAddress",
+   "all": [
+    [
+     "2",
+     "two"
+    ],
+    [
+     "lomandra"
+    ]
+   ],
+   "weight": 1,
+   "why": "said '2 Lomandra Crescent'"
+  },
+  {
+   "id": "walls-brick-veneer",
+   "kind": "mentions",
+   "path": "wallConstruction",
+   "all": [
+    [
+     "veneer"
+    ]
+   ],
+   "weight": 1,
+   "why": "'brick veneer'"
+  },
+  {
+   "id": "roof-colorbond",
+   "kind": "mentions",
+   "path": "roofType",
+   "all": [
+    [
+     "colorbond",
+     "colourbond",
+     "metal",
+     "steel"
+    ]
+   ],
+   "weight": 1,
+   "why": "'Colorbond roof'"
+  },
+  {
+   "id": "era-post-2003",
+   "kind": "equals",
+   "path": "constructionEra",
+   "values": [
+    "Post-2003"
+   ],
+   "weight": 2,
+   "why": "'built in 2008'"
+  },
+  {
+   "id": "floor-combination",
+   "kind": "mentions",
+   "path": "floorType",
+   "all": [
+    [
+     "combination",
+     "slab / timber",
+     "slab and timber"
+    ]
+   ],
+   "weight": 2,
+   "why": "'the original house is slab on ground and there's a rear extension... on brick peers (piers) with a timber floor so it's a combination'"
+  },
+  {
+   "id": "existing-system-reticulation",
+   "kind": "equals",
+   "path": "existingSystem",
+   "values": [
+    "Chemical Reticulation System"
+   ],
+   "weight": 3,
+   "why": "'term guard reticulation system under the slab and around the perimeter' (Termguard)"
+  },
+  {
+   "id": "existing-system-other-termguard",
+   "kind": "mentions",
+   "path": "existingSystemOther",
+   "all": [
+    [
+     "termguard",
+     "term guard",
+     "term-guard"
+    ]
+   ],
+   "weight": 2,
+   "why": "the brand on the notice"
+  },
+  {
+   "id": "existing-system-other-year",
+   "kind": "mentions",
+   "path": "existingSystemOther",
+   "all": [
+    [
+     "2008"
+    ]
+   ],
+   "weight": 1,
+   "why": "'installed 2008'"
+  },
+  {
+   "id": "durable-notice-yes",
+   "kind": "equals",
+   "path": "durableNoticePresent",
+   "values": [
+    "YES"
+   ],
+   "weight": 3,
+   "why": "'meter box durable notice is there'"
+  },
+  {
+   "id": "charge-uncertainty-kept",
+   "kind": "mentions",
+   "all": [
+    [
+     "charged",
+     "recharge",
+     "replenish"
+    ]
+   ],
+   "weight": 2,
+   "why": "'I can't tell if the system was ever charged might never have been' must survive somewhere (existingSystemOther, treatmentType or otherRecommendations)"
+  },
+  {
+   "id": "charge-not-asserted",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "recharged in",
+    "last charged",
+    "charged in 20",
+    "system is active",
+    "system active",
+    "fully charged"
+   ],
+   "weight": 3,
+   "why": "nothing says the system was ever charged"
+  },
+  {
+   "id": "findings-count-one",
+   "kind": "count",
+   "path": "findings",
+   "min": 1,
+   "max": 1,
+   "weight": 2,
+   "why": "one place: the two piers under the rear extension"
+  },
+  {
+   "id": "finding-inactive-piers",
+   "kind": "findingMatch",
+   "checks": [
+    {
+     "kind": "equals",
+     "path": "termiteActivity",
+     "values": [
+      "INACTIVE"
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "activityLocation",
+     "all": [
+      [
+       "pier"
+      ]
+     ]
+    }
+   ],
+   "weight": 3,
+   "why": "'shelter chews (shelter tubes) running up them... dry nothing moving no live termites in it... so that's inactive'"
+  },
+  {
+   "id": "finding-location-extension",
+   "kind": "every",
+   "path": "findings",
+   "checks": [
+    {
+     "kind": "mentions",
+     "path": "activityLocation",
+     "all": [
+      [
+       "extension",
+       "subfloor",
+       "rear",
+       "back"
+      ]
+     ]
+    }
+   ],
+   "weight": 2,
+   "why": "'two of the brick peers under the back extension'"
+  },
+  {
+   "id": "finding-damage-tubes",
+   "kind": "every",
+   "path": "findings",
+   "checks": [
+    {
+     "kind": "mentions",
+     "path": "damageDescription",
+     "all": [
+      [
+       "shelter tube",
+       "mud tube",
+       "mud lead",
+       "tube"
+      ]
+     ],
+     "none": [
+      "minor",
+      "moderate",
+      "severe",
+      "extensive",
+      "significant",
+      "extreme",
+      "major",
+      "heavy"
+     ]
+    }
+   ],
+   "weight": 3,
+   "why": "shelter tubes up the piers is what was seen; no grade"
+  },
+  {
+   "id": "finding-no-damage-kept",
+   "kind": "every",
+   "path": "findings",
+   "checks": [
+    {
+     "kind": "mentions",
+     "path": "damageDescription",
+     "all": [
+      [
+       "no damage",
+       "sound",
+       "dry"
+      ]
+     ]
+    }
+   ],
+   "weight": 1,
+   "why": "'the bearers above those peers sound fine when tapped no damage in the timber' is a fact to keep"
+  },
+  {
+   "id": "finding-timber-not-invented",
+   "kind": "every",
+   "path": "findings",
+   "checks": [
+    {
+     "kind": "mentions",
+     "path": "timberAffected",
+     "none": [
+      "bearer",
+      "joist",
+      "floor"
+     ],
+     "nullOk": true
+    }
+   ],
+   "weight": 2,
+   "why": "mud leads up a brick pier only: the bearers were sound, so no timber is affected"
+  },
+  {
+   "id": "finding-no-structural",
+   "kind": "every",
+   "path": "findings",
+   "checks": [
+    {
+     "kind": "equals",
+     "path": "structuralConcern",
+     "values": [
+      "NO",
+      null
+     ]
+    }
+   ],
+   "weight": 2,
+   "why": "'no damage in the timber' and no builder mentioned"
+  },
+  {
+   "id": "finding-species-absent",
+   "kind": "every",
+   "path": "findings",
+   "checks": [
+    {
+     "kind": "absent",
+     "path": "species"
+    }
+   ],
+   "weight": 2,
+   "why": "species was never raised"
+  },
+  {
+   "id": "no-species",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "coptotermes",
+    "schedorhinotermes",
+    "nasutitermes",
+    "heterotermes",
+    "microcerotermes",
+    "cryptotermes",
+    "mastotermes",
+    "porotermes"
+   ],
+   "weight": 3,
+   "why": "no species named"
+  },
+  {
+   "id": "ant-capping-gaps",
+   "kind": "equals",
+   "path": "antCapping",
+   "values": [
+    "GAPS"
+   ],
+   "weight": 3,
+   "why": "'and caps (ant caps) are on the peers but on those two they're squashed flat and the shelter tubes go straight over the top of them': damaged caps are GAPS, not NONE"
+  },
+  {
+   "id": "ant-capping-details",
+   "kind": "mentions",
+   "path": "antCappingDetails",
+   "all": [
+    [
+     "two",
+     "2"
+    ],
+    [
+     "squash",
+     "flat",
+     "damaged",
+     "bridged",
+     "over"
+    ]
+   ],
+   "weight": 2,
+   "why": "which piers and what is wrong"
+  },
+  {
+   "id": "slab-edge-obstructed",
+   "kind": "equals",
+   "path": "slabEdge",
+   "values": [
+    "OBSTRUCTED"
+   ],
+   "weight": 3,
+   "why": "'the paving comes right up over the slab edge and at the back the pool surround concrete covers it so I can't see the slab edge anywhere'"
+  },
+  {
+   "id": "hard-landscaping-yes",
+   "kind": "equals",
+   "path": "hardLandscaping",
+   "values": [
+    "YES"
+   ],
+   "weight": 2,
+   "why": "'hard landscaping all round'"
+  },
+  {
+   "id": "zone25-no",
+   "kind": "equals",
+   "path": "zone25mmVisible",
+   "values": [
+    "NO"
+   ],
+   "weight": 2,
+   "why": "'no 25 mil zone visible'"
+  },
+  {
+   "id": "weep-holes-bridged",
+   "kind": "equals",
+   "path": "weepHoles",
+   "values": [
+    "BRIDGED"
+   ],
+   "weight": 2,
+   "why": "'the pavers are over the weep holes on the north side'"
+  },
+  {
+   "id": "area-subfloor",
+   "kind": "equals",
+   "path": "areaStatus.subfloor",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 2,
+   "why": "'got in through the hatch on the side inspected it fully low but I got everywhere': a low subfloor fully reached is INSPECTED"
+  },
+  {
+   "id": "result-subfloor-found",
+   "kind": "equals",
+   "path": "areaResult.subfloor",
+   "values": [
+    "FOUND"
+   ],
+   "weight": 2,
+   "why": "shelter tubes on the piers"
+  },
+  {
+   "id": "area-interior",
+   "kind": "equals",
+   "path": "areaStatus.interior",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'interior inspected every room'"
+  },
+  {
+   "id": "area-exterior",
+   "kind": "equals",
+   "path": "areaStatus.exterior",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'exterior inspected all the way around'"
+  },
+  {
+   "id": "area-roofvoid",
+   "kind": "equals",
+   "path": "areaStatus.roofvoid",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'roof void inspected fully'"
+  },
+  {
+   "id": "result-interior-clear",
+   "kind": "equals",
+   "path": "areaResult.interior",
+   "values": [
+    "CLEAR"
+   ],
+   "weight": 1,
+   "why": "'no termite activity inside'"
+  },
+  {
+   "id": "no-hindered-areas",
+   "kind": "absent",
+   "path": "hinderedAreas",
+   "weight": 2,
+   "why": "'low but I got everywhere': nothing was kept from view, so no hindered area"
+  },
+  {
+   "id": "treatment-yes",
+   "kind": "equals",
+   "path": "treatmentRecommended",
+   "values": [
+    "YES"
+   ],
+   "weight": 3,
+   "why": "'treatment yes the shelter tubes on the peers want treating and the articulation (reticulation) system should be pressure tested and charged'"
+  },
+  {
+   "id": "treatment-type-piers-and-charge",
+   "kind": "mentions",
+   "path": "treatmentType",
+   "all": [
+    [
+     "pier",
+     "shelter tube",
+     "tubes"
+    ],
+    [
+     "reticulation",
+     "charge"
+    ]
+   ],
+   "none": [
+    "bait",
+    "barrier",
+    "termidor",
+    "dust",
+    "foam",
+    "physical"
+   ],
+   "weight": 3,
+   "why": "the targets he named: the tubes on the piers and charging the reticulation system; no other method was said"
+  },
+  {
+   "id": "other-recs-lift-paving",
+   "kind": "mentions",
+   "path": "otherRecommendations",
+   "all": [
+    [
+     "paving",
+     "pavers",
+     "paved"
+    ],
+    [
+     "slab edge",
+     "expose",
+     "lift"
+    ]
+   ],
+   "weight": 3,
+   "why": "'the paving along the walls needs lifting to expose the slab edge at least 75 mil'"
+  },
+  {
+   "id": "risk-high-stated",
+   "kind": "equals",
+   "path": "riskLevel",
+   "values": [
+    "HIGH"
+   ],
+   "weight": 2,
+   "why": "'overall I'll say high'"
+  },
+  {
+   "id": "frequency-6-months",
+   "kind": "mentions",
+   "path": "inspectionFrequency",
+   "all": [
+    [
+     "6 month",
+     "six month"
+    ]
+   ],
+   "weight": 2,
+   "why": "'re inspect in 6 months'"
+  },
+  {
+   "id": "no-severity",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "minor",
+    "moderate",
+    "severe",
+    "extensive",
+    "significant",
+    "extreme",
+    "major",
+    "heavy"
+   ],
+   "weight": 3,
+   "why": "no severity wording was said"
+  },
+  {
+   "id": "no-structural",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "structural",
+    "compromised",
+    "structurally"
+   ],
+   "weight": 3,
+   "why": "no damage, no referral"
+  },
+  {
+   "id": "no-mishearings",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "shelter chews",
+    "articulation",
+    "peers",
+    "and caps"
+   ],
+   "weight": 3,
+   "why": "dictation slips are corrected: shelter tubes, reticulation, piers, ant caps"
+  },
+  {
+   "id": "uncertainty-not-a-fact",
+   "kind": "manual",
+   "description": "The report says the reticulation system's charge history is unknown; nothing states it is working, charged or current."
+  }
+ ]
+}

@@ -1,0 +1,578 @@
+{
+  "id": "townhouse-strata",
+  "transcript": "transcripts/townhouse-strata.txt",
+  "about": "Pre-purchase of a two-storey rendered townhouse in a strata complex on a slab: roof void shared over the party wall and only half reached (truss space, insulation batts), common-property garden bed mulched over the front slab edge and weep holes, nothing found anywhere, and the strata manager to be asked about past treatments. Tests the townhouse structure type, subfloor NA, a PARTIAL roof void with matcher-friendly reasons, the unreached roof as the only high risk area, termiteHistory Unknown, no NONE card per area, and five mishearings.",
+  "checks": [
+    {
+      "id": "inspection-type",
+      "kind": "equals",
+      "path": "inspectionType",
+      "values": [
+        "Pre-Purchase — Timber Pest"
+      ],
+      "weight": 2,
+      "why": "'pre purchase timber pest'"
+    },
+    {
+      "id": "client-name",
+      "kind": "mentions",
+      "path": "clientName",
+      "all": [
+        [
+          "anika"
+        ],
+        [
+          "rossiter"
+        ]
+      ],
+      "weight": 1,
+      "why": "said 'Anika Rossiter' (extra)"
+    },
+    {
+      "id": "address",
+      "kind": "mentions",
+      "path": "propertyStreetAddress",
+      "all": [
+        [
+          "22"
+        ],
+        [
+          "marigold"
+        ]
+      ],
+      "weight": 1,
+      "why": "said 'unit 7 at 22 Marigold Way' (extra)"
+    },
+    {
+      "id": "structure-townhouse",
+      "kind": "equals",
+      "path": "structureType",
+      "values": [
+        "Terrace / townhouse"
+      ],
+      "weight": 2,
+      "why": "'town house in a strutter complex'"
+    },
+    {
+      "id": "height-double",
+      "kind": "mentions",
+      "path": "height",
+      "all": [
+        [
+          "double",
+          "two",
+          "2"
+        ]
+      ],
+      "none": [
+        "single",
+        "multiple"
+      ],
+      "weight": 2,
+      "why": "'two storey'"
+    },
+    {
+      "id": "walls-rendered",
+      "kind": "mentions",
+      "path": "wallConstruction",
+      "all": [
+        [
+          "render"
+        ]
+      ],
+      "none": [
+        "veneer",
+        "double brick",
+        "weatherboard"
+      ],
+      "weight": 2,
+      "why": "'rendered masonry walls'"
+    },
+    {
+      "id": "floor-slab",
+      "kind": "mentions",
+      "path": "floorType",
+      "all": [
+        [
+          "slab",
+          "concrete"
+        ]
+      ],
+      "none": [
+        "suspend",
+        "stump",
+        "timber floor",
+        "bearer",
+        "joist"
+      ],
+      "weight": 3,
+      "why": "'concrete slab on ground'"
+    },
+    {
+      "id": "era",
+      "kind": "equals",
+      "path": "constructionEra",
+      "values": [
+        "Post-2003"
+      ],
+      "weight": 2,
+      "why": "'built about 2010'"
+    },
+    {
+      "id": "occupancy-vacant",
+      "kind": "equals",
+      "path": "occupancyStatus",
+      "values": [
+        "Vacant"
+      ],
+      "weight": 1,
+      "why": "'vacant at the moment'"
+    },
+    {
+      "id": "area-subfloor-na",
+      "kind": "equals",
+      "path": "areaStatus.subfloor",
+      "values": [
+        "NA"
+      ],
+      "weight": 3,
+      "why": "'slab on ground so no subfloor not applicable'"
+    },
+    {
+      "id": "area-roofvoid-partial",
+      "kind": "equals",
+      "path": "areaStatus.roofvoid",
+      "values": [
+        "PARTIAL"
+      ],
+      "weight": 3,
+      "why": "'about halfway across our side... roof void partly inspected'"
+    },
+    {
+      "id": "area-interior",
+      "kind": "equals",
+      "path": "areaStatus.interior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 2,
+      "why": "'interior inspected all rooms downstairs and up'"
+    },
+    {
+      "id": "area-exterior",
+      "kind": "equals",
+      "path": "areaStatus.exterior",
+      "values": [
+        "INSPECTED",
+        "PARTIAL"
+      ],
+      "weight": 1,
+      "why": "front and rear walls walked; the side walls are party walls, so either reading is defensible"
+    },
+    {
+      "id": "result-interior-clear",
+      "kind": "equals",
+      "path": "areaResult.interior",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 2,
+      "why": "'nothing in the interior at all no activity no workings'"
+    },
+    {
+      "id": "result-exterior-clear",
+      "kind": "equals",
+      "path": "areaResult.exterior",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 1,
+      "why": "'no termites no borers no decay anywhere I looked'"
+    },
+    {
+      "id": "obstructions-roof",
+      "kind": "mentions",
+      "path": "obstructions",
+      "all": [
+        [
+          "roof"
+        ],
+        [
+          "insulation",
+          "batts",
+          "clearance",
+          "low",
+          "halfway",
+          "far side",
+          "party"
+        ]
+      ],
+      "none": [
+        "interior",
+        "exterior"
+      ],
+      "weight": 2,
+      "why": "the far half of the roof void behind the low truss space and insulation"
+    },
+    {
+      "id": "restricted-access-roof-reasons",
+      "kind": "mentions",
+      "path": "restrictedAccess",
+      "all": [
+        [
+          "roof"
+        ],
+        [
+          "insulation",
+          "low clearance"
+        ]
+      ],
+      "weight": 3,
+      "why": "'trust space got too low' and 'insulation batts' are the app's Low clearance / Insulation or sarking reasons for the roof void"
+    },
+    {
+      "id": "hindered-roof-only",
+      "kind": "mentions",
+      "path": "hinderedAreas",
+      "all": [
+        [
+          "roof",
+          "ceiling"
+        ]
+      ],
+      "none": [
+        "interior",
+        "exterior",
+        "garden",
+        "courtyard",
+        "subfloor"
+      ],
+      "weight": 2,
+      "why": "only the roof void was limited"
+    },
+    {
+      "id": "high-risk-roof-not-garden",
+      "kind": "mentions",
+      "path": "highRiskAreas",
+      "all": [
+        [
+          "roof",
+          "ceiling"
+        ]
+      ],
+      "none": [
+        "garden",
+        "slab edge",
+        "weep",
+        "front wall"
+      ],
+      "weight": 3,
+      "why": "the unreached roof section is the only place not inspected; the garden bed is a conducive condition, not a high risk area"
+    },
+    {
+      "id": "slab-edge-obstructed",
+      "kind": "equals",
+      "path": "slabEdge",
+      "values": [
+        "OBSTRUCTED"
+      ],
+      "weight": 3,
+      "why": "'mulched up over the slab edge... slab edge is obstructed there'"
+    },
+    {
+      "id": "weep-holes-bridged",
+      "kind": "equals",
+      "path": "weepHoles",
+      "values": [
+        "BRIDGED"
+      ],
+      "weight": 3,
+      "why": "'the weep holes are bridged under the mulch' ('wee poles' = weep holes); clear at the back does not undo bridged at the front"
+    },
+    {
+      "id": "soft-landscaping-yes",
+      "kind": "equals",
+      "path": "softLandscaping",
+      "values": [
+        "YES"
+      ],
+      "weight": 2,
+      "why": "garden bed against the front wall"
+    },
+    {
+      "id": "zone75-no",
+      "kind": "equals",
+      "path": "zone75mmVisible",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'I couldn't see the 75 mil zone at all along the front'"
+    },
+    {
+      "id": "hard-landscaping-yes",
+      "kind": "equals",
+      "path": "hardLandscaping",
+      "values": [
+        "YES"
+      ],
+      "weight": 1,
+      "why": "'rear courtyard is paved up to the wall'"
+    },
+    {
+      "id": "timber-soil-no",
+      "kind": "equals",
+      "path": "timberSoil",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'no timber in contact with the ground'"
+    },
+    {
+      "id": "findings-at-most-one",
+      "kind": "count",
+      "path": "findings",
+      "min": 0,
+      "max": 1,
+      "weight": 3,
+      "why": "nothing found anywhere: at most one NONE card, never one per area"
+    },
+    {
+      "id": "findings-all-none",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "termiteActivity",
+          "values": [
+            "NONE"
+          ]
+        },
+        {
+          "kind": "absent",
+          "path": "activityLocation"
+        },
+        {
+          "kind": "absent",
+          "path": "species"
+        },
+        {
+          "kind": "absent",
+          "path": "damageDescription"
+        }
+      ],
+      "weight": 3,
+      "why": "'no termites no borers no decay anywhere I looked'"
+    },
+    {
+      "id": "borers-none",
+      "kind": "equals",
+      "path": "borerActivity",
+      "values": [
+        "NONE"
+      ],
+      "weight": 2,
+      "why": "'no borers'"
+    },
+    {
+      "id": "decay-no",
+      "kind": "equals",
+      "path": "decayFound",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'no decay'"
+    },
+    {
+      "id": "moisture-no",
+      "kind": "equals",
+      "path": "moistureReadings",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'moisture meter normal everywhere 11 12 percent'"
+    },
+    {
+      "id": "leaks-not-found",
+      "kind": "equals",
+      "path": "waterLeaks",
+      "values": [
+        "NO",
+        null
+      ],
+      "weight": 2,
+      "why": "no leak was found or mentioned"
+    },
+    {
+      "id": "no-existing-system",
+      "kind": "equals",
+      "path": "existingSystem",
+      "values": [
+        "No System Found",
+        null
+      ],
+      "weight": 3,
+      "why": "'no sign of any system I'd say no system'"
+    },
+    {
+      "id": "durable-notice-no",
+      "kind": "equals",
+      "path": "durableNoticePresent",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'meter box no durable notice'"
+    },
+    {
+      "id": "history-unknown",
+      "kind": "equals",
+      "path": "termiteHistory",
+      "values": [
+        "Unknown"
+      ],
+      "weight": 2,
+      "why": "'nobody on site knew so termite history unknown'"
+    },
+    {
+      "id": "treatment-no",
+      "kind": "equals",
+      "path": "treatmentRecommended",
+      "values": [
+        "NO"
+      ],
+      "weight": 3,
+      "why": "'no treatment nothing found'"
+    },
+    {
+      "id": "treatment-type-empty",
+      "kind": "mentions",
+      "path": "treatmentType",
+      "none": [
+        "barrier",
+        "bait",
+        "chemical",
+        "reticulation",
+        "termidor",
+        "physical",
+        "top-up",
+        "top up"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "no treatment, so no method word anywhere in it"
+    },
+    {
+      "id": "other-recs-strata-and-garden",
+      "kind": "mentions",
+      "path": "otherRecommendations",
+      "all": [
+        [
+          "strata",
+          "body corporate"
+        ],
+        [
+          "garden bed"
+        ]
+      ],
+      "weight": 3,
+      "why": "ask the strata manager about past treatments; pull the garden bed back ('strutter manager' = strata manager)"
+    },
+    {
+      "id": "frequency-12-months",
+      "kind": "mentions",
+      "path": "inspectionFrequency",
+      "all": [
+        [
+          "12 month",
+          "twelve month",
+          "annual"
+        ]
+      ],
+      "weight": 2,
+      "why": "'annual inspection 12 months'"
+    },
+    {
+      "id": "risk-medium",
+      "kind": "equals",
+      "path": "riskLevel",
+      "values": [
+        "MEDIUM"
+      ],
+      "weight": 3,
+      "why": "'risk I'd put at medium because of that garden bed... not high'"
+    },
+    {
+      "id": "no-species",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "coptotermes",
+        "schedorhinotermes",
+        "nasutitermes",
+        "heterotermes",
+        "microcerotermes",
+        "cryptotermes",
+        "mastotermes",
+        "porotermes",
+        "acinaciformis",
+        "frenchi",
+        "intermedius",
+        "exitiosus",
+        "walkeri",
+        "ferox",
+        "copter"
+      ],
+      "weight": 3,
+      "why": "no species was raised"
+    },
+    {
+      "id": "no-severity",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "minor",
+        "moderate",
+        "severe",
+        "extensive",
+        "significant",
+        "extreme",
+        "major",
+        "heavy"
+      ],
+      "weight": 3,
+      "why": "no severity word was said"
+    },
+    {
+      "id": "no-structural",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "structural",
+        "compromised"
+      ],
+      "weight": 2,
+      "why": "no structural opinion"
+    },
+    {
+      "id": "no-mishearings",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "strutter",
+        "common properly",
+        "party war",
+        "trust roof",
+        "trust space",
+        "wee pole"
+      ],
+      "weight": 2,
+      "why": "'strutter' = strata, 'common properly' = common property, 'party war' = party wall, 'trust' = truss, 'wee poles' = weep holes"
+    },
+    {
+      "id": "strata-question-not-history",
+      "kind": "manual",
+      "description": "Asking the strata manager stays a recommendation; termiteHistory is Unknown, never Treated before, and no past treatment or system is invented."
+    }
+  ]
+}

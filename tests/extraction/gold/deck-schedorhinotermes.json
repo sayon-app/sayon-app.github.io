@@ -1,0 +1,583 @@
+{
+ "id": "deck-schedorhinotermes",
+ "transcript": "transcripts/deck-schedorhinotermes.txt",
+ "about": "Written case (2026-10-31): annual inspection of a brick veneer slab house with live Schedorhinotermes in the rear timber deck bearer and joists, workings up pergola posts set in the soil, a timber sleeper retaining wall, and a 'probably in the retaining wall' nest the inspector did not find. Tests that species is identification only (genus level, never a risk reason), the deck as the location, timber-in-soil contact, a located-nest hedge kept empty, and a deck treatment with no method word.",
+ "checks": [
+  {
+   "id": "inspection-type",
+   "kind": "equals",
+   "path": "inspectionType",
+   "values": [
+    "Annual — Existing Building"
+   ],
+   "weight": 2,
+   "why": "'annual inspection'"
+  },
+  {
+   "id": "client-name",
+   "kind": "mentions",
+   "path": "clientName",
+   "all": [
+    [
+     "carol"
+    ],
+    [
+     "hennessy"
+    ]
+   ],
+   "weight": 1,
+   "why": "said 'Carol Hennessy'"
+  },
+  {
+   "id": "address",
+   "kind": "mentions",
+   "path": "propertyStreetAddress",
+   "all": [
+    [
+     "19",
+     "nineteen"
+    ],
+    [
+     "casuarina"
+    ]
+   ],
+   "weight": 1,
+   "why": "said '19 Casuarina Way'"
+  },
+  {
+   "id": "walls-brick-veneer",
+   "kind": "mentions",
+   "path": "wallConstruction",
+   "all": [
+    [
+     "veneer"
+    ]
+   ],
+   "weight": 1,
+   "why": "'brick veneer'"
+  },
+  {
+   "id": "floor-slab",
+   "kind": "mentions",
+   "path": "floorType",
+   "all": [
+    [
+     "slab",
+     "concrete"
+    ]
+   ],
+   "none": [
+    "timber",
+    "suspended"
+   ],
+   "weight": 2,
+   "why": "'slab on ground'"
+  },
+  {
+   "id": "findings-count-two",
+   "kind": "count",
+   "path": "findings",
+   "min": 2,
+   "max": 2,
+   "weight": 2,
+   "why": "the deck (live) and, 'separately', the pergola posts (workings only); the retaining wall had no activity"
+  },
+  {
+   "id": "finding-active-deck",
+   "kind": "findingMatch",
+   "checks": [
+    {
+     "kind": "equals",
+     "path": "termiteActivity",
+     "values": [
+      "ACTIVE"
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "activityLocation",
+     "all": [
+      [
+       "deck"
+      ]
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "species",
+     "all": [
+      [
+       "schedorhinotermes"
+      ]
+     ],
+     "none": [
+      "intermedius",
+      "actuosus",
+      "seclusus",
+      "coptotermes",
+      "nasutitermes"
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "activityLocation",
+     "all": [
+      [
+       "deck"
+      ]
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "timberAffected",
+     "all": [
+      [
+       "bearer"
+      ],
+      [
+       "joist"
+      ]
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "activityLocation",
+     "all": [
+      [
+       "deck"
+      ]
+     ]
+    },
+    {
+     "kind": "equals",
+     "path": "structuralConcern",
+     "values": [
+      "YES"
+     ]
+    }
+   ],
+   "weight": 3,
+   "why": "'live termites in the re-deck (rear deck)... shed a rhino termies... the genus is Schedorhinotermes I'm just recording the genus'"
+  },
+  {
+   "id": "finding-inactive-pergola",
+   "kind": "findingMatch",
+   "checks": [
+    {
+     "kind": "equals",
+     "path": "termiteActivity",
+     "values": [
+      "INACTIVE"
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "activityLocation",
+     "all": [
+      [
+       "pergola",
+       "post"
+      ]
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "activityLocation",
+     "all": [
+      [
+       "pergola",
+       "post"
+      ]
+     ]
+    },
+    {
+     "kind": "equals",
+     "path": "structuralConcern",
+     "values": [
+      "NO",
+      null
+     ]
+    }
+   ],
+   "weight": 3,
+   "why": "'the pagola posts (pergola)... mud workings going up the post no live ones in the posts themselves'"
+  },
+  {
+   "id": "species-genus-format",
+   "kind": "mentions",
+   "path": "findings",
+   "all": [
+    [
+     "schedorhinotermes spp",
+     "schedorhinotermes sp."
+    ]
+   ],
+   "weight": 2,
+   "why": "a genus without the species is written 'Schedorhinotermes spp.'"
+  },
+  {
+   "id": "no-other-genus",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "coptotermes",
+    "nasutitermes",
+    "heterotermes",
+    "microcerotermes",
+    "cryptotermes",
+    "mastotermes",
+    "porotermes",
+    "intermedius",
+    "actuosus"
+   ],
+   "weight": 3,
+   "why": "only the genus Schedorhinotermes was named; 'the species would need confirming'"
+  },
+  {
+   "id": "nest-not-located",
+   "kind": "every",
+   "path": "findings",
+   "checks": [
+    {
+     "kind": "equals",
+     "path": "nestLocated",
+     "values": [
+      null,
+      "NO"
+     ]
+    }
+   ],
+   "weight": 3,
+   "why": "'the nest is probably in the retaining wall... but I haven't found it I didn't locate a nest': a possible nest never becomes a located one (nestLocated YES)"
+  },
+  {
+   "id": "no-nest-claimed",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "nest found",
+    "nest was found",
+    "nest located",
+    "nest was located",
+    "nest confirmed",
+    "located the nest",
+    "found the nest"
+   ],
+   "weight": 3,
+   "why": "no nest was found"
+  },
+  {
+   "id": "nest-hedge-kept",
+   "kind": "mentions",
+   "path": "findings",
+   "all": [
+    [
+     "nest"
+    ]
+   ],
+   "weight": 1,
+   "why": "the 'probably in the retaining wall' hedge belongs in a damageDescription"
+  },
+  {
+   "id": "findings-no-severity",
+   "kind": "every",
+   "path": "findings",
+   "checks": [
+    {
+     "kind": "mentions",
+     "path": "damageDescription",
+     "none": [
+      "minor",
+      "moderate",
+      "severe",
+      "extensive",
+      "significant",
+      "extreme",
+      "major",
+      "heavy"
+     ],
+     "nullOk": true
+    }
+   ],
+   "weight": 3,
+   "why": "'eaten out along the top' is the observation; no grade"
+  },
+  {
+   "id": "species-not-a-risk-reason",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "aggressive",
+    "destructive species",
+    "voracious",
+    "high risk species",
+    "more damaging",
+    "dangerous species"
+   ],
+   "weight": 3,
+   "why": "species is identification only; the risk rating comes from live termites in a structure attached to the house"
+  },
+  {
+   "id": "timber-soil-yes",
+   "kind": "equals",
+   "path": "timberSoil",
+   "values": [
+    "YES"
+   ],
+   "weight": 3,
+   "why": "'the posts are set straight into the soil no stirrups... so that's timber in the ground yes'"
+  },
+  {
+   "id": "area-retainingwalls",
+   "kind": "equals",
+   "path": "areaStatus.retainingwalls",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'timber sleeper retaining war (wall)... inspected it'"
+  },
+  {
+   "id": "result-retainingwalls-clear",
+   "kind": "equals",
+   "path": "areaResult.retainingwalls",
+   "values": [
+    "CLEAR"
+   ],
+   "weight": 2,
+   "why": "'no activity in it'; a possible nest is not evidence found"
+  },
+  {
+   "id": "area-interior",
+   "kind": "equals",
+   "path": "areaStatus.interior",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'interior inspected all rooms'"
+  },
+  {
+   "id": "area-exterior",
+   "kind": "equals",
+   "path": "areaStatus.exterior",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'exterior inspected all the way around'"
+  },
+  {
+   "id": "area-roofvoid",
+   "kind": "equals",
+   "path": "areaStatus.roofvoid",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'roof void inspected fully'"
+  },
+  {
+   "id": "result-interior-clear",
+   "kind": "equals",
+   "path": "areaResult.interior",
+   "values": [
+    "CLEAR"
+   ],
+   "weight": 2,
+   "why": "'no termite activity inside'"
+  },
+  {
+   "id": "no-hindered-areas",
+   "kind": "absent",
+   "path": "hinderedAreas",
+   "weight": 2,
+   "why": "nothing restricted"
+  },
+  {
+   "id": "high-risk-not-deck",
+   "kind": "mentions",
+   "path": "highRiskAreas",
+   "none": [
+    "deck",
+    "pergola"
+   ],
+   "nullOk": true,
+   "weight": 2,
+   "why": "the deck and posts were inspected and are findings, not places to check"
+  },
+  {
+   "id": "slab-edge-clear",
+   "kind": "equals",
+   "path": "slabEdge",
+   "values": [
+    "CLEAR"
+   ],
+   "weight": 1,
+   "why": "'slab edge is clear all round'"
+  },
+  {
+   "id": "weep-holes-clear",
+   "kind": "equals",
+   "path": "weepHoles",
+   "values": [
+    "CLEAR"
+   ],
+   "weight": 1,
+   "why": "'weep holes clear'"
+  },
+  {
+   "id": "no-existing-system",
+   "kind": "equals",
+   "path": "existingSystem",
+   "values": [
+    "No System Found",
+    null
+   ],
+   "weight": 2,
+   "why": "'no termite management system'"
+  },
+  {
+   "id": "durable-notice-no",
+   "kind": "equals",
+   "path": "durableNoticePresent",
+   "values": [
+    "NO"
+   ],
+   "weight": 1,
+   "why": "'meter box no durable notice'"
+  },
+  {
+   "id": "treatment-yes",
+   "kind": "equals",
+   "path": "treatmentRecommended",
+   "values": [
+    "YES"
+   ],
+   "weight": 3,
+   "why": "'treatment yes treat the live termites in the deck and the pergola posts'"
+  },
+  {
+   "id": "treatment-type-deck",
+   "kind": "mentions",
+   "path": "treatmentType",
+   "all": [
+    [
+     "deck"
+    ]
+   ],
+   "weight": 2,
+   "why": "the target is the deck (and the posts)"
+  },
+  {
+   "id": "treatment-type-no-method",
+   "kind": "mentions",
+   "path": "treatmentType",
+   "none": [
+    "barrier",
+    "bait",
+    "chemical",
+    "dust",
+    "foam",
+    "reticulation",
+    "termidor",
+    "physical",
+    "soil treatment"
+   ],
+   "weight": 3,
+   "why": "'I'll go through the options with Carol': no method was named"
+  },
+  {
+   "id": "other-recs-posts-stirrups",
+   "kind": "mentions",
+   "path": "otherRecommendations",
+   "all": [
+    [
+     "post"
+    ],
+    [
+     "stirrup",
+     "out of the ground",
+     "off the ground"
+    ]
+   ],
+   "weight": 2,
+   "why": "'the pergola posts should be cut off and set on stir ups (stirrups) out of the ground'"
+  },
+  {
+   "id": "risk-high",
+   "kind": "equals",
+   "path": "riskLevel",
+   "values": [
+    "HIGH"
+   ],
+   "weight": 2,
+   "why": "'overall risk high'"
+  },
+  {
+   "id": "frequency-6-months",
+   "kind": "mentions",
+   "path": "inspectionFrequency",
+   "all": [
+    [
+     "6 month",
+     "six month"
+    ]
+   ],
+   "weight": 2,
+   "why": "'re inspect in 6 months'"
+  },
+  {
+   "id": "no-severity",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "minor",
+    "moderate",
+    "severe",
+    "extensive",
+    "significant",
+    "extreme",
+    "major",
+    "heavy"
+   ],
+   "weight": 3,
+   "why": "no severity wording was said"
+  },
+  {
+   "id": "no-structural-verdict",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "structurally",
+    "compromised",
+    "unsound",
+    "unsafe",
+    "structural integrity"
+   ],
+   "weight": 3,
+   "why": "the builder is a referral; nothing says the deck is or is not safe"
+  },
+  {
+   "id": "no-mishearings",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "shed a rhino",
+    "termies",
+    "pagola",
+    "stir ups",
+    "retaining war",
+    "re-deck",
+    "barer",
+    " joys"
+   ],
+   "weight": 3,
+   "why": "dictation slips are corrected: Schedorhinotermes, termites, pergola, stirrups, retaining wall, rear deck, bearer, joists"
+  },
+  {
+   "id": "risk-not-from-species",
+   "kind": "manual",
+   "description": "No text gives the genus as a reason for the risk rating or the treatment; Schedorhinotermes appears only as the identification on the deck finding."
+  },
+  {
+   "id": "retaining-wall-not-a-finding",
+   "kind": "manual",
+   "description": "The retaining wall appears as inspected and clear with the nest hedge in the deck or pergola description; it is not a third finding."
+  }
+ ]
+}

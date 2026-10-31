@@ -1,0 +1,587 @@
+{
+  "id": "existing-baiting",
+  "transcript": "transcripts/existing-baiting.txt",
+  "about": "Written case (2026-10-31): annual inspection of a double brick slab house with an Exterra baiting system: fourteen in-ground stations, two on the south side with live termites, a durable notice in the meter box dated March 2024, nothing in the building, and the inspector wants the installer to service the stations. Tests existingSystem, existingSystemOther, durableNoticePresent, previousTreatment, and that activity in the stations is one ACTIVE finding at the stations without inventing a building finding.",
+  "checks": [
+    {
+      "id": "inspection-type",
+      "kind": "equals",
+      "path": "inspectionType",
+      "values": [
+        "Annual — Existing Building"
+      ],
+      "weight": 2,
+      "why": "'annual inspection'"
+    },
+    {
+      "id": "client-name",
+      "kind": "mentions",
+      "path": "clientName",
+      "all": [
+        [
+          "rosalind"
+        ],
+        [
+          "teo"
+        ]
+      ],
+      "weight": 1,
+      "why": "said 'Rosalind Teo'"
+    },
+    {
+      "id": "address",
+      "kind": "mentions",
+      "path": "propertyStreetAddress",
+      "all": [
+        [
+          "15",
+          "fifteen"
+        ],
+        [
+          "ironbark"
+        ]
+      ],
+      "weight": 1,
+      "why": "said '15 Ironbark Drive'"
+    },
+    {
+      "id": "walls-double-brick",
+      "kind": "mentions",
+      "path": "wallConstruction",
+      "all": [
+        [
+          "double brick",
+          "double-brick",
+          "cavity brick",
+          "solid brick"
+        ]
+      ],
+      "none": [
+        "veneer"
+      ],
+      "weight": 2,
+      "why": "'double brick house'"
+    },
+    {
+      "id": "floor-slab",
+      "kind": "mentions",
+      "path": "floorType",
+      "all": [
+        [
+          "slab",
+          "concrete"
+        ]
+      ],
+      "none": [
+        "timber",
+        "suspended"
+      ],
+      "weight": 2,
+      "why": "'concrete slab on ground so no subfloor'"
+    },
+    {
+      "id": "roof-concrete-tile",
+      "kind": "mentions",
+      "path": "roofType",
+      "all": [
+        [
+          "concrete",
+          "tile"
+        ]
+      ],
+      "none": [
+        "terracotta",
+        "colorbond",
+        "metal"
+      ],
+      "weight": 1,
+      "why": "'tiled roof concrete tiles'"
+    },
+    {
+      "id": "existing-system-baiting",
+      "kind": "equals",
+      "path": "existingSystem",
+      "values": [
+        "Termite Baiting System"
+      ],
+      "weight": 3,
+      "why": "'extra baiting system' on the notice, 'the brand is Exterra'"
+    },
+    {
+      "id": "existing-system-other-exterra",
+      "kind": "mentions",
+      "path": "existingSystemOther",
+      "all": [
+        [
+          "exterra"
+        ]
+      ],
+      "none": [
+        "extra ",
+        "sentricon",
+        "termidor"
+      ],
+      "weight": 3,
+      "why": "'extra baiting system' is Exterra ('the brand is Exterra'); the dictation's 'extra' is the mishearing"
+    },
+    {
+      "id": "existing-system-other-year",
+      "kind": "mentions",
+      "path": "existingSystemOther",
+      "all": [
+        [
+          "2024"
+        ]
+      ],
+      "weight": 1,
+      "why": "'installed by Southern Cross Pest Management March 2024'"
+    },
+    {
+      "id": "durable-notice-yes",
+      "kind": "equals",
+      "path": "durableNoticePresent",
+      "values": [
+        "YES"
+      ],
+      "weight": 3,
+      "why": "'there is a dribble notice in there' (durable notice)"
+    },
+    {
+      "id": "previous-treatment-yes",
+      "kind": "equals",
+      "path": "previousTreatment",
+      "values": [
+        "YES",
+        null
+      ],
+      "weight": 1,
+      "why": "bait stations in the ground are also past-treatment evidence by the prompt; either is defensible when the installed system is already recorded"
+    },
+    {
+      "id": "termite-history",
+      "kind": "mentions",
+      "path": "termiteHistory",
+      "all": [
+        [
+          "treated",
+          "reported",
+          "2024",
+          "laundry"
+        ]
+      ],
+      "weight": 1,
+      "why": "'Rosalind said they had termites in the laundry back then and that's when the system went in'"
+    },
+    {
+      "id": "findings-count-one",
+      "kind": "count",
+      "path": "findings",
+      "min": 1,
+      "max": 1,
+      "weight": 2,
+      "why": "one place with live termites: the two stations on the south side, nothing in the building"
+    },
+    {
+      "id": "finding-active-stations",
+      "kind": "findingMatch",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "termiteActivity",
+          "values": [
+            "ACTIVE"
+          ]
+        },
+        {
+          "kind": "mentions",
+          "path": "activityLocation",
+          "all": [
+            [
+              "station"
+            ]
+          ]
+        }
+      ],
+      "weight": 3,
+      "why": "'two of the stations on the south side have got live termites in them workers feeding on the timber interceptors'"
+    },
+    {
+      "id": "finding-location-south",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "mentions",
+          "path": "activityLocation",
+          "all": [
+            [
+              "south"
+            ]
+          ]
+        }
+      ],
+      "weight": 2,
+      "why": "'on the south side'"
+    },
+    {
+      "id": "finding-not-in-building",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "mentions",
+          "path": "activityLocation",
+          "none": [
+            "wall",
+            "skirting",
+            "laundry",
+            "roof",
+            "bearer",
+            "joist",
+            "slab"
+          ]
+        }
+      ],
+      "weight": 3,
+      "why": "'no activity in the building the activity is only in the two bait stations'"
+    },
+    {
+      "id": "finding-species-absent",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "absent",
+          "path": "species"
+        }
+      ],
+      "weight": 2,
+      "why": "species was never raised"
+    },
+    {
+      "id": "finding-nest-absent",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "absent",
+          "path": "nestLocated"
+        }
+      ],
+      "weight": 2,
+      "why": "no nest was mentioned"
+    },
+    {
+      "id": "finding-no-structural",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "structuralConcern",
+          "values": [
+            null,
+            "NO"
+          ]
+        }
+      ],
+      "weight": 2,
+      "why": "a bait station is not part of the building and no builder was mentioned"
+    },
+    {
+      "id": "finding-description-clean",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "mentions",
+          "path": "damageDescription",
+          "none": [
+            "minor",
+            "moderate",
+            "severe",
+            "extensive",
+            "significant",
+            "extreme",
+            "major",
+            "heavy",
+            "damage to"
+          ],
+          "nullOk": true
+        }
+      ],
+      "weight": 2,
+      "why": "workers feeding on interceptors is the observation; no grade, no building damage"
+    },
+    {
+      "id": "no-laundry-finding",
+      "kind": "mentions",
+      "path": "findings",
+      "none": [
+        "laundry"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "the laundry termites were in 2024, before the system; 'laundry is fine now nothing in there'"
+    },
+    {
+      "id": "no-species",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "coptotermes",
+        "schedorhinotermes",
+        "nasutitermes",
+        "heterotermes",
+        "microcerotermes",
+        "cryptotermes",
+        "mastotermes",
+        "porotermes"
+      ],
+      "weight": 3,
+      "why": "no genus was named"
+    },
+    {
+      "id": "area-subfloor-na",
+      "kind": "equals",
+      "path": "areaStatus.subfloor",
+      "values": [
+        "NA"
+      ],
+      "weight": 2,
+      "why": "'slab on ground so no subfloor'"
+    },
+    {
+      "id": "area-exterior",
+      "kind": "equals",
+      "path": "areaStatus.exterior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'exterior inspected all the way around'"
+    },
+    {
+      "id": "area-interior",
+      "kind": "equals",
+      "path": "areaStatus.interior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'interior inspected every room'"
+    },
+    {
+      "id": "area-roofvoid",
+      "kind": "equals",
+      "path": "areaStatus.roofvoid",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'inspected fully'"
+    },
+    {
+      "id": "no-partial-or-not",
+      "kind": "mentions",
+      "path": "areaStatus",
+      "none": [
+        "partial",
+        "not"
+      ],
+      "nullOk": true,
+      "weight": 2,
+      "why": "nothing was in the way"
+    },
+    {
+      "id": "result-interior-clear",
+      "kind": "equals",
+      "path": "areaResult.interior",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 2,
+      "why": "'no termite activity inside'"
+    },
+    {
+      "id": "result-roofvoid-clear",
+      "kind": "equals",
+      "path": "areaResult.roofvoid",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 1,
+      "why": "'no termite activity no borers no decay'"
+    },
+    {
+      "id": "slab-edge-clear",
+      "kind": "equals",
+      "path": "slabEdge",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 2,
+      "why": "'slab hedge is visible all the way round' (slab edge)"
+    },
+    {
+      "id": "weep-holes-clear",
+      "kind": "equals",
+      "path": "weepHoles",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 2,
+      "why": "'weep poles clear' (weep holes)"
+    },
+    {
+      "id": "no-hindered-areas",
+      "kind": "absent",
+      "path": "hinderedAreas",
+      "weight": 2,
+      "why": "nothing restricted"
+    },
+    {
+      "id": "no-high-risk-areas",
+      "kind": "absent",
+      "path": "highRiskAreas",
+      "weight": 2,
+      "why": "nothing inaccessible; the stations were opened and are a finding"
+    },
+    {
+      "id": "installer-service-recorded",
+      "kind": "mentions",
+      "all": [
+        [
+          "installer",
+          "southern cross"
+        ]
+      ],
+      "weight": 3,
+      "why": "'those stations need to be serviced by the installer get Southern Cross back out' must land in treatmentType or otherRecommendations"
+    },
+    {
+      "id": "treatment-type-stations-only",
+      "kind": "mentions",
+      "path": "treatmentType",
+      "all": [
+        [
+          "station"
+        ]
+      ],
+      "none": [
+        "barrier",
+        "chemical",
+        "reticulation",
+        "soil treatment",
+        "termidor",
+        "dust",
+        "foam",
+        "physical"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "'service and rebait the two active stations': baiting was said, no other method was"
+    },
+    {
+      "id": "treatment-recommended",
+      "kind": "equals",
+      "path": "treatmentRecommended",
+      "values": [
+        "YES"
+      ],
+      "weight": 1,
+      "why": "servicing and rebaiting active stations is a termite treatment, even if done by the installer"
+    },
+    {
+      "id": "risk-medium-stated",
+      "kind": "equals",
+      "path": "riskLevel",
+      "values": [
+        "MEDIUM"
+      ],
+      "weight": 3,
+      "why": "'overall risk I'd put at medium': the inspector's own statement wins over live termites on the property"
+    },
+    {
+      "id": "frequency-12-months",
+      "kind": "mentions",
+      "path": "inspectionFrequency",
+      "all": [
+        [
+          "12 month",
+          "twelve month",
+          "annual",
+          "yearly",
+          "every year"
+        ]
+      ],
+      "none": [
+        "week"
+      ],
+      "weight": 2,
+      "why": "'re inspect the house in 12 months'; the six to eight week station checks are the installer's, not the re-inspection interval"
+    },
+    {
+      "id": "no-severity",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "minor",
+        "moderate",
+        "severe",
+        "extensive",
+        "significant",
+        "extreme",
+        "major",
+        "heavy"
+      ],
+      "weight": 3,
+      "why": "no severity wording was said"
+    },
+    {
+      "id": "no-structural",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "structural",
+        "compromised",
+        "structurally"
+      ],
+      "weight": 3,
+      "why": "nothing in the building, no referral"
+    },
+    {
+      "id": "no-mishearings",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "dribble notice",
+        "extra baiting",
+        "extra in ground",
+        "weep poles",
+        "slab hedge",
+        "man hole"
+      ],
+      "weight": 3,
+      "why": "dictation slips are corrected: durable notice, Exterra, weep holes, slab edge, manhole"
+    },
+    {
+      "id": "no-brand-elsewhere",
+      "kind": "mentions",
+      "path": "findings",
+      "none": [
+        "exterra",
+        "southern cross"
+      ],
+      "nullOk": true,
+      "weight": 1,
+      "why": "the brand and installer belong in existingSystemOther and the recommendation, not the finding"
+    },
+    {
+      "id": "station-activity-not-building",
+      "kind": "manual",
+      "description": "The report reads as live termites intercepted in two bait stations on the south side, with the building clear; nothing suggests termites in the house."
+    },
+    {
+      "id": "installer-not-quoted-as-new-system",
+      "kind": "manual",
+      "description": "The recommendation is to have the installer service the existing stations, not to install a new system or barrier."
+    }
+  ]
+}

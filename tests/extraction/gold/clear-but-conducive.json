@@ -1,0 +1,546 @@
+{
+  "id": "clear-but-conducive",
+  "transcript": "transcripts/clear-but-conducive.txt",
+  "about": "Annual inspection, said area by area, with nothing found anywhere: interior, roof void, subfloor, exterior, fences and site all clear on a combination slab and timber floor house. Many conducive conditions: hot water overflow and air-con condensate onto the slab edge, garden beds over the weep holes, a dripping garden tap, stored timber on the dirt under the deck, poor subfloor ventilation. Tests that at most one NONE card is made and never one per area, that every conducive field is filled, that no treatment is recommended, and four mishearings.",
+  "checks": [
+    {
+      "id": "inspection-type",
+      "kind": "equals",
+      "path": "inspectionType",
+      "values": [
+        "Annual — Existing Building"
+      ],
+      "weight": 2,
+      "why": "'annual inspection'"
+    },
+    {
+      "id": "client-name",
+      "kind": "mentions",
+      "path": "clientName",
+      "all": [
+        [
+          "whitfield"
+        ]
+      ],
+      "weight": 1,
+      "why": "said 'Tom and Sarah Whitfield' (extra)"
+    },
+    {
+      "id": "address",
+      "kind": "mentions",
+      "path": "propertyStreetAddress",
+      "all": [
+        [
+          "5",
+          "five"
+        ],
+        [
+          "grevillea"
+        ]
+      ],
+      "weight": 1,
+      "why": "said '5 Grevillea Court' (extra)"
+    },
+    {
+      "id": "floor-combination",
+      "kind": "mentions",
+      "path": "floorType",
+      "all": [
+        [
+          "combination",
+          "slab / timber",
+          "slab and timber",
+          "slab/timber"
+        ]
+      ],
+      "weight": 3,
+      "why": "'original house is on a timber suspended floor... rear extension is on a slab so combination slab and timber'"
+    },
+    {
+      "id": "walls-brick-veneer",
+      "kind": "mentions",
+      "path": "wallConstruction",
+      "all": [
+        [
+          "veneer"
+        ]
+      ],
+      "none": [
+        "double brick",
+        "weatherboard"
+      ],
+      "weight": 2,
+      "why": "'brick veneer'"
+    },
+    {
+      "id": "era",
+      "kind": "equals",
+      "path": "constructionEra",
+      "values": [
+        "1965-1985",
+        "1985-2003"
+      ],
+      "weight": 1,
+      "why": "'built around 1975 the extension maybe 2000': either era is defensible"
+    },
+    {
+      "id": "area-interior",
+      "kind": "equals",
+      "path": "areaStatus.interior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 2,
+      "why": "'interior all rooms inspected'"
+    },
+    {
+      "id": "area-roofvoid",
+      "kind": "equals",
+      "path": "areaStatus.roofvoid",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 2,
+      "why": "'roof void inspected got right through it'"
+    },
+    {
+      "id": "area-subfloor",
+      "kind": "equals",
+      "path": "areaStatus.subfloor",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 2,
+      "why": "'subfloor inspected got right to the back'"
+    },
+    {
+      "id": "area-exterior",
+      "kind": "equals",
+      "path": "areaStatus.exterior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'exterior all round'"
+    },
+    {
+      "id": "area-fences",
+      "kind": "equals",
+      "path": "areaStatus.fences",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'fences inspected paling fences'"
+    },
+    {
+      "id": "area-site",
+      "kind": "equals",
+      "path": "areaStatus.site",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'site walked the yard'"
+    },
+    {
+      "id": "area-outbuildings-na",
+      "kind": "equals",
+      "path": "areaStatus.outbuildings",
+      "values": [
+        "NA"
+      ],
+      "weight": 1,
+      "why": "'no sheds so no outbuildings'"
+    },
+    {
+      "id": "no-partial-or-not",
+      "kind": "mentions",
+      "path": "areaStatus",
+      "none": [
+        "partial",
+        "not"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "every area was fully inspected"
+    },
+    {
+      "id": "result-interior-clear",
+      "kind": "equals",
+      "path": "areaResult.interior",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 2,
+      "why": "'no activity no workings nothing inside'"
+    },
+    {
+      "id": "result-roofvoid-clear",
+      "kind": "equals",
+      "path": "areaResult.roofvoid",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 2,
+      "why": "'clear no activity no workings'"
+    },
+    {
+      "id": "result-subfloor-clear",
+      "kind": "equals",
+      "path": "areaResult.subfloor",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 2,
+      "why": "'it's clear no activity no workings on any of the bearers or joists'; poor ventilation is not evidence"
+    },
+    {
+      "id": "result-exterior-clear",
+      "kind": "equals",
+      "path": "areaResult.exterior",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 1,
+      "why": "'no termites... anywhere on the property'; leaks and garden beds are not evidence"
+    },
+    {
+      "id": "result-fences-clear",
+      "kind": "equals",
+      "path": "areaResult.fences",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 1,
+      "why": "'paling fences no activity'"
+    },
+    {
+      "id": "no-found-anywhere",
+      "kind": "mentions",
+      "path": "areaResult",
+      "none": [
+        "found"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "conducive conditions never make an area FOUND"
+    },
+    {
+      "id": "findings-at-most-one",
+      "kind": "count",
+      "path": "findings",
+      "min": 0,
+      "max": 1,
+      "weight": 3,
+      "why": "the whole property is clear: at most one NONE card, never one for each area said clear"
+    },
+    {
+      "id": "findings-all-none",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "termiteActivity",
+          "values": [
+            "NONE"
+          ]
+        },
+        {
+          "kind": "absent",
+          "path": "activityLocation"
+        },
+        {
+          "kind": "absent",
+          "path": "species"
+        },
+        {
+          "kind": "absent",
+          "path": "damageDescription"
+        }
+      ],
+      "weight": 3,
+      "why": "'no termites no borers no decay anywhere on the property'"
+    },
+    {
+      "id": "borers-none",
+      "kind": "equals",
+      "path": "borerActivity",
+      "values": [
+        "NONE"
+      ],
+      "weight": 2,
+      "why": "'no borers'"
+    },
+    {
+      "id": "decay-no",
+      "kind": "equals",
+      "path": "decayFound",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'no decay anywhere'"
+    },
+    {
+      "id": "subfloor-ventilation-poor",
+      "kind": "equals",
+      "path": "subfloorVentilation",
+      "values": [
+        "POOR"
+      ],
+      "weight": 3,
+      "why": "'the ventilation under there is poor only three vents... air's dead and musty' ('sub for vents' = subfloor vents)"
+    },
+    {
+      "id": "leaks-yes",
+      "kind": "equals",
+      "path": "waterLeaks",
+      "values": [
+        "YES"
+      ],
+      "weight": 3,
+      "why": "hot water overflow, air-con condensate and a dripping garden tap are water sources"
+    },
+    {
+      "id": "leak-locations",
+      "kind": "mentions",
+      "path": "leakLocation",
+      "all": [
+        [
+          "tap"
+        ],
+        [
+          "hot water",
+          "overflow",
+          "condens"
+        ]
+      ],
+      "weight": 2,
+      "why": "'leak at the front garden tap' and the hot water overflow onto the slab edge ('garden tab' = garden tap, 'over flow' = overflow, 'air corn' = air con)"
+    },
+    {
+      "id": "weep-holes-bridged",
+      "kind": "equals",
+      "path": "weepHoles",
+      "values": [
+        "BRIDGED"
+      ],
+      "weight": 3,
+      "why": "'garden beds along the east side are built up over the weep holes... so they're bridged' ('weap holes' = weep holes)"
+    },
+    {
+      "id": "soft-landscaping-yes",
+      "kind": "equals",
+      "path": "softLandscaping",
+      "values": [
+        "YES"
+      ],
+      "weight": 2,
+      "why": "garden beds built up against the east wall"
+    },
+    {
+      "id": "zone75-no",
+      "kind": "equals",
+      "path": "zone75mmVisible",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'the 75 mil zone's not visible there'"
+    },
+    {
+      "id": "timber-soil-yes",
+      "kind": "equals",
+      "path": "timberSoil",
+      "values": [
+        "YES"
+      ],
+      "weight": 3,
+      "why": "'stack of old timber lying on the dirt... timber on soil under the deck'"
+    },
+    {
+      "id": "no-existing-system",
+      "kind": "equals",
+      "path": "existingSystem",
+      "values": [
+        "No System Found",
+        null
+      ],
+      "weight": 2,
+      "why": "'no termite system'"
+    },
+    {
+      "id": "durable-notice-no",
+      "kind": "equals",
+      "path": "durableNoticePresent",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'no durable notice'"
+    },
+    {
+      "id": "treatment-no",
+      "kind": "equals",
+      "path": "treatmentRecommended",
+      "values": [
+        "NO"
+      ],
+      "weight": 3,
+      "why": "'no treatment nothing to treat'; plumber and garden work are not a termite treatment"
+    },
+    {
+      "id": "treatment-type-empty",
+      "kind": "mentions",
+      "path": "treatmentType",
+      "none": [
+        "barrier",
+        "bait",
+        "chemical",
+        "reticulation",
+        "termidor",
+        "physical",
+        "top-up",
+        "top up",
+        "treat"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "no treatment, so no target or method"
+    },
+    {
+      "id": "other-recs-all-five",
+      "kind": "mentions",
+      "path": "otherRecommendations",
+      "all": [
+        [
+          "plumber",
+          "hot water",
+          "overflow"
+        ],
+        [
+          "tap"
+        ],
+        [
+          "garden bed"
+        ],
+        [
+          "timber",
+          "deck"
+        ],
+        [
+          "ventilation",
+          "vents"
+        ]
+      ],
+      "weight": 3,
+      "why": "redirect the overflow and condensate, fix the tap, pull the garden beds back, clear the timber from under the deck, more vents"
+    },
+    {
+      "id": "frequency-12-months",
+      "kind": "mentions",
+      "path": "inspectionFrequency",
+      "all": [
+        [
+          "12 month",
+          "twelve month",
+          "annual"
+        ]
+      ],
+      "weight": 2,
+      "why": "'re inspect in 12 months'"
+    },
+    {
+      "id": "risk-medium",
+      "kind": "equals",
+      "path": "riskLevel",
+      "values": [
+        "MEDIUM"
+      ],
+      "weight": 3,
+      "why": "'I'd put the risk at medium with all that going on'; with no termites it is never HIGH"
+    },
+    {
+      "id": "no-high-risk-areas",
+      "kind": "absent",
+      "path": "highRiskAreas",
+      "weight": 3,
+      "why": "everything was inspected; conducive spots are not high risk areas"
+    },
+    {
+      "id": "no-hindered-areas",
+      "kind": "absent",
+      "path": "hinderedAreas",
+      "weight": 2,
+      "why": "nothing restricted"
+    },
+    {
+      "id": "no-species",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "coptotermes",
+        "schedorhinotermes",
+        "nasutitermes",
+        "heterotermes",
+        "microcerotermes",
+        "cryptotermes",
+        "mastotermes",
+        "porotermes",
+        "acinaciformis",
+        "frenchi",
+        "intermedius",
+        "exitiosus",
+        "walkeri",
+        "ferox",
+        "copter"
+      ],
+      "weight": 3,
+      "why": "no species was raised"
+    },
+    {
+      "id": "no-severity",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "minor",
+        "moderate",
+        "severe",
+        "extensive",
+        "significant",
+        "extreme",
+        "major",
+        "heavy"
+      ],
+      "weight": 3,
+      "why": "no severity word was said"
+    },
+    {
+      "id": "no-structural",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "structural",
+        "compromised"
+      ],
+      "weight": 2,
+      "why": "no structural opinion"
+    },
+    {
+      "id": "no-mishearings",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "air corn",
+        "garden tab",
+        "weap hole",
+        "over flow"
+      ],
+      "weight": 2,
+      "why": "'air corn' = air con, 'garden tab' = garden tap, 'weap holes' = weep holes, 'over flow' = overflow"
+    },
+    {
+      "id": "no-card-per-area",
+      "kind": "manual",
+      "description": "Six areas were said clear one after another; the findings array holds at most one NONE entry and no entry names an area."
+    }
+  ]
+}

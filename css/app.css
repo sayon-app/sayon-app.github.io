@@ -3828,6 +3828,8 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
   animation: aiBusySlide 1.3s ease-in-out infinite;
 }
 body.ai-busy:has(#app[style*="flex"]) .ai-busy-bar { display: block; }
+.ai-keep-btn { margin: -6px 0 -6px 12px; padding: 6px 10px; min-height: 32px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); color: var(--text2); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; vertical-align: middle; }
+.ai-keep-btn[hidden] { display: none; }
 @keyframes aiBusySlide {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(290%); }

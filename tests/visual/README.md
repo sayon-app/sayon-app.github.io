@@ -38,3 +38,7 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 ## Photos while talking
 
 `tests/talk-photo/e2e.js <outDir>` takes a photo from the voice popover between two stretches of speech about a gum tree, then a second photo a minute later about nothing in particular, fills the report from the standard scenario and checks that the first photo lands on the gum-tree finding with the right sentence as its caption, the second stays in the Findings photos, and both survive a reload.
+
+## Send gaps
+
+`tests/send-gaps/e2e.js <outDir>` adds two photos whose upload fails, opens the check sheet and expects the "only on this phone" gap, taps Back up now once failing and once working, then starts a fill against a slow canned AI and taps Keep for later, expecting the note under Waiting notes and in the draft.

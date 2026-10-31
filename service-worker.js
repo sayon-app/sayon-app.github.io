@@ -15,6 +15,7 @@
 // drop the old cache and install() to pre-cache the new files, so a redeploy
 // takes effect on the very next load instead of needing an extra refresh.
 const CACHE_VERSION = 'korva-v198';
+const CACHE_VERSION = 'korva-v199';
 
 
 const APP_SHELL = [

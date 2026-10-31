@@ -4331,11 +4331,14 @@ function extractBlanks() {
 }
 
 let extractSummaryBlanks = [];
+let extractSummaryBefore = null;   // the snapshot the sheet counts from, kept so a fix can redraw it
+let extractSummaryFilledCount = 0;
 
 function showExtractSummary(before) {
   const overlay = document.getElementById('extractSummaryOverlay');
   if (!overlay) return;
-  const n = countExtractFilled(before);
+  extractSummaryBefore = before || extractSummaryBefore || extractSnapshot();
+  const n = extractSummaryFilledCount = countExtractFilled(extractSummaryBefore);
   extractSummaryBlanks = extractBlanks();
   document.getElementById('extractSummaryFilled').textContent = n
     ? `Filled ${n} field${n !== 1 ? 's' : ''} from your note.`
@@ -4344,27 +4347,97 @@ function showExtractSummary(before) {
   document.getElementById('extractSummaryBlanks').innerHTML = extractSummaryBlanks.length
     ? extractSummaryBlanks.map((b, i) => `<button class="extract-blank-btn" onclick="goToExtractBlank(${i})">${escapeHtml(b.label)}<span aria-hidden="true">›</span></button>`).join('')
     : '<div class="extract-summary-done">None of the key fields are blank.</div>';
+  // Before you leave: what the standard needs that the notes didn't cover.
+  const gaps = driveawayGaps();
+  document.getElementById('extractSummaryGaps').innerHTML = gaps.length
+    ? gaps.map(g => `<div class="extract-gap"><span>${escapeHtml(g.text)}</span>${g.fix ? `<span class="send-review-fixes">${g.fix}</span>` : ''}</div>`).join('')
+    : '<div class="extract-summary-done">Nothing the standard asks for is missing. Safe to leave.</div>';
+  const readBtn = document.getElementById('extractReadBackBtn');
+  if (readBtn) { readBtn.hidden = !('speechSynthesis' in window); readBtn.textContent = 'Read it back'; }
   overlay.classList.add('open');
 }
 
 function closeExtractSummary() {
   const overlay = document.getElementById('extractSummaryOverlay');
   if (overlay) overlay.classList.remove('open');
+  stopReadBack();
+}
+
+// ── SPOKEN READ-BACK ────────────────────────────────────────────────────
+// The sheet's headline, said aloud, so the inspector can check what the
+// note filled with their hands still full. Only the questions a client
+// asks first, then what's left to do. Same facts as the sheet, never more.
+function readBackText() {
+  const lines = [];
+  const n = extractSummaryFilledCount;
+  lines.push(n ? `Filled ${n} field${n !== 1 ? 's' : ''} from your note.` : 'Nothing new was filled from your note.');
+  const { groups, limited } = reportSummary();
+  const items = {};
+  groups.forEach(g => g.items.forEach(([q, a, , , detail]) => { items[q] = { a, detail }; }));
+  const say = (q, label) => {
+    const it = items[q];
+    if (!it) return;
+    const a = it.a === 'NOT RECORDED' ? 'not recorded' : it.a.toLowerCase();
+    lines.push(`${label}: ${a}${it.detail && it.a !== 'NOT RECORDED' ? `, ${it.detail}` : ''}.`);
+  };
+  say('Live termites found?', 'Live termites');
+  say('Termite workings or damage found?', 'Workings or damage');
+  say('Builder or engineer referral?', 'Builder referral');
+  say('Conditions conducive to timber pests?', 'Conducive conditions');
+  say('Termite treatment recommended?', 'Treatment recommended');
+  say('Risk of termite attack', 'Risk');
+  if (limited.length) lines.push(`${limited.length} area${limited.length === 1 ? '' : 's'} not fully inspected: ${limited.join('; ')}.`);
+  const blanks = extractSummaryBlanks.map(b => b.label);
+  if (blanks.length) lines.push(`Left blank: ${blanks.join(', ')}.`);
+  const gaps = driveawayGaps().map(g => g.text.replace(/"/g, ''));
+  lines.push(gaps.length ? `Before you leave: ${gaps.join('. ')}.` : 'Nothing the standard asks for is missing.');
+  return lines.join(' ');
+}
+
+let readBackUtterance = null;
+function toggleReadBack() {
+  if (!('speechSynthesis' in window)) return;
+  if (speechSynthesis.speaking || speechSynthesis.pending) { stopReadBack(); return; }
+  const u = new SpeechSynthesisUtterance(readBackText());
+  u.lang = 'en-AU';
+  u.rate = 1;
+  const voice = speechSynthesis.getVoices().find(v => /en[-_]AU/i.test(v.lang));
+  if (voice) u.voice = voice;
+  const btn = document.getElementById('extractReadBackBtn');
+  u.onend = u.onerror = () => { readBackUtterance = null; if (btn) btn.textContent = 'Read it back'; };
+  readBackUtterance = u;
+  if (btn) btn.textContent = 'Stop reading';
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+  track('read_back');
+}
+function stopReadBack() {
+  if (!('speechSynthesis' in window) || !readBackUtterance) return;
+  readBackUtterance = null;
+  speechSynthesis.cancel();
+  const btn = document.getElementById('extractReadBackBtn');
+  if (btn) btn.textContent = 'Read it back';
 }
 
 function goToExtractBlank(i) {
   const b = extractSummaryBlanks[i];
   closeExtractSummary();
   if (!b) return;
+  goToReportField(b.target, b.referral);
+}
+
+// Takes the inspector to a field in the report: its section, its group
+// opened, scrolled into view and flashed.
+function goToReportField(target, referral) {
   const popover = document.getElementById('voicePopover');
   if (popover && popover.classList.contains('open')) toggleVoicePopover();
-  let el = document.getElementById(b.target);
+  let el = document.getElementById(target);
   if (!el) return;
-  if (el.classList.contains('choice-source')) el = document.getElementById(b.target.replace(/^f-/, 'choices-')) || el;
+  if (el.classList.contains('choice-source')) el = document.getElementById(target.replace(/^f-/, 'choices-')) || el;
   const section = el.closest('.report-section');
   if (section && section.id.startsWith('section-')) showSection(section.id.slice(8));
   openFieldGroups(el);
-  if (b.referral) {
+  if (referral) {
     // The "Refer to a Builder or Engineer?" field inside the finding card.
     const label = [...el.querySelectorAll('.field-label')].find(l => /builder or engineer/i.test(l.textContent));
     if (label && label.nextElementSibling) el = label.nextElementSibling;
@@ -11993,24 +12066,39 @@ function reportPrepItems() { return reportPrepGaps().map(g => g.text); }
 
 // The same list, each with the buttons that fix it from the check sheet
 // (fix: HTML, or '' when it has to be fixed in the report).
-function reportPrepGaps() {
+// from: which sheet the fix buttons come back to ('send' or 'extract').
+// key: what kind of gap, so a sheet can leave some out.
+function reportPrepGaps(from = 'send') {
   const gaps = [];
-  const push = (text, fix) => gaps.push({ text, fix: fix || '' });
-  if (!document.getElementById('jobAddress').value.trim()) push('The job has no property address');
+  const push = (key, text, fix) => gaps.push({ key, text, fix: fix || '' });
+  const fixBtn = (kind, label) => `<button class="link-btn" onclick="fixReportGap('${kind}', '${from}')">${label}</button>`;
+  if (!document.getElementById('jobAddress').value.trim()) push('address', 'The job has no property address');
   const unmarked = Object.keys(OBS_ZONES).filter(z => !areaStatusOf(z));
-  if (unmarked.length) push(`${unmarked.length} area${unmarked.length === 1 ? ' has' : 's have'} no inspection status (${unmarked.map(z => OBS_ZONES[z].label).join(', ')})`,
-    `<button class="link-btn" onclick="fixSendGap('inspected')">Mark the rest as inspected</button>` +
-    `<button class="link-btn" onclick="fixSendGap('na')">Mark the rest not applicable</button>`);
+  if (unmarked.length) push('status', `${unmarked.length} area${unmarked.length === 1 ? ' has' : 's have'} no inspection status (${unmarked.map(z => OBS_ZONES[z].label).join(', ')})`,
+    fixBtn('inspected', 'Mark the rest as inspected') + fixBtn('na', 'Mark the rest not applicable'));
   const noResult = areasMissingResult();
-  if (noResult.length) push(`${noResult.length} area${noResult.length === 1 ? ' has' : 's have'} no result for what was found there (${noResult.map(z => OBS_ZONES[z].label.replace(/^The /, '')).join(', ')})`,
-    `<button class="link-btn" onclick="fixSendGap('clear')">Mark the rest as nothing found</button>`);
-  areasEvidenceUnlinked().forEach(z => push(`${OBS_ZONES[z].label}: marked "evidence found", but no finding mentions it`,
-    `<button class="link-btn" onclick="closeSendReview(); addFindingForArea('${z}')">Add finding</button>`));
-  findingsMissingReferral().forEach(n => push(`Finding ${n}: "refer to a builder or engineer?" isn't answered`));
+  if (noResult.length) push('result', `${noResult.length} area${noResult.length === 1 ? ' has' : 's have'} no result for what was found there (${noResult.map(z => OBS_ZONES[z].label.replace(/^The /, '')).join(', ')})`,
+    fixBtn('clear', 'Mark the rest as nothing found'));
+  areasEvidenceUnlinked().forEach(z => push('evidence', `${OBS_ZONES[z].label}: marked "evidence found", but no finding mentions it`, fixBtn('finding:' + z, 'Add finding')));
+  findingsMissingReferral().forEach(n => push('referral', `Finding ${n}: "refer to a builder or engineer?" isn't answered`));
   const pending = (reportData.pendingNotes || []).length;
-  if (pending) push(`${pending} voice note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
-  if (!reportData.inspectorSignature) push('The inspector hasn\'t signed');
-  if (!reportData.agreement) push('No pre-inspection agreement is recorded');
+  if (pending) push('pending', `${pending} voice note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
+  if (!reportData.inspectorSignature) push('signature', 'The inspector hasn\'t signed');
+  if (!reportData.agreement) push('agreement', 'No pre-inspection agreement is recorded', from === 'extract' ? fixBtn('agreement', 'Get it signed') : '');
+  return gaps;
+}
+
+// ── GAPS BEFORE YOU LEAVE ───────────────────────────────────────────────
+// The same gaps, shown on the after-extract sheet while the inspector is
+// still on site: what the standard asks for that the notes didn't cover,
+// and a minute fixes it in the driveway. Signing and waiting notes are
+// left out: they aren't on-site work. The referral is on the Left blank
+// list already.
+function driveawayGaps() {
+  const gaps = reportPrepGaps('extract').filter(g => !['pending', 'signature', 'referral'].includes(g.key));
+  const go = (target, label) => `<button class="link-btn" onclick="closeExtractSummary(); goToReportField('${target}')">${label}</button>`;
+  if (isBlankValue(reportData.moistureReadings)) gaps.push({ key: 'moisture', text: 'Moisture readings: not recorded', fix: go('f-moistureReadings', 'Record') });
+  if (isBlankValue(reportData.durableNoticePresent)) gaps.push({ key: 'notice', text: 'Durable notice in the meter box: not recorded', fix: go('f-durableNoticePresent', 'Record') });
   return gaps;
 }
 
@@ -12449,16 +12537,16 @@ function addSendReviewEmail() {
 
 // The fix buttons on the check sheet. Each changes the report, then the
 // sheet is redrawn from the report as it now is.
-function fixSendGap(kind) {
-  if (kind === 'quote') {
-    closeSendReview();
-    sendAfterQuote = true;
-    openQuoteFromReport();
-    return;
-  }
+function fixSendGap(kind) { fixReportGap(kind, 'send'); }
+function fixReportGap(kind, from = 'send') {
+  const reopen = () => from === 'send' ? openSendReview() : showExtractSummary(extractSummaryBefore);
+  const leave = () => from === 'send' ? closeSendReview() : closeExtractSummary();
+  if (kind === 'quote') { leave(); sendAfterQuote = true; openQuoteFromReport(); return; }
+  if (kind === 'agreement') { leave(); openAgreementSheet(); return; }
+  if (kind.startsWith('finding:')) { leave(); addFindingForArea(kind.slice(8)); return; }
   if (kind === 'clear') markRemainingAreasClear();
   else markRemainingAreasInspected(kind === 'na' ? 'NA' : 'INSPECTED');
-  openSendReview();
+  reopen();
 }
 
 // After "Build quote now", coming back from the quote reopens the check.

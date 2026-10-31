@@ -1,0 +1,543 @@
+{
+  "id": "limited-scope",
+  "transcript": "transcripts/limited-scope.txt",
+  "about": "Written case (2026-10-31): pre-purchase on a tenanted weatherboard house where the tenant refused entry to the back bedroom, the detached garage was padlocked with no key, the agent allowed 45 minutes, and insulation batts hid the roof void joists. Tests noAccessAreas and highRiskAreas for rooms never entered (not the hindered areas), the 'Restricted access' reason vocabulary the app's matcher ticks from, the declined risk rating, and the recommendation to inspect them before settlement.",
+  "checks": [
+    {
+      "id": "inspection-type",
+      "kind": "equals",
+      "path": "inspectionType",
+      "values": [
+        "Pre-Purchase — Timber Pest"
+      ],
+      "weight": 2,
+      "why": "'pre-purchased timber pest inspection... she's the purchaser'"
+    },
+    {
+      "id": "client-name",
+      "kind": "mentions",
+      "path": "clientName",
+      "all": [
+        [
+          "simone"
+        ],
+        [
+          "albrecht"
+        ]
+      ],
+      "weight": 1,
+      "why": "said 'Simone Albrecht'"
+    },
+    {
+      "id": "address",
+      "kind": "mentions",
+      "path": "propertyStreetAddress",
+      "all": [
+        [
+          "6",
+          "six"
+        ],
+        [
+          "quandong",
+          "quan dong"
+        ]
+      ],
+      "weight": 1,
+      "why": "said '6 Quan dong Place' (Quandong)"
+    },
+    {
+      "id": "walls-weatherboard",
+      "kind": "mentions",
+      "path": "wallConstruction",
+      "all": [
+        [
+          "weatherboard",
+          "weather board"
+        ]
+      ],
+      "weight": 1,
+      "why": "'weatherboard'"
+    },
+    {
+      "id": "floor-suspended-timber",
+      "kind": "mentions",
+      "path": "floorType",
+      "all": [
+        [
+          "suspended",
+          "timber"
+        ]
+      ],
+      "none": [
+        "slab"
+      ],
+      "weight": 1,
+      "why": "'timber suspended floor'"
+    },
+    {
+      "id": "era-not-guessed",
+      "kind": "absent",
+      "path": "constructionEra",
+      "weight": 2,
+      "why": "no age or year was said"
+    },
+    {
+      "id": "occupancy-tenanted",
+      "kind": "equals",
+      "path": "occupancyStatus",
+      "values": [
+        "Tenanted"
+      ],
+      "weight": 2,
+      "why": "'the property is tenanted'"
+    },
+    {
+      "id": "people-present-tenant",
+      "kind": "mentions",
+      "path": "peoplePresent",
+      "all": [
+        [
+          "tenant"
+        ]
+      ],
+      "none": [
+        "agent"
+      ],
+      "weight": 2,
+      "why": "'the tenet was home' (tenant); the agent set the time but was not said to be there"
+    },
+    {
+      "id": "no-access-bedroom",
+      "kind": "mentions",
+      "path": "noAccessAreas",
+      "all": [
+        [
+          "bedroom"
+        ],
+        [
+          "tenant",
+          "refused",
+          "would not",
+          "wouldn't",
+          "not permitted",
+          "declined"
+        ]
+      ],
+      "weight": 3,
+      "why": "'the tenet would not let me into the back bedroom... not inspected at all I never got in there'"
+    },
+    {
+      "id": "no-access-garage",
+      "kind": "mentions",
+      "path": "noAccessAreas",
+      "all": [
+        [
+          "garage"
+        ],
+        [
+          "padlock",
+          "locked",
+          "no key"
+        ]
+      ],
+      "weight": 3,
+      "why": "'detached garage it's pad locked and nobody had a key... not inspected either'"
+    },
+    {
+      "id": "no-access-not-roof-or-subfloor",
+      "kind": "mentions",
+      "path": "noAccessAreas",
+      "none": [
+        "roof",
+        "subfloor"
+      ],
+      "weight": 2,
+      "why": "the roof void and subfloor were entered"
+    },
+    {
+      "id": "high-risk-bedroom-and-garage",
+      "kind": "mentions",
+      "path": "highRiskAreas",
+      "all": [
+        [
+          "bedroom"
+        ],
+        [
+          "garage"
+        ]
+      ],
+      "weight": 3,
+      "why": "every place in noAccessAreas belongs in highRiskAreas; 'get those two inspected before settlement'"
+    },
+    {
+      "id": "hindered-roof-not-rooms",
+      "kind": "mentions",
+      "path": "hinderedAreas",
+      "all": [
+        [
+          "roof",
+          "ceiling"
+        ]
+      ],
+      "none": [
+        "bedroom",
+        "garage"
+      ],
+      "weight": 3,
+      "why": "'insulation bats right across the ceiling joists' (batts) hindered the roof void; a room never entered is no access, not hindered"
+    },
+    {
+      "id": "hindered-detail-insulation",
+      "kind": "mentions",
+      "path": "hinderedAreasDetail",
+      "all": [
+        [
+          "insulation",
+          "batts"
+        ]
+      ],
+      "weight": 1,
+      "why": "what hindered the roof void"
+    },
+    {
+      "id": "restricted-access-interior",
+      "kind": "mentions",
+      "path": "restrictedAccess",
+      "all": [
+        [
+          "interior"
+        ],
+        [
+          "restricted access"
+        ]
+      ],
+      "weight": 3,
+      "why": "a locked or refused room is 'Interior: Restricted access', the label the app ticks from"
+    },
+    {
+      "id": "restricted-access-outbuildings",
+      "kind": "mentions",
+      "path": "restrictedAccess",
+      "all": [
+        [
+          "outbuilding",
+          "garage"
+        ]
+      ],
+      "weight": 3,
+      "why": "the padlocked garage is 'Outbuildings: Restricted access'"
+    },
+    {
+      "id": "restricted-access-roof-insulation",
+      "kind": "mentions",
+      "path": "restrictedAccess",
+      "all": [
+        [
+          "roof"
+        ],
+        [
+          "insulation"
+        ]
+      ],
+      "weight": 2,
+      "why": "'Roof void: Insulation or sarking'"
+    },
+    {
+      "id": "obstructions-name-the-rooms",
+      "kind": "mentions",
+      "path": "obstructions",
+      "all": [
+        [
+          "bedroom"
+        ],
+        [
+          "garage"
+        ],
+        [
+          "roof"
+        ]
+      ],
+      "weight": 2,
+      "why": "obstructions lists every PARTIAL or NOT area and roughly where"
+    },
+    {
+      "id": "area-interior-partial",
+      "kind": "equals",
+      "path": "areaStatus.interior",
+      "values": [
+        "PARTIAL"
+      ],
+      "weight": 3,
+      "why": "one unentered bedroom makes the whole interior PARTIAL"
+    },
+    {
+      "id": "area-outbuildings-not",
+      "kind": "equals",
+      "path": "areaStatus.outbuildings",
+      "values": [
+        "NOT"
+      ],
+      "weight": 3,
+      "why": "'the garage was not inspected either'"
+    },
+    {
+      "id": "area-roofvoid-partial",
+      "kind": "equals",
+      "path": "areaStatus.roofvoid",
+      "values": [
+        "PARTIAL"
+      ],
+      "weight": 2,
+      "why": "'inspected it but... couldn't see the joists or the top plates under the bats'"
+    },
+    {
+      "id": "area-subfloor",
+      "kind": "equals",
+      "path": "areaStatus.subfloor",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'subfloor inspected got right through it'"
+    },
+    {
+      "id": "area-exterior",
+      "kind": "equals",
+      "path": "areaStatus.exterior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'exterior inspected all the way around'"
+    },
+    {
+      "id": "result-subfloor-clear",
+      "kind": "equals",
+      "path": "areaResult.subfloor",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 1,
+      "why": "'no termite activity under there'"
+    },
+    {
+      "id": "result-outbuildings-absent",
+      "kind": "absent",
+      "path": "areaResult.outbuildings",
+      "weight": 2,
+      "why": "an area never entered has no result, clear or found"
+    },
+    {
+      "id": "findings-count",
+      "kind": "count",
+      "path": "findings",
+      "min": 0,
+      "max": 1,
+      "weight": 1,
+      "why": "nothing found in the areas inspected; the property as a whole was not cleared, so an empty array is best and one NONE card is tolerated"
+    },
+    {
+      "id": "findings-all-none",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "termiteActivity",
+          "values": [
+            "NONE"
+          ]
+        },
+        {
+          "kind": "absent",
+          "path": "species"
+        },
+        {
+          "kind": "absent",
+          "path": "damageDescription"
+        },
+        {
+          "kind": "absent",
+          "path": "activityLocation"
+        }
+      ],
+      "weight": 3,
+      "why": "no evidence anywhere he looked; the locked rooms are access fields, never a finding"
+    },
+    {
+      "id": "no-live-termites",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "live termites",
+        "active termites",
+        "termite damage"
+      ],
+      "weight": 3,
+      "why": "nothing was found"
+    },
+    {
+      "id": "no-existing-system",
+      "kind": "equals",
+      "path": "existingSystem",
+      "values": [
+        "No System Found",
+        null
+      ],
+      "weight": 2,
+      "why": "'no termite management system that I can see'"
+    },
+    {
+      "id": "durable-notice-no",
+      "kind": "equals",
+      "path": "durableNoticePresent",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'no durable notice in the meter box'"
+    },
+    {
+      "id": "timber-soil-no",
+      "kind": "equals",
+      "path": "timberSoil",
+      "values": [
+        "NO",
+        null
+      ],
+      "weight": 1,
+      "why": "'no timber on the soil'"
+    },
+    {
+      "id": "treatment-not-recommended",
+      "kind": "equals",
+      "path": "treatmentRecommended",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'no treatment recommended at this stage'"
+    },
+    {
+      "id": "treatment-type-empty",
+      "kind": "absent",
+      "path": "treatmentType",
+      "weight": 2,
+      "why": "no treatment"
+    },
+    {
+      "id": "other-recs-before-settlement",
+      "kind": "mentions",
+      "path": "otherRecommendations",
+      "all": [
+        [
+          "settlement"
+        ],
+        [
+          "bedroom"
+        ],
+        [
+          "garage"
+        ]
+      ],
+      "weight": 3,
+      "why": "'recommend that Simone get those two inspected before settlement'"
+    },
+    {
+      "id": "invasive-not-invented",
+      "kind": "equals",
+      "path": "invasiveInspection",
+      "values": [
+        null,
+        "NO"
+      ],
+      "weight": 2,
+      "why": "inspecting the locked rooms is a further inspection, not an invasive one; nothing is to be cut or drilled"
+    },
+    {
+      "id": "time-limit-recorded",
+      "kind": "mentions",
+      "all": [
+        [
+          "45 min",
+          "45-min",
+          "forty five min",
+          "forty-five min",
+          "45 minutes"
+        ]
+      ],
+      "weight": 1,
+      "why": "'the agent only gave me 45 minutes on site' is a limit on the inspection and should land somewhere (accessNotes or the hindered detail)"
+    },
+    {
+      "id": "risk-withheld",
+      "kind": "equals",
+      "path": "riskLevel",
+      "values": [
+        null
+      ],
+      "weight": 2,
+      "why": "'I'm not rating the overall risk on this one until the back bedroom and the garage are inspected': the inspector's own statement wins"
+    },
+    {
+      "id": "frequency-12-months",
+      "kind": "mentions",
+      "path": "inspectionFrequency",
+      "all": [
+        [
+          "12 month",
+          "twelve month",
+          "annual",
+          "yearly",
+          "every year"
+        ]
+      ],
+      "weight": 1,
+      "why": "'re inspect in 12 months'"
+    },
+    {
+      "id": "no-severity",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "minor",
+        "moderate",
+        "severe",
+        "extensive",
+        "significant",
+        "extreme",
+        "major",
+        "heavy"
+      ],
+      "weight": 2,
+      "why": "no severity wording was said"
+    },
+    {
+      "id": "no-structural",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "structural",
+        "compromised",
+        "structurally"
+      ],
+      "weight": 2,
+      "why": "nothing found, no referral"
+    },
+    {
+      "id": "no-mishearings",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "tenet",
+        "roof fluid",
+        "quan dong",
+        "man hole",
+        "pad locked"
+      ],
+      "weight": 3,
+      "why": "dictation slips are corrected: tenant, roof void, Quandong, manhole, padlocked"
+    },
+    {
+      "id": "rooms-not-findings",
+      "kind": "manual",
+      "description": "The back bedroom and the garage appear only as no-access, high-risk and recommendation text; nothing implies termites were found or suspected in them."
+    }
+  ]
+}

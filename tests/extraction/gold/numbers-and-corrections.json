@@ -1,0 +1,620 @@
+{
+  "id": "numbers-and-corrections",
+  "transcript": "transcripts/numbers-and-corrections.txt",
+  "about": "Annual inspection on a weatherboard house on piers, dense with numbers: an inspection fee, eight moisture readings in eight rooms with the ensuite corrected ('32 no 22 not 32'), subfloor clearance in millimetres ('450 mil', '250 mil'), live termites on a joist under the laundry with no builder referral, and a dictated quote with a per-metre rate, a 30% deposit, a service warranty, a start date and a 3-month re-inspection. Tests numeric fidelity row by row, the quote fields, and three mishearings.",
+  "checks": [
+    {
+      "id": "inspection-type",
+      "kind": "equals",
+      "path": "inspectionType",
+      "values": [
+        "Annual — Existing Building"
+      ],
+      "weight": 2,
+      "why": "'annual inspection'"
+    },
+    {
+      "id": "client-name",
+      "kind": "mentions",
+      "path": "clientName",
+      "all": [
+        [
+          "helen"
+        ],
+        [
+          "marsh"
+        ]
+      ],
+      "weight": 1,
+      "why": "said 'Helen Marsh' (extra)"
+    },
+    {
+      "id": "address",
+      "kind": "mentions",
+      "path": "propertyStreetAddress",
+      "all": [
+        [
+          "71"
+        ],
+        [
+          "kookaburra"
+        ]
+      ],
+      "weight": 1,
+      "why": "said '71 Kookaburra Drive' (extra)"
+    },
+    {
+      "id": "inspection-fee",
+      "kind": "mentions",
+      "path": "inspectionFee",
+      "all": [
+        [
+          "380"
+        ]
+      ],
+      "weight": 2,
+      "why": "'inspection fee today is 380 dollars'"
+    },
+    {
+      "id": "era",
+      "kind": "equals",
+      "path": "constructionEra",
+      "values": [
+        "1945-1965"
+      ],
+      "weight": 2,
+      "why": "'built 1962'"
+    },
+    {
+      "id": "meter-eight-rows",
+      "kind": "count",
+      "path": "moistureMeterReadings",
+      "min": 8,
+      "max": 8,
+      "weight": 2,
+      "why": "eight readings were taken, one per room; the corrected ensuite reading is still one row"
+    },
+    {
+      "id": "meter-kitchen-14",
+      "kind": "mentions",
+      "path": "moistureMeterReadings",
+      "all": [
+        [
+          "kitchen"
+        ],
+        [
+          "14"
+        ]
+      ],
+      "weight": 1,
+      "why": "'kitchen wall by the sink 14%'"
+    },
+    {
+      "id": "meter-bed1-15",
+      "kind": "mentions",
+      "path": "moistureMeterReadings",
+      "all": [
+        [
+          "bedroom one",
+          "bedroom 1",
+          "bed 1"
+        ],
+        [
+          "15"
+        ]
+      ],
+      "weight": 1,
+      "why": "'bedroom one 15'"
+    },
+    {
+      "id": "meter-bathroom-18",
+      "kind": "mentions",
+      "path": "moistureMeterReadings",
+      "all": [
+        [
+          "bathroom"
+        ],
+        [
+          "18"
+        ]
+      ],
+      "weight": 1,
+      "why": "'bathroom wall 18'"
+    },
+    {
+      "id": "meter-ensuite-22",
+      "kind": "mentions",
+      "path": "moistureMeterReadings",
+      "all": [
+        [
+          "ensuite",
+          "en suite",
+          "en-suite"
+        ],
+        [
+          "22"
+        ]
+      ],
+      "weight": 3,
+      "why": "'on sweet wall behind the shower 32 no 22 not 32 22 percent' ('on sweet' = ensuite): the final value is 22"
+    },
+    {
+      "id": "meter-no-32",
+      "kind": "mentions",
+      "path": "moistureMeterReadings",
+      "none": [
+        "32"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "the corrected-away 32 must not appear in any row"
+    },
+    {
+      "id": "meter-laundry-26",
+      "kind": "mentions",
+      "path": "moistureMeterReadings",
+      "all": [
+        [
+          "laundry"
+        ],
+        [
+          "26"
+        ]
+      ],
+      "weight": 2,
+      "why": "'laundry 26 that one's elevated'"
+    },
+    {
+      "id": "meter-hallway-13",
+      "kind": "mentions",
+      "path": "moistureMeterReadings",
+      "all": [
+        [
+          "hall"
+        ],
+        [
+          "13"
+        ]
+      ],
+      "weight": 1,
+      "why": "'hallway 13'"
+    },
+    {
+      "id": "moisture-yes",
+      "kind": "equals",
+      "path": "moistureReadings",
+      "values": [
+        "YES"
+      ],
+      "weight": 2,
+      "why": "'laundry 26 that one's elevated'"
+    },
+    {
+      "id": "leaks-yes",
+      "kind": "equals",
+      "path": "waterLeaks",
+      "values": [
+        "YES"
+      ],
+      "weight": 3,
+      "why": "'washing machine tap in the laundry is dripping'"
+    },
+    {
+      "id": "leak-location-laundry-tap",
+      "kind": "mentions",
+      "path": "leakLocation",
+      "all": [
+        [
+          "laundry",
+          "tap"
+        ]
+      ],
+      "none": [
+        "ensuite",
+        "shower"
+      ],
+      "weight": 2,
+      "why": "'the leak at the laundry tap'; the ensuite reading is not a leak"
+    },
+    {
+      "id": "area-subfloor-partial",
+      "kind": "equals",
+      "path": "areaStatus.subfloor",
+      "values": [
+        "PARTIAL"
+      ],
+      "weight": 3,
+      "why": "'couldn't reach the last metre or so along the back wall low clearance so subfloor partly inspected'"
+    },
+    {
+      "id": "area-interior",
+      "kind": "equals",
+      "path": "areaStatus.interior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 2,
+      "why": "'interior all rooms inspected'"
+    },
+    {
+      "id": "restricted-access-low-clearance",
+      "kind": "mentions",
+      "path": "restrictedAccess",
+      "all": [
+        [
+          "subfloor"
+        ],
+        [
+          "low clearance"
+        ]
+      ],
+      "none": [
+        "restricted access",
+        "stored"
+      ],
+      "weight": 3,
+      "why": "'low clearance' is the app's subfloor reason; the inspector was in the subfloor, so never Restricted access"
+    },
+    {
+      "id": "high-risk-subfloor-back",
+      "kind": "mentions",
+      "path": "highRiskAreas",
+      "all": [
+        [
+          "subfloor",
+          "back",
+          "rear"
+        ]
+      ],
+      "none": [
+        "joist",
+        "laundry floor"
+      ],
+      "weight": 2,
+      "why": "the unreached back section needs checking; the laundry joist is a finding"
+    },
+    {
+      "id": "result-subfloor-found",
+      "kind": "equals",
+      "path": "areaResult.subfloor",
+      "values": [
+        "FOUND"
+      ],
+      "weight": 3,
+      "why": "live termites on a joist under the laundry"
+    },
+    {
+      "id": "finding-active-joist",
+      "kind": "findingMatch",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "termiteActivity",
+          "values": [
+            "ACTIVE"
+          ]
+        },
+        {
+          "kind": "mentions",
+          "path": "activityLocation",
+          "all": [
+            [
+              "joist",
+              "subfloor"
+            ],
+            [
+              "laundry"
+            ]
+          ]
+        }
+      ],
+      "weight": 3,
+      "why": "'live workers in a mud lead up the pier onto the joist... active termites on the laundry joist' ('joyce' = joist)"
+    },
+    {
+      "id": "findings-count-one",
+      "kind": "count",
+      "path": "findings",
+      "min": 1,
+      "max": 1,
+      "weight": 2,
+      "why": "one place only"
+    },
+    {
+      "id": "finding-timber-joist",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "mentions",
+          "path": "timberAffected",
+          "all": [
+            [
+              "joist"
+            ]
+          ]
+        }
+      ],
+      "weight": 2,
+      "why": "'into the joist'"
+    },
+    {
+      "id": "finding-species-not-identified",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "mentions",
+          "path": "species",
+          "all": [
+            [
+              "not identified"
+            ]
+          ],
+          "none": [
+            "coptotermes",
+            "schedorhinotermes",
+            "nasutitermes",
+            "heterotermes",
+            "microcerotermes",
+            "cryptotermes",
+            "mastotermes",
+            "porotermes",
+            "acinaciformis",
+            "frenchi",
+            "intermedius",
+            "exitiosus",
+            "walkeri",
+            "ferox",
+            "copter"
+          ]
+        }
+      ],
+      "weight": 3,
+      "why": "'species not identified I'll send a sample off'"
+    },
+    {
+      "id": "finding-no-builder",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "structuralConcern",
+          "values": [
+            "NO"
+          ]
+        }
+      ],
+      "weight": 3,
+      "why": "'no structural referral on that'"
+    },
+    {
+      "id": "treatment-yes",
+      "kind": "equals",
+      "path": "treatmentRecommended",
+      "values": [
+        "YES"
+      ],
+      "weight": 3,
+      "why": "'colony treatment of the active termites... and a chemical barrier'"
+    },
+    {
+      "id": "treatment-type",
+      "kind": "mentions",
+      "path": "treatmentType",
+      "all": [
+        [
+          "colony",
+          "active",
+          "treat"
+        ],
+        [
+          "chemical",
+          "barrier"
+        ]
+      ],
+      "none": [
+        "bait"
+      ],
+      "weight": 2,
+      "why": "colony treatment plus a chemical barrier, both said"
+    },
+    {
+      "id": "quote-two-items",
+      "kind": "count",
+      "path": "quote.items",
+      "min": 2,
+      "max": 2,
+      "weight": 2,
+      "why": "two priced lines: the colony treatment and the barrier"
+    },
+    {
+      "id": "quote-item-1-treatment-price",
+      "kind": "equals",
+      "path": "quote.items.0.price",
+      "values": [
+        450
+      ],
+      "weight": 3,
+      "why": "'colony treatment of the active termites in the subfloor 450 dollars'"
+    },
+    {
+      "id": "quote-item-2-barrier-qty",
+      "kind": "equals",
+      "path": "quote.items.1.qty",
+      "values": [
+        52
+      ],
+      "weight": 3,
+      "why": "'52 lineal metres'"
+    },
+    {
+      "id": "quote-item-2-barrier-rate",
+      "kind": "equals",
+      "path": "quote.items.1.price",
+      "values": [
+        38
+      ],
+      "weight": 3,
+      "why": "'38 dollars per lineal metre' is the unit price; 1976 is the line total, not the price"
+    },
+    {
+      "id": "quote-payment-30-deposit",
+      "kind": "mentions",
+      "path": "quote.paymentTerms",
+      "all": [
+        [
+          "30"
+        ],
+        [
+          "deposit"
+        ]
+      ],
+      "none": [
+        "50%",
+        "50 %"
+      ],
+      "weight": 3,
+      "why": "'30% deposit to book balance on completion'"
+    },
+    {
+      "id": "quote-service-12-months",
+      "kind": "mentions",
+      "path": "quote.servicePeriod",
+      "all": [
+        [
+          "12 month",
+          "twelve month",
+          "1 year",
+          "one year"
+        ]
+      ],
+      "weight": 2,
+      "why": "'12 months service warranty on the barrier'"
+    },
+    {
+      "id": "quote-start-date",
+      "kind": "mentions",
+      "path": "quote",
+      "all": [
+        [
+          "november",
+          "nov"
+        ]
+      ],
+      "weight": 1,
+      "why": "'we can start Monday the 10th of November' lands somewhere on the quote"
+    },
+    {
+      "id": "frequency-3-months-first",
+      "kind": "mentions",
+      "path": "inspectionFrequency",
+      "all": [
+        [
+          "3 month",
+          "three month"
+        ]
+      ],
+      "none": [
+        "6 month"
+      ],
+      "weight": 3,
+      "why": "'re inspection at 3 months'"
+    },
+    {
+      "id": "frequency-annual",
+      "kind": "mentions",
+      "path": "inspectionFrequency",
+      "all": [
+        [
+          "12 month",
+          "twelve month",
+          "annual"
+        ]
+      ],
+      "weight": 2,
+      "why": "'then every 12 months after that'"
+    },
+    {
+      "id": "risk-high",
+      "kind": "equals",
+      "path": "riskLevel",
+      "values": [
+        "HIGH"
+      ],
+      "weight": 3,
+      "why": "'overall risk high'"
+    },
+    {
+      "id": "no-existing-system",
+      "kind": "equals",
+      "path": "existingSystem",
+      "values": [
+        "No System Found",
+        null
+      ],
+      "weight": 2,
+      "why": "'no termite system'"
+    },
+    {
+      "id": "no-32-anywhere",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "32"
+      ],
+      "weight": 3,
+      "why": "the corrected-away reading must not survive in any field"
+    },
+    {
+      "id": "no-ml-clearance",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "250 ml",
+        "250ml",
+        "450 ml",
+        "450ml",
+        "250 mil",
+        "450 mil"
+      ],
+      "weight": 2,
+      "why": "a clearance in 'mil' is millimetres"
+    },
+    {
+      "id": "no-severity",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "minor",
+        "moderate",
+        "severe",
+        "extensive",
+        "significant",
+        "extreme",
+        "major",
+        "heavy"
+      ],
+      "weight": 3,
+      "why": "no severity word was said"
+    },
+    {
+      "id": "no-mishearings",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "on sweet",
+        "joyce"
+      ],
+      "weight": 2,
+      "why": "'on sweet' = ensuite, 'joyce' = joist"
+    },
+    {
+      "id": "clearance-in-mm",
+      "kind": "manual",
+      "description": "The 450 mm and 250 mm clearance, if recorded (obstructions or hinderedAreas), is written in mm, and the 1976 total does not replace the 38 per-metre rate."
+    },
+    {
+      "id": "reinspection-date",
+      "kind": "manual",
+      "description": "'early February' for the 3-month re-inspection, if kept, sits with the re-inspection wording and does not become a quote line or the start date."
+    }
+  ]
+}

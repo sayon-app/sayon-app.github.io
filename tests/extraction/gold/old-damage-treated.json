@@ -1,0 +1,600 @@
+{
+  "id": "old-damage-treated",
+  "transcript": "transcripts/old-damage-treated.txt",
+  "about": "Written case (2026-10-31): pre-purchase on a brick veneer slab house with inactive termite damage in the garage east wall frame, treated by another company about three years ago (plugged drill holes, no durable notice), no live termites, and the frame referred to a builder. Tests INACTIVE, termiteHistory and previousTreatment, structuralConcern YES as a referral only, an unidentified system, and no live activity.",
+  "checks": [
+    {
+      "id": "inspection-type",
+      "kind": "equals",
+      "path": "inspectionType",
+      "values": [
+        "Pre-Purchase — Timber Pest"
+      ],
+      "weight": 2,
+      "why": "'pre-purchased timber pest inspection'"
+    },
+    {
+      "id": "client-name",
+      "kind": "mentions",
+      "path": "clientName",
+      "all": [
+        [
+          "nathan"
+        ],
+        [
+          "whitlock"
+        ]
+      ],
+      "weight": 1,
+      "why": "said 'Nathan Whitlock'"
+    },
+    {
+      "id": "address",
+      "kind": "mentions",
+      "path": "propertyStreetAddress",
+      "all": [
+        [
+          "31",
+          "thirty"
+        ],
+        [
+          "grevillea"
+        ]
+      ],
+      "weight": 1,
+      "why": "said '31 Grevillea Avenue'"
+    },
+    {
+      "id": "walls-brick-veneer",
+      "kind": "mentions",
+      "path": "wallConstruction",
+      "all": [
+        [
+          "veneer"
+        ]
+      ],
+      "none": [
+        "double"
+      ],
+      "weight": 2,
+      "why": "'brick veneer'"
+    },
+    {
+      "id": "floor-slab",
+      "kind": "mentions",
+      "path": "floorType",
+      "all": [
+        [
+          "slab",
+          "concrete"
+        ]
+      ],
+      "none": [
+        "timber",
+        "suspended"
+      ],
+      "weight": 2,
+      "why": "'concrete slab on ground'"
+    },
+    {
+      "id": "era",
+      "kind": "equals",
+      "path": "constructionEra",
+      "values": [
+        "1985-2003"
+      ],
+      "weight": 2,
+      "why": "'built around 1990 the vendor said'"
+    },
+    {
+      "id": "findings-count-one",
+      "kind": "count",
+      "path": "findings",
+      "min": 1,
+      "max": 1,
+      "weight": 2,
+      "why": "one place: the garage east wall frame"
+    },
+    {
+      "id": "finding-inactive-garage",
+      "kind": "findingMatch",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "termiteActivity",
+          "values": [
+            "INACTIVE"
+          ]
+        },
+        {
+          "kind": "mentions",
+          "path": "activityLocation",
+          "all": [
+            [
+              "garage"
+            ]
+          ]
+        }
+      ],
+      "weight": 3,
+      "why": "'old term might damage' (termite damage), 'nothing alive in there... no live termites nothing moving so that's in active' (inactive)"
+    },
+    {
+      "id": "finding-location-east-wall",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "mentions",
+          "path": "activityLocation",
+          "all": [
+            [
+              "east"
+            ]
+          ]
+        }
+      ],
+      "weight": 2,
+      "why": "'the east wall of the garage'"
+    },
+    {
+      "id": "finding-timber-studs-plate",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "mentions",
+          "path": "timberAffected",
+          "all": [
+            [
+              "stud"
+            ],
+            [
+              "bottom plate",
+              "plate"
+            ]
+          ]
+        }
+      ],
+      "weight": 2,
+      "why": "'the studs and the bottom plait' (bottom plate)"
+    },
+    {
+      "id": "finding-damage-what-seen",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "mentions",
+          "path": "damageDescription",
+          "all": [
+            [
+              "galler",
+              "eaten",
+              "mud"
+            ]
+          ],
+          "none": [
+            "minor",
+            "moderate",
+            "severe",
+            "extensive",
+            "significant",
+            "extreme",
+            "major",
+            "heavy",
+            "live termites",
+            "active termites"
+          ]
+        }
+      ],
+      "weight": 3,
+      "why": "'eaten out galleries packed with dry mud'; nothing alive and no grade"
+    },
+    {
+      "id": "finding-structural-referral",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "structuralConcern",
+          "values": [
+            "YES"
+          ]
+        }
+      ],
+      "weight": 3,
+      "why": "'that frame needs a builder to look at it': structuralConcern means refer to a builder"
+    },
+    {
+      "id": "finding-species-absent",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "absent",
+          "path": "species"
+        }
+      ],
+      "weight": 2,
+      "why": "no genus or species was named"
+    },
+    {
+      "id": "finding-nest-absent",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "absent",
+          "path": "nestLocated"
+        }
+      ],
+      "weight": 2,
+      "why": "no nest was mentioned"
+    },
+    {
+      "id": "no-live-termites",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "live termites",
+        "active termites",
+        "live activity",
+        "currently active"
+      ],
+      "weight": 3,
+      "why": "'no live termites nothing moving'"
+    },
+    {
+      "id": "no-species",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "coptotermes",
+        "schedorhinotermes",
+        "nasutitermes",
+        "heterotermes",
+        "microcerotermes",
+        "cryptotermes",
+        "mastotermes",
+        "porotermes"
+      ],
+      "weight": 3,
+      "why": "no species named"
+    },
+    {
+      "id": "termite-history-treated",
+      "kind": "mentions",
+      "path": "termiteHistory",
+      "all": [
+        [
+          "treated"
+        ]
+      ],
+      "weight": 2,
+      "why": "'the vendor told me it was treated by another company Allpest about three years ago'"
+    },
+    {
+      "id": "termite-history-detail",
+      "kind": "mentions",
+      "path": "termiteHistory",
+      "all": [
+        [
+          "allpest",
+          "all pest",
+          "three years",
+          "3 years",
+          "2023"
+        ]
+      ],
+      "weight": 1,
+      "why": "the company or the time given"
+    },
+    {
+      "id": "previous-treatment-yes",
+      "kind": "equals",
+      "path": "previousTreatment",
+      "values": [
+        "YES"
+      ],
+      "weight": 3,
+      "why": "'drill wholes along the garage slab edge inside and out plugged with mortar' (drill holes)"
+    },
+    {
+      "id": "previous-treatment-details",
+      "kind": "mentions",
+      "path": "previousTreatmentDetails",
+      "all": [
+        [
+          "drill hole",
+          "drill-hole",
+          "drilled"
+        ]
+      ],
+      "weight": 2,
+      "why": "plugged drill holes"
+    },
+    {
+      "id": "previous-treatment-where",
+      "kind": "mentions",
+      "path": "previousTreatmentWhere",
+      "all": [
+        [
+          "garage"
+        ]
+      ],
+      "weight": 1,
+      "why": "'along the garage slab edge inside and out'"
+    },
+    {
+      "id": "existing-system-unidentified",
+      "kind": "equals",
+      "path": "existingSystem",
+      "values": [
+        "System Present — Type Unidentified"
+      ],
+      "weight": 2,
+      "why": "'put it down as system present type unidentified': his words, not 'Chemical Barrier' guessed from the drill holes"
+    },
+    {
+      "id": "durable-notice-no",
+      "kind": "equals",
+      "path": "durableNoticePresent",
+      "values": [
+        "NO"
+      ],
+      "weight": 3,
+      "why": "'there's no durable notice in the meter box nothing'"
+    },
+    {
+      "id": "no-brand-invented",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "termidor",
+        "altriset",
+        "biflex",
+        "premise",
+        "exterra",
+        "sentricon"
+      ],
+      "weight": 3,
+      "why": "'I can't confirm what was put down or when'"
+    },
+    {
+      "id": "treatment-not-recommended",
+      "kind": "equals",
+      "path": "treatmentRecommended",
+      "values": [
+        "NO"
+      ],
+      "weight": 3,
+      "why": "'no treatment required the damage is old and inactive'"
+    },
+    {
+      "id": "treatment-type-empty",
+      "kind": "mentions",
+      "path": "treatmentType",
+      "none": [
+        "barrier",
+        "bait",
+        "chemical",
+        "treat",
+        "builder"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "no treatment; the builder is a referral"
+    },
+    {
+      "id": "other-recs-builder",
+      "kind": "mentions",
+      "path": "otherRecommendations",
+      "all": [
+        [
+          "builder"
+        ]
+      ],
+      "weight": 2,
+      "why": "'a builder to look at that garage wall'"
+    },
+    {
+      "id": "other-recs-paperwork",
+      "kind": "mentions",
+      "path": "otherRecommendations",
+      "all": [
+        [
+          "paperwork",
+          "records",
+          "documentation",
+          "certificate",
+          "vendor"
+        ]
+      ],
+      "weight": 2,
+      "why": "'get the treatment paperwork off the vendor from Allpest'"
+    },
+    {
+      "id": "slab-edge-obstructed",
+      "kind": "equals",
+      "path": "slabEdge",
+      "values": [
+        "OBSTRUCTED"
+      ],
+      "weight": 2,
+      "why": "'except at the garage where the driveway concrete comes up over the slab edge': covered anywhere is OBSTRUCTED"
+    },
+    {
+      "id": "weep-holes-clear",
+      "kind": "equals",
+      "path": "weepHoles",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 1,
+      "why": "'weep holes clear all round'"
+    },
+    {
+      "id": "area-outbuildings",
+      "kind": "equals",
+      "path": "areaStatus.outbuildings",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 2,
+      "why": "the attached garage is outbuildings in the app, and it was inspected"
+    },
+    {
+      "id": "result-outbuildings-found",
+      "kind": "equals",
+      "path": "areaResult.outbuildings",
+      "values": [
+        "FOUND"
+      ],
+      "weight": 3,
+      "why": "termite damage in the garage frame"
+    },
+    {
+      "id": "area-subfloor-na",
+      "kind": "equals",
+      "path": "areaStatus.subfloor",
+      "values": [
+        "NA"
+      ],
+      "weight": 2,
+      "why": "slab on ground"
+    },
+    {
+      "id": "area-interior",
+      "kind": "equals",
+      "path": "areaStatus.interior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'interior inspected every room'"
+    },
+    {
+      "id": "area-exterior",
+      "kind": "equals",
+      "path": "areaStatus.exterior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'exterior inspected all the way around'"
+    },
+    {
+      "id": "area-roofvoid",
+      "kind": "equals",
+      "path": "areaStatus.roofvoid",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'roof void inspected fully'"
+    },
+    {
+      "id": "result-interior-clear",
+      "kind": "equals",
+      "path": "areaResult.interior",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 1,
+      "why": "'no termite activity inside no borers no rot'"
+    },
+    {
+      "id": "no-high-risk-areas",
+      "kind": "absent",
+      "path": "highRiskAreas",
+      "weight": 2,
+      "why": "nothing inaccessible; the garage wall is a finding, not a place to check"
+    },
+    {
+      "id": "risk-not-low",
+      "kind": "equals",
+      "path": "riskLevel",
+      "values": [
+        "MEDIUM",
+        "HIGH",
+        null
+      ],
+      "weight": 3,
+      "why": "inactive evidence in the building with a builder referral is never LOW; the prompt gives MEDIUM for inactive evidence and HIGH for a builder referral, so both are accepted"
+    },
+    {
+      "id": "risk-stated",
+      "kind": "equals",
+      "path": "riskLevel",
+      "values": [
+        "MEDIUM",
+        "HIGH"
+      ],
+      "weight": 1,
+      "why": "a whole-house note gives enough to rate it"
+    },
+    {
+      "id": "frequency-12-months",
+      "kind": "mentions",
+      "path": "inspectionFrequency",
+      "all": [
+        [
+          "12 month",
+          "twelve month",
+          "annual",
+          "yearly",
+          "every year"
+        ]
+      ],
+      "weight": 1,
+      "why": "'re inspect in 12 months'"
+    },
+    {
+      "id": "no-severity",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "minor",
+        "moderate",
+        "severe",
+        "extensive",
+        "significant",
+        "extreme",
+        "major",
+        "heavy"
+      ],
+      "weight": 3,
+      "why": "no severity wording was said"
+    },
+    {
+      "id": "no-structural-verdict",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "structurally",
+        "compromised",
+        "unsound",
+        "structural integrity",
+        "structural damage",
+        "not structural"
+      ],
+      "weight": 3,
+      "why": "'I'm not making a call on it that's the builders job'"
+    },
+    {
+      "id": "no-mishearings",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "term might",
+        "bottom plait",
+        "drill wholes",
+        "in active",
+        "man hole"
+      ],
+      "weight": 3,
+      "why": "dictation slips are corrected: termite, bottom plate, drill holes, inactive, manhole"
+    },
+    {
+      "id": "referral-only",
+      "kind": "manual",
+      "description": "structuralConcern YES reads as a builder referral; no text says the frame or the garage is or is not structurally sound."
+    }
+  ]
+}

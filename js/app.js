@@ -9540,7 +9540,7 @@ async function confirmBillingAfterCheckout() {
   if (el) el.textContent = 'Confirming your payment…';
   for (let i = 0; i < 10; i++) {
     const sub = await loadBillingStatus();
-    if (sub && sub.status !== 'trialing' && sub.stripe_subscription_id) { showToast('Subscription updated — thanks!', 'success'); return; }
+    if (sub && (sub.status !== 'trialing' || sub.subscribed)) { showToast('Subscription updated — thanks!', 'success'); return; }
     if (el && i < 9) el.textContent = 'Confirming your payment…';
     await new Promise(r => setTimeout(r, 2000));
   }

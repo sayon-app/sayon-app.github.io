@@ -90,8 +90,12 @@ let lastActiveAccountUserId = null;
 // ══════════════════════════════════════════════════════════════════════════
 const OB_KEY = 'korva_onboarded_v1';
 
+// Per account, and decided from the data too: a new person on a phone that
+// was used before still sets up their business, and an existing customer on
+// a new phone (whose details come down with the account) doesn't repeat it.
+function obKey() { return authUser && authUser.id ? `${OB_KEY}:${authUser.id}` : OB_KEY; }
 function shouldShowOnboarding() {
-  return !localStorage.getItem(OB_KEY);
+  return !localStorage.getItem(obKey()) && !getCompanyDetails().updatedAt;
 }
 
 function showOnboarding() {
@@ -257,7 +261,7 @@ function obRunDemo() {
 }
 
 function obFinish() {
-  localStorage.setItem(OB_KEY, '1');
+  try { localStorage.setItem(obKey(), '1'); } catch (e) {}
   document.getElementById('onboardScreen').style.display = 'none';
   document.getElementById('mainMenu').style.display      = 'flex';
   // Open the job details so they can start a new job immediately
@@ -1985,7 +1989,11 @@ window.addEventListener('load', () => {
 
       const hasSession = await restoreAuthSession();
       if (hasSession) { enterApp(); }
-      else { document.getElementById('authScreen').style.display = 'flex'; showAuth('authSignIn'); }
+      else {
+        document.getElementById('authScreen').style.display = 'flex';
+        // The website's "Start your free trial" lands on the sign-up card.
+        showAuth(new URLSearchParams(window.location.search).get('signup') ? 'authSignUp' : 'authSignIn');
+      }
     }, 600);
   }, 2200);
 });
@@ -3933,8 +3941,13 @@ function mergeLearned(a, b) {
 // save is dropped silently: testing must never get in the way of the report.
 const TEST_MODE_KEY = 'korva_test_mode';
 
+// The switch is for checking the AI on a business set up for it
+// (businesses.settings.testMode), not for every customer.
+function testModeAllowed() {
+  return isBusinessOwner() && !!(authBusiness && authBusiness.settings && authBusiness.settings.testMode);
+}
 function testModeOn() {
-  try { return localStorage.getItem(TEST_MODE_KEY) === '1' && isBusinessOwner(); } catch (e) { return false; }
+  try { return localStorage.getItem(TEST_MODE_KEY) === '1' && testModeAllowed(); } catch (e) { return false; }
 }
 
 function saveTestNote(transcript, extraction, problem, seconds) {
@@ -3958,10 +3971,10 @@ function showTestModeBadge() {
   if (badge) badge.hidden = !testModeOn();
 }
 
-// The row only shows for the business owner.
+// The row only shows where test mode is allowed (see testModeAllowed).
 function restoreTestModeSetting() {
   const row = document.getElementById('testModeRow');
-  if (row) row.hidden = !isBusinessOwner();
+  if (row) row.hidden = !testModeAllowed();
   const btn = document.getElementById('toggleTestMode');
   if (btn) {
     const on = testModeOn();
@@ -7648,7 +7661,8 @@ async function sendAgreementLink() {
   if (!navigator.onLine) { showToast('Sending a link needs signal. Try again when you have it', 'error'); return; }
   const values = agreementFormValues();
   const company = getCompanyDetails();
-  const doc = { company: company.name || '', client: signerName, address: getFullAddress(),
+  const doc = { company: company.name || '', phone: company.phone || '', email: company.email || '',
+    inspector: (document.getElementById('jobInspector') || {}).value?.trim() || '', client: signerName, address: getFullAddress(),
     inspectionDate: values.inspectionDate, standard: values.standard, text: values.text };
   const btn = document.getElementById('agreementLinkBtn');
   if (btn) btn.disabled = true;
@@ -7691,7 +7705,7 @@ async function sendAgreementLinkOn() {
       const company = getCompanyDetails().name || 'your inspector';
       const sent = await sendPdfsDirect({ files: [file], to,
         subject: `Please sign: pre-inspection agreement for ${getFullAddress() || 'your inspection'}`,
-        body: `${agreementLinkMessage(r)}\n\n${agreementLinkUrl(r.id)}\n\nA copy of the agreement is attached.\n\n${company}` });
+        body: `${agreementLinkMessage(r)}\n\n${agreementLinkUrl(r.id)}\n\nA copy of the agreement is attached.\n\nKind regards,\n${[(document.getElementById('jobInspector') || {}).value?.trim(), company].filter(Boolean).join('\n')}` });
       if (sent) {
         r.emailedTo = to; r.emailedAt = Date.now();
         saveDraft(); renderAgreementRemote();
@@ -9432,6 +9446,8 @@ function clearSession() {
 // breaking silently.
 const KORVA_WORKER_URL = 'https://korva.byronguyatt2.workers.dev';
 let billingStatusCache = null;
+// Where "contact us" points, everywhere in the app.
+const SUPPORT_EMAIL = 'sayon.application@gmail.com';
 
 function resetBillingDisplay() {
   const el = document.getElementById('billingStatusText');
@@ -9473,22 +9489,62 @@ async function loadBillingStatus() {
     if (!authUser || authUser.id !== forUser) return;
     billingStatusCache = sub;
     const planLabel = (sub.plan || 'trial').charAt(0).toUpperCase() + (sub.plan || 'trial').slice(1);
-    if (el) {
-      if (sub.status === 'trialing') {
-        const daysLeft = sub.trial_ends_at ? Math.max(0, Math.ceil((new Date(sub.trial_ends_at) - Date.now()) / 86400000)) : null;
-        el.textContent = `Free trial${daysLeft !== null ? `, ${daysLeft} day${daysLeft === 1 ? '' : 's'} left` : ''}. ${billingUsageText(sub, true)}`;
-      } else {
-        el.textContent = `${planLabel} plan. ${billingUsageText(sub)}`;
-      }
-    }
+    if (el) el.textContent = billingStatusLine(sub, planLabel);
     if (manageBtn) manageBtn.style.display = sub.stripe_customer_id ? '' : 'none';
+    markCurrentPlan(sub);
+    return sub;
   } catch (e) {
     if (!authUser || authUser.id !== forUser) return;
-    // Expected right now — the Stripe Worker routes aren't deployed yet.
-    // Fails quietly to a plain message rather than breaking the Billing panel.
-    if (el) el.textContent = 'Billing isn\'t set up yet — check back soon.';
-    console.warn('loadBillingStatus unavailable (expected until Stripe Worker is deployed):', e.message);
+    // Say which it is: no signal, an account still being set up, or a
+    // failure to try again, never "billing isn't set up".
+    const status = parseInt((String(e.message).match(/HTTP (\d+)/) || [])[1], 10);
+    if (el) el.textContent = !navigator.onLine ? 'No signal, so your plan can\'t be checked right now. It still works offline.'
+      : status === 403 ? 'Your account is still being set up. Close SAYON and open it again'
+      : 'Couldn\'t load your plan. Close this panel and open Billing again';
+    console.warn('loadBillingStatus failed:', e.message);
   }
+}
+
+// The one line under Current Plan, for each state the plan can be in.
+function billingStatusLine(sub, planLabel) {
+  const when = iso => iso ? new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : '';
+  if (sub.status === 'trialing') {
+    const daysLeft = sub.trial_ends_at ? Math.max(0, Math.ceil((new Date(sub.trial_ends_at) - Date.now()) / 86400000)) : null;
+    if (daysLeft === 0) return 'Your free trial has ended. Choose a plan below to keep using AI fills; your reports and notes are all still here.';
+    return `Free trial${daysLeft !== null ? `, ${daysLeft} day${daysLeft === 1 ? '' : 's'} left` : ''}. ${billingUsageText(sub, true)}`;
+  }
+  if (sub.status === 'past_due') return `${planLabel} plan, but the last payment failed. Update your card in Manage${sub.current_period_end ? ` before ${when(sub.current_period_end)}` : ''} or AI fills stop.`;
+  if (sub.status === 'canceled' || sub.status === 'cancelled') return `Your ${planLabel} plan has ended. Choose a plan below to keep using AI fills; your reports stay in your account either way.`;
+  if (sub.cancel_at_period_end && sub.current_period_end) return `${planLabel} plan, ending on ${when(sub.current_period_end)}. ${billingUsageText(sub)}`;
+  return `${planLabel} plan. ${billingUsageText(sub)}`;
+}
+
+// The plan list says which row is the current plan, and the other buttons
+// read Switch rather than Upgrade for someone already paying.
+function markCurrentPlan(sub) {
+  const paying = sub && sub.plan && sub.plan !== 'trial' && ['active', 'past_due'].includes(sub.status);
+  document.querySelectorAll('#billingPanel [data-plan]').forEach(row => {
+    const btn = row.querySelector('button');
+    const current = paying && row.dataset.plan === sub.plan;
+    row.classList.toggle('current-plan', current);
+    if (btn) btn.textContent = current ? 'Current plan' : paying ? 'Switch' : 'Upgrade';
+    if (btn) btn.disabled = !!current;
+  });
+}
+
+// Back from Stripe Checkout: the webhook that records the payment can land
+// a few seconds after the redirect. Until it does, the panel would still
+// offer Upgrade, and a second tap could start a second subscription.
+async function confirmBillingAfterCheckout() {
+  const el = document.getElementById('billingStatusText');
+  if (el) el.textContent = 'Confirming your payment…';
+  for (let i = 0; i < 10; i++) {
+    const sub = await loadBillingStatus();
+    if (sub && sub.status !== 'trialing' && sub.stripe_subscription_id) { showToast('Subscription updated — thanks!', 'success'); return; }
+    if (el && i < 9) el.textContent = 'Confirming your payment…';
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  showToast('Payment received. Your plan shows here once Stripe confirms it, usually within a minute', 'info');
 }
 
 // Strips any existing query string / hash and attaches a `billing=` marker
@@ -9547,8 +9603,7 @@ function handleBillingReturn() {
     if (!billing) return;
 
     if (billing === 'success') {
-      showToast('Subscription updated — thanks!', 'success');
-      loadBillingStatus();
+      confirmBillingAfterCheckout();
     } else if (billing === 'cancelled') {
       showToast('Checkout cancelled — no changes made', 'info');
     } else if (billing === 'updated') {
@@ -9727,6 +9782,9 @@ async function signUp() {
 
   errEl.textContent = '';
   if (!name || !business || !email || !password) { errEl.textContent = 'Please fill in all fields.'; return; }
+  // Receipts and password resets go to this address, so a typo locks the
+  // account out of both.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { errEl.textContent = 'That email address doesn\'t look right. Check it: your receipts and password resets go there.'; return; }
   if (password.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; return; }
 
   btn.disabled = true; btn.textContent = 'Creating account…';
@@ -9738,7 +9796,14 @@ async function signUp() {
       email, password,
       data: { name, business_name: business },
     });
-    if (data.error) { errEl.textContent = data.error.message || 'Sign up failed.'; return; }
+    if (data.error) {
+      if (data.error.code === 'user_already_exists' || /already (registered|exists)/i.test(data.error.message || '')) {
+        errEl.innerHTML = 'There\'s already a SAYON account for this email. <button type="button" class="auth-inline-link" onclick="signInAs(document.getElementById(\'suEmail\').value)">Sign in</button> or <button type="button" class="auth-inline-link" onclick="showAuth(\'authForgot\')">reset the password</button>.';
+        return;
+      }
+      errEl.textContent = data.error.code === 'weak_password' ? 'That password is too easy to guess. Try a longer one.' : (data.error.message || 'Sign up failed.');
+      return;
+    }
 
     if (data.access_token) {
       // Email confirmation is disabled on this project, so Supabase already handed back
@@ -9766,6 +9831,13 @@ async function signUp() {
   } finally {
     btn.disabled = false; btn.textContent = 'Create Account';
   }
+}
+
+// Back to the sign-in card with the email already typed.
+function signInAs(email) {
+  const el = document.getElementById('siEmail');
+  if (el && email) el.value = email.trim();
+  showAuth('authSignIn');
 }
 
 // ── SIGN IN ──────────────────────────────────────────────────────────────
@@ -9919,7 +9991,7 @@ async function endSessionOnDevice() {
 // phone's copy.
 const DELETE_ACCOUNT_BLOCKERS = {
   ACTIVE_SUBSCRIPTION: 'Your plan is still active. Cancel it in Menu › Billing › Manage first, then delete your account.',
-  HAS_TEAM: 'Other people are still linked to your business, so it can\'t be deleted from the app yet. Contact SAYON support to have them removed first.',
+  HAS_TEAM: `Other people are still linked to your business, so it can\'t be deleted from the app yet. Email ${SUPPORT_EMAIL} to have them removed first.`,
 };
 
 async function deleteAccountRpc(dryRun) {
@@ -10236,12 +10308,9 @@ function enterApp() {
   supabaseSyncOnOpen();
   checkAddressMove();
 
-  // New users see onboarding; returning users go straight to the menu
-  if (shouldShowOnboarding()) {
-    showOnboarding();
-  } else {
-    document.getElementById('mainMenu').style.display = 'flex';
-  }
+  // New users see onboarding; returning users go straight into the app.
+  if (shouldShowOnboarding()) showOnboarding();
+  else openApp('inspect');
 }
 
 function renderProfileMenu() {
@@ -10337,6 +10406,8 @@ async function restoreAuthSession() {
       startAuthAutoRefresh();
       return true;
     }
+    // Refused: say so, or "did I lose my report?" is the first thought.
+    setTimeout(() => showToast('Your sign-in expired. Sign in again; your work is still on this phone', 'info'), 900);
   }
 
   clearSession();

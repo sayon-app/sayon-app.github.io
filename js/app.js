@@ -1107,6 +1107,133 @@ function accessSpotPhotos() {
 
 function restoreResState() { renderAccessSummary(); }
 
+// ── PHOTOS WHILE TALKING ─────────────────────────────────────────────────
+// The inspector describes a spot and photographs it in the same breath.
+// A photo taken from the voice popover is kept with the words heard around
+// the moment it was taken (reportData.photosBySection.findings[i].heard),
+// and once the note has filled the report it moves onto the finding whose
+// place those words name, with the sentence as its caption. One that
+// matches no finding stays in the Findings photos, caption blank.
+const TALK_WINDOW_BEFORE_MS = 30000, TALK_WINDOW_AFTER_MS = 20000;
+let speechTimeline = []; // [{ t, text }] for the open report, this session
+
+function speechHeard(text) {
+  const t = Date.now();
+  const clean = String(text || '').trim();
+  if (!clean) return;
+  speechTimeline.push({ t, text: clean });
+  if (speechTimeline.length > 400) speechTimeline = speechTimeline.slice(-300);
+  // Words said just after the photo belong to it too.
+  let touched = false;
+  for (const p of getSectionPhotos('findings')) {
+    if (p.heard && !p.heard.placed && t - p.heard.at <= TALK_WINDOW_AFTER_MS) { p.heard.text = heardAround(p.heard.at); touched = true; }
+  }
+  if (touched) saveDraft();
+}
+
+function heardAround(at) {
+  // Each stretch of speech on its own line, so a caption can be one of them.
+  return speechTimeline.filter(e => e.t >= at - TALK_WINDOW_BEFORE_MS && e.t <= at + TALK_WINDOW_AFTER_MS).map(e => e.text).join('\n').trim();
+}
+
+function takePhotoWhileTalking() {
+  const input = document.getElementById('talkPhotoInput');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+async function handleTalkPhotoFiles(input) {
+  const files = Array.from(input.files || []);
+  input.value = '';
+  if (!files.length) return;
+  const at = Date.now();
+  const before = new Set(getSectionPhotos('findings').map(p => p.id));
+  await handleSectionPhotoFiles(files, 'findings');
+  const added = getSectionPhotos('findings').filter(p => !before.has(p.id));
+  added.forEach(p => { p.heard = { at, text: heardAround(at) }; });
+  if (added.length) {
+    showToast(added.length === 1 ? 'Photo kept. It lands on the finding you\'re describing once the note is filled in' : `${added.length} photos kept for the findings you're describing`, 'success');
+    renderSectionPhotoGrid('findings');
+    saveDraft();
+  }
+  updateTalkPhotoButton();
+}
+
+function talkPhotosWaiting() {
+  return getSectionPhotos('findings').filter(p => p.heard && !p.heard.placed);
+}
+
+function updateTalkPhotoButton() {
+  const btn = document.getElementById('voicePhotoBtn'), label = document.getElementById('voicePhotoBtnText');
+  if (!btn || !label) return;
+  const n = talkPhotosWaiting().length;
+  btn.classList.toggle('has-photos', n > 0);
+  label.textContent = n ? `${n} photo${n === 1 ? '' : 's'} waiting for the fill · take another` : 'Photo of what you\'re describing';
+}
+
+// Words that say where a finding is, for matching speech to a finding.
+const talkPlaceWords = t => keyWords(t).filter(w => !PLACE_FILLER.has(w) && !TALK_SKIP.has(w));
+const TALK_SKIP = new Set(['termite', 'termites', 'live', 'active', 'activity', 'there', 'here', 'yeah', 'okay', 'right', 'just', 'like', 'some', 'then', 'also', 'have', 'been', 'were', 'what', 'about', 'looks', 'look', 'found', 'photo', 'picture', 'taking', 'take']);
+
+// The finding the heard words name best: the most place words in common,
+// at least two, or one when only one finding has a place at all.
+function findingForHeard(text, findings) {
+  const said = new Set(talkPlaceWords(text));
+  if (!said.size) return null;
+  const placed = findings.filter(f => f && f.id && f.termiteActivity !== 'NONE' && (f.activityLocation || f.damageDescription || f.timberAffected));
+  let best = null, bestScore = 0, second = 0;
+  for (const f of placed) {
+    const words = new Set(talkPlaceWords([f.activityLocation, f.timberAffected, f.damageDescription].join(' ')));
+    let score = 0; words.forEach(w => { if (said.has(w)) score++; });
+    if (score > bestScore) { second = bestScore; bestScore = score; best = f; }
+    else if (score > second) second = score;
+  }
+  if (!best || bestScore === second) return null;
+  if (bestScore >= 2 || (bestScore === 1 && placed.length === 1)) return best;
+  return null;
+}
+
+// The sentence of the heard words that names the finding, tidied for a
+// caption: fillers out, first letter up, cut at a reasonable length.
+function talkCaption(text, finding) {
+  const want = new Set(talkPlaceWords([finding.activityLocation, finding.timberAffected, finding.damageDescription].join(' ')));
+  const parts = String(text).split(/\n+|(?<=[.!?])\s+|\s+(?=(?:and then|then|so|okay|right|um|next)\b)/i).map(s => s.trim()).filter(Boolean);
+  // The stretch that names the finding best.
+  let pick = '', pickScore = 0;
+  for (const part of parts) { const n = talkPlaceWords(part).filter(w => want.has(w)).length; if (n > pickScore) { pickScore = n; pick = part; } }
+  if (!pick) pick = parts[0] || '';
+  pick = pick.replace(/\b(um+|uh+|erm)\b[,.]?\s*/gi, ' ').replace(/^(?:\s*(?:okay|ok|right|so|yeah|like|and|then|well)\b[,.]?\s*)+/i, '').replace(/\s+/g, ' ').replace(/^[\s,.;:-]+|[\s,;:-]+$/g, '').trim();
+  if (pick.length > 110) pick = pick.slice(0, 107).replace(/\s+\S*$/, '') + '…';
+  return pick ? pick.charAt(0).toUpperCase() + pick.slice(1) : '';
+}
+
+function placeTalkPhotos() {
+  const waiting = talkPhotosWaiting();
+  if (!waiting.length) return 0;
+  const findings = reportData.findings || [];
+  let moved = 0;
+  for (const p of waiting) {
+    const text = p.heard.text || heardAround(p.heard.at);
+    const f = findingForHeard(text, findings);
+    if (!f) continue;
+    const section = findingPhotoSection(f.id);
+    if (getSectionPhotos(section).length >= sectionPhotoLimit(section)) continue;
+    reportData.photosBySection.findings = getSectionPhotos('findings').filter(x => x.id !== p.id);
+    if (!p.caption) p.caption = talkCaption(text, f);
+    p.heard.placed = f.id;
+    getSectionPhotos(section).push(p);
+    moved++;
+  }
+  if (moved) {
+    renderSectionPhotoGrid('findings');
+    renderFindingsUI();
+    showToast(moved === 1 ? 'Your photo is on the finding you described' : `${moved} photos are on the findings you described`, 'success');
+  }
+  updateTalkPhotoButton();
+  return moved;
+}
+
 // Findings with termite activity or evidence where "Refer to a builder or
 // engineer?" has no answer. A blank is never read as "no referral".
 function findingsMissingReferral() {
@@ -2947,7 +3074,7 @@ function whisperApply() {
     text = correctKnownMishearings(text);
     const stopAt = text.search(VOICE_STOP_LIVE_RE);
     if (stopAt >= 0) text = text.slice(0, stopAt).trim();
-    if (text) currentTranscript += text + ' ';
+    if (text) { currentTranscript += text + ' '; speechHeard(text); }
     pulseWave();
     if (stopAt >= 0 && isRecording) {
       stopRecording();
@@ -3078,7 +3205,7 @@ function startRecording() {
       pendingInterim = interim;
       // Each phrase goes to the draft as it lands, so a tab the phone kills
       // mid-dictation loses the current sentence at most.
-      if (final) saveDraft();
+      if (final) { speechHeard(final); saveDraft(); }
       pulseWave();
       const box = document.getElementById('transcriptBox');
       box.textContent = currentTranscript + interim;
@@ -3553,13 +3680,21 @@ async function requestExtraction(text) {
     saveTestNote(text, parsed, null, seconds());
     return parsed;
   } catch (err) {
-    const reason = err.noSignal ? 'no_signal' : err.tooLong ? 'too_long' : err.badAnswer ? 'bad_answer'
+    const reason = err.kept ? 'kept_for_later' : err.noSignal ? 'no_signal' : err.tooLong ? 'too_long' : err.badAnswer ? 'bad_answer'
       : err.status ? 'http_' + err.status : 'other';
     track('note_failed', { reason, seconds: seconds() });
     saveTestNote(text, null, reason, seconds());
     if (!err.noSignal && ![401, 402, 429].includes(err.status)) reportError(new Error('Extraction failed: ' + reason), 'extraction');
     throw err;
   }
+}
+
+// The fill in flight, so "Keep for later" on the busy bar can stop it.
+let activeExtraction = null;
+function keepNoteForLater() {
+  if (!activeExtraction) return;
+  activeExtraction.kept = true;
+  activeExtraction.controller.abort();
 }
 
 async function callExtraction(text) {
@@ -3569,6 +3704,7 @@ async function callExtraction(text) {
   const learned = learnedPromptBlock();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), EXTRACTION_TIMEOUT_MS);
+  const mine = activeExtraction = { controller, kept: false };
   let res, rawBody;
   try {
     res = await workerFetch('', {
@@ -3597,9 +3733,11 @@ async function callExtraction(text) {
     rawBody = await res.text();
   } catch (err) {
     // fetch() only rejects when the request never got an answer.
+    if (mine.kept) throw Object.assign(noSignal('kept for later'), { kept: true });
     throw noSignal(err && err.name === 'AbortError' ? 'no answer in time' : 'no connection');
   } finally {
     clearTimeout(timer);
+    if (activeExtraction === mine) activeExtraction = null;
   }
 
   // The worker refuses a request (expired sign-in, plan ended, usage
@@ -4126,7 +4264,10 @@ async function runFill({ whileRecording = false } = {}) {
       if (!isRecording) document.getElementById('extractBtn').disabled = false;
       return false;
     }
-    if (isNoteSpecificProblem(err)) {
+    if (err.kept) {
+      setAI('ready', 'Note saved');
+      showToast('Note saved under Waiting notes. Tap Fill in now when you\'re ready', 'info');
+    } else if (isNoteSpecificProblem(err)) {
       const waiting = getPendingNotes()[getPendingNotes().length - 1];
       if (waiting) { waiting.problem = extractionProblem(err); saveDraft(); renderPendingNotes(); }
       setAI('ready', 'Note saved');
@@ -4240,7 +4381,7 @@ async function processPendingNotes(manual) {
   pendingNotesRunning = true;
   renderPendingNotes();
   setAI('thinking', 'Filling in saved notes...');
-  let filled = 0, stillNoSignal = false, stuck = 0;
+  let filled = 0, stillNoSignal = false, stuck = 0, kept = false;
   try {
     // Oldest first. A note with a problem of its own (too long, an answer
     // that isn't JSON) is marked and skipped so it can't block the notes
@@ -4252,6 +4393,7 @@ async function processPendingNotes(manual) {
       try {
         extracted = await requestExtraction(note.text);
       } catch (err) {
+        if (err.kept) { kept = true; break; }
         if (err.noSignal) { stillNoSignal = true; break; }
         if (isNoteSpecificProblem(err)) {
           note.problem = extractionProblem(err);
@@ -4288,6 +4430,7 @@ async function processPendingNotes(manual) {
   // Fill in now shows what the notes filled; processTranscript() shows its
   // own sheet when it ran the queue.
   if (filled && manual && !extractSummaryOwned && reportData === target) showExtractSummary(before);
+  else if (kept) showToast('Your notes are kept under Waiting notes. Tap Fill in now when you\'re ready', 'info');
   else if (stillNoSignal && manual) showToast('Still no signal — the notes will fill in when you\'re back online', 'info');
   if (stuck && (manual || !filled)) showToast(`${stuck} note${stuck !== 1 ? 's' : ''} couldn't be read — see the reason under the note`, 'error');
 }
@@ -5021,8 +5164,9 @@ function populateFields(data, transcript) {
     setTimeout(() => {
       if (reportData !== target) { resolve(); return; }
       autoReveal(data);
-      saveDraft();
       ensureTreatmentForLiveTermites();
+      placeTalkPhotos();
+      saveDraft();
       resolve();
     }, entries.length * 70 + 50);
   });
@@ -8670,6 +8814,7 @@ function toggleVoicePopover() {
   const isOpen = popover.classList.toggle('open');
   fab.classList.toggle('open', isOpen);
   showTestModeBadge();
+  if (isOpen) updateTalkPhotoButton();
 
   // If closing while in notes-dictation mode, reset to default
   if (!isOpen && activeNotesTargetKey) {
@@ -9540,7 +9685,7 @@ async function confirmBillingAfterCheckout() {
   if (el) el.textContent = 'Confirming your payment…';
   for (let i = 0; i < 10; i++) {
     const sub = await loadBillingStatus();
-    if (sub && sub.status !== 'trialing' && sub.stripe_subscription_id) { showToast('Subscription updated — thanks!', 'success'); return; }
+    if (sub && (sub.status !== 'trialing' || sub.subscribed)) { showToast('Subscription updated — thanks!', 'success'); return; }
     if (el && i < 9) el.textContent = 'Confirming your payment…';
     await new Promise(r => setTimeout(r, 2000));
   }
@@ -11534,6 +11679,7 @@ function startBlankReport() {
 
 function resetReportState() {
   reportData = {};
+  speechTimeline = [];
   setAI('ready', 'AI ready');
   fieldNotes = {};
   pendingSpeciesMatch = null;
@@ -12103,6 +12249,10 @@ function setAI(state, text) {
   updateVoiceHud();
   const busyText = document.getElementById('aiBusyText');
   if (busyText && busy) busyText.textContent = text;
+  // A fill can take a while on a slow connection. The inspector doesn't
+  // have to stand there: the note can wait with the others.
+  const keep = document.getElementById('aiKeepBtn');
+  if (keep) keep.hidden = !(busy && /Filling in/.test(text));
 }
 
 // action: optional { label, run } adds a button to the toast (e.g. Undo).
@@ -12422,7 +12572,32 @@ function reportPrepGaps(from = 'send') {
   if (pending) push('pending', `${pending} voice note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
   if (!reportData.inspectorSignature) push('signature', 'The inspector hasn\'t signed');
   if (!reportData.agreement) push('agreement', 'No pre-inspection agreement is recorded', from === 'extract' ? fixBtn('agreement', 'Get it signed') : '');
+  // Photos the account never received are only on this phone: the PDF
+  // has them today, but a lost phone or another device's copy won't.
+  const onlyHere = photosOnlyOnThisPhone().length;
+  if (onlyHere && authSession) push('photos', `${onlyHere} photo${onlyHere === 1 ? ' is' : 's are'} only on this phone, not in your account yet`,
+    fixBtn('photos', navigator.onLine ? 'Back up now' : 'Back up when online'));
   return gaps;
+}
+
+function photosOnlyOnThisPhone() {
+  return allReportPhotos(reportData).filter(p => !p.path);
+}
+
+// "Back up now" on the check sheet: the photos go up, and the sheet is
+// drawn again with the gap gone or a reason it isn't.
+async function backUpPhotosFromGap(from) {
+  const reopen = () => from === 'send' ? openSendReview() : showExtractSummary(extractSummaryBefore);
+  if (!navigator.onLine) { showToast('You\'re offline. The photos back up on their own once you\'re online', 'warn'); return; }
+  const before = photosOnlyOnThisPhone().length;
+  showToast(`Backing up ${before} photo${before === 1 ? '' : 's'}…`, 'info');
+  let changed = false;
+  try { changed = await uploadPendingPhotos(reportData); } catch (e) { reportError(e, 'photo_backup_gap'); }
+  if (changed) { saveDraft(); if (currentReportId) saveCurrentReport(true); }
+  const left = photosOnlyOnThisPhone().length;
+  if (!left) showToast('Photos are in your account', 'success');
+  else showToast(`${left} photo${left === 1 ? '' : 's'} couldn\'t be backed up. Check your connection and try again`, 'error');
+  reopen();
 }
 
 // ── GAPS BEFORE YOU LEAVE ───────────────────────────────────────────────
@@ -12880,6 +13055,7 @@ function fixReportGap(kind, from = 'send') {
   const leave = () => from === 'send' ? closeSendReview() : closeExtractSummary();
   if (kind === 'quote') { leave(); sendAfterQuote = true; openQuoteFromReport(); return; }
   if (kind === 'agreement') { leave(); openAgreementSheet(); return; }
+  if (kind === 'photos') { backUpPhotosFromGap(from); return; }
   if (kind.startsWith('finding:')) { leave(); addFindingForArea(kind.slice(8)); return; }
   if (kind === 'clear') markRemainingAreasClear();
   else markRemainingAreasInspected(kind === 'na' ? 'NA' : 'INSPECTED');

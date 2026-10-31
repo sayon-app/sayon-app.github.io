@@ -705,7 +705,7 @@
       <span class="progress-ring-label" id="progressRingLabel" style="display:none">Complete</span>
     </div>
   </header>
-  <div class="ai-busy-bar" role="status" aria-live="polite"><span id="aiBusyText">Filling in the report…</span></div>
+  <div class="ai-busy-bar" role="status" aria-live="polite"><span id="aiBusyText">Filling in the report…</span><button type="button" class="ai-keep-btn" id="aiKeepBtn" hidden onclick="keepNoteForLater()">Keep for later</button></div>
 
   <!-- DRAWER OVERLAY -->
   <div class="drawer-overlay" id="drawerOverlay" onclick="toggleDrawer()"></div>
@@ -1852,6 +1852,13 @@
       </svg>
       <span id="voiceBtnText">Tap to Speak</span>
     </button>
+    <!-- A photo taken while talking lands on the finding being described
+         once the note is filled in (see PHOTOS WHILE TALKING in js/app.js). -->
+    <button type="button" class="voice-photo-btn" id="voicePhotoBtn" onclick="takePhotoWhileTalking()">
+      <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      <span id="voicePhotoBtnText">Photo of what you're describing</span>
+    </button>
+    <input type="file" id="talkPhotoInput" accept="image/*" capture="environment" multiple style="display:none" onchange="handleTalkPhotoFiles(this)">
 
     <div class="waveform" id="waveform">
       <div class="wave-bar"></div><div class="wave-bar"></div>

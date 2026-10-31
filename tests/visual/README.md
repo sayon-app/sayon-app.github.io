@@ -34,3 +34,7 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 ## Last visit
 
 `tests/last-visit/e2e.js <outDir>` saves a report, starts a new job at the same address typed differently, and checks the offer, Not now, Start from it (property details copied, findings and risk not, termite history written) and the Since last visit sheet.
+
+## Photos while talking
+
+`tests/talk-photo/e2e.js <outDir>` takes a photo from the voice popover between two stretches of speech about a gum tree, then a second photo a minute later about nothing in particular, fills the report from the standard scenario and checks that the first photo lands on the gum-tree finding with the right sentence as its caption, the second stays in the Findings photos, and both survive a reload.

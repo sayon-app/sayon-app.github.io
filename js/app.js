@@ -9488,7 +9488,7 @@ async function loadBillingStatus() {
     // Signed out, or into another account, while this was loading.
     if (!authUser || authUser.id !== forUser) return;
     billingStatusCache = sub;
-    const planLabel = (sub.plan || 'trial').charAt(0).toUpperCase() + (sub.plan || 'trial').slice(1);
+    const planLabel = planDisplayLabel(sub.plan);
     if (el) el.textContent = billingStatusLine(sub, planLabel);
     if (manageBtn) manageBtn.style.display = sub.stripe_customer_id ? '' : 'none';
     markCurrentPlan(sub);
@@ -9503,6 +9503,14 @@ async function loadBillingStatus() {
       : 'Couldn\'t load your plan. Close this panel and open Billing again';
     console.warn('loadBillingStatus failed:', e.message);
   }
+}
+
+// Display name for a stored plan key. The stored key (trial/starter/pro/business)
+// never changes; only what we show for it does.
+function planDisplayLabel(plan) {
+  if (plan === 'starter') return 'Solo';
+  if (!plan) return 'Trial';
+  return plan.charAt(0).toUpperCase() + plan.slice(1);
 }
 
 // The one line under Current Plan, for each state the plan can be in.

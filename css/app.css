@@ -5259,6 +5259,7 @@ body:not(.dark-screen) .agreement-banner.last-visit-banner, .agreement-banner.la
 body.dark-screen .agreement-banner.last-visit-banner { border-color: rgba(var(--accent-rgb),0.45); background: rgba(var(--accent-rgb),0.1); color: var(--accent2); }
 .last-visit-skip { flex-shrink: 0; padding: 0 6px; min-height: 32px; font-size: 12px; font-weight: 700; color: inherit; opacity: 0.8; }
 .last-visit-skip[hidden] { display: none; }
+.agreement-banner[hidden] { display: none; }
 body:not(.dark-screen) .agreement-banner.last-visit-banner .agreement-banner-btn { background: var(--accent2); border-color: var(--accent2); color: #fff; box-shadow: none; }
 .last-visit-rows { display: flex; flex-direction: column; gap: 8px; }
 .last-visit-row { padding: 10px 12px; border-radius: 10px; background: var(--bg); border-left: 3px solid transparent; }

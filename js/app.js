@@ -4331,11 +4331,14 @@ function extractBlanks() {
 }
 
 let extractSummaryBlanks = [];
+let extractSummaryBefore = null;   // the snapshot the sheet counts from, kept so a fix can redraw it
+let extractSummaryFilledCount = 0;
 
 function showExtractSummary(before) {
   const overlay = document.getElementById('extractSummaryOverlay');
   if (!overlay) return;
-  const n = countExtractFilled(before);
+  extractSummaryBefore = before || extractSummaryBefore || extractSnapshot();
+  const n = extractSummaryFilledCount = countExtractFilled(extractSummaryBefore);
   extractSummaryBlanks = extractBlanks();
   document.getElementById('extractSummaryFilled').textContent = n
     ? `Filled ${n} field${n !== 1 ? 's' : ''} from your note.`
@@ -4344,27 +4347,97 @@ function showExtractSummary(before) {
   document.getElementById('extractSummaryBlanks').innerHTML = extractSummaryBlanks.length
     ? extractSummaryBlanks.map((b, i) => `<button class="extract-blank-btn" onclick="goToExtractBlank(${i})">${escapeHtml(b.label)}<span aria-hidden="true">›</span></button>`).join('')
     : '<div class="extract-summary-done">None of the key fields are blank.</div>';
+  // Before you leave: what the standard needs that the notes didn't cover.
+  const gaps = driveawayGaps();
+  document.getElementById('extractSummaryGaps').innerHTML = gaps.length
+    ? gaps.map(g => `<div class="extract-gap"><span>${escapeHtml(g.text)}</span>${g.fix ? `<span class="send-review-fixes">${g.fix}</span>` : ''}</div>`).join('')
+    : '<div class="extract-summary-done">Nothing the standard asks for is missing. Safe to leave.</div>';
+  const readBtn = document.getElementById('extractReadBackBtn');
+  if (readBtn) { readBtn.hidden = !('speechSynthesis' in window); readBtn.textContent = 'Read it back'; }
   overlay.classList.add('open');
 }
 
 function closeExtractSummary() {
   const overlay = document.getElementById('extractSummaryOverlay');
   if (overlay) overlay.classList.remove('open');
+  stopReadBack();
+}
+
+// ── SPOKEN READ-BACK ────────────────────────────────────────────────────
+// The sheet's headline, said aloud, so the inspector can check what the
+// note filled with their hands still full. Only the questions a client
+// asks first, then what's left to do. Same facts as the sheet, never more.
+function readBackText() {
+  const lines = [];
+  const n = extractSummaryFilledCount;
+  lines.push(n ? `Filled ${n} field${n !== 1 ? 's' : ''} from your note.` : 'Nothing new was filled from your note.');
+  const { groups, limited } = reportSummary();
+  const items = {};
+  groups.forEach(g => g.items.forEach(([q, a, , , detail]) => { items[q] = { a, detail }; }));
+  const say = (q, label) => {
+    const it = items[q];
+    if (!it) return;
+    const a = it.a === 'NOT RECORDED' ? 'not recorded' : it.a.toLowerCase();
+    lines.push(`${label}: ${a}${it.detail && it.a !== 'NOT RECORDED' ? `, ${it.detail}` : ''}.`);
+  };
+  say('Live termites found?', 'Live termites');
+  say('Termite workings or damage found?', 'Workings or damage');
+  say('Builder or engineer referral?', 'Builder referral');
+  say('Conditions conducive to timber pests?', 'Conducive conditions');
+  say('Termite treatment recommended?', 'Treatment recommended');
+  say('Risk of termite attack', 'Risk');
+  if (limited.length) lines.push(`${limited.length} area${limited.length === 1 ? '' : 's'} not fully inspected: ${limited.join('; ')}.`);
+  const blanks = extractSummaryBlanks.map(b => b.label);
+  if (blanks.length) lines.push(`Left blank: ${blanks.join(', ')}.`);
+  const gaps = driveawayGaps().map(g => g.text.replace(/"/g, ''));
+  lines.push(gaps.length ? `Before you leave: ${gaps.join('. ')}.` : 'Nothing the standard asks for is missing.');
+  return lines.join(' ');
+}
+
+let readBackUtterance = null;
+function toggleReadBack() {
+  if (!('speechSynthesis' in window)) return;
+  if (speechSynthesis.speaking || speechSynthesis.pending) { stopReadBack(); return; }
+  const u = new SpeechSynthesisUtterance(readBackText());
+  u.lang = 'en-AU';
+  u.rate = 1;
+  const voice = speechSynthesis.getVoices().find(v => /en[-_]AU/i.test(v.lang));
+  if (voice) u.voice = voice;
+  const btn = document.getElementById('extractReadBackBtn');
+  u.onend = u.onerror = () => { readBackUtterance = null; if (btn) btn.textContent = 'Read it back'; };
+  readBackUtterance = u;
+  if (btn) btn.textContent = 'Stop reading';
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+  track('read_back');
+}
+function stopReadBack() {
+  if (!('speechSynthesis' in window) || !readBackUtterance) return;
+  readBackUtterance = null;
+  speechSynthesis.cancel();
+  const btn = document.getElementById('extractReadBackBtn');
+  if (btn) btn.textContent = 'Read it back';
 }
 
 function goToExtractBlank(i) {
   const b = extractSummaryBlanks[i];
   closeExtractSummary();
   if (!b) return;
+  goToReportField(b.target, b.referral);
+}
+
+// Takes the inspector to a field in the report: its section, its group
+// opened, scrolled into view and flashed.
+function goToReportField(target, referral) {
   const popover = document.getElementById('voicePopover');
   if (popover && popover.classList.contains('open')) toggleVoicePopover();
-  let el = document.getElementById(b.target);
+  let el = document.getElementById(target);
   if (!el) return;
-  if (el.classList.contains('choice-source')) el = document.getElementById(b.target.replace(/^f-/, 'choices-')) || el;
+  if (el.classList.contains('choice-source')) el = document.getElementById(target.replace(/^f-/, 'choices-')) || el;
   const section = el.closest('.report-section');
   if (section && section.id.startsWith('section-')) showSection(section.id.slice(8));
   openFieldGroups(el);
-  if (b.referral) {
+  if (referral) {
     // The "Refer to a Builder or Engineer?" field inside the finding card.
     const label = [...el.querySelectorAll('.field-label')].find(l => /builder or engineer/i.test(l.textContent));
     if (label && label.nextElementSibling) el = label.nextElementSibling;
@@ -7770,7 +7843,14 @@ function drawAgreementBody(doc, a, y, { M, CW, onNewPage }) {
     if (m) {
       sawClause = true;
       const body = lines.slice(1).map(l => doc.splitTextToSize(l, CW - GUT - 3));
-      const firstH = 5 + (body[0] ? Math.min(body[0].length, 2) * LH : 0);
+      let firstH = 5 + (body[0] ? Math.min(body[0].length, 2) * LH : 0);
+      // The last clause goes over with the closing words and the signatures,
+      // so they never sit on a page of their own.
+      const next = blocks[bi + 1];
+      if (next && bi + 1 === blocks.length - 1 && !/^\d+\.\s/.test(next[0]) && !a.unsigned) {
+        const closingH = next.flatMap(l => doc.splitTextToSize(l, CW - 13)).length * LH + 9;
+        firstH = 7.4 + body.reduce((h, w, i) => h + w.length * LH + (i ? 1.5 : 0), 0) + 2.6 + closingH + 34;
+      }
       if (!room(firstH + 4) && !first) {
         doc.setDrawColor(...C.ruleLight); doc.setLineWidth(0.2); doc.line(M + GUT, y - 1.6, M + CW, y - 1.6);
       }
@@ -7819,10 +7899,7 @@ function drawAgreementBody(doc, a, y, { M, CW, onNewPage }) {
   pdfTracked(doc, 'AGREED AND SIGNED', M, y, { cs: 0.6 });
   y += 20;
   const colW = (CW - 16) / 3;
-  const onLine = (text, x) => {
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...C.ink);
-    doc.text(doc.splitTextToSize(text, colW - 2)[0], x + 1, y - 2);
-  };
+  const onLine = (text, x) => drawPdfOnLine(doc, text, x, y, colW);
   onLine(a.signerName, M);
   drawPdfSignature(doc, { x: M, y, w: colW, caption: 'Agreed by' });
   drawPdfSignature(doc, { x: M + colW + 8, y, w: colW, caption: a.signature ? 'Client signature' : 'How it was signed',
@@ -8640,8 +8717,166 @@ function updateJob() {
   }
 
   syncAllSelectCards();
+  renderLastVisitBanner();
   saveDraft();
 }
+
+// ── LAST VISIT ──────────────────────────────────────────────────────────
+// An address this account has inspected before. The inspector can start
+// from that report: the property details that don't change from year to
+// year are copied in, the known termite history is written from what was
+// found then, and a sheet shows what changed since. Nothing about this
+// visit's findings is copied: those are inspected afresh.
+//   reportData.lastVisit = { id, date, copied }   once started from
+//   reportData.lastVisitDismissed = <id>          when the inspector said not now
+const LAST_VISIT_KEYS = ['structureType', 'height', 'wallConstruction', 'roofType', 'floorType', 'facadeDirection', 'constructionEra',
+  'siteSurroundings', 'siteSlope', 'existingSystem', 'existingSystemOther', 'standard', 'toolsUsed'];
+
+// "7 Banksia Dr, Epping" and "7 Banksia Drive EPPING" are the same place.
+function addressKey(street, suburb) {
+  const norm = v => String(v || '').toLowerCase()
+    .replace(/[^a-z0-9/ ]+/g, ' ')
+    .replace(/\b(unit|apartment|apt|flat|lot|shop|suite)\s+/g, '')
+    .replace(/\b(street|st|road|rd|avenue|ave|av|drive|dr|dve|place|pl|court|ct|crescent|cres|cr|parade|pde|lane|ln|highway|hwy|boulevard|bvd|blvd|terrace|tce|close|cl|way|circuit|cct|grove|gr|esplanade|esp|square|sq)\b/g, '')
+    .replace(/\s+/g, ' ').trim();
+  const a = norm(street), b = norm(suburb);
+  return a && b ? `${a}|${b}` : '';
+}
+
+function previousVisitFor() {
+  const key = addressKey(document.getElementById('jobAddress').value, document.getElementById('jobSuburb').value);
+  if (!key) return null;
+  const list = getSavedReports().filter(r => r && r.id !== currentReportId && r.reportData && addressKey(r.jobAddress, r.jobSuburb) === key);
+  if (!list.length) return null;
+  // A completed report over a draft, then the most recent.
+  list.sort((a, b) => ((b.reportData.issue ? 1 : 0) - (a.reportData.issue ? 1 : 0)) || ((b.savedAt || 0) - (a.savedAt || 0)));
+  return list[0];
+}
+
+function visitDate(entry) {
+  const rd = entry.reportData || {};
+  return (rd.issue && rd.issue.completedAt) || (rd.agreement && rd.agreement.inspectionDate && new Date(rd.agreement.inspectionDate + 'T00:00:00').getTime()) || entry.savedAt || Date.now();
+}
+
+// The answers a client asks about, from any report, for last time against now.
+function visitFacts(rd) {
+  rd = rd || {};
+  const fs = (rd.findings || []).filter(f => f && f.termiteActivity);
+  const where = list => list.map(f => f.activityLocation).filter(Boolean).join('; ');
+  const live = fs.filter(f => f.termiteActivity === 'ACTIVE'), old = fs.filter(f => f.termiteActivity === 'INACTIVE');
+  const conducive = conduciveConditions(rd);
+  const conduciveAnswered = ['waterLeaks', 'timberSoil', 'weepHoles', 'antCapping', 'slabEdge', 'subfloorVentilation', 'mouldSeen', 'siteDrainage', 'subfloorDrainage', 'nonDurableTimber'].some(k => !isBlankValue(rd[k]));
+  const yn = v => ({ YES: 'Yes', NO: 'No' })[v] || '';
+  return [
+    ['Live termites', live.length ? `Yes: ${where(live) || 'see findings'}` : fs.length ? 'No' : ''],
+    ['Workings or damage', old.length ? `Yes: ${where(old) || 'see findings'}` : fs.length ? 'No' : ''],
+    ['Borers', { ACTIVE: 'Active', INACTIVE: 'Old damage', NONE: 'No' }[rd.borerActivity] || ''],
+    ['Wood decay', yn(rd.decayFound)],
+    ['Conducive conditions', conducive.length ? conducive.join('; ').replace(/^./, c => c.toUpperCase()) : conduciveAnswered ? 'None' : ''],
+    ['Termite management system', rd.existingSystem || ''],
+    ['Treatment recommended', yn(rd.treatmentRecommended)],
+    ['Risk of termite attack', rd.riskLevel || ''],
+    ['Next inspection', rd.inspectionFrequency || ''],
+  ];
+}
+
+// What the last report found, in the words the Known Termite History field uses.
+function termiteHistoryFrom(entry) {
+  const rd = entry.reportData || {};
+  const when = formatIssueDate(visitDate(entry));
+  const fs = (rd.findings || []).filter(f => f && f.termiteActivity);
+  const live = fs.filter(f => f.termiteActivity === 'ACTIVE'), old = fs.filter(f => f.termiteActivity === 'INACTIVE');
+  const where = list => list.map(f => f.activityLocation).filter(Boolean).slice(0, 2).join('; ');
+  const t = entry.quote && entry.quote.treatment;
+  const treatedOn = t && t.date ? formatIssueDate(new Date(t.date + 'T00:00:00')) : '';
+  if (treatedOn) return `Treated before (${treatedOn}, after our inspection on ${when}${live.length ? `: live termites, ${where(live)}` : ''})`;
+  if (live.length) return `Termites reported before (our inspection on ${when}: live termites, ${where(live)})`;
+  if (old.length) return `Termites reported before (our inspection on ${when}: workings or damage, ${where(old)})`;
+  if (fs.length) return `None known (our inspection on ${when} found no termite activity)`;
+  return '';
+}
+
+function renderLastVisitBanner() {
+  const banner = document.getElementById('lastVisitBanner');
+  if (!banner) return;
+  const text = document.getElementById('lastVisitText');
+  const btn = document.getElementById('lastVisitBtn');
+  const skip = document.getElementById('lastVisitSkip');
+  const started = reportData.lastVisit;
+  const prev = started ? null : previousVisitFor();
+  if (started) {
+    banner.hidden = false;
+    text.textContent = `Started from the ${formatIssueDate(started.date)} inspection here.`;
+    btn.textContent = 'What changed';
+    skip.hidden = true;
+  } else if (prev && reportData.lastVisitDismissed !== prev.id) {
+    banner.hidden = false;
+    text.textContent = `Inspected here before, on ${formatIssueDate(visitDate(prev))}.`;
+    btn.textContent = 'Start from it';
+    skip.hidden = false;
+  } else banner.hidden = true;
+}
+
+function lastVisitAction() {
+  if (reportData.lastVisit) openLastVisitChanges();
+  else startFromLastVisit();
+}
+
+function dismissLastVisit() {
+  const prev = previousVisitFor();
+  if (prev) reportData.lastVisitDismissed = prev.id;
+  saveDraft();
+  renderLastVisitBanner();
+}
+
+// Copies what doesn't change about the property, and only into blank
+// fields, so nothing the inspector has already said is overwritten.
+function startFromLastVisit() {
+  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  const prev = previousVisitFor();
+  if (!prev) { renderLastVisitBanner(); return; }
+  const pr = prev.reportData || {};
+  let copied = 0;
+  const put = (k, v) => {
+    reportData[k] = v;
+    const el = document.getElementById('f-' + k);
+    if (el) renderField(el, k, v);
+    copied++;
+  };
+  LAST_VISIT_KEYS.forEach(k => { if (isBlankValue(reportData[k]) && !isBlankValue(pr[k])) put(k, pr[k]); });
+  const history = termiteHistoryFrom(prev);
+  if (history && isBlankValue(reportData.termiteHistory)) put('termiteHistory', history);
+  reportData.lastVisit = { id: prev.id, date: visitDate(prev), copied };
+  delete reportData.lastVisitDismissed;
+  updateProgress();
+  checkAsbestosFlag();
+  checkSystemVerify();
+  saveDraft();
+  renderLastVisitBanner();
+  showToast(copied ? `${copied} detail${copied === 1 ? '' : 's'} copied from the ${formatIssueDate(visitDate(prev))} inspection. Check them as you go` : 'Nothing to copy from the last report', copied ? 'success' : 'info');
+  track('last_visit_started', { copied });
+}
+
+// Last time against now, the answers a client asks about first.
+function openLastVisitChanges() {
+  const lv = reportData.lastVisit;
+  const prev = lv && getSavedReports().find(r => r.id === lv.id);
+  if (!prev) { showToast('The earlier report is no longer on this phone', 'info'); return; }
+  const esc = escapeHtml;
+  const rows = visitFacts(prev.reportData).map(([label, before], i) => {
+    const now = visitFacts(reportData)[i][1];
+    // Marked only once this visit has an answer: a blank isn't a change yet.
+    const changed = !!before && !!now && before !== now;
+    return `<div class="last-visit-row${changed ? ' changed' : ''}"><div class="last-visit-label">${esc(label)}</div>` +
+      `<div class="last-visit-cols"><div><small>Last time</small>${esc(before || 'Not recorded')}</div><div><small>Now</small>${esc(now || 'Not yet')}</div></div></div>`;
+  });
+  document.getElementById('lastVisitSheetSub').textContent =
+    `Inspected ${formatIssueDate(visitDate(prev))}${prev.inspector ? ` by ${prev.inspector}` : ''}. ${lv.copied ? `${lv.copied} property detail${lv.copied === 1 ? '' : 's'} were copied from it.` : ''}`;
+  document.getElementById('lastVisitRows').innerHTML = rows.join('');
+  document.getElementById('lastVisitOverlay').classList.add('open');
+  track('screen_viewed', { screen: 'last_visit_changes' });
+}
+function closeLastVisitChanges() { document.getElementById('lastVisitOverlay').classList.remove('open'); }
 
 // ── ADDRESS SUGGESTIONS ──────────────────────────────────────────────────
 // As the street address is typed, real addresses are listed under it; tapping
@@ -11871,6 +12106,24 @@ const OBS_ZONES_BY_LABEL = Object.fromEntries(Object.entries(OBS_ZONES).map(([z,
 // The headline results, shared by the PDF's summary page and the review
 // screen before sending. Tiles are [label, value, tone (bad | warn | good |
 // none), detail].
+// The conducive conditions a report records, as short phrases.
+function conduciveConditions(rd) {
+  const conducive = [];
+  if (rd.waterLeaks === 'YES') conducive.push(`water leak${rd.leakLocation ? ` (${rd.leakLocation})` : ''}`);
+  else if (rd.moistureReadings === 'YES') conducive.push('elevated moisture');
+  if (rd.timberSoil === 'YES') conducive.push('timber in contact with soil');
+  if (rd.weepHoles === 'BRIDGED') conducive.push('weep holes bridged');
+  if (rd.antCapping === 'GAPS') conducive.push('gaps in the ant capping');
+  else if (rd.antCapping === 'NONE') conducive.push('no ant capping on piers');
+  if (rd.slabEdge === 'OBSTRUCTED') conducive.push('slab edge concealed');
+  if (rd.subfloorVentilation === 'POOR') conducive.push('poor subfloor ventilation');
+  if (rd.mouldSeen === 'YES') conducive.push(`mould growth${rd.mouldWhere ? ` (${rd.mouldWhere})` : ''}`);
+  if (rd.siteDrainage === 'POOR') conducive.push('poor site drainage');
+  if (rd.subfloorDrainage === 'POOR') conducive.push('poor subfloor drainage');
+  if (rd.nonDurableTimber === 'YES') conducive.push(`untreated or non-durable timber in a damp area${whatWhere(rd.nonDurableTimberDetails, rd.nonDurableTimberWhere) ? ` (${whatWhere(rd.nonDurableTimberDetails, rd.nonDurableTimberWhere)})` : ''}`);
+  return conducive;
+}
+
 function reportSummary() {
   const fs = (reportData.findings || []).filter(f => f && f.termiteActivity);
   const live = fs.filter(f => f.termiteActivity === 'ACTIVE');
@@ -11881,19 +12134,7 @@ function reportSummary() {
   const borerReferral = shownBorerFindings().some(b => b.structuralConcern === 'YES');
   const structural = termiteReferral || borerReferral;
   const unanswered = findingsMissingReferral();
-  const conducive = [];
-  if (reportData.waterLeaks === 'YES') conducive.push(`water leak${reportData.leakLocation ? ` (${reportData.leakLocation})` : ''}`);
-  else if (reportData.moistureReadings === 'YES') conducive.push('elevated moisture');
-  if (reportData.timberSoil === 'YES') conducive.push('timber in contact with soil');
-  if (reportData.weepHoles === 'BRIDGED') conducive.push('weep holes bridged');
-  if (reportData.antCapping === 'GAPS') conducive.push('gaps in the ant capping');
-  else if (reportData.antCapping === 'NONE') conducive.push('no ant capping on piers');
-  if (reportData.slabEdge === 'OBSTRUCTED') conducive.push('slab edge concealed');
-  if (reportData.subfloorVentilation === 'POOR') conducive.push('poor subfloor ventilation');
-  if (reportData.mouldSeen === 'YES') conducive.push(`mould growth${reportData.mouldWhere ? ` (${reportData.mouldWhere})` : ''}`);
-  if (reportData.siteDrainage === 'POOR') conducive.push('poor site drainage');
-  if (reportData.subfloorDrainage === 'POOR') conducive.push('poor subfloor drainage');
-  if (reportData.nonDurableTimber === 'YES') conducive.push(`untreated or non-durable timber in a damp area${whatWhere(reportData.nonDurableTimberDetails, reportData.nonDurableTimberWhere) ? ` (${whatWhere(reportData.nonDurableTimberDetails, reportData.nonDurableTimberWhere)})` : ''}`);
+  const conducive = conduciveConditions(reportData);
   const places = list => list.map(f => f.activityLocation).filter(Boolean).join('; ');
   const NR = 'NOT RECORDED';
   const limitedZones = areasNotFullyInspected();
@@ -11989,24 +12230,39 @@ function reportPrepItems() { return reportPrepGaps().map(g => g.text); }
 
 // The same list, each with the buttons that fix it from the check sheet
 // (fix: HTML, or '' when it has to be fixed in the report).
-function reportPrepGaps() {
+// from: which sheet the fix buttons come back to ('send' or 'extract').
+// key: what kind of gap, so a sheet can leave some out.
+function reportPrepGaps(from = 'send') {
   const gaps = [];
-  const push = (text, fix) => gaps.push({ text, fix: fix || '' });
-  if (!document.getElementById('jobAddress').value.trim()) push('The job has no property address');
+  const push = (key, text, fix) => gaps.push({ key, text, fix: fix || '' });
+  const fixBtn = (kind, label) => `<button class="link-btn" onclick="fixReportGap('${kind}', '${from}')">${label}</button>`;
+  if (!document.getElementById('jobAddress').value.trim()) push('address', 'The job has no property address');
   const unmarked = Object.keys(OBS_ZONES).filter(z => !areaStatusOf(z));
-  if (unmarked.length) push(`${unmarked.length} area${unmarked.length === 1 ? ' has' : 's have'} no inspection status (${unmarked.map(z => OBS_ZONES[z].label).join(', ')})`,
-    `<button class="link-btn" onclick="fixSendGap('inspected')">Mark the rest as inspected</button>` +
-    `<button class="link-btn" onclick="fixSendGap('na')">Mark the rest not applicable</button>`);
+  if (unmarked.length) push('status', `${unmarked.length} area${unmarked.length === 1 ? ' has' : 's have'} no inspection status (${unmarked.map(z => OBS_ZONES[z].label).join(', ')})`,
+    fixBtn('inspected', 'Mark the rest as inspected') + fixBtn('na', 'Mark the rest not applicable'));
   const noResult = areasMissingResult();
-  if (noResult.length) push(`${noResult.length} area${noResult.length === 1 ? ' has' : 's have'} no result for what was found there (${noResult.map(z => OBS_ZONES[z].label.replace(/^The /, '')).join(', ')})`,
-    `<button class="link-btn" onclick="fixSendGap('clear')">Mark the rest as nothing found</button>`);
-  areasEvidenceUnlinked().forEach(z => push(`${OBS_ZONES[z].label}: marked "evidence found", but no finding mentions it`,
-    `<button class="link-btn" onclick="closeSendReview(); addFindingForArea('${z}')">Add finding</button>`));
-  findingsMissingReferral().forEach(n => push(`Finding ${n}: "refer to a builder or engineer?" isn't answered`));
+  if (noResult.length) push('result', `${noResult.length} area${noResult.length === 1 ? ' has' : 's have'} no result for what was found there (${noResult.map(z => OBS_ZONES[z].label.replace(/^The /, '')).join(', ')})`,
+    fixBtn('clear', 'Mark the rest as nothing found'));
+  areasEvidenceUnlinked().forEach(z => push('evidence', `${OBS_ZONES[z].label}: marked "evidence found", but no finding mentions it`, fixBtn('finding:' + z, 'Add finding')));
+  findingsMissingReferral().forEach(n => push('referral', `Finding ${n}: "refer to a builder or engineer?" isn't answered`));
   const pending = (reportData.pendingNotes || []).length;
-  if (pending) push(`${pending} voice note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
-  if (!reportData.inspectorSignature) push('The inspector hasn\'t signed');
-  if (!reportData.agreement) push('No pre-inspection agreement is recorded');
+  if (pending) push('pending', `${pending} voice note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
+  if (!reportData.inspectorSignature) push('signature', 'The inspector hasn\'t signed');
+  if (!reportData.agreement) push('agreement', 'No pre-inspection agreement is recorded', from === 'extract' ? fixBtn('agreement', 'Get it signed') : '');
+  return gaps;
+}
+
+// ── GAPS BEFORE YOU LEAVE ───────────────────────────────────────────────
+// The same gaps, shown on the after-extract sheet while the inspector is
+// still on site: what the standard asks for that the notes didn't cover,
+// and a minute fixes it in the driveway. Signing and waiting notes are
+// left out: they aren't on-site work. The referral is on the Left blank
+// list already.
+function driveawayGaps() {
+  const gaps = reportPrepGaps('extract').filter(g => !['pending', 'signature', 'referral'].includes(g.key));
+  const go = (target, label) => `<button class="link-btn" onclick="closeExtractSummary(); goToReportField('${target}')">${label}</button>`;
+  if (isBlankValue(reportData.moistureReadings)) gaps.push({ key: 'moisture', text: 'Moisture readings: not recorded', fix: go('f-moistureReadings', 'Record') });
+  if (isBlankValue(reportData.durableNoticePresent)) gaps.push({ key: 'notice', text: 'Durable notice in the meter box: not recorded', fix: go('f-durableNoticePresent', 'Record') });
   return gaps;
 }
 
@@ -12186,7 +12442,7 @@ function installReportLockGuard() {
 // Browsers that can't share files (desktop) download the PDFs and open a
 // new email to the client instead. The share sheet only opens straight
 // from a tap, so the PDFs must already be built when this is called.
-function clientMessage({ client, address, docs, signOff }) {
+function clientMessage({ client, address, docs, signOff, link }) {
   const company = getCompanyDetails();
   const firstName = (client || '').trim().split(/\s+/)[0];
   return [
@@ -12194,6 +12450,8 @@ function clientMessage({ client, address, docs, signOff }) {
     '',
     `Please find attached your ${docs} for ${address || 'the property'}.`,
     '',
+    // The client link: read the quote and accept or decline it on a phone.
+    ...(link ? ['You can read the quote and accept or decline it on your phone here:', link, ''] : []),
     `If you have any questions, just reply to this email${company.phone ? ` or call us on ${company.phone}` : ''}.`,
     '',
     'Kind regards,',
@@ -12386,11 +12644,14 @@ function openSendReview() {
 
   document.getElementById('sendReviewSubject').value =
     `${withQuote ? 'Timber pest inspection report and quote' : 'Timber pest inspection report'} — ${address || 'your property'}`;
-  document.getElementById('sendReviewBody').value = clientMessage({
+  sendReview.message = {
     client, address,
     docs: withQuote ? 'timber pest inspection report and treatment quote' : 'timber pest inspection report',
     signOff: document.getElementById('jobInspector').value.trim(),
-  });
+  };
+  sendReview.defaultBody = clientMessage(sendReview.message);
+  document.getElementById('sendReviewBody').value = sendReview.defaultBody;
+  if (withQuote) prepareSendReviewLink(sendReview);
   sendReview.label = gaps.length ? 'Send anyway'
     : directEmail && email ? `Send to ${email}` : 'Open email to send';
   const btn = document.getElementById('sendReviewBtn');
@@ -12399,6 +12660,30 @@ function openSendReview() {
   document.getElementById('sendReviewOverlay').classList.add('open');
   const body = document.querySelector('#sendReviewOverlay .page-sheet-body');
   if (body) body.scrollTop = 0;
+}
+
+// The client link for the quote (see CLIENT LINK in js/quote.js): made
+// while the inspector reads the sheet, then added to the message and the
+// Attached list. The PDFs are built now so the page can offer them; they
+// are the same files the send then uses.
+async function prepareSendReviewLink(r) {
+  if (!authSession || !navigator.onLine) return;
+  let link = null;
+  try {
+    const files = await sendReviewFiles(r);
+    link = await ensureQuoteLink(r.quote, { report: files[0], quote: files[1] });
+  } catch (e) {
+    reportError(e, 'send_review_link');
+  }
+  if (!link || sendReview !== r) return;
+  r.link = quoteLinkUrl(link.id);
+  const body = document.getElementById('sendReviewBody');
+  const withLink = clientMessage(Object.assign({}, r.message, { link: r.link }));
+  if (body.value === r.defaultBody) body.value = withLink;
+  r.defaultBody = withLink;
+  const files = document.getElementById('sendReviewFiles');
+  files.insertAdjacentHTML('beforeend', `<div class="send-review-file"><div><div class="send-review-file-name">Link to accept the quote</div>` +
+    `<div class="send-review-file-meta">In the message. The client reads the quote and accepts or declines it on their phone</div></div></div>`);
 }
 
 // Saves the email typed on the check sheet to the job, then redraws the
@@ -12416,16 +12701,16 @@ function addSendReviewEmail() {
 
 // The fix buttons on the check sheet. Each changes the report, then the
 // sheet is redrawn from the report as it now is.
-function fixSendGap(kind) {
-  if (kind === 'quote') {
-    closeSendReview();
-    sendAfterQuote = true;
-    openQuoteFromReport();
-    return;
-  }
+function fixSendGap(kind) { fixReportGap(kind, 'send'); }
+function fixReportGap(kind, from = 'send') {
+  const reopen = () => from === 'send' ? openSendReview() : showExtractSummary(extractSummaryBefore);
+  const leave = () => from === 'send' ? closeSendReview() : closeExtractSummary();
+  if (kind === 'quote') { leave(); sendAfterQuote = true; openQuoteFromReport(); return; }
+  if (kind === 'agreement') { leave(); openAgreementSheet(); return; }
+  if (kind.startsWith('finding:')) { leave(); addFindingForArea(kind.slice(8)); return; }
   if (kind === 'clear') markRemainingAreasClear();
   else markRemainingAreasInspected(kind === 'na' ? 'NA' : 'INSPECTED');
-  openSendReview();
+  reopen();
 }
 
 // After "Build quote now", coming back from the quote reopens the check.
@@ -12488,7 +12773,7 @@ async function confirmSendReview() {
     });
     if (!sent || sendReview !== r) return;
     closeSendReview();
-    track('report_sent', { documents: files.length, with_quote: !!r.quote });
+    track('report_sent', { documents: files.length, with_quote: !!r.quote, with_link: !!r.link });
     if (r.quote) markQuoteSent(r.quote);
     recordReportSent(r.report.fingerprint, r.report.version);
   } finally {
@@ -12614,15 +12899,23 @@ function drawPdfLetterhead(doc, company, { docLabel, date }) {
   drawPdfFadeRule(doc, 0, 0, W, 1.6);
   const markW = drawPdfCompanyMark(doc, company, M, 11, 17);
   const tx = M + markW + 5;
-  doc.setFont('helvetica','bold'); doc.setFontSize(13.5); doc.setTextColor(...C.ink);
-  doc.text(company.name || 'SAYON', tx, 17.5, { maxWidth: 112 - markW });
+  // A long business name steps down in size, then takes a second line,
+  // and the details below move down with it rather than print over it.
+  const name = company.name || 'SAYON', nameW = 112 - markW;
+  let nameSize = 13.5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(nameSize); doc.setTextColor(...C.ink);
+  while (nameSize > 11 && doc.getTextWidth(name) > nameW) doc.setFontSize(nameSize -= 0.5);
+  const nameLines = doc.splitTextToSize(name, nameW).slice(0, 2);
+  const two = nameLines.length > 1;
+  doc.text(nameLines, tx, two ? 15 : 17.5, { lineHeightFactor: 1.15 });
+  const dy = two ? 1.6 : 0;
   const sub = [];
   if (company.licence) sub.push(`Licence ${company.licence}`);
   if (company.abn) sub.push(`ABN ${company.abn}`);
   const contact = [company.phone, company.email].filter(Boolean);
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...C.inkLight);
-  if (sub.length) doc.text(sub.join('   ·   '), tx, 22.6);
-  if (contact.length) doc.text(contact.join('   ·   '), tx, 26.6);
+  if (sub.length) doc.text(sub.join('   ·   '), tx, 22.6 + dy);
+  if (contact.length) doc.text(contact.join('   ·   '), tx, 26.6 + dy);
   if (!company.name) doc.text('Intelligent Inspection Platform', tx, 22.6);
   doc.setFont('helvetica','bold'); doc.setFontSize(6.8); doc.setTextColor(...C.accentDark);
   pdfTracked(doc, (docLabel || '').toUpperCase(), W - M, 17.5, { align: 'right' });
@@ -12645,6 +12938,24 @@ function drawPdfSignature(doc, { x, y, w, image, note, caption }) {
   doc.setDrawColor(...C.ink); doc.setLineWidth(0.3); doc.line(x, y, x + w, y);
   doc.setFont('helvetica','bold'); doc.setFontSize(6.3); doc.setTextColor(...C.inkMuted);
   pdfTracked(doc, (caption || 'SIGNATURE').toUpperCase(), x, y + 4, { cs: 0.3 });
+}
+
+// Text cut to fit w at the current font, with an ellipsis when it's cut.
+function pdfFitText(doc, text, w) {
+  text = String(text || '');
+  if (doc.getTextWidth(text) <= w) return text;
+  while (text.length > 1 && doc.getTextWidth(text + '…') > w) text = text.slice(0, -1);
+  return text.trimEnd() + '…';
+}
+
+// A name or date written on a signature line (y is the line). Long names
+// step down in size to fit the line instead of losing words.
+function drawPdfOnLine(doc, text, x, y, w) {
+  if (!text) return;
+  let size = 9.5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(size); doc.setTextColor(...PDF_COLORS.ink);
+  while (size > 7 && doc.getTextWidth(String(text)) > w - 2) doc.setFontSize(size -= 0.5);
+  doc.text(pdfFitText(doc, text, w - 2), x + 1, y - 2);
 }
 
 // A labelled value, small tracked label over the value. Returns the value's
@@ -12772,7 +13083,7 @@ async function buildReportPdf() {
     const sub = [companyName ? reportKindTitle() : '', addr].filter(Boolean).join('   ·   ');
     if (sub) {
       doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);
-      doc.text(sub.length > 90 ? sub.slice(0, 89) + '…' : sub, M, 14);
+      doc.text(pdfFitText(doc, sub, CW), M, 14);
     }
     doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C.accentDark);
     doc.text(sectionLabel.toUpperCase(), W-M, 10, { align:'right' });
@@ -13177,10 +13488,15 @@ async function buildReportPdf() {
   doc.setFillColor(...C.rule); doc.rect(M, 284, CW, 0.3, 'F');
   doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);
   const footerPreparedBy = company.name ? `Prepared by ${company.name}` : 'Generated via SAYON';
-  doc.text(footerPreparedBy, M, 291);
-  doc.text('This report does not conclusively determine that the property is free of termites.', W/2, 291, { align:'center' });
+  // A long business name would run into the centred line, so then the
+  // centred line goes above the other two.
+  const coverDisclaimer = 'This report does not conclusively determine that the property is free of termites.';
+  const crowded = doc.getTextWidth(footerPreparedBy) + 4 > W/2 - doc.getTextWidth(coverDisclaimer)/2 - M;
+  const footY = crowded ? 293 : 291;
+  doc.text(coverDisclaimer, W/2, crowded ? 289 : 291, { align:'center' });
+  doc.text(pdfFitText(doc, footerPreparedBy, CW - 40), M, footY);
   doc.setFont('helvetica','bold'); doc.setTextColor(...C.inkLight);
-  doc.text(today, W-M, 291, { align:'right' });
+  doc.text(today, W-M, footY, { align:'right' });
 
   // ── CONTENTS ── its page is kept here and filled in at the end, once
   // every section's page is known.
@@ -13514,7 +13830,9 @@ async function buildReportPdf() {
     // This finding's own photos, inside its card.
     const fPhotos = card.photosId ? ((reportData.photosBySection || {})[findingPhotoSection(card.photosId)] || []) : [];
     if (fPhotos.length) {
-      if (y + 12 > 270) newPage();
+      // The label goes over with the first row of photos, never alone.
+      const firstRowH = ((bodyW - 5) / 2) * 0.72 + 12;
+      if (y + 3 + firstRowH > 280) newPage();
       doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
       doc.text('PHOTOS', bodyX, y); y += 3;
       photoGrid(fPhotos, bodyX, bodyW);
@@ -13566,7 +13884,12 @@ async function buildReportPdf() {
   }
 
   subhead('TERMITES');
-  findings.forEach((f, idx) => findingCard(f, idx));
+  // A report with nothing recorded about termites says so in a row, rather
+  // than printing an empty "Not recorded" finding card.
+  const findingRecorded = f => ['termiteActivity','species','activityLocation','timberAffected','damageDescription','nestLocated','structuralConcern']
+    .some(k => f[k] && String(f[k]).trim()) || ((reportData.photosBySection || {})[findingPhotoSection(f.id)] || []).length;
+  if (findings.some(findingRecorded)) findings.forEach((f, idx) => findingCard(f, idx));
+  else { row('Termite Activity', 'Not recorded'); gap(4); }
 
   // Borers, decay and delignification: the other timber pests AS 4349.3
   // covers. Always printed, so an unanswered field reads "Not recorded"
@@ -13847,11 +14170,7 @@ async function buildReportPdf() {
   sectionTitle('INSPECTOR DETAILS', REPORT_PARTS.inspector);
   // Signature blocks: the value sits on the line, its caption under it.
   const sigColW = (CW - 16) / 3;
-  const onSigLine = (text, x) => {
-    if (!text) return;
-    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(...C.ink);
-    doc.text(doc.splitTextToSize(String(text), sigColW - 2)[0], x + 1, y - 2);
-  };
+  const onSigLine = (text, x) => drawPdfOnLine(doc, text, x, y, sigColW);
   const provider = [co.name, co.phone, co.email].filter(Boolean).join('  ·  ');
   if (provider) {
     doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...C.inkLight);

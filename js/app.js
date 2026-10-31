@@ -3680,13 +3680,21 @@ async function requestExtraction(text) {
     saveTestNote(text, parsed, null, seconds());
     return parsed;
   } catch (err) {
-    const reason = err.noSignal ? 'no_signal' : err.tooLong ? 'too_long' : err.badAnswer ? 'bad_answer'
+    const reason = err.kept ? 'kept_for_later' : err.noSignal ? 'no_signal' : err.tooLong ? 'too_long' : err.badAnswer ? 'bad_answer'
       : err.status ? 'http_' + err.status : 'other';
     track('note_failed', { reason, seconds: seconds() });
     saveTestNote(text, null, reason, seconds());
     if (!err.noSignal && ![401, 402, 429].includes(err.status)) reportError(new Error('Extraction failed: ' + reason), 'extraction');
     throw err;
   }
+}
+
+// The fill in flight, so "Keep for later" on the busy bar can stop it.
+let activeExtraction = null;
+function keepNoteForLater() {
+  if (!activeExtraction) return;
+  activeExtraction.kept = true;
+  activeExtraction.controller.abort();
 }
 
 async function callExtraction(text) {
@@ -3696,6 +3704,7 @@ async function callExtraction(text) {
   const learned = learnedPromptBlock();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), EXTRACTION_TIMEOUT_MS);
+  const mine = activeExtraction = { controller, kept: false };
   let res, rawBody;
   try {
     res = await workerFetch('', {
@@ -3724,9 +3733,11 @@ async function callExtraction(text) {
     rawBody = await res.text();
   } catch (err) {
     // fetch() only rejects when the request never got an answer.
+    if (mine.kept) throw Object.assign(noSignal('kept for later'), { kept: true });
     throw noSignal(err && err.name === 'AbortError' ? 'no answer in time' : 'no connection');
   } finally {
     clearTimeout(timer);
+    if (activeExtraction === mine) activeExtraction = null;
   }
 
   // The worker refuses a request (expired sign-in, plan ended, usage
@@ -4253,7 +4264,10 @@ async function runFill({ whileRecording = false } = {}) {
       if (!isRecording) document.getElementById('extractBtn').disabled = false;
       return false;
     }
-    if (isNoteSpecificProblem(err)) {
+    if (err.kept) {
+      setAI('ready', 'Note saved');
+      showToast('Note saved under Waiting notes. Tap Fill in now when you\'re ready', 'info');
+    } else if (isNoteSpecificProblem(err)) {
       const waiting = getPendingNotes()[getPendingNotes().length - 1];
       if (waiting) { waiting.problem = extractionProblem(err); saveDraft(); renderPendingNotes(); }
       setAI('ready', 'Note saved');
@@ -4367,7 +4381,7 @@ async function processPendingNotes(manual) {
   pendingNotesRunning = true;
   renderPendingNotes();
   setAI('thinking', 'Filling in saved notes...');
-  let filled = 0, stillNoSignal = false, stuck = 0;
+  let filled = 0, stillNoSignal = false, stuck = 0, kept = false;
   try {
     // Oldest first. A note with a problem of its own (too long, an answer
     // that isn't JSON) is marked and skipped so it can't block the notes
@@ -4379,6 +4393,7 @@ async function processPendingNotes(manual) {
       try {
         extracted = await requestExtraction(note.text);
       } catch (err) {
+        if (err.kept) { kept = true; break; }
         if (err.noSignal) { stillNoSignal = true; break; }
         if (isNoteSpecificProblem(err)) {
           note.problem = extractionProblem(err);
@@ -4415,6 +4430,7 @@ async function processPendingNotes(manual) {
   // Fill in now shows what the notes filled; processTranscript() shows its
   // own sheet when it ran the queue.
   if (filled && manual && !extractSummaryOwned && reportData === target) showExtractSummary(before);
+  else if (kept) showToast('Your notes are kept under Waiting notes. Tap Fill in now when you\'re ready', 'info');
   else if (stillNoSignal && manual) showToast('Still no signal — the notes will fill in when you\'re back online', 'info');
   if (stuck && (manual || !filled)) showToast(`${stuck} note${stuck !== 1 ? 's' : ''} couldn't be read — see the reason under the note`, 'error');
 }
@@ -12233,6 +12249,10 @@ function setAI(state, text) {
   updateVoiceHud();
   const busyText = document.getElementById('aiBusyText');
   if (busyText && busy) busyText.textContent = text;
+  // A fill can take a while on a slow connection. The inspector doesn't
+  // have to stand there: the note can wait with the others.
+  const keep = document.getElementById('aiKeepBtn');
+  if (keep) keep.hidden = !(busy && /Filling in/.test(text));
 }
 
 // action: optional { label, run } adds a button to the toast (e.g. Undo).
@@ -12552,7 +12572,32 @@ function reportPrepGaps(from = 'send') {
   if (pending) push('pending', `${pending} voice note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
   if (!reportData.inspectorSignature) push('signature', 'The inspector hasn\'t signed');
   if (!reportData.agreement) push('agreement', 'No pre-inspection agreement is recorded', from === 'extract' ? fixBtn('agreement', 'Get it signed') : '');
+  // Photos the account never received are only on this phone: the PDF
+  // has them today, but a lost phone or another device's copy won't.
+  const onlyHere = photosOnlyOnThisPhone().length;
+  if (onlyHere && authSession) push('photos', `${onlyHere} photo${onlyHere === 1 ? ' is' : 's are'} only on this phone, not in your account yet`,
+    fixBtn('photos', navigator.onLine ? 'Back up now' : 'Back up when online'));
   return gaps;
+}
+
+function photosOnlyOnThisPhone() {
+  return allReportPhotos(reportData).filter(p => !p.path);
+}
+
+// "Back up now" on the check sheet: the photos go up, and the sheet is
+// drawn again with the gap gone or a reason it isn't.
+async function backUpPhotosFromGap(from) {
+  const reopen = () => from === 'send' ? openSendReview() : showExtractSummary(extractSummaryBefore);
+  if (!navigator.onLine) { showToast('You\'re offline. The photos back up on their own once you\'re online', 'warn'); return; }
+  const before = photosOnlyOnThisPhone().length;
+  showToast(`Backing up ${before} photo${before === 1 ? '' : 's'}…`, 'info');
+  let changed = false;
+  try { changed = await uploadPendingPhotos(reportData); } catch (e) { reportError(e, 'photo_backup_gap'); }
+  if (changed) { saveDraft(); if (currentReportId) saveCurrentReport(true); }
+  const left = photosOnlyOnThisPhone().length;
+  if (!left) showToast('Photos are in your account', 'success');
+  else showToast(`${left} photo${left === 1 ? '' : 's'} couldn\'t be backed up. Check your connection and try again`, 'error');
+  reopen();
 }
 
 // ── GAPS BEFORE YOU LEAVE ───────────────────────────────────────────────
@@ -13010,6 +13055,7 @@ function fixReportGap(kind, from = 'send') {
   const leave = () => from === 'send' ? closeSendReview() : closeExtractSummary();
   if (kind === 'quote') { leave(); sendAfterQuote = true; openQuoteFromReport(); return; }
   if (kind === 'agreement') { leave(); openAgreementSheet(); return; }
+  if (kind === 'photos') { backUpPhotosFromGap(from); return; }
   if (kind.startsWith('finding:')) { leave(); addFindingForArea(kind.slice(8)); return; }
   if (kind === 'clear') markRemainingAreasClear();
   else markRemainingAreasInspected(kind === 'na' ? 'NA' : 'INSPECTED');

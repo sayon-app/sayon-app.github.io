@@ -31,6 +31,14 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 
 `tests/extract-sheet/e2e.js <outDir>` checks the "From your note" sheet: the Before you leave gaps with their one-tap fixes, the Record and Get it signed buttons, the read-back text, and that the send sheet's fixes still work. Screenshots at 390 and 320.
 
+## Data safety
+
+`tests/data-safety/e2e.js <outDir>` drives a fake speech recogniser and a canned account: a final phrase is in the draft within a second; a report the account refused shows "Not in your account yet" and goes up on `online`; the quote stored on a report counts as a new save; every delete asks; a full phone (a thrown QuotaExceededError) offers to park the oldest finished jobs and Bring them back restores them; the fix links on the sheets don't overlap; a 503 from Supabase at launch keeps the sign-in.
+
+## First day
+
+`tests/first-day/e2e.js <outDir>` is the first day as a customer: `?signup=1`, the email check and the duplicate-account message, business set-up per account (a second person on the same phone still sets up theirs), straight into the report screen on reopen, each Billing state and the current-plan marking, "Confirming your payment…" after checkout, test mode hidden, the help link, the client's sign page with the sender's contact, the legal pages without the draft banner, and the website's plans and FAQ.
+
 ## Last visit
 
 `tests/last-visit/e2e.js <outDir>` saves a report, starts a new job at the same address typed differently, and checks the offer, Not now, Start from it (property details copied, findings and risk not, termite history written) and the Since last visit sheet.

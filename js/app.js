@@ -2033,7 +2033,7 @@ function openApp(appName) {
     if (restored) lastLocalSaveAt = Date.now();
     updateSyncStatus();
     // pull any cloud reports not on this device, then sort out photo storage
-    supabaseSyncOnOpen().finally(tidyPhotoStorage);
+    supabaseSyncOnOpen().then(pushUnsyncedReports).finally(tidyPhotoStorage);
     processPendingNotes();
   }
 }
@@ -3068,6 +3068,9 @@ function startRecording() {
       }
       currentTranscript += final;
       pendingInterim = interim;
+      // Each phrase goes to the draft as it lands, so a tab the phone kills
+      // mid-dictation loses the current sentence at most.
+      if (final) saveDraft();
       pulseWave();
       const box = document.getElementById('transcriptBox');
       box.textContent = currentTranscript + interim;
@@ -3979,6 +3982,7 @@ function isNoteSpecificProblem(err) {
 function extractionProblem(err) {
   switch (err && err.status) {
     case 401: return 'Your sign-in has expired. Close SAYON, open it again and sign in';
+    case 403: return 'Your account is still being set up. Close SAYON and open it again';
     case 402: return 'Your SAYON plan has ended. Subscribe in Menu › Billing';
     case 429: return 'This month\'s AI fills are used up. Your note is kept. Upgrade in Menu › Billing, or they come back on the 1st';
     case 413: return 'A note is too long for the AI in one go. Delete it and say it again in shorter parts';
@@ -8312,7 +8316,7 @@ async function handleSectionPhotoFiles(fileList, section) {
       const id = genPhotoId();
       await putPhotoBlob(id, blob);
       existing.push({ id, width, height, caption: '' });
-    } catch(e) { showToast('Could not process photo', 'error'); }
+    } catch(e) { showToast(photoStoreProblem(e), 'error'); }
   }
   if (replacing && existing.length) reportData.photosBySection[section] = existing;
   renderSectionPhotoGrid(section);
@@ -9585,6 +9589,9 @@ async function supabaseAuth(endpoint, body) {
     headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
     body: JSON.stringify(body),
   });
+  // Supabase itself being down is not a refusal: callers treat a thrown
+  // error like no signal and keep the saved sign-in.
+  if (res.status >= 500) throw new Error(`Supabase auth HTTP ${res.status}`);
   const data = await res.json().catch(() => ({}));
   // FIX: callers (signIn/signUp) were written against the older OAuth2-style
   // error shape ({error: {message: '...'}}) and checked `if (data.error)`.
@@ -10119,18 +10126,24 @@ async function _lookUpBusiness() {
       authBusiness = Array.isArray(created) ? created[0] : created;
       localStorage.removeItem('korva_pending_business');
 
-      // Add owner as team member
-      await fetch(`${SUPABASE_URL}/rest/v1/team_members`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          business_id: authBusiness.id,
-          user_id: authUser.id,
-          role: 'owner',
-          name: meta.name || authUser.email,
-          email: authUser.email,
-        }),
-      });
+      // Add owner as team member. The Worker refuses every AI call until
+      // this row exists, so a failed insert is tried once more here rather
+      // than left for the next launch.
+      let tm = null;
+      try {
+        tm = await fetch(`${SUPABASE_URL}/rest/v1/team_members`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            business_id: authBusiness.id,
+            user_id: authUser.id,
+            role: 'owner',
+            name: meta.name || authUser.email,
+            email: authUser.email,
+          }),
+        });
+      } catch (e) { console.warn('team_members insert failed:', e); }
+      if (!tm || !tm.ok) await ensureOwnerTeamMember();
       loadBillingStatus();
     }
 }
@@ -10561,7 +10574,8 @@ async function supabaseSyncOnOpen() {
   if (!authSession) return;
   await flushPendingDeletes();
   const deleting = new Set(getPendingDeletes().map(d => d.id));
-  const cloudReports = (await supabaseLoadAll() || []).filter(c => c && !deleting.has(c.id));
+  const archived = new Set(getArchivedReportIds());
+  const cloudReports = (await supabaseLoadAll() || []).filter(c => c && !deleting.has(c.id) && !archived.has(c.id));
   if (cloudReports.length === 0) return;
   const local = getSavedReports();
   const byId = new Map(local.map(r => [r.id, r]));
@@ -10588,6 +10602,30 @@ async function supabaseSyncOnOpen() {
     }
   }
   for (const c of clashes) await keepBothCopies(byId.get(c.id));
+}
+
+// A report saved on this phone that the account doesn't have yet: saved
+// with no signal, or while the account refused it. cloudSavedAt is 0 until
+// the first save lands and null on reports from before it was recorded.
+function notInAccount(entry) {
+  return !!entry && entry.cloudSavedAt != null && (entry.savedAt || 0) > entry.cloudSavedAt;
+}
+function inAccount(entry) {
+  return !!entry && entry.cloudSavedAt != null && entry.cloudSavedAt >= (entry.savedAt || 0);
+}
+// Those reports go up the next time the app is online and in front, so a
+// job finished in a subfloor is never left only on the phone.
+let pushUnsyncedRunning = false;
+async function pushUnsyncedReports() {
+  if (!authSession || !navigator.onLine || pushUnsyncedRunning) return;
+  pushUnsyncedRunning = true;
+  try {
+    const waiting = getSavedReports().filter(r => r && r.reportData && notInAccount(r));
+    let landed = 0;
+    for (const r of waiting) { if (await supabaseSave(r, true)) landed++; }
+    if (landed) { renderSavedList(); updateSyncStatus(); }
+  } catch (e) { console.warn('pushUnsyncedReports:', e); }
+  finally { pushUnsyncedRunning = false; }
 }
 
 // saveDraft() is called on nearly every keystroke and on every signature
@@ -10680,7 +10718,7 @@ function updateSyncStatus(state) {
   textEl.textContent = 'Not saved yet';
 }
 
-window.addEventListener('online', () => { updateSyncStatus(); processPendingNotes(); });
+window.addEventListener('online', () => { updateSyncStatus(); processPendingNotes(); pushUnsyncedReports(); });
 window.addEventListener('offline', () => updateSyncStatus());
 
 // Make sure a pending debounced save is never lost if the app is backgrounded
@@ -10690,13 +10728,14 @@ window.addEventListener('offline', () => updateSyncStatus());
 document.addEventListener('visibilitychange', async () => {
   if (document.hidden) {
     flushDraftSave();
-    if (updateReloadPending && !document.body.classList.contains('ai-busy')) location.reload();
+    if (updateReloadPending && !isRecording && !document.body.classList.contains('ai-busy')) location.reload();
     return;
   }
   // An app left open for days never navigates, so ask for a new version here.
   if (swRegistration) swRegistration.update().catch(() => {});
   await maybeRefreshAuthSession();
   processPendingNotes();
+  pushUnsyncedReports();
   checkAddressMove();
 });
 window.addEventListener('pagehide', flushDraftSave);
@@ -10790,16 +10829,68 @@ function getSavedReports() {
   }
 }
 
-function setSavedReports(reports) {
+function setSavedReports(reports, retrying) {
   try {
     localStorage.setItem(reportsStorageKey(), JSON.stringify(reports));
     return true;
   } catch (e) {
     console.error('Failed to save reports', e);
     reportError(e, 'save_reports');
-    showToast('Could not save — storage full or unavailable', 'error');
+    // Full phone: older jobs already in the account can leave the phone to
+    // make room, then this save is tried once more.
+    if (isQuotaError(e) && !retrying && freeStorageFor(reports)) return setSavedReports(reports, true);
+    showToast(isQuotaError(e)
+      ? 'Could not save: this phone\'s storage is full. Back up from Menu › Data, then delete old jobs'
+      : 'Could not save — storage full or unavailable', 'error');
     return false;
   }
+}
+
+function isQuotaError(e) {
+  return !!e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22 || e.code === 1014 || /quota/i.test(String(e.message || '')));
+}
+function photoStoreProblem(e) {
+  return isQuotaError(e) ? 'This phone\'s storage is full. Free some space or remove old jobs, then add the photo again' : 'Could not process photo';
+}
+
+// ── OLDER JOBS KEPT IN THE ACCOUNT ONLY ───────────────────────────────────
+// When the phone is full, finished jobs that the account already holds are
+// taken off the phone (their ids kept here, so the next sync doesn't bring
+// them straight back). Bring them back clears the list and syncs again.
+function archivedReportsKey() {
+  return (authUser && authUser.id) ? `korva_archived_reports_${authUser.id}` : 'korva_archived_reports';
+}
+function getArchivedReportIds() {
+  try { const v = JSON.parse(localStorage.getItem(archivedReportsKey()) || '[]'); return Array.isArray(v) ? v : []; }
+  catch (e) { return []; }
+}
+function setArchivedReportIds(ids) {
+  try { if (ids.length) localStorage.setItem(archivedReportsKey(), JSON.stringify(ids)); else localStorage.removeItem(archivedReportsKey()); } catch (e) {}
+}
+// Takes the oldest finished, backed-up jobs out of `reports` (in place)
+// after the inspector agrees. Returns true when something was removed.
+function freeStorageFor(reports) {
+  if (!authSession) return false;
+  const candidates = reports
+    .filter(r => r && r.id !== currentReportId && r.reportData && r.reportData.issue && inAccount(r))
+    .sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0));
+  if (!candidates.length) return false;
+  const n = Math.max(1, Math.ceil(candidates.length / 2));
+  const going = candidates.slice(0, n);
+  const ok = confirm(`This phone's storage is full. Take the ${n === 1 ? 'oldest finished job' : `${n} oldest finished jobs`} off this phone? ${n === 1 ? 'It stays' : 'They stay'} in your account and can be brought back from Saved Reports.`);
+  if (!ok) return false;
+  const ids = new Set(going.map(r => r.id));
+  for (let i = reports.length - 1; i >= 0; i--) if (ids.has(reports[i].id)) reports.splice(i, 1);
+  setArchivedReportIds([...new Set([...getArchivedReportIds(), ...ids])]);
+  showToast(`${n} older job${n === 1 ? '' : 's'} now kept in your account only`, 'info');
+  return true;
+}
+async function restoreArchivedReports() {
+  if (!navigator.onLine) { showToast('No signal. Try again when you have one', 'error'); return; }
+  setArchivedReportIds([]);
+  await supabaseSyncOnOpen();
+  renderSavedList();
+  refreshDashboardIfOpen();
 }
 
 function calculateCompletion() {
@@ -10815,9 +10906,10 @@ function calculateCompletion() {
 // field filled), Sent, Complete vN or Amending vN.
 function savedReportStatus(r) {
   const d = r.reportData || {};
-  if (d.issue) return d.amending
-    ? { label: `Amending v${d.issue.version}`, tone: 'amending' }
-    : { label: `Complete v${d.issue.version}`, tone: 'complete' };
+  if (d.issue) {
+    const v = d.issue.version ? ` v${d.issue.version}` : '';
+    return d.amending ? { label: `Amending${v}`, tone: 'amending' } : { label: `Complete${v}`, tone: 'complete' };
+  }
   if (d.sent) return { label: 'Sent', tone: 'sent' };
   if ((r.completion || 0) >= 100) return { label: 'Ready', tone: 'ready' };
   return { label: 'Draft', tone: 'draft' };
@@ -11059,9 +11151,14 @@ function deleteReport(id, event) {
   const index = all.findIndex(r => r.id === id);
   const deleted = all[index];
   if (!deleted) return;
-  // A finished job has gone to the client, so it's asked about first.
-  if (deleted.reportData && deleted.reportData.issue &&
-      !confirm(`Delete the finished report for ${deleted.address || 'this property'}? Its quote and photos go too.`)) return;
+  // Always asked: the delete button sits beside the row's tap target, and
+  // the account copy goes with it.
+  const where = deleted.address || 'this property';
+  const finished = deleted.reportData && deleted.reportData.issue;
+  const extra = notInAccount(deleted) ? ' It isn\'t in your account yet, so it can\'t be brought back.' : '';
+  if (!confirm(finished
+    ? `Delete the finished report for ${where}? Its quote and photos go too.${extra}`
+    : `Delete the job at ${where}? Its report, quote and photos go too.${extra}`)) return;
   if (!setSavedReports(all.filter(r => r.id !== id))) return;
   const wasOpen = currentReportId === id;
   if (wasOpen) startBlankReport();
@@ -11856,8 +11953,12 @@ function renderSavedList() {
   const allReports = getSavedReports();
   const summary = document.getElementById('savedPanelSummary');
 
+  const archived = getArchivedReportIds().length;
+  const archivedNote = archived
+    ? `<div class="saved-archived">${archived} older job${archived === 1 ? ' is' : 's are'} kept in your account only. <button class="link-btn" onclick="restoreArchivedReports()">Bring ${archived === 1 ? 'it' : 'them'} back</button></div>`
+    : '';
   if (allReports.length === 0) {
-    list.innerHTML = SAVED_EMPTY_HTML;
+    list.innerHTML = SAVED_EMPTY_HTML + archivedNote;
     if (summary) summary.textContent = 'None saved';
     return;
   }
@@ -11904,12 +12005,13 @@ function renderSavedList() {
             ${statusTag}
             ${answerTag}
             ${pending ? `<span class="saved-item-pending">${pending} note${pending !== 1 ? 's' : ''} to fill in</span>` : ''}
+            ${notInAccount(r) ? '<span class="saved-item-unsynced">Not in your account yet</span>' : ''}
           </div>
         </div>
         <button class="saved-item-delete" onclick="deleteReport('${r.id}', event)" title="Delete">✕</button>
       </div>
     `;
-  }).join('');
+  }).join('') + archivedNote;
 }
 
 // Safe inside text and inside quoted attributes (value="…", src="…").

@@ -111,6 +111,9 @@ function storeQuoteOnReport(q, cloud) {
   const entry = reports.find(r => r.id === q.reportKey);
   if (!entry) return;
   entry.quote = q;
+  // A new save of the report, so another device takes the quote in.
+  entry.cloudSavedAt = cloudBaseOf(entry);
+  entry.savedAt = Date.now();
   if (setSavedReports(reports) && cloud) supabaseSave(entry);
 }
 function quotePriceMemory() { return readJSON(quotePricesStorageKey(), {}); }

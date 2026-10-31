@@ -1,0 +1,614 @@
+{
+  "id": "wet-day-partial",
+  "transcript": "transcripts/wet-day-partial.txt",
+  "about": "Pre-purchase in heavy rain after a wet week: roof void not entered (water running down the sarking, unsafe), exterior walked under an umbrella, subfloor front half entered and the flooded rear section not, nothing seen in what was inspected, and a re-inspection of the roof void and rear subfloor asked for when it dries out. Tests weatherConditions and recentWeather, roof void NOT and subfloor PARTIAL with the reason words the app's matcher ticks ('unsafe' for Restricted access), highRiskAreas naming both unreached places, no areaResult for an area not inspected, the one-off re-inspection kept out of inspectionFrequency, and three mishearings.",
+  "checks": [
+    {
+      "id": "inspection-type",
+      "kind": "equals",
+      "path": "inspectionType",
+      "values": [
+        "Pre-Purchase — Timber Pest"
+      ],
+      "weight": 2,
+      "why": "'pre purchase timber pest'"
+    },
+    {
+      "id": "client-name",
+      "kind": "mentions",
+      "path": "clientName",
+      "all": [
+        [
+          "lau"
+        ]
+      ],
+      "weight": 1,
+      "why": "said 'Marcus and Jenny Lau' (extra)"
+    },
+    {
+      "id": "address",
+      "kind": "mentions",
+      "path": "propertyStreetAddress",
+      "all": [
+        [
+          "16",
+          "sixteen"
+        ],
+        [
+          "banksia"
+        ]
+      ],
+      "weight": 1,
+      "why": "said '16 Banksia Rise' (extra)"
+    },
+    {
+      "id": "walls-brick-veneer",
+      "kind": "mentions",
+      "path": "wallConstruction",
+      "all": [
+        [
+          "veneer"
+        ]
+      ],
+      "none": [
+        "double brick",
+        "weatherboard"
+      ],
+      "weight": 2,
+      "why": "'brick veneer'"
+    },
+    {
+      "id": "floor-suspended",
+      "kind": "mentions",
+      "path": "floorType",
+      "all": [
+        [
+          "suspend",
+          "timber"
+        ]
+      ],
+      "none": [
+        "slab",
+        "concrete"
+      ],
+      "weight": 2,
+      "why": "'suspended timber floor'"
+    },
+    {
+      "id": "occupancy-vacant",
+      "kind": "equals",
+      "path": "occupancyStatus",
+      "values": [
+        "Vacant"
+      ],
+      "weight": 1,
+      "why": "'vacant'"
+    },
+    {
+      "id": "weather-heavy-rain",
+      "kind": "equals",
+      "path": "weatherConditions",
+      "values": [
+        "Heavy rain"
+      ],
+      "weight": 3,
+      "why": "'absolutely bucketing down today heavy rain the whole time'"
+    },
+    {
+      "id": "recent-weather-wet",
+      "kind": "equals",
+      "path": "recentWeather",
+      "values": [
+        "Prolonged wet period"
+      ],
+      "weight": 2,
+      "why": "'it's rained all week'"
+    },
+    {
+      "id": "area-roofvoid-not",
+      "kind": "equals",
+      "path": "areaStatus.roofvoid",
+      "values": [
+        "NOT"
+      ],
+      "weight": 3,
+      "why": "'I did not enter the roof void not inspected unsafe'; a head through the manhole is not an inspection"
+    },
+    {
+      "id": "area-subfloor-partial",
+      "kind": "equals",
+      "path": "areaStatus.subfloor",
+      "values": [
+        "PARTIAL"
+      ],
+      "weight": 3,
+      "why": "'sub floor partly inspected front section only the rear section not reached'"
+    },
+    {
+      "id": "area-interior",
+      "kind": "equals",
+      "path": "areaStatus.interior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 2,
+      "why": "'interior all rooms inspected'"
+    },
+    {
+      "id": "area-exterior",
+      "kind": "equals",
+      "path": "areaStatus.exterior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 2,
+      "why": "'I did get all the way round under the umbrella'"
+    },
+    {
+      "id": "area-fences",
+      "kind": "equals",
+      "path": "areaStatus.fences",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 1,
+      "why": "'fences inspected paling fence'"
+    },
+    {
+      "id": "restricted-access-roof-unsafe",
+      "kind": "mentions",
+      "path": "restrictedAccess",
+      "all": [
+        [
+          "roof"
+        ],
+        [
+          "restricted access",
+          "unsafe",
+          "not safe",
+          "hazard"
+        ]
+      ],
+      "weight": 3,
+      "why": "the roof void was not entered because it was unsafe: 'Restricted access' or the word 'unsafe' is what the app's matcher ticks"
+    },
+    {
+      "id": "restricted-access-subfloor-water",
+      "kind": "mentions",
+      "path": "restrictedAccess",
+      "all": [
+        [
+          "subfloor",
+          "sub floor"
+        ],
+        [
+          "flood",
+          "water",
+          "wet",
+          "restricted access"
+        ]
+      ],
+      "none": [
+        "stored",
+        "low clearance"
+      ],
+      "weight": 2,
+      "why": "the rear subfloor was flooded; no reason label fits, so plain words after the area name, never a stored-items or clearance reason"
+    },
+    {
+      "id": "obstructions-both",
+      "kind": "mentions",
+      "path": "obstructions",
+      "all": [
+        [
+          "roof"
+        ],
+        [
+          "subfloor",
+          "sub floor"
+        ],
+        [
+          "rear",
+          "back"
+        ]
+      ],
+      "none": [
+        "interior",
+        "exterior",
+        "fence"
+      ],
+      "weight": 2,
+      "why": "'roof void not inspected' and 'rear section not reached'"
+    },
+    {
+      "id": "no-access-roof",
+      "kind": "mentions",
+      "path": "noAccessAreas",
+      "all": [
+        [
+          "roof"
+        ],
+        [
+          "unsafe",
+          "not safe",
+          "wet",
+          "water",
+          "rain"
+        ]
+      ],
+      "none": [
+        "interior",
+        "exterior"
+      ],
+      "weight": 2,
+      "why": "the roof void was not entered at all and the reason was safety"
+    },
+    {
+      "id": "hindered-subfloor-rear",
+      "kind": "mentions",
+      "path": "hinderedAreas",
+      "all": [
+        [
+          "subfloor",
+          "sub floor"
+        ],
+        [
+          "rear",
+          "back"
+        ]
+      ],
+      "none": [
+        "interior",
+        "exterior",
+        "fence"
+      ],
+      "weight": 2,
+      "why": "the flooded rear section is a temporary limit; the inspected areas never appear here"
+    },
+    {
+      "id": "high-risk-both",
+      "kind": "mentions",
+      "path": "highRiskAreas",
+      "all": [
+        [
+          "roof"
+        ],
+        [
+          "subfloor",
+          "sub floor"
+        ]
+      ],
+      "none": [
+        "interior",
+        "exterior",
+        "fence"
+      ],
+      "weight": 3,
+      "why": "'the roof void and the rear subfloor are the areas I'd flag as not inspected and to be checked'"
+    },
+    {
+      "id": "subfloor-drainage-poor",
+      "kind": "equals",
+      "path": "subfloorDrainage",
+      "values": [
+        "POOR"
+      ],
+      "weight": 3,
+      "why": "'subfloor drainage poor obviously with water lying under there' ('pounding' = ponding)"
+    },
+    {
+      "id": "site-drainage-ok",
+      "kind": "equals",
+      "path": "siteDrainage",
+      "values": [
+        "ADEQUATE"
+      ],
+      "weight": 1,
+      "why": "'the ground falls away from the house drainage looks ok out there'"
+    },
+    {
+      "id": "site-slope-away",
+      "kind": "equals",
+      "path": "siteSlope",
+      "values": [
+        "Slopes away from the building"
+      ],
+      "weight": 1,
+      "why": "'the ground falls away from the house'"
+    },
+    {
+      "id": "weep-holes-clear",
+      "kind": "equals",
+      "path": "weepHoles",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 1,
+      "why": "'weep holes clear where I could see them'"
+    },
+    {
+      "id": "timber-soil-no",
+      "kind": "equals",
+      "path": "timberSoil",
+      "values": [
+        "NO"
+      ],
+      "weight": 1,
+      "why": "'no timber on the ground'"
+    },
+    {
+      "id": "result-interior-clear",
+      "kind": "equals",
+      "path": "areaResult.interior",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 2,
+      "why": "'no activity no workings nothing inside'"
+    },
+    {
+      "id": "result-roofvoid-none",
+      "kind": "absent",
+      "path": "areaResult.roofvoid",
+      "weight": 3,
+      "why": "an area not inspected has no result, CLEAR least of all"
+    },
+    {
+      "id": "result-subfloor-part",
+      "kind": "equals",
+      "path": "areaResult.subfloor",
+      "values": [
+        null,
+        "CLEAR"
+      ],
+      "weight": 1,
+      "why": "only the front half was seen clear: null is the prompt's answer, CLEAR is defensible"
+    },
+    {
+      "id": "findings-at-most-one",
+      "kind": "count",
+      "path": "findings",
+      "min": 0,
+      "max": 1,
+      "weight": 3,
+      "why": "nothing was found in what was seen; never a card per area and nothing invented for the unseen areas"
+    },
+    {
+      "id": "findings-all-none",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "termiteActivity",
+          "values": [
+            "NONE"
+          ]
+        },
+        {
+          "kind": "absent",
+          "path": "activityLocation"
+        },
+        {
+          "kind": "absent",
+          "path": "species"
+        },
+        {
+          "kind": "absent",
+          "path": "damageDescription"
+        }
+      ],
+      "weight": 3,
+      "why": "'nothing found'"
+    },
+    {
+      "id": "borers-none",
+      "kind": "equals",
+      "path": "borerActivity",
+      "values": [
+        "NONE"
+      ],
+      "weight": 1,
+      "why": "'no borers'"
+    },
+    {
+      "id": "decay-no",
+      "kind": "equals",
+      "path": "decayFound",
+      "values": [
+        "NO"
+      ],
+      "weight": 1,
+      "why": "'no decay in what I could see'"
+    },
+    {
+      "id": "no-existing-system",
+      "kind": "equals",
+      "path": "existingSystem",
+      "values": [
+        "No System Found",
+        null
+      ],
+      "weight": 2,
+      "why": "'no termite system'"
+    },
+    {
+      "id": "durable-notice-no",
+      "kind": "equals",
+      "path": "durableNoticePresent",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'no durable notice'"
+    },
+    {
+      "id": "treatment-no",
+      "kind": "equals",
+      "path": "treatmentRecommended",
+      "values": [
+        "NO"
+      ],
+      "weight": 3,
+      "why": "'no treatment nothing found'"
+    },
+    {
+      "id": "treatment-type-empty",
+      "kind": "mentions",
+      "path": "treatmentType",
+      "none": [
+        "barrier",
+        "bait",
+        "chemical",
+        "reticulation",
+        "termidor",
+        "physical",
+        "top-up",
+        "top up",
+        "treat"
+      ],
+      "nullOk": true,
+      "weight": 2,
+      "why": "no treatment"
+    },
+    {
+      "id": "invasive-not-raised",
+      "kind": "equals",
+      "path": "invasiveInspection",
+      "values": [
+        null,
+        "NO"
+      ],
+      "weight": 2,
+      "why": "a return visit when dry is not an invasive inspection"
+    },
+    {
+      "id": "other-recs-reinspect-when-dry",
+      "kind": "mentions",
+      "path": "otherRecommendations",
+      "all": [
+        [
+          "inspect",
+          "come back",
+          "return",
+          "revisit"
+        ],
+        [
+          "dry",
+          "dried",
+          "rain"
+        ],
+        [
+          "roof"
+        ],
+        [
+          "subfloor",
+          "sub floor"
+        ]
+      ],
+      "weight": 3,
+      "why": "'come back and re inspect the roof void and the rear subfloor when it's dried out say in two weeks'"
+    },
+    {
+      "id": "frequency-12-months",
+      "kind": "mentions",
+      "path": "inspectionFrequency",
+      "all": [
+        [
+          "12 month",
+          "twelve month",
+          "annual"
+        ]
+      ],
+      "weight": 2,
+      "why": "'after that the normal 12 months'"
+    },
+    {
+      "id": "frequency-not-the-return-visit",
+      "kind": "mentions",
+      "path": "inspectionFrequency",
+      "none": [
+        "week",
+        "dry",
+        "rain"
+      ],
+      "nullOk": true,
+      "weight": 2,
+      "why": "the one-off return visit is not the routine interval"
+    },
+    {
+      "id": "risk-medium-or-open",
+      "kind": "equals",
+      "path": "riskLevel",
+      "values": [
+        "MEDIUM",
+        null
+      ],
+      "weight": 2,
+      "why": "'I can't give a full rating... but on what I've seen call it medium'; never HIGH with nothing found"
+    },
+    {
+      "id": "no-species",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "coptotermes",
+        "schedorhinotermes",
+        "nasutitermes",
+        "heterotermes",
+        "microcerotermes",
+        "cryptotermes",
+        "mastotermes",
+        "porotermes",
+        "acinaciformis",
+        "frenchi",
+        "intermedius",
+        "exitiosus",
+        "walkeri",
+        "ferox",
+        "copter"
+      ],
+      "weight": 2,
+      "why": "no species was raised"
+    },
+    {
+      "id": "no-severity",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "minor",
+        "moderate",
+        "severe",
+        "extensive",
+        "significant",
+        "extreme",
+        "major"
+      ],
+      "weight": 3,
+      "why": "no severity word was said ('heavy' is allowed only because 'Heavy rain' is the weather value)"
+    },
+    {
+      "id": "no-structural",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "structural",
+        "compromised"
+      ],
+      "weight": 2,
+      "why": "no structural opinion"
+    },
+    {
+      "id": "no-mishearings",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "sucking",
+        "pounding"
+      ],
+      "weight": 2,
+      "why": "'sucking' = sarking, 'pounding' = ponding"
+    },
+    {
+      "id": "reinspection-placement",
+      "kind": "manual",
+      "description": "The return visit in two weeks sits in otherRecommendations (or noAccess/highRisk wording), not in inspectionFrequency and not as an invasive inspection."
+    }
+  ]
+}

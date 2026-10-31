@@ -1,0 +1,606 @@
+{
+  "id": "backwards-order",
+  "transcript": "transcripts/backwards-order.txt",
+  "about": "A note dictated in reverse: the plan and the quote first ('so what I want to do is...'), then the live termites in the laundry wall behind the tub (Coptotermes acinaciformis, bottom plate and stud, builder referral, leaking tub waste), then the clear areas, then the property description and a corrected inspection type last. Tests that order does not matter, the quote line items with a per-metre rate and a deposit, a full species name from a mangled dictation, and five mishearings.",
+  "checks": [
+    {
+      "id": "inspection-type-corrected",
+      "kind": "equals",
+      "path": "inspectionType",
+      "values": [
+        "Annual — Existing Building"
+      ],
+      "weight": 3,
+      "why": "'pre purchase no sorry it's the owner's... so annual inspection'"
+    },
+    {
+      "id": "client-name",
+      "kind": "mentions",
+      "path": "clientName",
+      "all": [
+        [
+          "dean"
+        ],
+        [
+          "okafor"
+        ]
+      ],
+      "weight": 1,
+      "why": "said 'Dean Okafor' at the very end (extra)"
+    },
+    {
+      "id": "address",
+      "kind": "mentions",
+      "path": "propertyStreetAddress",
+      "all": [
+        [
+          "27"
+        ],
+        [
+          "wattlebird"
+        ]
+      ],
+      "weight": 1,
+      "why": "said '27 Wattlebird Crescent' at the very end (extra)"
+    },
+    {
+      "id": "height-single",
+      "kind": "mentions",
+      "path": "height",
+      "all": [
+        [
+          "single",
+          "one"
+        ]
+      ],
+      "none": [
+        "double",
+        "two"
+      ],
+      "weight": 2,
+      "why": "'single storey'"
+    },
+    {
+      "id": "walls-brick-veneer",
+      "kind": "mentions",
+      "path": "wallConstruction",
+      "all": [
+        [
+          "veneer"
+        ]
+      ],
+      "none": [
+        "double brick",
+        "weatherboard",
+        "rendered"
+      ],
+      "weight": 3,
+      "why": "'brick veneer on a slab', said last"
+    },
+    {
+      "id": "floor-slab",
+      "kind": "mentions",
+      "path": "floorType",
+      "all": [
+        [
+          "slab",
+          "concrete"
+        ]
+      ],
+      "none": [
+        "suspend",
+        "stump",
+        "timber floor"
+      ],
+      "weight": 3,
+      "why": "'on a slab', 'no subfloor it's a slab'"
+    },
+    {
+      "id": "era",
+      "kind": "equals",
+      "path": "constructionEra",
+      "values": [
+        "1985-2003"
+      ],
+      "weight": 2,
+      "why": "'built late eighties around 88'"
+    },
+    {
+      "id": "finding-active-laundry",
+      "kind": "findingMatch",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "termiteActivity",
+          "values": [
+            "ACTIVE"
+          ]
+        },
+        {
+          "kind": "mentions",
+          "path": "activityLocation",
+          "all": [
+            [
+              "laundry"
+            ]
+          ],
+          "none": [
+            "roof",
+            "garden"
+          ]
+        }
+      ],
+      "weight": 3,
+      "why": "'live termites workers in the bottom plate and up the stud' in the laundry wall behind the tub"
+    },
+    {
+      "id": "findings-count-one",
+      "kind": "count",
+      "path": "findings",
+      "min": 1,
+      "max": 1,
+      "weight": 2,
+      "why": "one place only"
+    },
+    {
+      "id": "finding-timber-plate-stud",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "mentions",
+          "path": "timberAffected",
+          "all": [
+            [
+              "plate"
+            ],
+            [
+              "stud"
+            ]
+          ]
+        }
+      ],
+      "weight": 2,
+      "why": "'in the bottom plate and up the stood' ('stood' = stud)"
+    },
+    {
+      "id": "finding-damage-observed",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "mentions",
+          "path": "damageDescription",
+          "all": [
+            [
+              "mud",
+              "bubbling",
+              "eaten"
+            ]
+          ],
+          "none": [
+            "minor",
+            "moderate",
+            "severe",
+            "extensive",
+            "significant",
+            "extreme",
+            "major",
+            "heavy",
+            "compromised"
+          ]
+        }
+      ],
+      "weight": 2,
+      "why": "mud leads, bubbling paint, timbers eaten out; no severity word"
+    },
+    {
+      "id": "finding-species-full",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "species",
+          "values": [
+            "Coptotermes acinaciformis"
+          ]
+        }
+      ],
+      "weight": 3,
+      "why": "'Coptotermes a sinus formist... so Coptotermes acinaciformis'"
+    },
+    {
+      "id": "finding-builder-referral",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "structuralConcern",
+          "values": [
+            "YES"
+          ]
+        }
+      ],
+      "weight": 3,
+      "why": "'get a builder to look at the bottom plate and the stud', said in the plan before the finding"
+    },
+    {
+      "id": "finding-nest-not-yes",
+      "kind": "every",
+      "path": "findings",
+      "checks": [
+        {
+          "kind": "equals",
+          "path": "nestLocated",
+          "values": [
+            null,
+            "NO"
+          ]
+        }
+      ],
+      "weight": 2,
+      "why": "no nest mentioned"
+    },
+    {
+      "id": "moisture-yes",
+      "kind": "equals",
+      "path": "moistureReadings",
+      "values": [
+        "YES"
+      ],
+      "weight": 2,
+      "why": "'30% elevated'"
+    },
+    {
+      "id": "meter-laundry-30",
+      "kind": "mentions",
+      "path": "moistureMeterReadings",
+      "all": [
+        [
+          "laundry"
+        ],
+        [
+          "30"
+        ]
+      ],
+      "weight": 2,
+      "why": "'the moisture on that wall is 30%'"
+    },
+    {
+      "id": "leaks-yes",
+      "kind": "equals",
+      "path": "waterLeaks",
+      "values": [
+        "YES"
+      ],
+      "weight": 3,
+      "why": "'the tub waste is leaking underneath the tub'"
+    },
+    {
+      "id": "leak-location-tub",
+      "kind": "mentions",
+      "path": "leakLocation",
+      "all": [
+        [
+          "tub",
+          "waste",
+          "laundry"
+        ]
+      ],
+      "none": [
+        "slab edge",
+        "garden"
+      ],
+      "weight": 2,
+      "why": "'the leak is at the laundry tub waste'"
+    },
+    {
+      "id": "slab-edge-obstructed",
+      "kind": "equals",
+      "path": "slabEdge",
+      "values": [
+        "OBSTRUCTED"
+      ],
+      "weight": 3,
+      "why": "'garden bed is built up over it so slab edge obstructed there'"
+    },
+    {
+      "id": "weep-holes-bridged",
+      "kind": "equals",
+      "path": "weepHoles",
+      "values": [
+        "BRIDGED"
+      ],
+      "weight": 2,
+      "why": "'weep holes on that side are under the soil bridged'"
+    },
+    {
+      "id": "area-roofvoid",
+      "kind": "equals",
+      "path": "areaStatus.roofvoid",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 2,
+      "why": "'roof void inspected went right through it clear'"
+    },
+    {
+      "id": "area-interior",
+      "kind": "equals",
+      "path": "areaStatus.interior",
+      "values": [
+        "INSPECTED"
+      ],
+      "weight": 2,
+      "why": "'interior otherwise all rooms clear'"
+    },
+    {
+      "id": "area-subfloor-na",
+      "kind": "equals",
+      "path": "areaStatus.subfloor",
+      "values": [
+        "NA"
+      ],
+      "weight": 2,
+      "why": "'no subfloor it's a slab'"
+    },
+    {
+      "id": "result-interior-found",
+      "kind": "equals",
+      "path": "areaResult.interior",
+      "values": [
+        "FOUND"
+      ],
+      "weight": 3,
+      "why": "the laundry wall is inside the house"
+    },
+    {
+      "id": "result-roofvoid-clear",
+      "kind": "equals",
+      "path": "areaResult.roofvoid",
+      "values": [
+        "CLEAR"
+      ],
+      "weight": 2,
+      "why": "'no activity in the roof'"
+    },
+    {
+      "id": "no-partial-or-not",
+      "kind": "mentions",
+      "path": "areaStatus",
+      "none": [
+        "partial",
+        "not"
+      ],
+      "nullOk": true,
+      "weight": 2,
+      "why": "nothing was limited"
+    },
+    {
+      "id": "high-risk-not-laundry",
+      "kind": "mentions",
+      "path": "highRiskAreas",
+      "none": [
+        "laundry",
+        "tub"
+      ],
+      "nullOk": true,
+      "weight": 3,
+      "why": "the laundry is a finding, never a high risk area"
+    },
+    {
+      "id": "no-hindered-areas",
+      "kind": "absent",
+      "path": "hinderedAreas",
+      "weight": 2,
+      "why": "nothing restricted"
+    },
+    {
+      "id": "no-existing-system",
+      "kind": "equals",
+      "path": "existingSystem",
+      "values": [
+        "No System Found",
+        null
+      ],
+      "weight": 3,
+      "why": "'no existing system'"
+    },
+    {
+      "id": "durable-notice-no",
+      "kind": "equals",
+      "path": "durableNoticePresent",
+      "values": [
+        "NO"
+      ],
+      "weight": 2,
+      "why": "'meter box no durable notice'"
+    },
+    {
+      "id": "treatment-yes",
+      "kind": "equals",
+      "path": "treatmentRecommended",
+      "values": [
+        "YES"
+      ],
+      "weight": 3,
+      "why": "'treat the live termites in the laundry wall directly and then put a... chemical barrier'"
+    },
+    {
+      "id": "treatment-type",
+      "kind": "mentions",
+      "path": "treatmentType",
+      "all": [
+        [
+          "laundry",
+          "active",
+          "live"
+        ],
+        [
+          "chemical",
+          "barrier",
+          "termidor"
+        ]
+      ],
+      "none": [
+        "bait"
+      ],
+      "weight": 3,
+      "why": "direct treatment of the laundry activity plus a Termidor chemical barrier ('term adore' = Termidor)"
+    },
+    {
+      "id": "quote-two-items",
+      "kind": "count",
+      "path": "quote.items",
+      "min": 2,
+      "max": 2,
+      "weight": 2,
+      "why": "'the direct treatment is 350 and the barrier is 46 lineal metres at 40 a metre'"
+    },
+    {
+      "id": "quote-item-1-treatment-price",
+      "kind": "equals",
+      "path": "quote.items.0.price",
+      "values": [
+        350
+      ],
+      "weight": 3,
+      "why": "first priced: 'the direct treatment is 350'"
+    },
+    {
+      "id": "quote-item-2-barrier-qty",
+      "kind": "equals",
+      "path": "quote.items.1.qty",
+      "values": [
+        46
+      ],
+      "weight": 3,
+      "why": "'46 lineal metres'"
+    },
+    {
+      "id": "quote-item-2-barrier-rate",
+      "kind": "equals",
+      "path": "quote.items.1.price",
+      "values": [
+        40
+      ],
+      "weight": 3,
+      "why": "'at 40 a metre' is the price for one unit, not 1840"
+    },
+    {
+      "id": "quote-payment-terms",
+      "kind": "mentions",
+      "path": "quote.paymentTerms",
+      "all": [
+        [
+          "50"
+        ],
+        [
+          "deposit"
+        ]
+      ],
+      "weight": 2,
+      "why": "'50% deposit to book the rest on completion'"
+    },
+    {
+      "id": "frequency-3-months-first",
+      "kind": "mentions",
+      "path": "inspectionFrequency",
+      "all": [
+        [
+          "3 month",
+          "three month"
+        ]
+      ],
+      "none": [
+        "6 month"
+      ],
+      "weight": 3,
+      "why": "'re inspect at 3 months and then every 12 months'"
+    },
+    {
+      "id": "frequency-annual",
+      "kind": "mentions",
+      "path": "inspectionFrequency",
+      "all": [
+        [
+          "12 month",
+          "twelve month",
+          "annual"
+        ]
+      ],
+      "weight": 2,
+      "why": "'and then every 12 months after that'"
+    },
+    {
+      "id": "risk-high",
+      "kind": "equals",
+      "path": "riskLevel",
+      "values": [
+        "HIGH"
+      ],
+      "weight": 3,
+      "why": "'overall risk high'"
+    },
+    {
+      "id": "no-wrong-species",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "frenchi",
+        "lacteus",
+        "schedorhinotermes",
+        "nasutitermes"
+      ],
+      "weight": 2,
+      "why": "acinaciformis was named"
+    },
+    {
+      "id": "no-severity",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "minor",
+        "moderate",
+        "severe",
+        "extensive",
+        "significant",
+        "extreme",
+        "major",
+        "heavy"
+      ],
+      "weight": 3,
+      "why": "no severity word was said"
+    },
+    {
+      "id": "no-structural-verdict-words",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "compromised",
+        "structurally",
+        "unsound"
+      ],
+      "weight": 3,
+      "why": "a builder referral is not a structural verdict"
+    },
+    {
+      "id": "no-mishearings",
+      "kind": "forbidAnywhere",
+      "terms": [
+        "term adore",
+        "mud leed",
+        "pain on",
+        "the stood",
+        "sinus",
+        "formist"
+      ],
+      "weight": 3,
+      "why": "'term adore' = Termidor, 'mud leeds' = mud leads, 'bubbling pain' = bubbling paint, 'stood' = stud, 'a sinus formist' = acinaciformis"
+    },
+    {
+      "id": "order-does-not-matter",
+      "kind": "manual",
+      "description": "The property, client and inspection type dictated last land in their fields exactly as if said first, and the plan dictated first is not mistaken for a finding."
+    }
+  ]
+}

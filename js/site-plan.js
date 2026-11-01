@@ -7,8 +7,11 @@
 //   { id, k: symbol key, x, y } for a point,
 //   { ..., n } for a station (one number sequence across all station types),
 //   { ..., w, h } for a building or an area (x, y its top-left corner),
+//     with rot: degrees clockwise about its centre when it's turned,
 //   { id, k, pts: [[x, y], ...] } for a line, or a closed shape (a building
-//   of any shape),
+//   of any shape, or a building or area reshaped corner by corner; rot is
+//   then the angle it was turned to, which the editor keeps corners square
+//   to),
 //   any of them with a label, and layer: 'sub' when it's on the subfloor
 //   plan (drawn under the same building, at the same scale) ],
 //   mpu: metres per plan unit, once the technician gives one real size,
@@ -245,12 +248,48 @@ function pdfPainter(doc, ox, oy, s) {
 
 const rectPts = (x, y, w, h) => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
 
-// 45° hatching inside a rectangle, as line segments.
-function hatchSegments(x0, y0, w, h, gap) {
-  const x1 = x0 + w, y1 = y0 + h, segs = [];
-  for (let c = x0 + y0 + gap; c < x1 + y1; c += gap) {
-    const a = Math.max(x0, c - y1), b = Math.min(x1, c - y0);
-    if (b > a) segs.push([[a, c - a], [b, c - b]]);
+// Turn points by deg (clockwise, as y runs down) about c.
+function planRotatePts(pts, c, deg) {
+  const a = deg * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a);
+  return pts.map(q => [c[0] + (q[0] - c[0]) * cos - (q[1] - c[1]) * sin, c[1] + (q[0] - c[0]) * sin + (q[1] - c[1]) * cos]);
+}
+
+// The outline of a building, area or shape in plan units: its corners, in
+// order, turned when it's turned. Lines give their points.
+function planItemPts(it) {
+  if (it.pts) return it.pts;
+  const pts = rectPts(it.x, it.y, it.w, it.h);
+  return it.rot ? planRotatePts(pts, [it.x + it.w / 2, it.y + it.h / 2], it.rot) : pts;
+}
+
+// A building or area's width and depth while it's still a rectangle
+// (turned or not), else null.
+function planRectDims(it) {
+  if (!it.pts) return { w: it.w, h: it.h };
+  const q = it.pts;
+  if (q.length !== 4) return null;
+  const v = i => [q[(i + 1) % 4][0] - q[i][0], q[(i + 1) % 4][1] - q[i][1]];
+  const len = i => Math.hypot(...v(i));
+  for (let i = 0; i < 4; i++) {
+    const a = v(i), b = v((i + 1) % 4);
+    if (Math.abs(a[0] * b[0] + a[1] * b[1]) > 0.02 * len(i) * len((i + 1) % 4)) return null;
+  }
+  return { w: len(0), h: len(1) };
+}
+
+// 45° hatching inside a shape, as line segments: lines of y + dir·x = c,
+// clipped to the shape (dir -1 hatches the other way, for cross-hatching).
+function hatchPolygon(pts, gap, dir = 1) {
+  const f = q => q[1] + dir * q[0];
+  const cs = pts.map(f), lo = Math.min(...cs), hi = Math.max(...cs), segs = [];
+  for (let c = lo + gap; c < hi; c += gap) {
+    const xs = [];
+    pts.forEach((a, i) => {
+      const b = pts[(i + 1) % pts.length], fa = f(a) - c, fb = f(b) - c;
+      if ((fa < 0) !== (fb < 0)) xs.push(a[0] + (b[0] - a[0]) * fa / (fa - fb));
+    });
+    xs.sort((m, n) => m - n);
+    for (let i = 0; i + 1 < xs.length; i += 2) segs.push([[xs[i], c - dir * xs[i]], [xs[i + 1], c - dir * xs[i + 1]]]);
   }
   return segs;
 }
@@ -387,28 +426,25 @@ function planLineStyle(k) {
     : { stroke: I.muted, lw: 2.5, dash: [18, 6, 3, 6] };
 }
 
-function drawPlanRect(P, k, x, y, w, h, label, size) {
-  const o = planRectStyle(k);
-  P.poly(rectPts(x, y, w, h), { fill: o.fill });
-  if (o.hatch) hatchSegments(x, y, w, h, 18).forEach(seg => P.poly(seg, { stroke: o.hatch, lw: 1.5, close: false }));
-  if (o.cross) hatchSegments(-x - w, y, w, h, 18).forEach(seg => P.poly(seg.map(q => [-q[0], q[1]]), { stroke: o.hatch, lw: 1.5, close: false }));
-  P.poly(rectPts(x, y, w, h), { stroke: o.stroke, lw: o.lw, dash: o.dash });
-  if (label) P.text(x + w / 2, y + h / 2 - (size ? 12 : 0), label, { size: k === 'house' ? 24 : 19, bold: k === 'house', color: k === 'house' ? PLAN_INK.ink : PLAN_INK.muted, halo: !!o.hatch });
-  if (size) P.text(x + w / 2, y + h / 2 + (label ? 14 : 0), size, { size: 16, color: PLAN_INK.muted, halo: !!o.hatch });
-}
-
-// A building of any shape, with each wall's length once there's a scale.
-function drawPlanArea(P, k, pts, label, mpu) {
+// A building, area or shape of any outline, square or turned: its fill,
+// hatching, walls and label. size ("10 × 7.5 m") goes under the label;
+// mpu, when given, puts each wall's length outside it.
+function drawPlanShape(P, k, pts, label, { size, mpu } = {}) {
   const o = planRectStyle(k);
   if (pts.length < 3) { P.poly(pts, { stroke: o.stroke, lw: o.lw, close: false }); return; }
-  P.poly(pts, { fill: o.fill, stroke: o.stroke, lw: o.lw });
+  P.poly(pts, { fill: o.fill });
+  if (o.hatch) hatchPolygon(pts, 18).forEach(seg => P.poly(seg, { stroke: o.hatch, lw: 1.5, close: false }));
+  if (o.cross) hatchPolygon(pts, 18, -1).forEach(seg => P.poly(seg, { stroke: o.hatch, lw: 1.5, close: false }));
+  P.poly(pts, { stroke: o.stroke, lw: o.lw, dash: o.dash });
   // The label goes on the shape's true centre (its centroid), sized to fit.
   let A = 0, cx = 0, cy = 0;
   pts.forEach((a, i) => { const b = pts[(i + 1) % pts.length], f = a[0] * b[1] - b[0] * a[1]; A += f; cx += (a[0] + b[0]) * f; cy += (a[1] + b[1]) * f; });
   if (Math.abs(A) > 1) { cx /= 3 * A; cy /= 3 * A; } else { cx = pts[0][0]; cy = pts[0][1]; }
   const xs = pts.map(q => q[0]);
   const fit = (Math.max(...xs) - Math.min(...xs)) / Math.max(1, String(label || '').length * 0.62);
-  if (label) P.text(cx, cy, label, { size: Math.max(14, Math.min(24, fit)), bold: true, color: PLAN_INK.ink, halo: true });
+  const main = ['house', 'outline', 'subfloorShape'].includes(k);
+  if (label) P.text(cx, cy - (size ? 12 : 0), label, { size: main ? Math.max(14, Math.min(24, fit)) : Math.max(13, Math.min(19, fit)), bold: main, color: main ? PLAN_INK.ink : PLAN_INK.muted, halo: true });
+  if (size) P.text(cx, cy + (label ? 14 : 0), size, { size: 16, color: PLAN_INK.muted, halo: true });
   if (!mpu) return;
   pts.forEach((a, i) => {
     const b = pts[(i + 1) % pts.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -468,7 +504,7 @@ function drawSitePlan(P, plan, opts = {}) {
   const drawWalls = () => {
     walls = true;
     planLayerItems(plan, 'site').filter(it => ['house', 'outline', 'shed', 'deck'].includes(it.k)).forEach(it => {
-      const pts = it.pts || rectPts(it.x, it.y, it.w, it.h);
+      const pts = planItemPts(it);
       if (pts.length < 3) return;
       P.poly(pts, { stroke: '#8899AA', lw: it.k === 'deck' ? 2 : 4, dash: it.k === 'deck' ? [10, 6] : null });
       const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]);
@@ -480,8 +516,11 @@ function drawSitePlan(P, plan, opts = {}) {
     if (!sym) return;
     if (!walls && (sym.z || 0) >= 2) drawWalls();
     const mpu = plan.mpu;
-    if (sym.kind === 'rect') drawPlanRect(P, it.k, it.x, it.y, it.w, it.h, it.label, mpu && sym.size ? `${formatPlanMetres(it.w * mpu).replace(' m', '')} × ${formatPlanMetres(it.h * mpu)}` : '');
-    else if (sym.kind === 'area') drawPlanArea(P, it.k, it.pts || [], it.label, it.k === 'outline' ? mpu : 0);
+    if (sym.kind === 'rect') {
+      // Still a rectangle: its width × depth. Reshaped: each wall's length.
+      const dims = planRectDims(it);
+      drawPlanShape(P, it.k, planItemPts(it), it.label, mpu && sym.size ? (dims ? { size: `${formatPlanMetres(dims.w * mpu).replace(' m', '')} × ${formatPlanMetres(dims.h * mpu)}` } : { mpu }) : {});
+    } else if (sym.kind === 'area') drawPlanShape(P, it.k, it.pts || [], it.label, { mpu: it.k === 'outline' ? mpu : 0 });
     else if (sym.kind === 'line') {
       drawPlanLine(P, it.k, it.pts || [], plan.mpu);
       const len = mpu && sym.size && it.pts && it.pts.length > 1 ? formatPlanMetres(planPathLength(it.pts) * mpu) : '';
@@ -524,8 +563,8 @@ function sitePlanLegendKeys(plan, layer = 'site') {
 // A legend entry's swatch, centred on x, y.
 function drawPlanSwatch(P, k, x, y) {
   const sym = SITE_PLAN_SYMBOLS[k];
-  if (sym.kind === 'rect') drawPlanRect(P, k, x - 34, y - 22, 68, 44, '');
-  else if (sym.kind === 'area') drawPlanArea(P, k, [[x - 34, y - 22], [x + 10, y - 22], [x + 10, y - 4], [x + 34, y - 4], [x + 34, y + 22], [x - 34, y + 22]], '');
+  if (sym.kind === 'rect') drawPlanShape(P, k, rectPts(x - 34, y - 22, 68, 44), '');
+  else if (sym.kind === 'area') drawPlanShape(P, k, [[x - 34, y - 22], [x + 10, y - 22], [x + 10, y - 4], [x + 34, y - 4], [x + 34, y + 22], [x - 34, y + 22]], '');
   else if (sym.kind === 'line') drawPlanLine(P, k, [[x - 36, y], [x + 36, y]], k === 'pierrow' ? 0.025 : 0);
   else drawPlanSymbol(P, k, x, y, SITE_PLAN_STATIONS.includes(k) ? { n: '' } : {});
 }
@@ -632,9 +671,17 @@ function drawSitePlanStationListPdf(doc, plan, { x, y, w, cols = 3 } = {}) {
 
 // ── THE EDITOR ──
 // A full-screen sheet with the plan, a tray of symbols by group, and a bar
-// for the selected item (its label, delete). Opened from the treatment
-// record; Save hands the plan back through sitePlanEditor.onSave.
-const sitePlanEditor = { plan: null, layer: 'site', tool: null, group: 'build', sel: null, drawing: null, drag: null, undo: [], onSave: null, zoom: 1, cx: PLAN_W / 2, cy: PLAN_H / 2 };
+// for the selected item (its label, real size, angle, delete). A selected
+// building, area or line shows handles: a white dot on each corner to drag
+// it, a pink tab on each wall to push or pull that wall in or out, and a
+// turn handle to set it at any angle (a house built on the diagonal). Tap a
+// corner or a tab to pick it: then give the wall's real length, add a corner
+// in it, step a corner in for an L shape, or remove a corner. Two fingers
+// pinch to zoom. Opened from the treatment record; Save hands the plan back
+// through sitePlanEditor.onSave.
+const sitePlanEditor = { plan: null, layer: 'site', tool: null, group: 'build', sel: null, part: null, drawing: null, drag: null, undo: [], onSave: null,
+  zoom: 1, cx: PLAN_W / 2, cy: PLAN_H / 2, upx: 3, ptrs: new Map(), pinch: null, down: null, partBase: null };
+const PLAN_MAX_ZOOM = 4;
 
 function newSitePlan() {
   const d = SITE_PLAN_SYMBOLS.house.def;
@@ -647,8 +694,9 @@ function openSitePlan(plan, onSave) {
   const E = sitePlanEditor;
   E.plan = sitePlanHasContent(plan) ? JSON.parse(JSON.stringify(plan)) : newSitePlan();
   if (E.plan.north == null) E.plan.north = 0;
-  E.tool = null; E.sel = null; E.drawing = null; E.drag = null; E.undo = []; E.onSave = onSave;
+  E.tool = null; E.sel = null; E.part = null; E.drawing = null; E.drag = null; E.undo = []; E.onSave = onSave;
   E.layer = 'site'; E.group = 'build'; E.zoom = 1; E.cx = PLAN_W / 2; E.cy = PLAN_H / 2;
+  E.ptrs.clear(); E.pinch = null; E.down = null;
   track('screen_viewed', { screen: 'site_plan' });
   document.getElementById('sitePlanOverlay').classList.add('open');
   renderSitePlanTray();
@@ -660,6 +708,7 @@ function openSitePlan(plan, onSave) {
     svgWrap.addEventListener('pointermove', onSitePlanMove);
     svgWrap.addEventListener('pointerup', onSitePlanUp);
     svgWrap.addEventListener('pointercancel', onSitePlanUp);
+    svgWrap.addEventListener('wheel', onSitePlanWheel, { passive: false });
   }
 }
 
@@ -690,7 +739,7 @@ function undoSitePlan() {
   const E = sitePlanEditor;
   if (!E.undo.length) return;
   E.plan = JSON.parse(E.undo.pop());
-  E.drawing = null;
+  E.drawing = null; E.part = null;
   if (E.sel && !E.plan.items.some(it => it.id === E.sel)) E.sel = null;
   renderSitePlanEditor();
 }
@@ -706,13 +755,14 @@ function setSitePlanLayer(layer) {
   const E = sitePlanEditor;
   finishSitePlanLine();
   if (E.layer === layer) return;
-  E.layer = layer; E.tool = null; E.sel = null;
+  E.layer = layer; E.tool = null; E.sel = null; E.part = null;
   E.group = SITE_PLAN_TRAYS[layer][0];
   if (layer === 'sub' && !sitePlanHasSubfloor(E.plan)) {
     pushSitePlanUndo();
     planLayerItems(E.plan, 'site').forEach(it => {
-      if (it.k === 'house') E.plan.items.push({ id: planId(), k: 'subfloor', layer: 'sub', x: it.x, y: it.y, w: it.w, h: it.h, label: 'Subfloor' });
-      if (it.k === 'outline' && (it.pts || []).length > 2) E.plan.items.push({ id: planId(), k: 'subfloorShape', layer: 'sub', pts: it.pts.map(q => q.slice()), label: 'Subfloor' });
+      const turned = it.rot ? { rot: it.rot } : {};
+      if (it.k === 'house') E.plan.items.push(Object.assign({ id: planId(), k: 'subfloor', layer: 'sub', label: 'Subfloor' }, it.pts ? { pts: it.pts.map(q => q.slice()) } : { x: it.x, y: it.y, w: it.w, h: it.h }, turned));
+      if (it.k === 'outline' && (it.pts || []).length > 2) E.plan.items.push(Object.assign({ id: planId(), k: 'subfloorShape', layer: 'sub', pts: it.pts.map(q => q.slice()), label: 'Subfloor' }, turned));
     });
   }
   renderSitePlanTray();
@@ -723,7 +773,7 @@ function setSitePlanTool(k) {
   const E = sitePlanEditor;
   finishSitePlanLine();
   E.tool = E.tool === k ? null : k;
-  E.sel = null;
+  E.sel = null; E.part = null;
   renderSitePlanTray();
   renderSitePlanEditor();
 }
@@ -739,6 +789,9 @@ function renderSitePlanTray() {
     `<button type="button" class="sp-tool${E.tool === k ? ' on' : ''}" aria-pressed="${E.tool === k}" onclick="setSitePlanTool('${k}')">${swatch(k)}<span>${s.label}</span></button>`).join('');
 }
 
+const sitePlanSelected = () => sitePlanEditor.plan.items.find(it => it.id === sitePlanEditor.sel) || null;
+const sitePlanClosed = it => SITE_PLAN_SYMBOLS[it.k].kind !== 'line';
+
 function sitePlanHint() {
   const E = sitePlanEditor;
   if (E.drawing) {
@@ -753,55 +806,172 @@ function sitePlanHint() {
       : s.kind === 'station' ? `Tap the plan to place each ${s.label.toLowerCase()} station. They number themselves.`
       : `Tap the plan to place it.`;
   }
-  if (E.sel) return 'Drag to move it. Name it below, give its real size, or delete it.';
-  if (E.zoom > 1) return 'Zoomed in: drag an empty spot to look around.';
+  const sel = sitePlanSelected();
+  if (E.drag && E.drag.mode === 'turn' && sel) return `Turned to ${Math.round(sel.rot || 0)}°. It clicks at every 15°.`;
+  if (sel && sitePlanHandles(sel)) {
+    const wall = sitePlanClosed(sel) ? 'wall' : 'stretch';
+    if (E.part && E.part.type === 'corner') return `Drag the corner to reshape it. Below: ${sitePlanClosed(sel) ? 'step it in for an L shape, or ' : ''}remove it.`;
+    if (E.part && E.part.type === 'wall') return `Drag the pink tab to push or pull this ${wall}. Below: its real length, or add a corner in it.`;
+    return sitePlanClosed(sel) ? 'Drag a white corner or a wall\'s pink tab to reshape it, ↻ to turn it, or the middle to move it.'
+      : 'Drag a white corner or a pink tab to reshape the line, ↻ to turn it, or the line itself to move it.';
+  }
+  if (sel) return 'Drag to move it. Name it below, or delete it.';
+  if (E.zoom > 1) return 'Zoomed in: drag an empty spot to look around, pinch to zoom.';
   return E.layer === 'sub' ? 'The subfloor, under the house walls (grey). Mark the piers, vents, access and what you found.'
-    : 'Pick a symbol below, then tap the plan. Tap something on the plan to move or name it.';
+    : 'Pick a symbol below, then tap the plan. Tap something on the plan to move, reshape or name it.';
 }
 
-function renderSitePlanEditor() {
+// The handles of a selected building, area or line, in plan units: its
+// corners, a tab in the middle of each wall long enough for one, and the
+// turn handle just above it (below it when there's no room). Handles keep
+// the same size on screen however far the plan is zoomed.
+function sitePlanHandles(it) {
+  const kind = SITE_PLAN_SYMBOLS[it.k].kind;
+  if (!['rect', 'area', 'line'].includes(kind)) return null;
+  const pts = planItemPts(it), closed = kind !== 'line';
+  if (pts.length < (closed ? 3 : 2)) return null;
+  const u = sitePlanEditor.upx, walls = [];
+  for (let i = 0; i < pts.length - (closed ? 0 : 1); i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    walls.push({ i, a, b, mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], tab: Math.hypot(b[0] - a[0], b[1] - a[1]) > 58 * u });
+  }
+  const bb = planBoundsOf(pts), [vx, vy, vw, vh] = sitePlanViewBox();
+  const above = bb.y - 38 * u >= vy + 16 * u;
+  const turn = [planClamp(bb.x + bb.w / 2, vx + 16 * u, vx + vw - 16 * u), planClamp(above ? bb.y - 38 * u : bb.y + bb.h + 38 * u, vy + 16 * u, vy + vh - 16 * u)];
+  return { corners: pts, walls, closed, turn, from: [turn[0], above ? bb.y : bb.y + bb.h], centre: planCentre(pts) };
+}
+
+function drawSitePlanHandles(P, sel) {
+  const E = sitePlanEditor, u = E.upx, pink = PLAN_INK.pink, white = PLAN_INK.paper;
+  const h = sitePlanHandles(sel);
+  if (!h) {
+    const b = sitePlanBounds(sel);
+    P.poly(rectPts(b.x - 10, b.y - 10, b.w + 20, b.h + 20), { stroke: pink, lw: 3, dash: [10, 7] });
+    return;
+  }
+  P.poly(h.corners, { stroke: pink, lw: 2.5 * u, close: h.closed ? undefined : false });
+  const part = E.part;
+  if (part && part.type === 'wall' && h.walls[part.i]) P.poly([h.walls[part.i].a, h.walls[part.i].b], { stroke: pink, lw: 7 * u, close: false });
+  // The turn handle: a round button with a curved arrow, tied to the shape.
+  const [tx, ty] = h.turn, r = 6.5 * u;
+  P.poly([h.from, h.turn], { stroke: pink, lw: 1.5 * u, close: false, dash: [4 * u, 4 * u] });
+  P.circle(tx, ty, 13 * u, { fill: white, stroke: pink, lw: 2.5 * u });
+  const arc = [];
+  for (let a = -160; a <= 100; a += 20) { const t = a * Math.PI / 180; arc.push([tx + r * Math.cos(t), ty + r * Math.sin(t)]); }
+  P.poly(arc, { stroke: pink, lw: 2.2 * u, close: false });
+  const t = 100 * Math.PI / 180, ex = tx + r * Math.cos(t), ey = ty + r * Math.sin(t), dx = -Math.sin(t), dy = Math.cos(t), s = 3.6 * u;
+  P.poly([[ex + dx * s, ey + dy * s], [ex - dy * s, ey + dx * s], [ex + dy * s, ey - dx * s]], { fill: pink });
+  if (E.drag && E.drag.mode === 'turn') P.text(tx, ty + (h.from[1] < ty ? 26 : -26) * u, `${Math.round(sel.rot || 0)}°`, { size: 15 * u, bold: true, color: pink, halo: true });
+  // A tab on each wall: drag it to push or pull the wall.
+  h.walls.forEach(w => {
+    if (!w.tab) return;
+    const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]), ex2 = (w.b[0] - w.a[0]) / L, ey2 = (w.b[1] - w.a[1]) / L;
+    const hl = 11 * u, hw = 4.5 * u, [mx, my] = w.mid, on = part && part.type === 'wall' && part.i === w.i;
+    P.poly([[mx - ex2 * hl - ey2 * hw, my - ey2 * hl + ex2 * hw], [mx + ex2 * hl - ey2 * hw, my + ey2 * hl + ex2 * hw], [mx + ex2 * hl + ey2 * hw, my + ey2 * hl - ex2 * hw], [mx - ex2 * hl + ey2 * hw, my - ey2 * hl - ex2 * hw]],
+      { fill: on ? white : pink, stroke: on ? pink : white, lw: 2 * u });
+  });
+  // With a scale, the picked wall's length (or the two walls either side of
+  // the picked corner) in large type, outside the shape, as it's dragged.
+  if (E.plan.mpu && part) {
+    const n = h.corners.length, placed = [];
+    const show = h.walls.filter(w => part.type === 'wall' ? w.i === part.i : w.i === part.i || w.i === (part.i - 1 + n) % n);
+    show.forEach(w => {
+      const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
+      let nx = -(w.b[1] - w.a[1]) / (L || 1), ny = (w.b[0] - w.a[0]) / (L || 1);
+      if (h.closed && planInside(h.corners, [w.mid[0] + nx * 4, w.mid[1] + ny * 4])) { nx = -nx; ny = -ny; }
+      // Beside a picked corner, each wall's length sits further from it, so the two don't meet.
+      const f = part.type === 'wall' ? 0.5 : w.i === part.i ? 0.65 : 0.35;
+      const words = formatPlanMetres(L * E.plan.mpu), size = 14 * u, bw = words.length * size * 0.62;
+      let x = w.a[0] + (w.b[0] - w.a[0]) * f + nx * 22 * u, y = w.a[1] + (w.b[1] - w.a[1]) * f + ny * 22 * u;
+      // In a tight corner, the second one steps further out so they don't overlap.
+      for (let k = 0; k < 4 && placed.some(b => Math.abs(b[0] - x) < (b[2] + bw) / 2 && Math.abs(b[1] - y) < size * 1.1); k++) { x += nx * size; y += ny * size; }
+      placed.push([x, y, bw]);
+      P.text(x, y, words, { size, bold: true, color: PLAN_INK.pink, halo: true });
+    });
+  }
+  // A dot on each corner: drag it to move the corner.
+  h.corners.forEach((q, i) => {
+    const on = part && part.type === 'corner' && part.i === i;
+    P.circle(q[0], q[1], (on ? 10 : 8) * u, { fill: on ? pink : white, stroke: on ? white : pink, lw: 3 * u });
+  });
+}
+
+// The plan and what's being drawn or picked. During a drag only this and the
+// selection bar redraw; the legend and summary wait for the finger to lift.
+function renderSitePlanCanvas() {
   const E = sitePlanEditor;
-  const sel = E.plan.items.find(it => it.id === E.sel);
+  const sel = sitePlanSelected();
   const vb = sitePlanViewBox();
-  document.getElementById('spCanvas').innerHTML = sitePlanSVG(E.plan, { grid: true, layer: E.layer, cls: 'site-plan-svg sp-edit', viewBox: vb.join(' '), after: P => {
+  const wrap = document.getElementById('spCanvas');
+  E.upx = vb[2] / (wrap.clientWidth || 350);
+  wrap.innerHTML = sitePlanSVG(E.plan, { grid: true, layer: E.layer, cls: 'site-plan-svg sp-edit', viewBox: vb.join(' '), after: P => {
     if (E.drawing) {
       const it = E.plan.items.find(x => x.id === E.drawing);
-      if (it) it.pts.forEach((p, i) => P.circle(p[0], p[1], i ? 9 : 13, { fill: i ? PLAN_INK.paper : PLAN_INK.pink, stroke: PLAN_INK.pink, lw: 3 }));
+      if (it) it.pts.forEach((p, i) => P.circle(p[0], p[1], (i ? 6 : 8) * E.upx, { fill: i ? PLAN_INK.paper : PLAN_INK.pink, stroke: PLAN_INK.pink, lw: 2.5 * E.upx }));
     }
-    if (!sel) return;
-    const b = sitePlanBounds(sel);
-    P.poly(rectPts(b.x - 10, b.y - 10, b.w + 20, b.h + 20), { stroke: PLAN_INK.pink, lw: 3, dash: [10, 7] });
-    if (SITE_PLAN_SYMBOLS[sel.k].kind === 'rect') P.circle(sel.x + sel.w, sel.y + sel.h, 16, { fill: PLAN_INK.pink, stroke: PLAN_INK.paper, lw: 4 });
+    if (sel) drawSitePlanHandles(P, sel);
   } });
   document.getElementById('spHint').textContent = sitePlanHint();
   const fin = document.getElementById('spFinishLine');
   fin.hidden = !E.drawing;
   if (E.drawing) fin.textContent = SITE_PLAN_SYMBOLS[(E.plan.items.find(x => x.id === E.drawing) || {}).k || 'fence'].kind === 'area' ? 'Finish shape' : 'Finish line';
+}
+
+// The bar under the plan for what's selected: its name and label, its real
+// size, its angle, and the picked corner or wall.
+function renderSitePlanSelBar() {
+  const E = sitePlanEditor;
+  const sel = sitePlanSelected();
+  const bar = document.getElementById('spSelBar');
+  bar.hidden = !sel;
+  if (!sel) return;
+  const sym = SITE_PLAN_SYMBOLS[sel.k], m1 = v => String(Math.round(v * 10) / 10);
+  document.getElementById('spSelName').textContent = sym.kind === 'station' ? `Station ${sel.n} · ${sym.label}` : sym.label.replace(', square', '');
+  const inp = document.getElementById('spSelLabel');
+  inp.placeholder = sym.ph || 'Name it';
+  if (document.activeElement !== inp) inp.value = sel.label || '';
+  // The real size: one known measurement sets the scale for the whole plan.
+  const units = sitePlanItemUnits(sel);
+  const row = document.getElementById('spSelSizeRow');
+  row.hidden = !units;
+  if (units) {
+    document.getElementById('spSelSizeLabel').textContent = sym.kind === 'rect' && planRectDims(sel) ? 'Real width' : sym.kind === 'line' ? 'Real length' : 'Real length of the walls, all round';
+    const m = document.getElementById('spSelMetres');
+    if (document.activeElement !== m) m.value = E.plan.mpu ? m1(units * E.plan.mpu) : '';
+  }
+  const h = sitePlanHandles(sel);
+  document.getElementById('spTurnRow').hidden = !h;
+  const ang = document.getElementById('spAngle');
+  if (h && document.activeElement !== ang) ang.value = String(Math.round(sel.rot || 0));
+  // The picked corner or wall.
+  const part = h && E.part && (E.part.type === 'corner' ? h.corners[E.part.i] : h.walls[E.part.i]) ? E.part : null;
+  document.getElementById('spPart').hidden = !part;
+  if (!part) return;
+  const wallWord = h.closed ? 'wall' : 'stretch';
+  document.getElementById('spPartName').textContent = part.type === 'corner' ? `Corner ${part.i + 1} of ${h.corners.length}` : `This ${wallWord}`;
+  document.getElementById('spPartLenRow').hidden = part.type !== 'wall';
+  if (part.type === 'wall') {
+    const w = h.walls[part.i], len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
+    document.getElementById('spPartLenLabel').textContent = E.plan.mpu ? `Real length of this ${wallWord}` : `Real length of this ${wallWord} (sets the scale)`;
+    const pm = document.getElementById('spPartMetres');
+    if (document.activeElement !== pm) pm.value = E.plan.mpu ? m1(len * E.plan.mpu) : '';
+  }
+  document.getElementById('spPartAdd').hidden = part.type !== 'wall';
+  document.getElementById('spPartStep').hidden = part.type !== 'corner' || !h.closed;
+  document.getElementById('spPartRemove').hidden = part.type !== 'corner' || h.corners.length <= (h.closed ? 3 : 2);
+}
+
+function renderSitePlanEditor() {
+  const E = sitePlanEditor;
+  renderSitePlanCanvas();
+  renderSitePlanSelBar();
   document.getElementById('spZoomOut').disabled = E.zoom <= 1;
-  document.getElementById('spZoomIn').disabled = E.zoom >= 3;
+  document.getElementById('spZoomIn').disabled = E.zoom >= PLAN_MAX_ZOOM;
   document.getElementById('spBgRemove').hidden = !E.plan.bg;
   document.querySelector('#sitePlanOverlay .sp-bg').hidden = E.layer === 'sub';
   document.getElementById('spBgLabel').firstChild.textContent = E.plan.bg ? 'Change the photo underneath' : 'Trace over a map or photo';
   document.getElementById('spUndo').disabled = !E.undo.length;
   document.getElementById('spNorth').textContent = `North: ${['up', 'up-right', 'right', 'down-right', 'down', 'down-left', 'left', 'up-left'][E.plan.north || 0]}`;
-  const bar = document.getElementById('spSelBar');
-  bar.hidden = !sel;
-  if (sel) {
-    const sym = SITE_PLAN_SYMBOLS[sel.k];
-    document.getElementById('spSelName').textContent = sym.kind === 'station' ? `Station ${sel.n} · ${sym.label}` : sym.label;
-    const inp = document.getElementById('spSelLabel');
-    inp.placeholder = sym.ph || 'Name it';
-    if (document.activeElement !== inp) inp.value = sel.label || '';
-    // The real size: one known measurement sets the scale for the whole plan.
-    const units = sitePlanItemUnits(sel);
-    const row = document.getElementById('spSelSizeRow');
-    row.hidden = !units;
-    if (units) {
-      document.getElementById('spSelSizeLabel').textContent = sym.kind === 'rect' ? 'Real width' : sym.kind === 'area' ? 'Real length of the walls, all round' : 'Real length';
-      const m = document.getElementById('spSelMetres');
-      if (document.activeElement !== m) m.value = E.plan.mpu ? String(Math.round(units * E.plan.mpu * 10) / 10) : '';
-    }
-  }
   document.getElementById('spScaleNote').textContent = E.plan.mpu
     ? 'The plan has a scale. Lengths show on the barrier and walls, and the barrier\'s metres fill the record.'
     : 'Tip: tap the house, then type its real width, and the plan works out every length from it.';
@@ -810,13 +980,17 @@ function renderSitePlanEditor() {
   document.getElementById('spSummary').textContent = sum ? `The ${E.layer === 'sub' ? 'subfloor plan' : 'plan'} shows ${sum}.` : '';
 }
 
+const planBoundsOf = pts => {
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+};
+// The middle of a shape's corners: what it turns about.
+const planCentre = pts => [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length];
+const planRound = pts => pts.map(q => [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10]);
+
 function sitePlanBounds(it) {
   const sym = SITE_PLAN_SYMBOLS[it.k];
-  if (sym.kind === 'rect') return { x: it.x, y: it.y, w: it.w, h: it.h };
-  if (sym.kind === 'line' || sym.kind === 'area') {
-    const xs = it.pts.map(p => p[0]), ys = it.pts.map(p => p[1]);
-    return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
-  }
+  if (sym.kind === 'rect' || sym.kind === 'line' || sym.kind === 'area') return planBoundsOf(planItemPts(it));
   const r = sym.kind === 'text' ? 0 : 26;
   const tw = sym.kind === 'text' ? Math.max(40, (it.label || 'Label').length * 12) : r;
   return { x: it.x - tw, y: it.y - (r || 14), w: tw * 2, h: (r || 14) * 2 };
@@ -831,10 +1005,27 @@ function sitePlanViewBox() {
 
 function zoomSitePlan(step) {
   const E = sitePlanEditor;
-  E.zoom = planClamp(E.zoom + step, 1, 3);
+  E.zoom = step > 0 ? Math.min(PLAN_MAX_ZOOM, Math.floor(E.zoom + 1e-6) + 1) : Math.max(1, Math.ceil(E.zoom - 1e-6) - 1);
   // Zoom in on what's selected.
-  const sel = E.plan.items.find(it => it.id === E.sel);
+  const sel = sitePlanSelected();
   if (sel && step > 0) { const b = sitePlanBounds(sel); E.cx = b.x + b.w / 2; E.cy = b.y + b.h / 2; }
+  renderSitePlanEditor();
+}
+
+// Zoom so the plan point under the screen point (sx, sy) stays under it.
+function zoomSitePlanAt(zoom, anchor, sx, sy) {
+  const E = sitePlanEditor, r = document.querySelector('#spCanvas svg').getBoundingClientRect();
+  E.zoom = planClamp(zoom, 1, PLAN_MAX_ZOOM);
+  const vw = PLAN_W / E.zoom, vh = PLAN_H / E.zoom;
+  E.cx = anchor[0] - (sx - r.left) / r.width * vw + vw / 2;
+  E.cy = anchor[1] - (sy - r.top) / r.height * vh + vh / 2;
+}
+
+// A mouse wheel or trackpad zooms too, on a computer.
+function onSitePlanWheel(e) {
+  e.preventDefault();
+  const E = sitePlanEditor;
+  zoomSitePlanAt(E.zoom * Math.exp(-e.deltaY * 0.0025), sitePlanPoint(e), e.clientX, e.clientY);
   renderSitePlanEditor();
 }
 
@@ -842,7 +1033,7 @@ function zoomSitePlan(step) {
 // building's width, a line's length, a shape's walls all round.
 function sitePlanItemUnits(it) {
   const sym = SITE_PLAN_SYMBOLS[it.k];
-  if (sym.kind === 'rect') return it.w;
+  if (sym.kind === 'rect') { const d = planRectDims(it); return d ? d.w : planPathLength(it.pts, true); }
   if (sym.kind === 'line') return (it.pts || []).length > 1 ? planPathLength(it.pts) : 0;
   if (sym.kind === 'area') return (it.pts || []).length > 2 ? planPathLength(it.pts, true) : 0;
   return 0;
@@ -850,7 +1041,7 @@ function sitePlanItemUnits(it) {
 
 function onSitePlanMetres(inp) {
   const E = sitePlanEditor;
-  const it = E.plan.items.find(x => x.id === E.sel);
+  const it = sitePlanSelected();
   const m = parseFloat(String(inp.value).replace(',', '.'));
   const units = it ? sitePlanItemUnits(it) : 0;
   if (!units) return;
@@ -904,42 +1095,184 @@ function sitePlanPoint(e) {
 
 const planSnap = (v, g = PLAN_GRID) => Math.round(v / g) * g;
 const planClamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+// How finely corners and walls snap: half a grid square, finer zoomed in.
+const sitePlanStep = () => PLAN_GRID / 2 / Math.pow(2, Math.floor(Math.log2(sitePlanEditor.zoom) + 1e-6));
+// Angles run clockwise, 0 to 359.
+const planAngle = deg => ((Math.round(deg * 10) / 10) % 360 + 360) % 360;
 
-// The topmost item under a point, stations first.
+function planSegDist(p, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1;
+  const t = planClamp(((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L, 0, 1);
+  return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+}
+
+// Is p inside the shape (ray casting)?
+function planInside(pts, p) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > p[1]) !== (yj > p[1]) && p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+// Snap q to the grid of a shape turned deg about o, so a turned house's
+// corners stay square to its own walls.
+function planSnapInFrame(q, o, deg, g) {
+  const l = planRotatePts([q], o, -deg)[0];
+  return planRotatePts([[o[0] + planSnap(l[0] - o[0], g), o[1] + planSnap(l[1] - o[1], g)]], o, deg)[0];
+}
+
+// Is p on the item?
+function sitePlanItemHit(it, p) {
+  const kind = SITE_PLAN_SYMBOLS[it.k].kind;
+  if (kind === 'line') return it.pts.some((a, i) => i && planSegDist(p, it.pts[i - 1], a) < 24);
+  if (kind === 'rect' || kind === 'area') {
+    // Inside the shape, or on one of its walls.
+    const pts = planItemPts(it);
+    return (pts.length > 2 && planInside(pts, p)) || pts.some((a, i) => (i || pts.length > 2) && planSegDist(p, pts[(i || pts.length) - 1], a) < 20);
+  }
+  if (kind === 'text') { const b = sitePlanBounds(it); return p[0] >= b.x && p[0] <= b.x + b.w && Math.abs(p[1] - it.y) < 26; }
+  return Math.hypot(p[0] - it.x, p[1] - it.y) < 38;
+}
+
+// The topmost item under a point: stations and symbols over lines over
+// buildings, and the one drawn last when they're level.
 function sitePlanHit(p) {
-  const E = sitePlanEditor;
-  const items = planLayerItems(E.plan, E.layer).slice().sort((a, b) => (SITE_PLAN_SYMBOLS[b.k].z || 0) - (SITE_PLAN_SYMBOLS[a.k].z || 0));
-  const segDist = (p, a, b) => {
-    const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1;
-    const t = planClamp(((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L, 0, 1);
-    return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+  const E = sitePlanEditor, z = it => SITE_PLAN_SYMBOLS[it.k].z || 0;
+  return planLayerItems(E.plan, E.layer).map((it, i) => [it, i]).sort((a, b) => (z(b[0]) - z(a[0])) || (b[1] - a[1]))
+    .map(x => x[0]).find(it => sitePlanItemHit(it, p)) || null;
+}
+
+// Which handle of the selected item is under p: the turn handle, a corner,
+// or a wall's tab (the nearest wins).
+function sitePlanHandleAt(sel, p) {
+  const h = sitePlanHandles(sel);
+  if (!h) return null;
+  const u = sitePlanEditor.upx, dist = q => Math.hypot(p[0] - q[0], p[1] - q[1]);
+  if (dist(h.turn) < 24 * u) return { type: 'turn' };
+  let best = null, bd = Infinity;
+  // A corner's reach shrinks on a short wall, so its middle still grabs the wall.
+  const n = h.corners.length, wallLen = i => {
+    if (!h.closed && (i < 0 || i >= n - 1)) return Infinity;
+    const a = h.corners[(i + n) % n], b = h.corners[(i + 1) % n];
+    return Math.hypot(b[0] - a[0], b[1] - a[1]);
   };
-  return items.find(it => {
-    const kind = SITE_PLAN_SYMBOLS[it.k].kind;
-    if (kind === 'rect') return p[0] >= it.x && p[0] <= it.x + it.w && p[1] >= it.y && p[1] <= it.y + it.h;
-    if (kind === 'line') return it.pts.some((a, i) => i && segDist(p, it.pts[i - 1], a) < 24);
-    if (kind === 'area') {
-      // Inside the shape (ray casting), or on one of its walls.
-      let inside = false;
-      for (let i = 0, j = it.pts.length - 1; i < it.pts.length; j = i++) {
-        const [xi, yi] = it.pts[i], [xj, yj] = it.pts[j];
-        if ((yi > p[1]) !== (yj > p[1]) && p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi) inside = !inside;
-      }
-      return inside || it.pts.some((a, i) => segDist(p, it.pts[(i || it.pts.length) - 1], a) < 20);
-    }
-    if (kind === 'text') { const b = sitePlanBounds(it); return p[0] >= b.x && p[0] <= b.x + b.w && Math.abs(p[1] - it.y) < 26; }
-    return Math.hypot(p[0] - it.x, p[1] - it.y) < 38;
-  }) || null;
+  h.corners.forEach((q, i) => {
+    // Corner i sits between wall i - 1 and wall i.
+    const reach = Math.max(10 * u, Math.min(22 * u, 0.4 * Math.min(wallLen(i - 1), wallLen(i))));
+    const d = dist(q); if (d < reach && d < bd) { best = { type: 'corner', i }; bd = d; }
+  });
+  if (best) return best;
+  h.walls.forEach(w => { const d = dist(w.mid); if (w.tab && d < 20 * u && d < bd) { best = { type: 'wall', i: w.i }; bd = d; } });
+  return best;
+}
+
+// The wall of a selected building or area right under p, if any: a wall
+// can be pushed or pulled from anywhere along it, not just its tab.
+function sitePlanWallAt(sel, p) {
+  const h = sitePlanHandles(sel);
+  if (!h || !h.closed) return null;
+  let best = null, bd = 11 * sitePlanEditor.upx;
+  h.walls.forEach(w => { const d = planSegDist(p, w.a, w.b); if (d < bd) { best = w.i; bd = d; } });
+  return best;
+}
+
+// Push or pull wall i (pts[i] to pts[i + 1]) t units along its normal. The
+// walls either side stretch along their own lines, so their angles hold.
+function planMoveWall(pts, i, t, closed) {
+  const n = pts.length, j = (i + 1) % n, a = pts[i], b = pts[j];
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L;
+  const a2 = [a[0] + nx * t, a[1] + ny * t], b2 = [b[0] + nx * t, b[1] + ny * t];
+  const meet = (p0, p1, from) => {
+    const d1 = [p1[0] - p0[0], p1[1] - p0[1]], d2 = [b2[0] - a2[0], b2[1] - a2[1]], den = d1[0] * d2[1] - d1[1] * d2[0];
+    if (Math.abs(den) < 1e-6 * (Math.hypot(...d1) * Math.hypot(...d2) || 1)) return null;
+    const s = ((a2[0] - p0[0]) * d2[1] - (a2[1] - p0[1]) * d2[0]) / den, q = [p0[0] + d1[0] * s, p0[1] + d1[1] * s];
+    // A wall nearly in line with this one would shoot off: just slide.
+    return Math.hypot(q[0] - from[0], q[1] - from[1]) > 3 * Math.abs(t) + 1 ? null : q;
+  };
+  const out = pts.map(q => q.slice());
+  const prev = closed || i > 0 ? pts[(i - 1 + n) % n] : null, next = closed || j < n - 1 ? pts[(j + 1) % n] : null;
+  out[i] = (prev && meet(prev, a, a)) || a2;
+  out[j] = (next && meet(next, b, b)) || b2;
+  return out;
+}
+
+// Make wall i of pts `target` units long. The wall after it moves, so a
+// square-cornered building stays square; a line's last stretch just ends
+// further along.
+function planSetWallLength(pts, i, target, closed) {
+  const n = pts.length, j = (i + 1) % n, a = pts[i], b = pts[j];
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L, delta = target - L;
+  if (closed || j < n - 1) {
+    const c = pts[(j + 1) % n], Ln = Math.hypot(c[0] - b[0], c[1] - b[1]) || 1;
+    const dot = (-(c[1] - b[1]) / Ln) * ux + ((c[0] - b[0]) / Ln) * uy;
+    if (Math.abs(dot) > 0.5) return planMoveWall(pts, j, delta * dot, closed);
+  }
+  const out = pts.map(q => q.slice());
+  out[j] = [b[0] + ux * delta, b[1] + uy * delta];
+  return out;
+}
+
+// Put new corners on the item. A building or area that was a rectangle
+// stays one (its width, depth and centre come from the corners). The change
+// is refused if it would turn the shape inside out or squash it flat.
+const planArea = pts => pts.reduce((a, p, i) => { const q = pts[(i + 1) % pts.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0) / 2;
+function setSitePlanItemPts(it, orig, pts) {
+  if (orig.pts) {
+    if (sitePlanClosed(orig)) { const a0 = planArea(orig.pts), a1 = planArea(pts); if (Math.sign(a1) !== Math.sign(a0) || Math.abs(a1) < PLAN_GRID * PLAN_GRID) return false; }
+    it.pts = planRound(pts); return true;
+  }
+  const r = (orig.rot || 0) * Math.PI / 180, u = [Math.cos(r), Math.sin(r)], v = [-Math.sin(r), Math.cos(r)];
+  const w = (pts[1][0] - pts[0][0]) * u[0] + (pts[1][1] - pts[0][1]) * u[1];
+  const h = (pts[3][0] - pts[0][0]) * v[0] + (pts[3][1] - pts[0][1]) * v[1];
+  if (w < PLAN_GRID || h < PLAN_GRID) return false;
+  const c = planCentre(pts);
+  it.w = Math.round(w * 10) / 10; it.h = Math.round(h * 10) / 10;
+  it.x = Math.round((c[0] - it.w / 2) * 10) / 10; it.y = Math.round((c[1] - it.h / 2) * 10) / 10;
+  return true;
+}
+
+// A rectangle becomes a shape of corners, to add, step or remove one.
+function sitePlanToShape(it) {
+  if (it.pts) return;
+  it.pts = planRound(planItemPts(it));
+  delete it.x; delete it.y; delete it.w; delete it.h;
+}
+
+// Turn the item to deg, about its middle. orig is how it was before.
+function setSitePlanItemAngle(it, orig, deg) {
+  const rot = planAngle(deg);
+  if (orig.pts) it.pts = planRound(planRotatePts(orig.pts, planCentre(orig.pts), rot - (orig.rot || 0)));
+  if (rot) it.rot = rot; else delete it.rot;
+}
+
+// Nudge the item back inside the plan if a turn or a stretch took it over
+// the edge.
+function keepSitePlanItemIn(it) {
+  const b = planBoundsOf(planItemPts(it));
+  const dx = b.w > PLAN_W ? 0 : b.x < 0 ? -b.x : b.x + b.w > PLAN_W ? PLAN_W - b.x - b.w : 0;
+  const dy = b.h > PLAN_H ? 0 : b.y < 0 ? -b.y : b.y + b.h > PLAN_H ? PLAN_H - b.y - b.h : 0;
+  if (!dx && !dy) return;
+  if (it.pts) it.pts = planRound(it.pts.map(q => [q[0] + dx, q[1] + dy]));
+  else { it.x += dx; it.y += dy; }
 }
 
 function onSitePlanDown(e) {
   const E = sitePlanEditor;
-  if (!e.isPrimary) return;
   e.preventDefault();
+  // A tap on the plan puts the keyboard away.
+  const typing = document.activeElement;
+  if (typing && typing.closest && typing.closest('#spSelBar')) typing.blur();
+  try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+  E.ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  if (E.ptrs.size === 2) { startSitePlanPinch(); return; }
+  if (E.ptrs.size > 2 || E.pinch) return;
+  // How things were, in case a second finger turns this into a pinch.
+  E.down = { plan: JSON.stringify(E.plan), undo: E.undo.length, sel: E.sel, part: E.part, drawing: E.drawing, tool: E.tool };
   const p = sitePlanPoint(e);
   const tool = E.tool, sym = tool && SITE_PLAN_SYMBOLS[tool];
   const pt = [planClamp(planSnap(p[0], PLAN_GRID / 2), 10, PLAN_W - 10), planClamp(planSnap(p[1], PLAN_GRID / 2), 10, PLAN_H - 10)];
-  e.currentTarget.setPointerCapture(e.pointerId);
   if (sym && (sym.kind === 'line' || sym.kind === 'area')) {
     const gp = [planSnap(p[0]), planSnap(p[1])].map((v, i) => planClamp(v, 0, i ? PLAN_H : PLAN_W));
     let it = E.drawing && E.plan.items.find(x => x.id === E.drawing);
@@ -967,7 +1300,7 @@ function onSitePlanDown(e) {
     if (E.layer === 'sub') it.layer = 'sub';
     E.plan.items.push(it);
     E.drag = { mode: 'newrect', id: it.id, from: gp, moved: false };
-    E.sel = it.id;
+    E.sel = it.id; E.part = null;
     return;
   }
   if (sym) {
@@ -977,7 +1310,7 @@ function onSitePlanDown(e) {
     if (sym.kind === 'station') it.n = sitePlanStations(E.plan).reduce((m, s) => Math.max(m, s.n || 0), 0) + 1;
     if (sym.kind === 'text') it.label = '';
     E.plan.items.push(it);
-    E.sel = it.id;
+    E.sel = it.id; E.part = null;
     // Stations keep the tool, so a run of them goes in tap after tap.
     if (sym.kind !== 'station') E.tool = null;
     E.drag = { mode: 'move', id: it.id, start: p, orig: JSON.parse(JSON.stringify(it)), moved: false, undoPushed: true };
@@ -985,28 +1318,71 @@ function onSitePlanDown(e) {
     if (sym.kind === 'text') setTimeout(() => document.getElementById('spSelLabel').focus(), 50);
     return;
   }
-  // No tool: pick up what's under the finger, or the selected building's corner handle.
-  const sel = E.plan.items.find(it => it.id === E.sel);
-  if (sel && SITE_PLAN_SYMBOLS[sel.k].kind === 'rect' && Math.hypot(p[0] - sel.x - sel.w, p[1] - sel.y - sel.h) < 34) {
-    E.drag = { mode: 'resize', id: sel.id, moved: false, before: JSON.stringify(E.plan) };
+  // No tool: a handle of what's selected, then what's under the finger.
+  const sel = sitePlanSelected(), before = E.down.plan, clone = it => JSON.parse(JSON.stringify(it));
+  const hd = sel && sitePlanHandleAt(sel, p);
+  if (hd) {
+    if (hd.type === 'turn') E.drag = { mode: 'turn', id: sel.id, start: p, c: planCentre(planItemPts(sel)), orig: clone(sel), before, moved: false };
+    else { E.part = { type: hd.type, i: hd.i }; E.drag = { mode: hd.type, id: sel.id, i: hd.i, start: p, orig: clone(sel), before, moved: false }; }
+    renderSitePlanEditor();
     return;
   }
-  const hit = sitePlanHit(p);
-  E.sel = hit ? hit.id : null;
-  E.drag = hit ? { mode: 'move', id: hit.id, start: p, orig: JSON.parse(JSON.stringify(hit)), moved: false, before: JSON.stringify(E.plan) }
+  const hit = sitePlanHit(p), z = it => SITE_PLAN_SYMBOLS[it.k].z || 0;
+  // The selected building keeps the finger unless a symbol sits on top of it.
+  if (sel && !(hit && hit !== sel && z(hit) > z(sel))) {
+    const wall = sitePlanWallAt(sel, p);
+    if (wall != null) {
+      E.part = { type: 'wall', i: wall };
+      E.drag = { mode: 'wall', id: sel.id, i: wall, start: p, orig: clone(sel), before, moved: false };
+      renderSitePlanEditor();
+      return;
+    }
+    if (sitePlanItemHit(sel, p)) {
+      E.part = null;
+      E.drag = { mode: 'move', id: sel.id, start: p, orig: clone(sel), moved: false, before };
+      renderSitePlanEditor();
+      return;
+    }
+  }
+  E.sel = hit ? hit.id : null; E.part = null;
+  E.drag = hit ? { mode: 'move', id: hit.id, start: p, orig: clone(hit), moved: false, before }
     : E.zoom > 1 ? { mode: 'pan', sx: e.clientX, sy: e.clientY, cx: E.cx, cy: E.cy } : null;
   renderSitePlanEditor();
 }
 
+// A second finger: whatever the first one started is put back, and the two
+// pinch to zoom about the point between them.
+function startSitePlanPinch() {
+  const E = sitePlanEditor, s = E.down;
+  if (s) {
+    E.plan = JSON.parse(s.plan); E.undo.length = Math.min(E.undo.length, s.undo);
+    E.sel = s.sel; E.part = s.part; E.drawing = s.drawing; E.tool = s.tool;
+  }
+  E.drag = null; E.down = null;
+  const [a, b] = [...E.ptrs.values()], mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  E.pinch = { d0: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, z0: E.zoom, anchor: sitePlanPoint({ clientX: mid[0], clientY: mid[1] }) };
+  renderSitePlanTray(); renderSitePlanEditor();
+}
+
 function onSitePlanMove(e) {
-  const E = sitePlanEditor, d = E.drag;
+  const E = sitePlanEditor;
+  if (E.ptrs.has(e.pointerId)) E.ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  if (E.pinch) {
+    e.preventDefault();
+    if (E.ptrs.size < 2) return;
+    const [a, b] = [...E.ptrs.values()];
+    zoomSitePlanAt(E.pinch.z0 * Math.hypot(a[0] - b[0], a[1] - b[1]) / E.pinch.d0, E.pinch.anchor, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    renderSitePlanCanvas();
+    return;
+  }
+  const d = E.drag;
   if (!d) return;
   e.preventDefault();
   if (d.mode === 'pan') {
     const r = document.querySelector('#spCanvas svg').getBoundingClientRect();
     E.cx = d.cx - (e.clientX - d.sx) / r.width * PLAN_W / E.zoom;
     E.cy = d.cy - (e.clientY - d.sy) / r.height * PLAN_H / E.zoom;
-    renderSitePlanEditor();
+    renderSitePlanCanvas();
     return;
   }
   const p = sitePlanPoint(e);
@@ -1017,31 +1393,69 @@ function onSitePlanMove(e) {
     it.x = Math.min(d.from[0], gp[0]); it.y = Math.min(d.from[1], gp[1]);
     it.w = Math.abs(gp[0] - d.from[0]); it.h = Math.abs(gp[1] - d.from[1]);
     d.moved = true;
-  } else if (d.mode === 'resize') {
-    it.w = Math.max(PLAN_GRID * 2, planClamp(planSnap(p[0]), 0, PLAN_W) - it.x);
-    it.h = Math.max(PLAN_GRID * 2, planClamp(planSnap(p[1]), 0, PLAN_H) - it.y);
-    d.moved = true;
   } else {
     let dx = p[0] - d.start[0], dy = p[1] - d.start[1];
-    if (!d.moved && Math.hypot(dx, dy) < 8) return;
+    if (!d.moved && Math.hypot(dx, dy) < 5 * E.upx) return;
     d.moved = true;
-    const kind = SITE_PLAN_SYMBOLS[it.k].kind;
-    if (kind === 'rect') {
-      it.x = planClamp(planSnap(d.orig.x + dx), 0, PLAN_W - it.w);
-      it.y = planClamp(planSnap(d.orig.y + dy), 0, PLAN_H - it.h);
-    } else if (kind === 'line' || kind === 'area') {
-      dx = planSnap(dx); dy = planSnap(dy);
-      it.pts = d.orig.pts.map(q => [planClamp(q[0] + dx, 0, PLAN_W), planClamp(q[1] + dy, 0, PLAN_H)]);
+    const kind = SITE_PLAN_SYMBOLS[it.k].kind, g = sitePlanStep();
+    if (d.mode === 'corner') dragSitePlanCorner(it, d, p, g);
+    else if (d.mode === 'wall') {
+      const pts = planItemPts(d.orig), a = pts[d.i], b = pts[(d.i + 1) % pts.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const t = planSnap(dx * -(b[1] - a[1]) / L + dy * (b[0] - a[0]) / L, g);
+      const apply = t => setSitePlanItemPts(it, d.orig, planMoveWall(pts, d.i, t, sitePlanClosed(it)));
+      // Pulled too far, the wall stops as close to the far wall as it can go.
+      if (!apply(t)) { let lo = 0, hi = t; for (let k = 0; k < 12; k++) { const m = (lo + hi) / 2; if (apply(m)) lo = m; else hi = m; } apply(lo); }
+    } else if (d.mode === 'turn') {
+      let deg = (d.orig.rot || 0) + (Math.atan2(p[1] - d.c[1], p[0] - d.c[0]) - Math.atan2(d.start[1] - d.c[1], d.start[0] - d.c[0])) * 180 / Math.PI;
+      // Whole degrees, clicking to every 15°.
+      deg = Math.round(deg);
+      if (Math.abs(deg - planSnap(deg, 15)) <= 4) deg = planSnap(deg, 15);
+      setSitePlanItemAngle(it, d.orig, deg);
+    } else if (kind === 'rect' || kind === 'line' || kind === 'area') {
+      // The whole thing moves, kept inside the plan.
+      const b = planBoundsOf(planItemPts(d.orig));
+      dx = planClamp(planSnap(dx, 2 * g), -b.x, PLAN_W - b.x - b.w); dy = planClamp(planSnap(dy, 2 * g), -b.y, PLAN_H - b.y - b.h);
+      if (d.orig.pts) it.pts = d.orig.pts.map(q => [q[0] + dx, q[1] + dy]);
+      else { it.x = d.orig.x + dx; it.y = d.orig.y + dy; }
     } else {
       it.x = planClamp(planSnap(d.orig.x + dx, PLAN_GRID / 2), 10, PLAN_W - 10);
       it.y = planClamp(planSnap(d.orig.y + dy, PLAN_GRID / 2), 10, PLAN_H - 10);
     }
   }
-  renderSitePlanEditor();
+  renderSitePlanCanvas();
+  renderSitePlanSelBar();
 }
 
-function onSitePlanUp() {
-  const E = sitePlanEditor, d = E.drag;
+// Drag a corner. A rectangle stays a rectangle, its far corner staying put;
+// a shape's or line's corner goes under the finger, on the grid of the way
+// the shape is turned, so its walls stay square.
+function dragSitePlanCorner(it, d, p, g) {
+  const q = [planClamp(p[0], 0, PLAN_W), planClamp(p[1], 0, PLAN_H)];
+  if (!d.orig.pts) {
+    const r = (d.orig.rot || 0) * Math.PI / 180, u = [Math.cos(r), Math.sin(r)], v = [-Math.sin(r), Math.cos(r)];
+    const pts = planItemPts(d.orig), o = pts[(d.i + 2) % 4], c0 = pts[d.i];
+    const along = (pt, ax) => (pt[0] - o[0]) * ax[0] + (pt[1] - o[1]) * ax[1];
+    const sx = Math.sign(along(c0, u)) || 1, sy = Math.sign(along(c0, v)) || 1;
+    const w = Math.max(PLAN_GRID, planSnap(along(q, u) * sx, g)), h = Math.max(PLAN_GRID, planSnap(along(q, v) * sy, g));
+    const cx = o[0] + u[0] * sx * w / 2 + v[0] * sy * h / 2, cy = o[1] + u[1] * sx * w / 2 + v[1] * sy * h / 2;
+    it.w = w; it.h = h; it.x = Math.round((cx - w / 2) * 10) / 10; it.y = Math.round((cy - h / 2) * 10) / 10;
+    return;
+  }
+  const pts = d.orig.pts.map(x => x.slice());
+  pts[d.i] = planSnapInFrame(q, d.orig.pts[d.i ? 0 : 1], d.orig.rot || 0, g);
+  it.pts = planRound(pts);
+}
+
+function onSitePlanUp(e) {
+  const E = sitePlanEditor;
+  E.ptrs.delete(e.pointerId);
+  if (E.pinch) {
+    // The pinch ends when both fingers are off.
+    if (!E.ptrs.size) E.pinch = null;
+    renderSitePlanEditor();
+    return;
+  }
+  const d = E.drag;
   if (!d) return;
   E.drag = null;
   const it = E.plan.items.find(x => x.id === d.id);
@@ -1056,6 +1470,7 @@ function onSitePlanUp() {
     E.tool = null;
     renderSitePlanTray();
   }
+  if (it && d.moved && ['corner', 'wall', 'turn'].includes(d.mode)) keepSitePlanItemIn(it);
   // A move only counts for undo once something moved.
   if (d.before && d.moved) { E.undo.push(d.before); if (E.undo.length > 40) E.undo.shift(); }
   renderSitePlanEditor();
@@ -1067,7 +1482,7 @@ function finishSitePlanLine() {
   const it = E.plan.items.find(x => x.id === E.drawing);
   E.drawing = null;
   if (it && it.pts.length < (SITE_PLAN_SYMBOLS[it.k].kind === 'area' ? 3 : 2)) E.plan.items = E.plan.items.filter(x => x !== it);
-  else if (it) E.sel = it.id;
+  else if (it) { E.sel = it.id; E.part = null; }
   E.tool = null;
   renderSitePlanTray();
   renderSitePlanEditor();
@@ -1075,10 +1490,97 @@ function finishSitePlanLine() {
 
 function onSitePlanLabel(inp) {
   const E = sitePlanEditor;
-  const it = E.plan.items.find(x => x.id === E.sel);
+  const it = sitePlanSelected();
   if (!it) return;
   if (!inp.dataset.undo) { pushSitePlanUndo(); inp.dataset.undo = '1'; }
   it.label = inp.value;
+  renderSitePlanEditor();
+}
+
+// Turn the selected building, area or line to the next 15° either way.
+function turnSitePlanItem(dir) {
+  const it = sitePlanSelected();
+  if (!it || !sitePlanHandles(it)) return;
+  pushSitePlanUndo();
+  const cur = it.rot || 0;
+  setSitePlanItemAngle(it, JSON.parse(JSON.stringify(it)), dir > 0 ? (Math.floor(cur / 15 + 1e-6) + 1) * 15 : (Math.ceil(cur / 15 - 1e-6) - 1) * 15);
+  keepSitePlanItemIn(it);
+  renderSitePlanEditor();
+}
+
+// Or type the angle: 0 to 359, clockwise.
+function onSitePlanAngle(inp) {
+  const it = sitePlanSelected(), deg = parseFloat(inp.value);
+  if (!it || !isFinite(deg)) return;
+  if (!inp.dataset.undo) { pushSitePlanUndo(); inp.dataset.undo = '1'; }
+  setSitePlanItemAngle(it, JSON.parse(JSON.stringify(it)), deg);
+  keepSitePlanItemIn(it);
+  renderSitePlanEditor();
+}
+
+// The picked wall's real length. With no scale yet it sets the scale for the
+// whole plan; with one, the wall after it moves so this wall is that long.
+// Each keystroke works from the wall as it was when the box was tapped.
+function onSitePlanPartFocus(inp) {
+  delete inp.dataset.undo; delete inp.dataset.scale;
+  const E = sitePlanEditor, it = sitePlanSelected();
+  E.partBase = it && E.part ? { key: it.id + ':' + E.part.type + E.part.i, it: JSON.parse(JSON.stringify(it)) } : null;
+}
+function onSitePlanPartMetres(inp) {
+  const E = sitePlanEditor, it = sitePlanSelected();
+  if (!it || !E.part || E.part.type !== 'wall') return;
+  // Another wall picked since the box was tapped: start again from this one.
+  if (!E.partBase || E.partBase.key !== it.id + ':' + E.part.type + E.part.i) onSitePlanPartFocus(inp);
+  const base = E.partBase.it;
+  const m = parseFloat(String(inp.value).replace(',', '.'));
+  const pts = planItemPts(base), a = pts[E.part.i], b = pts[(E.part.i + 1) % pts.length], units = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  if (!(m > 0 && m < 2000) || !units) return;
+  if (!inp.dataset.undo) { pushSitePlanUndo(); inp.dataset.undo = '1'; }
+  if (!E.plan.mpu || inp.dataset.scale) {
+    // No scale yet: this wall sets it, and keeps setting it while typing.
+    E.plan.mpu = m / units; inp.dataset.scale = '1';
+  } else {
+    if (setSitePlanItemPts(it, base, planSetWallLength(pts, E.part.i, m / E.plan.mpu, sitePlanClosed(it)))) keepSitePlanItemIn(it);
+  }
+  renderSitePlanEditor();
+}
+
+// Add a corner in the middle of the picked wall, picked to drag.
+function addSitePlanCorner() {
+  const E = sitePlanEditor, it = sitePlanSelected(), part = E.part;
+  if (!it || !part || part.type !== 'wall') return;
+  pushSitePlanUndo();
+  sitePlanToShape(it);
+  const a = it.pts[part.i], b = it.pts[(part.i + 1) % it.pts.length];
+  it.pts.splice(part.i + 1, 0, planRound([[(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]])[0]);
+  E.part = { type: 'corner', i: part.i + 1 };
+  renderSitePlanEditor();
+}
+
+// Step the picked corner in, for an L shape or a notch: it becomes three
+// corners, the same way along each wall.
+function stepSitePlanCorner() {
+  const E = sitePlanEditor, it = sitePlanSelected(), part = E.part;
+  if (!it || !part || part.type !== 'corner' || !sitePlanClosed(it)) return;
+  pushSitePlanUndo();
+  sitePlanToShape(it);
+  const n = it.pts.length, i = part.i, c = it.pts[i], a = it.pts[(i - 1 + n) % n], b = it.pts[(i + 1) % n];
+  const la = Math.hypot(a[0] - c[0], a[1] - c[1]) || 1, lb = Math.hypot(b[0] - c[0], b[1] - c[1]) || 1;
+  const s = Math.max(PLAN_GRID / 2, planSnap(Math.min(la, lb) / 3, PLAN_GRID / 2));
+  const p1 = [c[0] + (a[0] - c[0]) / la * s, c[1] + (a[1] - c[1]) / la * s], p2 = [c[0] + (b[0] - c[0]) / lb * s, c[1] + (b[1] - c[1]) / lb * s];
+  it.pts.splice(i, 1, ...planRound([p1, [p1[0] + p2[0] - c[0], p1[1] + p2[1] - c[1]], p2]));
+  E.part = { type: 'corner', i: i + 1 };
+  renderSitePlanEditor();
+}
+
+function removeSitePlanCorner() {
+  const E = sitePlanEditor, it = sitePlanSelected(), part = E.part;
+  if (!it || !part || part.type !== 'corner') return;
+  if (planItemPts(it).length <= (sitePlanClosed(it) ? 3 : 2)) return;
+  pushSitePlanUndo();
+  sitePlanToShape(it);
+  it.pts.splice(part.i, 1);
+  E.part = null;
   renderSitePlanEditor();
 }
 
@@ -1088,7 +1590,7 @@ function deleteSitePlanItem() {
   pushSitePlanUndo();
   if (E.drawing === E.sel) E.drawing = null;
   E.plan.items = E.plan.items.filter(x => x.id !== E.sel);
-  E.sel = null;
+  E.sel = null; E.part = null;
   renderSitePlanEditor();
 }
 
@@ -1114,7 +1616,7 @@ function clearSitePlan() {
     if (E.plan.bg) keep.bg = E.plan.bg;
     E.plan = Object.assign(newSitePlan(), keep);
   }
-  E.sel = null; E.drawing = null;
+  E.sel = null; E.part = null; E.drawing = null;
   renderSitePlanEditor();
 }
 

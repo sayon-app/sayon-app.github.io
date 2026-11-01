@@ -766,6 +766,26 @@
           <input class="job-input" id="spSelMetres" type="number" min="0" step="any" inputmode="decimal" placeholder="metres" oninput="onSitePlanMetres(this)" onfocus="onSitePlanLabelFocus(this)">
           <span>m</span>
         </label>
+        <div class="sp-selrow sp-turn" id="spTurnRow" hidden>
+          <span class="sp-turn-label">Angle</span>
+          <button type="button" class="quote-link-btn sp-turn-btn" onclick="turnSitePlanItem(-1)" aria-label="Turn 15 degrees anticlockwise"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M3.5 15a9 9 0 1 0 2.1-9.4L1 10"/></svg></button>
+          <input class="job-input" id="spAngle" type="number" min="0" max="359" step="1" inputmode="numeric" oninput="onSitePlanAngle(this)" onfocus="onSitePlanLabelFocus(this)" aria-label="Angle in degrees, clockwise">
+          <span>°</span>
+          <button type="button" class="quote-link-btn sp-turn-btn" onclick="turnSitePlanItem(1)" aria-label="Turn 15 degrees clockwise"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10"/></svg></button>
+        </div>
+        <div class="sp-part" id="spPart" hidden>
+          <div class="sp-selname" id="spPartName"></div>
+          <label class="sp-selrow sp-size" id="spPartLenRow" hidden>
+            <span id="spPartLenLabel">Real length of this wall</span>
+            <input class="job-input" id="spPartMetres" type="number" min="0" step="any" inputmode="decimal" placeholder="metres" oninput="onSitePlanPartMetres(this)" onfocus="onSitePlanPartFocus(this)">
+            <span>m</span>
+          </label>
+          <div class="sp-part-btns">
+            <button type="button" class="quote-link-btn" id="spPartAdd" onclick="addSitePlanCorner()">Add a corner here</button>
+            <button type="button" class="quote-link-btn" id="spPartStep" onclick="stepSitePlanCorner()">Step the corner in</button>
+            <button type="button" class="quote-link-btn sp-delete" id="spPartRemove" onclick="removeSitePlanCorner()">Remove this corner</button>
+          </div>
+        </div>
       </div>
       <p class="quote-hint sp-scale-note" id="spScaleNote"></p>
       <div class="sp-groups" id="spGroups" role="tablist" aria-label="Symbols"></div>

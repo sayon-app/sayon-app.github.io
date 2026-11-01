@@ -508,10 +508,19 @@ function renderAreaFindingPrompts() {
   }).join('');
   el.hidden = !zones.length;
 }
+// An area a finding (or the borer, decay or delignification details) names
+// is marked "evidence found", not "nothing found": the report would
+// otherwise say "no visible evidence" over a finding in that area.
 function markRemainingAreasClear() {
   if (!reportData.areaResult) reportData.areaResult = {};
-  areasMissingResult().forEach(z => { reportData.areaResult[z] = 'CLEAR'; });
+  const found = [];
+  areasMissingResult().forEach(z => {
+    const ev = areaEvidence(z).length > 0;
+    reportData.areaResult[z] = ev ? 'FOUND' : 'CLEAR';
+    if (ev) found.push(OBS_ZONES[z].label.replace(/^The /, ''));
+  });
   syncObstructionData();
+  if (found.length) showToast(`${found.join(', ')} marked "evidence found", from your findings`, 'info');
 }
 
 // Areas that weren't fully inspected, i.e. the ones with obstructions.
@@ -2161,7 +2170,8 @@ function openApp(appName) {
         if (llWrap) llWrap.style.display = '';
       }
     }
-    if (restored) showToast('Restored unsaved work', 'info');
+    // The draft is the job as it was left, saved or not, so this doesn't say "unsaved".
+    if (restored) showToast('Picked up where you left off', 'info');
     if (!reportData.standard) setStandard('AS 3660.2-2017');
     enableKeyboardActivation();
     restoreA11ySettings();
@@ -7986,7 +7996,7 @@ function buildAgreementPdf(a) {
   y += 2;
   y = drawAgreementBody(doc, a, y, { M, CW, onNewPage: header });
   drawPdfDocFooters(doc, `Pre-inspection agreement${company.name ? `  ·  ${company.name}` : ''}`);
-  const fname = `Agreement_${(getFullAddress() || 'property').replace(/\s+/g, '_').substring(0, 25)}.pdf`;
+  const fname = `Agreement_${fileNamePart(getFullAddress()) || 'Property'}.pdf`;
   return { blob: doc.output('blob'), fname };
 }
 
@@ -8861,6 +8871,15 @@ function tidyPhoneInput(el) {
   if (v !== el.value) { el.value = v; el.dispatchEvent(new Event('input')); }
 }
 
+// A file-name part from free text: letters, digits and underscores only,
+// cut at a word end. "7 Banksia Drive, Epping NSW 2121" gives
+// "7_Banksia_Drive_Epping_NSW_2121", not "7_Banksia_Drive,_Epping_N".
+function fileNamePart(text, max = 40) {
+  let s = String(text || '').replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '');
+  if (s.length > max) { s = s.slice(0, max + 1); const cut = s.lastIndexOf('_'); s = cut > max / 2 ? s.slice(0, cut) : s.slice(0, max); }
+  return s.replace(/_+$/, '');
+}
+
 function formatAddress(street, suburb, state, postcode) {
   const line2 = [suburb, [state, postcode].filter(Boolean).join(' ')].filter(Boolean).join(' ');
   return [street, line2].filter(Boolean).join(', ');
@@ -8881,6 +8900,9 @@ function updateJob() {
     const parts = [addr, client].filter(Boolean);
     summary.textContent = parts.length ? parts.join(' · ') : 'No job set';
   }
+
+  const newHint = document.querySelector('.dash-current-new');
+  if (newHint) newHint.textContent = dashNewJobHint();
 
   syncAllSelectCards();
   renderLastVisitBanner();
@@ -12170,6 +12192,13 @@ function openJobDetails() {
   setDashboardTab('current');
 }
 
+// The line above Job details for a job not saved yet. Once an address is
+// typed it stops asking for one.
+function dashNewJobHint() {
+  const addr = getFullAddress();
+  return addr ? `${addr}: a draft until you save the report or send it.` : 'A new job. Fill in the address and client to start its report.';
+}
+
 function refreshDashboardIfOpen() {
   if (document.getElementById('dashboardOverlay').classList.contains('open')) renderDashboard();
 }
@@ -12381,7 +12410,7 @@ function renderDashboardJobs(fade) {
           </span>
           <svg class="icon dash-row-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
         </button>`
-        : '<p class="dash-current-new">A new job. Fill in the address and client to start its report.</p>'}
+        : `<p class="dash-current-new">${escapeHtml(dashNewJobHint())}</p>`}
       <div class="dash-current-head">Job details</div>
       <div id="dashCurrentSlot"></div>
     </div>`;
@@ -12991,6 +13020,9 @@ function reportPrepGaps(from = 'send') {
   const noResult = areasMissingResult();
   if (noResult.length) push('result', `${noResult.length} area${noResult.length === 1 ? ' has' : 's have'} no result for what was found there (${noResult.map(z => OBS_ZONES[z].label.replace(/^The /, '')).join(', ')})`,
     fixBtn('clear', 'Mark the rest as nothing found'));
+  // "Nothing found" over an area a finding names: the report would contradict itself.
+  Object.keys(OBS_ZONES).filter(z => areaResultOf(z) === 'CLEAR' && areaEvidence(z).length).forEach(z =>
+    push('contradiction', `${OBS_ZONES[z].label}: marked "nothing found", but ${areaEvidence(z)[0].replace(/ \(.*$/, '')} is there`, fixBtn('found:' + z, 'Mark evidence found')));
   areasEvidenceUnlinked().forEach(z => push('evidence', `${OBS_ZONES[z].label}: marked "evidence found", but no finding mentions it`, fixBtn('finding:' + z, 'Add finding')));
   findingsMissingReferral().forEach(n => push('referral', `Finding ${n}: "refer to a builder or engineer?" isn't answered`));
   const pending = (reportData.pendingNotes || []).length;
@@ -13482,7 +13514,8 @@ function fixReportGap(kind, from = 'send') {
   if (kind === 'agreement') { leave(); openAgreementSheet(); return; }
   if (kind === 'photos') { backUpPhotosFromGap(from); return; }
   if (kind.startsWith('finding:')) { leave(); addFindingForArea(kind.slice(8)); return; }
-  if (kind === 'clear') markRemainingAreasClear();
+  if (kind.startsWith('found:')) { if (!reportData.areaResult) reportData.areaResult = {}; reportData.areaResult[kind.slice(6)] = 'FOUND'; syncObstructionData(); }
+  else if (kind === 'clear') markRemainingAreasClear();
   else markRemainingAreasInspected(kind === 'na' ? 'NA' : 'INSPECTED');
   reopen();
 }
@@ -15093,7 +15126,7 @@ async function buildReportPdf() {
     doc.text(`Page ${p-1} of ${totalPages-1}`, W-M, 290, { align:'right' });
   }
 
-  const fname = `SAYON_${address.replace(/\s+/g,'_').substring(0,25)}_${today.replace(/\s+/g,'_')}.pdf`;
+  const fname = `SAYON_${fileNamePart(address) || 'Property'}_${fileNamePart(today)}.pdf`;
   const blob = doc.output('blob');
   saveDraft(); // keeps the report number it was given
   return { blob, fname, fingerprint, version };

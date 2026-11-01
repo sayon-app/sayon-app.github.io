@@ -7772,6 +7772,11 @@ function updateAgreementSignButton() {
     li.classList.toggle('now', !done && !nowSet);
     if (!done) nowSet = true;
   });
+  // The bar under the header: one segment per step, filled once it's done.
+  const bar = document.getElementById('agreementProgress');
+  if (bar) [...bar.children].forEach((seg, i) => seg.classList.toggle('done', steps[i][1]));
+  const by = document.getElementById('agreementSigBy');
+  if (by) by.textContent = named ? document.getElementById('agreementSignerName').value.trim() : 'Client';
   const need = [!typed && 'choose the inspection type', !agreed && 'tick that the client has read it',
     !named && "enter the client's name", !drawn && 'get their signature'].filter(Boolean);
   const needEl = document.getElementById('agreementSignNeed');

@@ -2617,7 +2617,6 @@ body.report-locked #micDock { opacity: 0.4; }
   color: var(--text);
 }
 .agreement-check input { width: 22px; height: 22px; }
-.agreement-sig-actions { display: flex; justify-content: flex-end; }
 .agreement-other-toggle { align-self: center; }
 .agreement-other { display: flex; gap: 8px; }
 .agreement-other .job-input { flex: 1; min-width: 0; }
@@ -2631,73 +2630,87 @@ body.report-locked #micDock { opacity: 0.4; }
   border-radius: 10px;
 }
 
-/* The agreement sheet: an intro with the address, then three steps on a
-   side line (the job, read it together, client signs), as on a job's sheet. */
-.agr-body { gap: 0; padding-left: 20px; padding-right: 20px; font-feature-settings: 'cv11', 'ss01'; }
-.agr-intro { padding: 6px 0 20px; }
-.agr-kicker, .agr-section-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent2); }
+/* The agreement sheet: the address on top, then three steps, each with a
+   numbered head, and a thin bar under the header that fills as they're done. */
+#agreementOverlay .page-sheet-header { position: relative; }
+/* On a wide screen the sheet floats as a card instead of a full-height strip. */
+@media (min-width: 720px) {
+  #agreementOverlay .page-sheet { inset: 24px 0; border-radius: 20px; overflow: hidden; box-shadow: 0 24px 60px -20px rgba(0,0,0,0.45); }
+}
+.agr-progress {
+  position: absolute; left: 16px; right: 16px; bottom: -2px; height: 3px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+}
+.agr-progress i { display: block; border-radius: 3px; background: var(--border); transition: background 0.25s; }
+.agr-progress i.done { background: var(--accent); }
+#agreementOverlay:has(#agreementEdit[style*="display: none"]) .agr-progress { display: none; }
+
+.agr-body { gap: 0; padding: 22px 20px calc(32px + env(safe-area-inset-bottom, 0px)); font-feature-settings: 'cv11', 'ss01'; }
+.agr-intro { padding: 0 0 18px; }
+.agr-kicker, .agr-section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent2); }
 .agr-addr {
-  margin: 6px 0 0; font-family: 'Space Grotesk', sans-serif; font-size: 23px; line-height: 1.15;
-  font-weight: 700; letter-spacing: -0.02em; color: var(--text); text-wrap: balance;
+  margin: 8px 0 0; font-family: 'Space Grotesk', sans-serif; font-size: 26px; line-height: 1.12;
+  font-weight: 700; letter-spacing: -0.025em; color: var(--text); text-wrap: balance;
 }
 .agr-addr.empty { color: var(--text3); }
-.agr-lede { margin: 8px 0 0; font-size: 14px; line-height: 1.55; color: var(--text2); text-wrap: pretty; }
+.agr-lede { margin: 10px 0 0; font-size: 14.5px; line-height: 1.55; color: var(--text2); text-wrap: pretty; max-width: 46ch; }
+#agreementEdit > .sheet-voice { margin: 0 0 8px; }
 
+/* Each step: a numbered head, then its content at full width. */
 .agr-steps { list-style: none; margin: 0; padding: 0; }
-.agr-step { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 0 0 28px 40px; }
-.agr-step:last-child { padding-bottom: 0; }
-.agr-step::before {
-  content: ''; position: absolute; left: 11px; top: 30px; bottom: 4px; width: 2px;
-  border-radius: 2px; background: var(--border); transition: background 0.2s;
-}
-.agr-step:last-child::before { display: none; }
-.agr-step.done::before { background: var(--accent); }
+.agr-step { display: flex; flex-direction: column; gap: 12px; padding: 26px 0 0; }
+.agr-step + .agr-step { margin-top: 26px; border-top: 1px solid var(--border); }
+.agr-step-head { display: flex; align-items: center; gap: 12px; margin-bottom: 2px; }
 .agr-step-dot {
-  position: absolute; left: 0; top: 0; width: 24px; height: 24px; border-radius: 99px; box-sizing: border-box;
-  border: 2px solid var(--border); background: var(--surface);
+  flex: none; width: 32px; height: 32px; border-radius: 99px; box-sizing: border-box;
+  border: 1.5px solid var(--border); background: var(--surface);
   display: flex; align-items: center; justify-content: center;
-  font-size: 11.5px; font-weight: 700; color: var(--text3); font-variant-numeric: tabular-nums;
-  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+  font-size: 13px; font-weight: 700; color: var(--text3); font-variant-numeric: tabular-nums;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, color 0.2s;
 }
-.agr-step.now .agr-step-dot { border-color: var(--accent); color: var(--accent2); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.16); }
+.agr-step.now .agr-step-dot { border-color: var(--accent); color: var(--accent2); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.14); }
 .agr-step.done .agr-step-dot { background: var(--accent); border-color: var(--accent); color: #fff; }
 .agr-step.done .agr-step-dot b { display: none; }
 .agr-step.done .agr-step-dot::after {
-  content: ''; width: 9px; height: 5px; margin-top: -2px;
+  content: ''; width: 11px; height: 6px; margin-top: -3px;
   border: solid #fff; border-width: 0 0 2px 2px; transform: rotate(-45deg);
 }
+.agr-step-of { font-size: 11px; font-weight: 650; letter-spacing: 0.04em; color: var(--text3); font-variant-numeric: tabular-nums; }
+.agr-step.done .agr-step-of { color: var(--accent2); }
 .agr-step-title {
-  margin: 1px 0 2px; font-family: 'Space Grotesk', sans-serif; font-size: 17px; line-height: 22px;
-  font-weight: 700; letter-spacing: -0.015em; color: var(--text);
+  margin: 1px 0 0; font-family: 'Space Grotesk', sans-serif; font-size: 19px; line-height: 24px;
+  font-weight: 700; letter-spacing: -0.02em; color: var(--text);
 }
 .agr-step .job-field, .agr-step .job-row { margin: 0; }
-.agr-hint { margin: -2px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--yellow-text); }
+.agr-hint {
+  margin: -4px 0 0; padding: 9px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.5;
+  background: rgba(255,182,72,0.12); color: var(--yellow-text);
+}
 .agr-hint[hidden] { display: none; }
-.agr-sign-need { margin: 0; color: var(--text3); text-align: center; }
+.agr-sign-need { margin: -2px 0 0; padding: 0; background: none; color: var(--text3); text-align: center; }
 
-/* The wording, set as a document: numbered clauses with a hairline between. */
+/* The wording, set as a page: a numbered gutter, clause titles, room to read. */
 .agr-doc {
-  padding: 2px 16px; border: 1px solid var(--border); border-radius: 14px;
-  background: var(--surface2); color: var(--text2);
+  padding: 4px 16px; border: 1px solid var(--border); border-radius: 16px;
+  background: var(--surface); color: var(--text2);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.12);
 }
 .agr-clause {
-  display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: start;
-  padding: 14px 0; border-bottom: 1px solid var(--border);
+  display: grid; grid-template-columns: 20px minmax(0, 1fr); column-gap: 6px; align-items: baseline;
+  padding: 16px 0; border-bottom: 1px solid var(--border);
 }
-.agr-clause > p { grid-column: 1 / -1; }
+.agr-clause > p { grid-column: 2; }
 .agr-clause:last-of-type { border-bottom: 0; }
 .agr-clause-num {
-  margin-top: 1px; min-width: 20px; height: 20px; padding: 0 4px; box-sizing: border-box; border-radius: 6px;
-  background: rgba(var(--accent-rgb), 0.12); color: var(--accent2);
-  font-size: 11px; font-weight: 700; line-height: 20px; text-align: center; font-variant-numeric: tabular-nums;
+  font-size: 13px; font-weight: 700; color: var(--accent2); font-variant-numeric: tabular-nums;
 }
-.agr-clause-title { margin: 0 0 4px; font-size: 14.5px; line-height: 22px; font-weight: 650; letter-spacing: -0.01em; color: var(--text); }
-.agr-doc p { margin: 0; font-size: 14px; line-height: 1.6; text-wrap: pretty; }
+.agr-clause-title { margin: 0 0 6px; font-size: 15px; line-height: 22px; font-weight: 650; letter-spacing: -0.01em; color: var(--text); }
+.agr-doc p { margin: 0; font-size: 14.5px; line-height: 1.65; text-wrap: pretty; }
 .agr-doc p + p { margin-top: 8px; }
-.agr-doc-intro { padding: 14px 0 0; }
+.agr-doc-intro { padding: 16px 0 0; }
 .agr-doc-close {
-  margin: 2px -16px -2px !important; padding: 14px 16px 16px;
-  border-top: 1px solid var(--border); border-radius: 0 0 13px 13px;
+  margin: 4px -16px -4px !important; padding: 16px 16px 18px;
+  border-top: 1px solid rgba(var(--accent-rgb), 0.22); border-radius: 0 0 15px 15px;
   background: rgba(var(--accent-rgb), 0.07); color: var(--text); font-weight: 500;
 }
 .agr-doc-close + .agr-doc-close { margin-top: 0 !important; border-top: 0; padding-top: 0; }
@@ -2705,25 +2718,66 @@ body.report-locked #micDock { opacity: 0.4; }
   display: inline-block; padding: 0 6px; border-radius: 5px; font-size: 12.5px; font-weight: 600;
   background: rgba(255,182,72,0.18); color: var(--yellow-text);
 }
-.agr-step .agreement-check { padding: 2px 0; }
+
+/* "I have read and agree": a large tap target that turns green when ticked. */
+.agr-step .agreement-check {
+  gap: 12px; min-height: 56px; padding: 12px 16px; box-sizing: border-box; cursor: pointer;
+  border: 1.5px solid var(--border); border-radius: 14px; background: var(--surface2);
+  font-size: 14.5px; transition: background 0.2s, border-color 0.2s;
+}
+.agr-step .agreement-check input { flex: none; margin: 0; accent-color: var(--accent); }
+.agr-step .agreement-check:has(input:checked) { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.08); }
+
+/* The signature pad: a signing line with the client's name under it. */
+.signature-pad-wrap.agreement-sig-wrap { height: 176px; border: 1.5px solid var(--border); border-radius: 14px; }
+.agreement-sig-wrap::before {
+  content: '×'; position: absolute; left: 18px; bottom: 34px; font-size: 18px; line-height: 1; color: #94a3b8; pointer-events: none;
+}
+.agreement-sig-wrap::after {
+  content: ''; position: absolute; left: 18px; right: 18px; bottom: 32px; height: 1px; background: #cbd5e1; pointer-events: none;
+}
+.agreement-sig-wrap .signature-placeholder { padding-bottom: 30px; font-size: 13px; color: #94a3b8; }
+.agreement-sig-actions { display: flex; align-items: center; justify-content: space-between; margin-top: -6px; }
+.agr-sig-by { font-size: 12.5px; color: var(--text3); }
+.agr-sig-by::before { content: 'Signed by '; }
+.agr-sig-clear {
+  min-height: 36px; padding: 0 12px; margin-right: -12px; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--text2);
+}
+.agr-sig-clear:hover { color: var(--accent2); }
+#agreementEdit .agr-step .extract-btn { margin-top: 6px; }
+
+/* Other ways to sign: quiet rows under the button. */
+.agr-alt { margin-top: 10px; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.agr-alt-label { padding: 12px 16px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); }
+.agr-alt-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%;
+  min-height: 50px; padding: 0 16px; border: 0; background: none; cursor: pointer; text-align: left;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--text);
+}
+.agr-alt-btn + .agr-alt-btn { border-top: 1px solid var(--border); }
+.agr-alt-btn svg { flex: none; color: var(--text3); }
+.agr-alt-btn:hover { background: var(--surface2); }
+.agr-alt-btn:disabled { opacity: 0.55; cursor: default; }
+.agr-alt .agreement-other { padding: 0 16px 14px; }
 
 /* Signed: who and when on top, then the wording. */
 .agr-signed {
-  margin: 4px 0 22px; padding: 18px; border-radius: 16px;
-  background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.10), rgba(var(--accent-rgb), 0.03));
+  margin: 0 0 24px; padding: 20px; border-radius: 18px;
+  background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.11), rgba(var(--accent-rgb), 0.03));
   border: 1px solid rgba(var(--accent-rgb), 0.28);
 }
 .agr-signed-chip {
-  display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px;
-  border-radius: 99px; font-size: 12px; font-weight: 650; background: rgba(var(--accent-rgb), 0.14); color: var(--accent2);
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 11px;
+  border-radius: 99px; font-size: 12.5px; font-weight: 650; background: rgba(var(--accent-rgb), 0.15); color: var(--accent2);
 }
 .agr-signed-chip::before { content: ''; width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
-.agr-signed-name { margin-top: 10px; font-family: 'Space Grotesk', sans-serif; font-size: 21px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
-.agr-signed-meta { margin-top: 3px; font-size: 13.5px; color: var(--text2); font-variant-numeric: tabular-nums; }
-.agr-section-label { color: var(--text3); margin-bottom: 10px; }
-#agreementView .agr-doc + .extract-btn { margin-top: 18px; }
-#agreementView .agreement-other-toggle { margin-top: 6px; }
-#agreementEdit .agr-step .extract-btn { margin-top: 4px; }
+.agr-signed-name { margin-top: 12px; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
+.agr-signed-meta { margin-top: 4px; font-size: 13.5px; color: var(--text2); font-variant-numeric: tabular-nums; }
+.agr-signed .agreement-view-signature { max-width: 260px; margin-top: 16px; border-radius: 12px; padding: 6px; box-sizing: border-box; }
+.agr-section-label { color: var(--text3); margin-bottom: 12px; }
+#agreementView .agr-doc + .extract-btn { margin-top: 22px; }
+#agreementView .link-btn { align-self: center; margin-top: 6px; }
 /* Check before sending */
 .send-review-label {
   margin-top: 6px;

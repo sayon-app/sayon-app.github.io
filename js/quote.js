@@ -802,6 +802,7 @@ function openQuote(from, preferKey) {
   quoteSources = collectQuoteSources();
   renderQuoteSourceOptions(preferKey);
   onQuoteSourceChange();
+  renderDocStrips();
   document.querySelector('#quoteScreen .quote-scroll').scrollTop = 0;
   track('screen_viewed', { screen: 'quote' });
 }

@@ -4942,75 +4942,138 @@ body .compass-body .compass-main.locked { background: var(--accent3); box-shadow
 .compass-body .extract-btn { max-width: 360px; margin-top: 4px; padding: 16px; font-size: 17px; }
 .compass-body .extract-btn[hidden] { display: none; }
 
-/* ── BOTTOM TABS ──
-   Dashboard, Report, the mic, Quote and Menu along the bottom, on the report
-   and the quote. The screens above stop short of it.
-   The lit tab is read off what's open: the menu, the dashboard, the quote,
-   else the report. */
-:root { --tabbar-h: calc(62px + env(safe-area-inset-bottom, 0px)); }
+/* ── BOTTOM DOCK ──
+   Three things in a rounded glass dock that floats above the bottom edge:
+   Jobs, the mic and This job. However much the app grows, nothing else
+   joins it: new documents go on the job's page. The place on show is lit
+   as a teal chip: Jobs for the job list and the account menu behind it,
+   This job for the job's page and every document under it. The mic is a
+   round button, no word: open, it shows a down mark to close the panel;
+   while it listens it turns red with a Stop square and the time above it;
+   while the AI fills the report it spins. */
+:root {
+  --dock-h: 68px;
+  --dock-gap: max(10px, env(safe-area-inset-bottom, 0px));
+  --tabbar-h: calc(var(--dock-h) + 8px + var(--dock-gap));
+  --mic-clearance: 16px;
+}
 .tabbar {
   display: none;
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 240;
   height: var(--tabbar-h);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  background: var(--ink);
-  border-top: 1px solid rgba(255,255,255,0.07);
-  box-shadow: 0 -8px 28px rgba(0,0,0,0.28);
+  padding: 8px 14px var(--dock-gap);
+  box-sizing: border-box;
+  pointer-events: none;
 }
 body:has(#app[style*="flex"]) .tabbar,
 body:has(#quoteScreen.open) .tabbar { display: block; }
-.tabbar-inner { display: flex; height: 62px; max-width: 560px; margin: 0 auto; padding: 0 4px; }
+.tabbar-inner {
+  pointer-events: auto;
+  display: flex; align-items: center; gap: 4px;
+  height: var(--dock-h); max-width: 420px; margin: 0 auto; padding: 0 7px;
+  border-radius: calc(var(--dock-h) / 2);
+  background: rgba(14,24,33,0.94);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid rgba(255,255,255,0.09);
+  box-shadow: 0 14px 34px rgba(0,0,0,0.55), 0 0 0 1px rgba(var(--glow),0.14), 0 -6px 24px -10px rgba(var(--glow),0.45);
+}
 .tabbar-inner > .tab { flex: 1; min-width: 0; }
 .tab {
-  position: relative; width: 100%; height: 100%;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  position: relative; height: 54px; border-radius: 27px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   border: none; background: none; cursor: pointer; padding: 0;
-  color: var(--on-ink2); font: 600 11px 'Inter', sans-serif; letter-spacing: 0.1px;
+  color: var(--on-ink2); font: 600 12px 'Inter', sans-serif; letter-spacing: 0.1px;
   -webkit-tap-highlight-color: transparent;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
 }
-.tab:active .icon { transform: scale(0.9); }
-/* The lit tab: a soft teal pill behind its icon, and its label in teal. */
-.tab .icon { box-sizing: content-box; padding: 4px 16px; border-radius: 99px; transition: transform 0.2s cubic-bezier(0.34, 1.4, 0.5, 1), background 0.2s, box-shadow 0.2s; }
-body:has(#sidebarPanel.open) .tab[data-tab="menu"],
-body:has(#dashboardOverlay.open):not(:has(#sidebarPanel.open)) .tab[data-tab="dashboard"],
-body:has(#quoteScreen.open) .tab[data-tab="quote"],
-body:has(#app[style*="flex"]):not(:has(#sidebarPanel.open)):not(:has(#dashboardOverlay.open)):not(:has(#quoteScreen.open)) .tab[data-tab="report"] { color: #5EEAD4; }
-body:has(#sidebarPanel.open) .tab[data-tab="menu"] .icon,
-body:has(#dashboardOverlay.open):not(:has(#sidebarPanel.open)) .tab[data-tab="dashboard"] .icon,
-body:has(#quoteScreen.open) .tab[data-tab="quote"] .icon,
-body:has(#app[style*="flex"]):not(:has(#sidebarPanel.open)):not(:has(#dashboardOverlay.open)):not(:has(#quoteScreen.open)) .tab[data-tab="report"] .icon {
-  background: rgba(94,234,212,0.16); box-shadow: inset 0 0 0 1px rgba(94,234,212,0.22), 0 0 14px rgba(var(--glow),0.25);
+.tabbar-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px; }
+.tab-icon { position: relative; display: flex; }
+.tab .icon { transition: transform 0.2s cubic-bezier(0.34, 1.4, 0.5, 1); }
+.tab:active .icon { transform: scale(0.88); }
+body:has(#dashboardOverlay.open) .tab[data-tab="dashboard"],
+body:has(#sidebarPanel.open) .tab[data-tab="dashboard"],
+body:not(:has(#dashboardOverlay.open)):not(:has(#sidebarPanel.open)) .tab[data-tab="job"] {
+  color: #CCFBF1;
+  background: linear-gradient(180deg, rgba(94,234,212,0.24), rgba(20,184,166,0.14));
+  box-shadow: inset 0 0 0 1px rgba(94,234,212,0.35), 0 0 18px rgba(var(--glow),0.25);
 }
 
-/* The mic sits in the middle, raised above the bar, with its own label
-   like the tabs beside it. Bars that sit just above the tabs (the quote's
-   total) leave it room, so it never covers a button. Open, it shows a
-   close mark; recording, it pulses red. */
-:root { --mic-rise: 22px; }
+/* What each tab knows. Jobs: how many need the inspector. This job: a ring
+   that fills as the report does, a tick when it's done. */
+.tab-count {
+  position: absolute; top: -6px; left: calc(100% - 6px);
+  min-width: 17px; height: 17px; padding: 0 4px; box-sizing: border-box; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  background: #2DD4BF; color: #04312C; font: 800 10.5px 'Inter', sans-serif;
+  box-shadow: 0 0 0 2px rgb(14,24,33);
+}
+.tab-count[hidden] { display: none; }
+.tab-ring { position: absolute; top: -6px; left: calc(100% - 7px); width: 16px; height: 16px; border-radius: 50%; background: rgb(14,24,33); }
+.tab-ring circle { fill: none; stroke: rgba(255,255,255,0.2); stroke-width: 3; }
+.tab-ring .tab-ring-fill { stroke: #5EEAD4; stroke-linecap: round; stroke-dasharray: var(--ring, 0) 100; transform: rotate(-90deg); transform-origin: 10px 10px; transition: stroke-dasharray 0.4s ease; }
+.tab-ring .tab-ring-tick { fill: none; stroke: #04312C; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+.tab-ring.done { background: #2DD4BF; }
+.tab-ring.done circle { stroke: transparent; }
+.tab-ring.done .tab-ring-tick { opacity: 1; }
+.tab-ring.empty { display: none; }
+
+/* The mic: a round button in the middle of the dock. */
 .tabbar-inner > .mic-dock {
   position: relative; left: auto; bottom: auto; transform: none; z-index: auto;
-  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 5px;
+  flex: 0 0 auto; display: flex; justify-content: center; padding: 0 6px;
 }
-.tabbar .mic-fab { width: 54px; height: 54px; margin-top: calc(4px - var(--mic-rise)); outline: 4px solid var(--ink); flex-shrink: 0; }
-.tabbar .mic-label { font: 600 11px 'Inter', sans-serif; letter-spacing: 0.1px; color: var(--on-ink2); pointer-events: none; }
-.tabbar .mic-fab.recording + .mic-label { color: #FF8A80; }
-.mic-fab .mic-fab-close { display: none; }
-.mic-fab.open:not(.recording) .mic-fab-mic { display: none; }
-.mic-fab.open:not(.recording) .mic-fab-close { display: block; }
-.tabbar .mic-badge { top: -24px; right: calc(50% - 34px); }
-/* While recording the screen is locked, the tabs too. */
+.tabbar .mic-fab { width: 58px; height: 58px; margin: 0; outline: none; }
+.tabbar .mic-fab::after { display: none; }
+.tabbar .mic-fab > svg { position: relative; z-index: 1; }
+.mic-fab .mic-fab-close, .mic-fab .mic-fab-stop { display: none; }
+.tabbar .mic-fab:hover { transform: none; }
+.tabbar .mic-fab:active { transform: scale(0.94); }
+body:not(.dark-screen) .tabbar .mic-fab:not(.recording):not(.open) { color: #04312C; }
+body:not(.dark-screen) .tabbar .mic-fab:not(.recording):not(.open) svg { filter: none; }
+body.large-touch .tabbar .mic-fab { width: 62px; height: 62px; }
+/* Open, not listening: a quiet button with a down mark that closes the panel. */
+.tabbar .mic-fab.open { background: rgba(255,255,255,0.12); color: var(--on-ink); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2); }
+.tabbar .mic-fab.open::before { display: none; }
+.mic-fab.open .mic-fab-mic { display: none; }
+.mic-fab.open .mic-fab-close { display: block; }
+/* Listening: red, a Stop square, a ring pulsing out, and the time above. */
+body[data-voice="listening"] .tabbar .mic-fab {
+  background: linear-gradient(180deg, #F0524A 0%, #D7261E 100%); color: #FFFFFF;
+  animation: dockListen 1.4s ease-out infinite;
+}
+body[data-voice="listening"] .tabbar .mic-fab::before { display: none; }
+body[data-voice="listening"] .mic-fab .mic-fab-mic,
+body[data-voice="listening"] .mic-fab .mic-fab-close { display: none; }
+body[data-voice="listening"] .mic-fab .mic-fab-stop { display: block; }
+.mic-fab-time {
+  position: absolute; left: 50%; bottom: calc(100% + 14px); transform: translateX(-50%);
+  display: none; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 13px;
+  background: #D7261E; color: #FFFFFF; font: 700 13px 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+  box-shadow: 0 6px 16px rgba(215,38,30,0.45); pointer-events: none; white-space: nowrap;
+}
+.mic-fab-time::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #FFFFFF; animation: dockDot 1s ease-in-out infinite; }
+body[data-voice="listening"] .mic-fab-time { display: inline-flex; }
+@keyframes dockListen { 0% { box-shadow: 0 6px 18px rgba(215,38,30,0.5), 0 0 0 0 rgba(240,82,74,0.55); } 100% { box-shadow: 0 6px 18px rgba(215,38,30,0.5), 0 0 0 14px rgba(240,82,74,0); } }
+@keyframes dockDot { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+/* Thinking: the AI is filling the report. */
+body[data-voice="thinking"] .mic-fab:not(.open) .mic-fab-mic { animation: dockSpin 1.2s linear infinite; }
+@keyframes dockSpin { to { transform: rotate(360deg); } }
+.tabbar .mic-badge { top: -4px; right: 0; }
+@media (prefers-reduced-motion: reduce) {
+  body[data-voice="listening"] .tabbar .mic-fab, .mic-fab-time::before, body[data-voice="thinking"] .mic-fab .mic-fab-mic { animation: none; }
+}
+/* While recording the screen is locked, the tabs too; the mic stays live to stop. */
 body.pocket-lock .tabbar .tab { pointer-events: none; opacity: 0.4; }
-.voice-popover { bottom: calc(var(--tabbar-h) + 34px); max-height: calc(100dvh - var(--tabbar-h) - 50px - env(safe-area-inset-top, 0px)); }
+.voice-popover { bottom: calc(var(--tabbar-h) + 10px); max-height: calc(100dvh - var(--tabbar-h) - 26px - env(safe-area-inset-top, 0px)); }
 
-/* Room for the tabs under the screens, the menu and the dashboard. */
-body:has(#app[style*="flex"]) #app { height: calc(100vh - var(--tabbar-h)); height: calc(100dvh - var(--tabbar-h)); }
+/* Room for the dock under the screens, the menu and the dashboard. #app
+   is a flex child that would otherwise grow under the dock. */
+body:has(#app[style*="flex"]) #app { flex: none; height: calc(100vh - var(--tabbar-h)); height: calc(100dvh - var(--tabbar-h)); }
 #quoteScreen.open { height: calc(100vh - var(--tabbar-h)); height: calc(100dvh - var(--tabbar-h)); }
-.sidebar, .dashboard-overlay { bottom: var(--tabbar-h); }
-:root { --mic-clearance: 32px; }
+.sidebar, .dashboard-overlay, .job-overlay { bottom: var(--tabbar-h); }
 body:has(#app[style*="flex"]) .toast,
-body:has(#quoteScreen.open) .toast { bottom: calc(var(--tabbar-h) + var(--mic-clearance) + 8px); }
-#quoteScreen .quote-bar { padding-bottom: calc(var(--mic-rise) + 10px); }
-.dashboard-panel-body, .drawer-scroll { padding-bottom: var(--mic-clearance); }
+body:has(#quoteScreen.open) .toast { bottom: calc(var(--tabbar-h) + var(--mic-clearance)); }
+.dashboard-panel-body, .drawer-scroll, .job-page-body { padding-bottom: 24px; }
 .dash-detail-sheet { padding-bottom: 20px; }
 
 /* ── PAGE TOP BARS ──
@@ -5038,10 +5101,22 @@ body:not(.dark-screen) .page-topbar {
 body:not(.dark-screen) .page-topbar-title { color: var(--on-ink); }
 body:not(.dark-screen) .page-topbar .drawer-back { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
 
+/* The account and settings button on the Jobs bar. */
+.topbar-account {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 10px 0 4px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--surface2); color: var(--text2); cursor: pointer;
+}
+.topbar-account-initials {
+  width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(145deg, #2DD4BF, var(--accent2)); color: #fff; font: 800 12px 'Inter', sans-serif;
+}
+body:not(.dark-screen) .page-topbar .topbar-account { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
+
 /* The dashboard and the menu's list sit on the backdrop like the report
    and the quote, white cards on ink, so the four places read as one app.
    A menu page keeps its light page, as its forms sit straight on it. */
 body:not(.dark-screen) .dashboard-overlay,
+body:not(.dark-screen) .job-overlay,
 body:not(.dark-screen) .sidebar:not(.on-page) { background: var(--backdrop); background-color: #070B10; color-scheme: dark; }
 body:not(.dark-screen) .dash-hero-date { color: #5EEAD4; }
 body:not(.dark-screen) .dash-hero-title { color: var(--on-ink); }
@@ -5054,10 +5129,8 @@ body:not(.dark-screen) .dash-tab.active span { background: rgba(94,234,212,0.18)
 body:not(.dark-screen) .dash-tabs.searching .dash-tab.active { color: var(--on-ink2); }
 body:not(.dark-screen) .dash-tab-line { background: #5EEAD4; box-shadow: 0 0 10px rgba(var(--glow-hi),0.6); }
 body:not(.dark-screen) .dash-none,
-body:not(.dark-screen) .dash-current-head { color: var(--on-ink2); }
 body:not(.dark-screen) .dash-search,
-body:not(.dark-screen) .dash-list,
-body:not(.dark-screen) .dash-current-job { border-color: transparent; box-shadow: 0 14px 36px rgba(0,0,0,0.35); }
+body:not(.dark-screen) .dash-list { border-color: transparent; box-shadow: 0 14px 36px rgba(0,0,0,0.35); }
 body:not(.dark-screen) .sidebar:not(.on-page) .drawer-group-label { color: #5EEAD4; }
 body:not(.dark-screen) .sidebar:not(.on-page) .drawer-group-label::after { background: linear-gradient(90deg, rgba(var(--glow-hi),0.6), rgba(var(--glow-hi),0)); }
 body:not(.dark-screen) .sidebar:not(.on-page) .drawer-legal,
@@ -5136,16 +5209,6 @@ body.dark-screen .finish-next-btn.primary small, body.dark-screen .finish-next-b
 @keyframes qp-flash { 50% { box-shadow: 0 0 0 6px rgba(var(--accent-rgb), 0.3); } }
 @media (prefers-reduced-motion: reduce) { .qp-cert-email.flash { animation: none; } }
 
-/* Current report tab: the open job's row, then its details to fill in. */
-.dash-current { margin-top: 16px; }
-.dash-current-job { width: 100%; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,40,80,0.06); }
-.dash-current-new { margin: 0; padding: 14px 16px; border-radius: 14px; border: 1px dashed var(--border2); font-size: 14px; color: var(--text2); background: var(--surface); }
-.dash-current-head { margin: 22px 2px 10px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); }
-.dash-current #jobPanel > .panel-label { display: none; }
-.dash-current #jobPanel { border-radius: 16px; }
-.dash-current .job-panel-body { padding: 14px 16px 6px; }
-.dash-current .job-actions, .dash-current .sync-status { padding-left: 16px; padding-right: 16px; }
-.dash-current .sync-status { padding-bottom: 14px; }
 .dash-search[hidden] { display: none; }
 
 /* Two fields that belong together (the termite system and its name),
@@ -5373,3 +5436,69 @@ body:not(.dark-screen) .agreement-banner.last-visit-banner .agreement-banner-btn
   .quote-bar .quote-bar-pdf .icon { width: 18px; height: 18px; }
   .quote-bar-send { padding: 0 14px; }
 }
+
+
+/* ── THIS JOB ──
+   The open job's page over the report: the address, the next step, every
+   stage as a numbered line (each opens its document), then the job's
+   details. A readable column on wide screens. */
+.job-overlay {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 220;
+  background: var(--bg); opacity: 0; pointer-events: none; transition: opacity 0.22s;
+}
+.job-overlay.open { opacity: 1; pointer-events: auto; }
+.job-page { height: 100%; display: flex; flex-direction: column; transform: translateY(14px); transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1); }
+.job-overlay.open .job-page { transform: none; }
+.job-page-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 max(16px, calc(50% - 340px)); }
+.job-hero { padding: 18px 0 4px; }
+.job-hero .dash-detail-chip { margin-bottom: 8px; }
+.job-hero-addr { margin: 0; font: 700 26px/1.15 'Space Grotesk', sans-serif; letter-spacing: -0.02em; color: var(--text); }
+.job-hero-sub { margin: 6px 0 0; font-size: 15px; color: var(--text2); }
+.job-next { background: var(--surface); border: none; border-top: 3px solid var(--accent); box-shadow: 0 14px 36px rgba(0,0,0,0.25); }
+.job-next.waiting { background: var(--surface); border-top-color: #F0B43C; }
+.job-next.done { background: var(--surface); border-top-color: var(--border2); }
+.job-section-head { margin: 24px 2px 10px; font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); }
+.job-steps .dash-timeline-btn { min-height: 58px; }
+.job-page #jobPanel > .panel-label { display: none; }
+.job-page #jobPanel { border-radius: 16px; margin-bottom: 8px; }
+.job-page .job-panel-body { padding: 14px 16px 6px; }
+.job-page .job-actions, .job-page .sync-status { padding-left: 16px; padding-right: 16px; }
+.job-page .sync-status { padding-bottom: 14px; }
+body:not(.dark-screen) .job-hero-addr { color: var(--on-ink); }
+body:not(.dark-screen) .job-hero-sub,
+body:not(.dark-screen) .job-section-head { color: var(--on-ink2); }
+body:not(.dark-screen) .job-section-head { color: #5EEAD4; }
+body:not(.dark-screen) .job-steps .dash-timeline-btn { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
+body:not(.dark-screen) .job-steps li::before { background: rgba(255,255,255,0.18); }
+body:not(.dark-screen) .job-steps li.done::before { background: #2DD4BF; }
+body:not(.dark-screen) .job-steps .dash-timeline-dot { border-color: rgba(255,255,255,0.3); background: #0F1A23; color: var(--on-ink2); }
+body:not(.dark-screen) .job-steps li.done .dash-timeline-dot { background: #2DD4BF; border-color: #2DD4BF; color: #04312C; }
+body:not(.dark-screen) .job-steps li.now .dash-timeline-dot { border-color: #5EEAD4; color: #5EEAD4; box-shadow: 0 0 0 4px rgba(94,234,212,0.18); }
+body:not(.dark-screen) .job-page #jobPanel { border-color: transparent; box-shadow: 0 14px 36px rgba(0,0,0,0.35); }
+
+/* ── DOCUMENT STRIP ──
+   At the top of the report and the quote: back to the job's page, then the
+   job's documents, the one on show lit. Scrolls sideways on a small phone. */
+.doc-strip { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 10px 16px 8px; }
+.doc-strip::-webkit-scrollbar { display: none; }
+.doc-strip:empty { display: none; }
+.doc-chip {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 13px; border-radius: 17px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text2);
+  font: 600 13px 'Inter', sans-serif; cursor: pointer; white-space: nowrap;
+}
+.doc-chip.done::after { content: ''; width: 6px; height: 6px; margin-left: 2px; border-radius: 50%; background: var(--accent); }
+.doc-chip.here { background: var(--accent); border-color: var(--accent); color: #fff; cursor: default; }
+.doc-chip.here.done::after { background: rgba(255,255,255,0.85); }
+.doc-chip-job { padding-left: 8px; color: var(--text); }
+body:not(.dark-screen) .doc-chip { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink2); }
+body:not(.dark-screen) .doc-chip-job { color: var(--on-ink); }
+body:not(.dark-screen) .doc-chip.done::after { background: #5EEAD4; }
+body:not(.dark-screen) .doc-chip.here { background: linear-gradient(180deg, #2DD4BF 0%, #14B8A6 100%); border-color: transparent; color: #04312C; }
+body:not(.dark-screen) .doc-chip.here.done::after { background: #04312C; }
+.doc-strip-bar { flex-shrink: 0; }
+body:not(.dark-screen) .doc-strip-bar { background: var(--ink); }
+/* The strip names the document, so the report's own title line steps aside. */
+.report-header .report-title { display: none; }
+.report-header { padding: 0; }
+.report-header .doc-strip { flex: 1; min-width: 0; }

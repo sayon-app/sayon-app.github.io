@@ -91,6 +91,7 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(3200); await openBilling(p);
     check(/starter:Upgrade pro:hidden business:hidden/.test(await rowState(p)), 'old Worker: Team and Business stay hidden: ' + await rowState(p));
     check(await p.evaluate(() => !document.getElementById('seatPlansSoon').hidden && document.getElementById('profileYourTeam').hidden), 'old Worker: "coming soon" shows and there is no Your team');
+    check(await p.evaluate(() => !document.getElementById('billingTermsRow').hidden), 'the owner sees the prices and cancelling wording');
     check(!errs.length, 'no page errors ' + errs.join('; '));
     await ctx.close();
   }
@@ -179,6 +180,7 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(3200); await openBilling(p);
     const t = await p.evaluate(() => ({ rows: [...document.querySelectorAll('#billingPanel [data-plan]')].every(r => r.hidden), note: !document.getElementById('billingOwnerOnly').hidden, manage: document.getElementById('manageBillingBtn').style.display, team: document.getElementById('profileYourTeam').hidden }));
     check(t.rows && t.note && t.manage === 'none' && t.team, 'technician: no plan rows, no Manage, no Your team, and a note: ' + JSON.stringify(t));
+    check(await p.evaluate(() => document.getElementById('billingTermsRow').hidden), 'technician: no prices, cancelling or paying wording');
     check(!errs.length, 'no page errors ' + errs.join('; '));
     await ctx.close();
   }
@@ -239,6 +241,19 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     check(await p.evaluate(() => document.getElementById('suTitle').textContent === 'Create your account' && !document.getElementById('suBusinessField').hidden), 'a plain sign-up card is unchanged');
     await p.fill('#suName', 'Sol Owner'); await p.fill('#suBusiness', 'Sol Pest'); await p.fill('#suEmail', 'sol@x.test'); await p.fill('#suPassword', 'longenough1'); await p.click('#suBtn'); await p.waitForTimeout(2800);
     check(!st.calls.some(c => c.path.includes('/rpc/accept_invite')) && st.madeBusiness, 'no invite link: no invite is looked for, and their own business is made');
+    check(!errs.length, 'no page errors ' + errs.join('; '));
+    await ctx.close();
+  }
+
+  // 7. An invite link opened while already signed in: say whose it is, keep nothing.
+  for (const [who, email, want] of [['someone else', 'tech@acme.test', /invite is for tech@acme\.test, but you're signed in as boss@acme\.test/], ['the same person', 'boss@acme.test', /already signed in as boss@acme\.test/], ['a dead link', null, /expired or been replaced/]]) {
+    const { ctx, p, st, errs } = await setup(b, { user: OWNER, sub: trial({ seat_plans: true }) });
+    st.invite = email ? { business: 'Acme Pest', email } : null;
+    await ctx.addInitScript(() => { window.__seen = []; document.addEventListener('DOMContentLoaded', () => { const t = document.getElementById('toast'); new MutationObserver(() => window.__seen.push(t.textContent)).observe(t, { childList: true, subtree: true, characterData: true }); }); });
+    await p.goto(`http://localhost:${PORT}/?signup=1&invite=${TOKEN}`); await p.waitForTimeout(4200);
+    const r = await p.evaluate(() => ({ seen: window.__seen, url: location.search, kept: localStorage.getItem('korva_pending_invite'), app: getComputedStyle(document.getElementById('authScreen')).display }));
+    check(r.seen.some(t => want.test(t)), `signed in, invite for ${who}: told so: ` + JSON.stringify(r.seen.filter(t => /invite|signed in|expired/.test(t))));
+    check(!/invite=|signup=/.test(r.url) && !r.kept && !st.calls.some(c => c.path.includes('/rpc/accept_invite')) && r.app === 'none', `signed in, invite for ${who}: link cleared from the address bar, nothing kept or accepted, still in the app`);
     check(!errs.length, 'no page errors ' + errs.join('; '));
     await ctx.close();
   }

@@ -2125,7 +2125,7 @@ window.addEventListener('load', () => {
       }
 
       const hasSession = await restoreAuthSession();
-      if (hasSession) { enterApp(); }
+      if (hasSession) { enterApp(); noticeInviteWhileSignedIn(); }
       else {
         document.getElementById('authScreen').style.display = 'flex';
         // The website's "Start your free trial" lands on the sign-up card.
@@ -9722,6 +9722,8 @@ function showPlanOptions(sub, owner) {
     row.hidden = !owner || (row.hasAttribute('data-seat-plan') && !seatPlans);
   });
   document.getElementById('billingOwnerOnly').hidden = owner;
+  // Prices, cancelling and paying are the owner's business, not a technician's.
+  document.getElementById('billingTermsRow').hidden = !owner;
   document.getElementById('seatPlansSoon').hidden = seatPlans || !owner;
   document.getElementById('billingSeatTerms').hidden = !seatPlans || !owner;
   Object.keys(SEAT_PLANS).forEach(plan => {
@@ -10080,11 +10082,10 @@ async function signUp() {
   const btn      = document.getElementById('suBtn');
 
   errEl.textContent = '';
-  const missing = [!name && 'your name', !business && 'your business name', !email && 'your email', !password && 'a password'].filter(Boolean);
-  if (missing.length) { errEl.textContent = `Add ${joinWithAnd(missing)}.`; return; }
   // Joining from an invite link: the business is theirs to join, not to name.
   const joining = document.getElementById('suBusinessField').hidden;
-  if (!name || (!business && !joining) || !email || !password) { errEl.textContent = 'Please fill in all fields.'; return; }
+  const missing = [!name && 'your name', !business && !joining && 'your business name', !email && 'your email', !password && 'a password'].filter(Boolean);
+  if (missing.length) { errEl.textContent = `Add ${joinWithAnd(missing)}.`; return; }
   // Receipts and password resets go to this address, so a typo locks the
   // account out of both.
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { errEl.textContent = 'That email address doesn\'t look right. Check it: your receipts and password resets go there.'; return; }
@@ -10637,6 +10638,36 @@ async function applyInviteToSignUp() {
   inviteSignUp = { business: String(invite.business).slice(0, 120), email: String(invite.email) };
   document.getElementById('suEmail').value = inviteSignUp.email;
   showInviteSignUp(true);
+}
+
+// An invite link opened on a phone that's already signed in: the link is
+// for signing up, so say whose it is instead of quietly ignoring it. The
+// secret isn't kept, so it can't be used by whoever is signed in.
+async function noticeInviteWhileSignedIn() {
+  const params = new URLSearchParams(window.location.search);
+  const token = (params.get('invite') || '').trim();
+  if (!token) return;
+  params.delete('invite');
+  params.delete('signup');
+  history.replaceState(null, '', window.location.pathname + (params.toString() ? '?' + params : '') + window.location.hash);
+  if (!/^[0-9a-f]{64}$/.test(token)) return;
+  let invite = null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+      body: JSON.stringify({ p_token: token }),
+    });
+    if (res.ok) invite = await res.json();
+  } catch (e) { return; }
+  const me = (authUser && authUser.email || '').toLowerCase();
+  if (!invite || !invite.email) {
+    showToast('That invite link has expired or been replaced. Ask for a new one.', 'info');
+  } else if (String(invite.email).toLowerCase() === me) {
+    showToast(`You're already signed in as ${invite.email}.`, 'info');
+  } else {
+    showToast(`That invite is for ${invite.email}, but you're signed in as ${authUser.email}. To use it, sign out and open the link again.`, 'error');
+  }
 }
 
 // The invite's business and email while the sign-up card is joining one.

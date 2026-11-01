@@ -132,8 +132,7 @@ let shotN = 0;
   let dl = downloads.length;
   await tap(p.locator('#generateBtn'), 'Generate report'); await p.waitForTimeout(5000); await shot('generated');
   console.log('after generate: downloads', downloads.slice(dl), 'toasts', await toasts());
-  await tap(p.locator('.tab[data-tab="menu"]'), 'Menu tab'); await p.waitForTimeout(700); await shot('menu');
-  await tap(p.locator('#shareBtn'), 'Send (drawer)'); await p.waitForTimeout(1500); await shot('send-review');
+  await tap(p.locator('#shareBtn'), 'Send to client (Finish step)'); await p.waitForTimeout(1500); await shot('send-review');
   console.log('send review:', (await p.evaluate(() => document.querySelector('#sendReviewOverlay .page-sheet').innerText)).slice(0, 600));
   let em = emails.length;
   await tap(p.locator('#sendReviewBtn'), 'Send review confirm'); await p.waitForTimeout(6000); await shot('report-sent');
@@ -202,7 +201,6 @@ let shotN = 0;
   check(names.length >= 4 && names.every(n => /^[\w-]+\.pdf$/.test(n) && /Epping_NSW_2121/.test(n)), 'PDF file names keep the whole address with no commas: ' + names.join(', '));
 
   // 11. Back on the dashboard, the job shows as done.
-  await tap(p.locator('.quote-back'), 'Quote back'); await p.waitForTimeout(800);
   await tap(p.locator('.tab[data-tab="dashboard"]'), 'Dashboard tab'); await p.waitForTimeout(1200); await shot('dashboard-end');
   check(/Treated/.test(await p.evaluate(() => document.getElementById('dashboardOverlay').innerText)), 'the dashboard shows the job as treated');
 

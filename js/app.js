@@ -8302,7 +8302,9 @@ async function tidyPhotoStorage() {
     const keep = referencedPhotoIds();
     const stored = await listPhotoBlobIds();
     for (const id of stored) {
-      if (!keep.has(id)) await deletePhotoBlob(id);
+      // A marked-up photo's clean copy (see PHOTO MARKUP) lives as long as the photo.
+      const photoId = String(id).startsWith('orig_') ? String(id).slice(5) : id;
+      if (!keep.has(photoId)) await deletePhotoBlob(id);
     }
   } catch (e) { console.warn('Photo tidy-up skipped:', e && e.message); }
 }
@@ -8340,6 +8342,7 @@ async function openPhotoViewer(id) {
   document.getElementById('photoViewerInfo').textContent =
     [(p.caption || '').trim(), p.width && p.height ? `${p.width} × ${p.height}` : ''].filter(Boolean).join('  ·  ');
   setPhotoZoom(1, 0, 0);
+  if (typeof updateMarkupButton === 'function') updateMarkupButton(id);
   document.getElementById('photoViewer').hidden = false;
 }
 

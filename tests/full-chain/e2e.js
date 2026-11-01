@@ -62,7 +62,7 @@ let shotN = 0;
     await p.fill('#ob-phone', '0400000000');
     await tap(p.locator('#obBusinessSave'), 'Continue (business)'); await shot('ob-1');
     await tap(p.locator('#obDemoNext'), 'Continue (demo)'); await shot('ob-2');
-    await tap(p.getByRole('button', { name: /Start Inspecting/ }), 'Start Inspecting'); await p.waitForTimeout(1200); await shot('after-onboarding');
+    await tap(p.getByRole('button', { name: /Start inspecting/i }), 'Start Inspecting'); await p.waitForTimeout(1200); await shot('after-onboarding');
   }
 
   // 2. Job details, typed on the dashboard.
@@ -94,7 +94,7 @@ let shotN = 0;
   check(ag && ag.method === 'onsite' && ag.name === 'Sam Taylor', 'agreement signed on site: ' + JSON.stringify(ag));
   const dlBefore = downloads.length;
   await tap(p.locator('#agreementBannerBtn'), 'View agreement'); await p.waitForTimeout(600);
-  await tap(p.getByRole('button', { name: /Send the client a copy/ }), 'agreement copy'); await p.waitForTimeout(2500); await shot('agreement-copy');
+  await tap(p.getByRole('button', { name: /Send the client a copy/i }), 'agreement copy'); await p.waitForTimeout(2500); await shot('agreement-copy');
   console.log('after agreement copy: downloads', downloads.slice(dlBefore), 'emails', emails.length, 'toasts', await toasts());
   if (await p.evaluate(() => document.getElementById('agreementOverlay').classList.contains('open'))) await tap(p.locator('#agreementOverlay .voice-popover-close'), 'close agreement');
 
@@ -154,7 +154,7 @@ let shotN = 0;
   console.log('after quote send: emails', emails.slice(em).map(e => e.subject + ' -> ' + e.to + ' [' + (e.attachments || []).map(a => a.filename) + ']'), 'toasts', await toasts());
 
   // 8. The client's answer, signed on the phone.
-  await tap(p.locator('#quoteAnswer button', { hasText: /^Accepted$/ }).first(), 'Accepted'); await p.waitForTimeout(800); await shot('answer-open');
+  await tap(p.locator('#quoteAnswer button', { hasText: /^Accepted$/i }).first(), 'Accepted'); await p.waitForTimeout(800); await shot('answer-open');
   const qa = await p.evaluate(() => ({ by: document.getElementById('qaBy').value, method: document.getElementById('qaMethod').value, signShown: !document.getElementById('qaSignWrap').hidden && !!document.getElementById('qaSignWrap').offsetParent, btn: document.getElementById('qaSaveBtn').disabled }));
   console.log('answer sheet:', JSON.stringify(qa));
   if (!qa.by) await p.fill('#qaBy', 'Sam Taylor');
@@ -166,7 +166,7 @@ let shotN = 0;
   console.log('toasts', await toasts());
 
   // 9. Treatment record.
-  await tap(p.getByRole('button', { name: /Treatment done\? Record it/ }), 'Record treatment'); await p.waitForTimeout(1000); await shot('treatment-open');
+  await tap(p.getByRole('button', { name: /Treatment done\? Record it/i }), 'Record treatment'); await p.waitForTimeout(1000); await shot('treatment-open');
   const tr0 = await p.evaluate(() => [...document.querySelectorAll('#treatmentOverlay input, #treatmentOverlay textarea, #treatmentOverlay select')].filter(e => e.offsetParent && e.type !== 'radio' && e.type !== 'checkbox').map(e => `${e.id}=${e.value}`).join(' | '));
   console.log('treatment prefill:', tr0);
   const need = await p.evaluate(() => ({ btn: document.getElementById('trSaveBtn').disabled, need: (document.querySelector('#treatmentOverlay .sign-need, #trSaveNeed') || {}).textContent }));
@@ -185,14 +185,14 @@ let shotN = 0;
   // 10. Certificate.
   await p.evaluate(() => window.scrollTo(0, 0)); await shot('quote-after-treatment');
   em = emails.length;
-  await tap(p.getByRole('button', { name: /Email certificate to/ }), 'Email certificate'); await p.waitForTimeout(2000); await shot('cert-1');
+  await tap(p.getByRole('button', { name: /Email certificate to/i }), 'Email certificate'); await p.waitForTimeout(2000); await shot('cert-1');
   if (await p.locator('#sendReviewOverlay.open').count()) { await tap(p.locator('#sendReviewBtn'), 'certificate send confirm'); }
   await p.waitForTimeout(5000); await shot('cert-sent');
   const certMail = emails.slice(em);
   console.log('certificate: emails', certMail.map(e => e.subject + ' -> ' + e.to + ' [' + (e.attachments || []).map(a => a.filename) + ']'), 'toasts', await toasts());
   check(certMail.length === 1 && (certMail[0].attachments || []).length === 1, 'certificate emailed with its PDF');
   dl = downloads.length;
-  await tap(p.getByRole('button', { name: /^Certificate PDF$/ }), 'Certificate PDF'); await p.waitForTimeout(3000);
+  await tap(p.getByRole('button', { name: /^Certificate PDF$/i }), 'Certificate PDF'); await p.waitForTimeout(3000);
   console.log('certificate pdf:', downloads.slice(dl));
   // Save every PDF that went out, to look at.
   for (const e of emails) for (const a of (e.attachments || [])) if (a.content) fs.writeFileSync(`${OUT}/${a.filename}`, Buffer.from(a.content, 'base64'));

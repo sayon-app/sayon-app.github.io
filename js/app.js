@@ -10073,6 +10073,10 @@ function stopAuthAutoRefresh() {
 }
 
 // ── SIGN UP ──────────────────────────────────────────────────────────────
+// The Terms and Privacy versions a new account agrees to at sign-up. Raise
+// these with the "Version N" lines at the top of terms.html and privacy.html.
+const LEGAL_VERSIONS = { terms: 3, privacy: 6 };
+
 async function signUp() {
   const name     = document.getElementById('suName').value.trim();
   const business = document.getElementById('suBusiness').value.trim();
@@ -10086,6 +10090,7 @@ async function signUp() {
   const joining = document.getElementById('suBusinessField').hidden;
   const missing = [!name && 'your name', !business && !joining && 'your business name', !email && 'your email', !password && 'a password'].filter(Boolean);
   if (missing.length) { errEl.textContent = `Add ${joinWithAnd(missing)}.`; return; }
+  if (!document.getElementById('suConsent').checked) { errEl.textContent = 'Tick the box to agree to the Terms of Service and Privacy Policy.'; return; }
   // Receipts and password resets go to this address, so a typo locks the
   // account out of both.
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { errEl.textContent = 'That email address doesn\'t look right. Check it: your receipts and password resets go there.'; return; }
@@ -10098,7 +10103,9 @@ async function signUp() {
 
     const data = await supabaseAuth('signup', {
       email, password,
-      data: joining ? { name } : { name, business_name: business },
+      // Which Terms and Privacy versions they ticked, and when, kept with the login.
+      data: Object.assign(joining ? { name } : { name, business_name: business },
+        { terms_version: LEGAL_VERSIONS.terms, privacy_version: LEGAL_VERSIONS.privacy, terms_accepted_at: new Date().toISOString() }),
     });
     if (data.error) {
       if (data.error.code === 'user_already_exists' || /already (registered|exists)/i.test(data.error.message || '')) {

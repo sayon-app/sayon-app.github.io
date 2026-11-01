@@ -80,9 +80,9 @@ let shotN = 0;
   check(await p.evaluate(() => document.getElementById('sitePlanOverlay').classList.contains('open') && sitePlanEditor.plan.items.length === 1 && sitePlanEditor.plan.items[0].k === 'house'), 'the editor opens with a house to start from');
   await shot('editor-start');
   // A garage dragged out to the right.
-  await tool('The site', 'Garage or shed'); await dragPlan(850, 275, 975, 425);
+  await tool('Buildings', 'Garage or shed'); await dragPlan(850, 275, 975, 425);
   await p.fill('#spSelLabel', 'Garage');
-  await tool('The site', 'Tree or stump'); await tapPlan(150, 650);
+  await tool('Yard', 'Tree or stump'); await tapPlan(150, 650);
   await p.fill('#spSelLabel', 'Gum tree');
   // The barrier along the front and two sides.
   await tool('Treatment', 'Chemical barrier');
@@ -100,7 +100,41 @@ let shotN = 0;
   await tool('Stations', 'Above-ground'); await tapPlan(400, 300); await tapPlan(600, 450);
   await tool('Stations', 'Monitoring'); await tapPlan(900, 650);
   await tool('Findings', 'Termite activity'); await tapPlan(625, 450); await p.fill('#spSelLabel', 'Laundry door frame');
-  await tool('Findings', 'Access point'); await tapPlan(400, 450); await p.fill('#spSelLabel', 'Subfloor hatch');
+  await tool('Services', 'Access point'); await tapPlan(400, 450); await p.fill('#spSelLabel', 'Subfloor hatch');
+  // A studio of any shape, corner by corner, closed by tapping the first corner.
+  await tool('Buildings', 'House, any shape');
+  for (const [x, y] of [[50, 50], [200, 50], [200, 100], [125, 100], [125, 150], [50, 150], [50, 50]]) await tapPlan(x, y);
+  await p.fill('#spSelLabel', 'Studio');
+  const studio = await p.evaluate(() => { const it = sitePlanEditor.plan.items.find(i => i.k === 'outline'); return it && { pts: it.pts.length, label: it.label, drawing: sitePlanEditor.drawing }; });
+  check(studio && studio.pts === 6 && studio.label === 'Studio' && !studio.drawing, 'a building of any shape closes when its first corner is tapped again: ' + JSON.stringify(studio));
+  // The yard and services.
+  await tool('Yard', 'Garden bed'); await dragPlan(325, 650, 575, 700);
+  await tool('Yard', 'Water tank'); await tapPlan(950, 200);
+  await tool('Yard', 'Retaining wall'); await tapPlan(25, 725); await tapPlan(300, 725); await tap(p.locator('#spFinishLine'), 'Finish line (3)');
+  await tool('Services', 'Hot water'); await tapPlan(750, 275);
+  await tool('Findings', 'Timber on soil'); await tapPlan(625, 675); await p.fill('#spSelLabel', 'Woodpile');
+  // One real size gives the plan its scale: the house is 16 m wide.
+  await p.evaluate(() => { sitePlanEditor.tool = null; renderSitePlanTray(); });
+  await tapPlan(450, 260);
+  check(await p.evaluate(() => (sitePlanEditor.plan.items.find(i => i.id === sitePlanEditor.sel) || {}).k === 'house' && !document.getElementById('spSelSizeRow').hidden), 'tapping the house offers its real width');
+  await p.fill('#spSelMetres', '16');
+  const scaled = await p.evaluate(() => ({ mpu: sitePlanEditor.plan.mpu, barrier: sitePlanLength(sitePlanEditor.plan, 'barrier'), svg: document.querySelector('#spCanvas svg').textContent }));
+  console.log('scale:', JSON.stringify({ mpu: scaled.mpu, barrier: scaled.barrier }));
+  check(Math.abs(scaled.mpu - 0.04) < 1e-9 && Math.round(scaled.barrier) === 44, 'the house width sets the scale, so the barrier measures 44 m');
+  check(/16 × 11 m/.test(scaled.svg) && /44 m/.test(scaled.svg) && /5 m/.test(scaled.svg), 'the house shows its size, the barrier its length, and a scale bar shows');
+  // Zoom in to place a station exactly, then look around.
+  await tap(p.locator('#spZoomIn'), 'Zoom in');
+  const vb = await p.evaluate(() => document.querySelector('#spCanvas svg').getAttribute('viewBox'));
+  check(/ 500 375$/.test(vb), 'zooming in shows half the plan: ' + vb);
+  await shot('editor-zoomed');
+  await tap(p.locator('#spZoomOut'), 'Zoom out');
+  // A map screenshot underneath to trace over.
+  await p.setInputFiles('#spBgLabel input', require('path').join(__dirname, '../../icon-512.png'));
+  await p.waitForTimeout(600);
+  check(await p.evaluate(() => /^data:image\/jpeg/.test(sitePlanEditor.plan.bg || '') && !!document.querySelector('#spCanvas svg image')), 'a map or photo goes underneath the plan');
+  await shot('editor-underlay');
+  await tap(p.locator('#spBgRemove'), 'Remove the photo');
+  check(await p.evaluate(() => !sitePlanEditor.plan.bg), 'and comes off again');
   // Name the first station: tap it with no tool picked.
   await tapPlan(225, 175); await p.fill('#spSelLabel', 'Front left corner');
   await tapPlan(500, 600); await p.fill('#spSelLabel', 'Rear, by the laundry');
@@ -111,8 +145,8 @@ let shotN = 0;
   check(ed.items.filter(i => /^inground/.test(i)).length === 8 && ed.items.includes('above9') && ed.items.includes('above10') && ed.items.includes('monitor11'), 'stations number themselves across the three kinds (1–8, 9–10, 11)');
   check(ed.items.includes('inground1:Front left corner') && ed.items.includes('garage'.replace('garage', 'shed:Garage')), 'a station and the garage are named');
   check(ed.tree && ed.tree.x === 100 && ed.tree.y === 675, 'dragging moves a symbol, snapped to the grid');
-  check(ed.legend.length === 11 && ed.legend.some(l => /In-ground bait station \(8\)/.test(l)) && ed.legend.some(l => /Chemical barrier/.test(l)), 'the legend lists each symbol used, with station counts');
-  check(/8 in-ground bait stations, 2 above-ground bait stations, 1 monitoring station, a chemical barrier/.test(ed.summary), 'the plan is summed up in words: ' + ed.summary);
+  check(ed.legend.length === 16 && ed.legend.some(l => /In-ground bait station \(8\)/.test(l)) && ed.legend.some(l => /Chemical barrier/.test(l)), 'the legend lists each symbol used, with station counts');
+  check(/8 in-ground bait stations, 2 above-ground bait stations, 1 monitoring station, a chemical barrier \(about 44 m\)/.test(ed.summary), 'the plan is summed up in words: ' + ed.summary);
   await p.evaluate(() => { sitePlanEditor.sel = null; renderSitePlanEditor(); document.querySelector('#sitePlanOverlay .page-sheet-body').scrollTop = 0; });
   await shot('editor-drawn');
   await p.evaluate(() => document.querySelector('#sitePlanOverlay .sp-key').scrollIntoView({ block: 'end' })); await shot('editor-legend');
@@ -126,13 +160,13 @@ let shotN = 0;
   // 3. Back on the record: the plan, its legend, and the station count.
   const rec = await p.evaluate(() => ({ open: document.getElementById('sitePlanOverlay').classList.contains('open'), svg: !!document.querySelector('#trPlan svg'), legend: document.querySelectorAll('#trPlan .site-plan-legend li').length, bait: document.querySelector('#trMethods input[data-key="bait"]').checked, qty: document.querySelector('#trMethods [data-qty="bait"]').value }));
   console.log('record:', JSON.stringify(rec));
-  check(!rec.open && rec.svg && rec.legend === 11, 'the record shows the plan and its legend');
+  check(!rec.open && rec.svg && rec.legend === 16, 'the record shows the plan and its legend');
   check(rec.bait && rec.qty === '10', 'the 10 bait stations drawn fill the station count');
   await p.evaluate(() => document.getElementById('trPlan').scrollIntoView({ block: 'start' })); await shot('record-plan');
   await sign('#trSigCanvas');
   await tap(p.locator('#trSaveBtn'), 'Save treatment record'); await p.waitForTimeout(600);
   const t = await p.evaluate(() => ({ plan: quoteState.treatment.plan && quoteState.treatment.plan.items.length, site: quoteState.treatment.site }));
-  check(t.plan === 19 && /Concrete slab/.test(t.site.floor), 'the plan and the site are kept with the treatment record');
+  check(t.plan === 25 && /Concrete slab/.test(t.site.floor), 'the plan and the site are kept with the treatment record');
 
   // 4. The certificates carry the plan, the legend and where each station is.
   await p.evaluate(() => ensureJsPDFLoaded()); await p.waitForTimeout(400);
@@ -144,7 +178,7 @@ let shotN = 0;
     check(pdf.pages === 2, `${name}: the certificate keeps page 1, and the plan gets page 2`);
     if (text) {
       check(/SITE PLAN/.test(text) && /LEGEND/.test(text) && /In-ground bait station \(8\)/.test(text) && /Above-ground bait station \(2\)/.test(text) && /Durable notice/.test(text), `${name}: the plan prints with its legend`);
-      check(/WHERE EACH STATION IS/.test(text) && /Front left corner/.test(text) && /Not to scale/.test(text), `${name}: station locations under the plan`);
+      check(/WHERE EACH STATION IS/.test(text) && /Front left corner/.test(text) && /Approximate scale/.test(text) && /44 m/.test(text), `${name}: station locations under the plan`);
       check(/THE SITE/.test(text) && /Brick/.test(text) && /Concrete slab/.test(text) && /None found/.test(text), `${name}: the site details print`);
     }
   }

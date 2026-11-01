@@ -2880,7 +2880,7 @@ body.report-locked #micDock { opacity: 0.4; }
 .send-review-tile strong { font-size: 12.5px; font-weight: 800; color: var(--text3); }
 .send-review-tile.tone-bad  { border-color: var(--risk);   background: #FDF2F0; }
 .send-review-tile.tone-warn { border-color: var(--yellow); background: #FDF7EA; }
-.send-review-tile.tone-good { border-color: rgb(var(--green-rgb));  background: #ECFDF9; }
+.send-review-tile.tone-good { border-color: rgb(var(--green-rgb));  background: var(--green-wash); }
 .send-review-tile.tone-bad strong  { color: var(--risk); }
 .send-review-tile.tone-warn strong { color: var(--yellow-text); }
 .send-review-tile.tone-good strong { color: var(--green); }
@@ -5634,3 +5634,50 @@ body:not(.dark-screen) .job-steps li.done .dash-timeline-dot { background: var(-
 body:not(.dark-screen) .job-steps li.done::before { background: var(--green-fill); }
 body:not(.dark-screen) .doc-chip.done::after { background: var(--green-fill); }
 ::selection { background: rgba(var(--pink-rgb), 0.28); }
+
+/* Check before sending, refreshed: section heads in sentence case, roomier
+   cards, each thing worth checking on its own row with its fixes as small
+   buttons, and Preview as a button rather than a link. */
+#sendReviewOverlay .page-sheet-body { gap: 10px; padding: 20px 20px calc(32px + env(safe-area-inset-bottom, 0px)); }
+.send-review-label {
+  margin-top: 14px; font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 700;
+  letter-spacing: -0.01em; text-transform: none; color: var(--text);
+}
+.send-review-card { padding: 14px 16px; border-radius: 14px; background: var(--surface); gap: 12px; }
+.send-review-name { font-size: 15px; }
+.send-review-warn { font-size: 13px; }
+.send-review-file + .send-review-file, .send-review-file + .send-review-gap { padding-top: 12px; border-top: 1px solid var(--border); }
+.send-review-file-name { font-size: 14.5px; }
+.send-review-file-meta { margin-top: 2px; font-size: 12.5px; }
+.send-review-file .link-btn, .send-review-fixes .link-btn {
+  flex: none; margin: 0; min-height: 36px; padding: 0 14px; border: 1px solid var(--border2); border-radius: 99px;
+  background: var(--surface); text-decoration: none; font-size: 13px; font-weight: 650; color: var(--accent2);
+}
+.send-review-file .link-btn:hover, .send-review-fixes .link-btn:hover { border-color: var(--accent); background: var(--accent-wash); }
+.send-review-fixes { gap: 6px; margin-top: 8px; }
+.send-review-sub { margin-top: 10px; font-size: 12.5px; }
+.send-review-tiles { gap: 8px; }
+.send-review-tile { padding: 10px 12px; border-radius: 10px; }
+.send-review-tile span { font-size: 11px; }
+.send-review-tile strong { font-size: 13px; }
+.send-review-gaps { padding: 14px 16px 6px; border-radius: 14px; border-color: rgba(212,146,10,0.45); }
+.send-review-gaps .send-review-label { margin: 0 0 4px; font-size: 15px; color: var(--yellow-text); }
+.send-review-gaps .send-review-list { list-style: none; margin: 0; padding: 0; }
+.send-review-gaps .send-review-list li {
+  position: relative; padding: 10px 0 10px 18px; font-size: 13.5px; line-height: 1.45; color: var(--text);
+}
+.send-review-gaps .send-review-list li + li { border-top: 1px solid rgba(212,146,10,0.25); }
+.send-review-gaps .send-review-list li::before {
+  content: ''; position: absolute; left: 2px; top: 17px; width: 7px; height: 7px; border-radius: 99px; background: var(--yellow);
+}
+body.dark-screen .send-review-file .link-btn, body.dark-screen .send-review-fixes .link-btn { background: var(--surface2); }
+
+/* Saved reports, refreshed: cards at reading size, with a delete button
+   big enough to hit. */
+.saved-item { gap: 12px; padding: 14px 10px 14px 16px; border-radius: 14px; background: var(--surface); }
+.saved-item:hover { background: var(--accent-wash); }
+.saved-item-address { font-size: 15px; letter-spacing: -0.01em; }
+.saved-item-meta { margin-top: 4px; flex-wrap: wrap; gap: 4px 8px; font-size: 12.5px; }
+.saved-item-risk, .saved-item-quote, .saved-item-status { font-size: 11px; padding: 2px 8px; border-radius: 99px; }
+.saved-item-delete { width: 40px; height: 40px; border-radius: 10px; font-size: 16px; }
+body.dark-screen .saved-item:hover { background: var(--surface2); }

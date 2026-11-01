@@ -9,7 +9,8 @@
 //   { ..., w, h } for a building or an area (x, y its top-left corner),
 //   { id, k, pts: [[x, y], ...] } for a line, or a closed shape (a building
 //   of any shape),
-//   any of them with a label ],
+//   any of them with a label, and layer: 'sub' when it's on the subfloor
+//   plan (drawn under the same building, at the same scale) ],
 //   mpu: metres per plan unit, once the technician gives one real size,
 //   bg: a faded JPEG data URL of a map screenshot or photo to trace over }.
 // Plan units are 1000 × 750 (4:3), top-left origin. The same drawing code
@@ -31,7 +32,19 @@ const PLAN_INK = {
 
 // group: the tab it sits under in the editor. legend: the words in the key
 // (symbols with the same words share one line of the legend).
-const SITE_PLAN_GROUPS = { build: 'Buildings', yard: 'Yard', services: 'Services', treat: 'Treatment', stations: 'Stations', find: 'Findings' };
+const SITE_PLAN_GROUPS = { build: 'Buildings', yard: 'Yard', services: 'Services', treat: 'Treatment', stations: 'Stations', find: 'Findings',
+  structure: 'Structure', subaccess: 'Access', subfind: 'Findings' };
+// The tabs in each view of the editor: the site, and the subfloor under the
+// building. Some symbols (access, termite activity) appear in both.
+const SITE_PLAN_TRAYS = {
+  site: ['build', 'yard', 'services', 'treat', 'stations', 'find'],
+  sub: ['structure', 'subaccess', 'subfind'],
+};
+const SITE_PLAN_SUB_TRAY = {
+  structure: ['subfloor', 'subfloorShape', 'slab', 'pier', 'pierrow', 'dwarf', 'vent'],
+  subaccess: ['access', 'clearance', 'noaccess', 'subtreated', 'text'],
+  subfind: ['activity', 'damage', 'decay', 'moisture', 'antcap', 'timber'],
+};
 const SITE_PLAN_SYMBOLS = {
   house:     { kind: 'rect', group: 'build', label: 'House, square', legend: 'House or main building', z: 0, def: { w: 400, h: 275, label: 'House' }, ph: 'e.g. House, Unit 2', size: true },
   outline:   { kind: 'area', group: 'build', label: 'House, any shape', legend: 'House or main building', z: 0, ph: 'e.g. House', size: true },
@@ -64,6 +77,19 @@ const SITE_PLAN_SYMBOLS = {
   moisture:  { kind: 'point', group: 'find', label: 'Moisture or leak', legend: 'Moisture or leak', z: 3, ph: 'e.g. Leaking shower' },
   timber:    { kind: 'point', group: 'find', label: 'Timber on soil', legend: 'Timber on soil, woodpile or stored timber', z: 3, ph: 'e.g. Woodpile against wall' },
   bridge:    { kind: 'point', group: 'find', label: 'Bridging', legend: 'Bridging of the barrier or slab edge', z: 3, ph: 'e.g. Soil over slab edge' },
+  // The subfloor plan's own symbols (SITE_PLAN_SUB_TRAY).
+  subfloor:  { kind: 'rect', label: 'Subfloor, square', legend: 'Subfloor (suspended floor)', z: 0, def: { w: 400, h: 275, label: 'Subfloor' }, ph: 'e.g. Subfloor, 600 mm clearance', size: true },
+  subfloorShape: { kind: 'area', label: 'Subfloor, any shape', legend: 'Subfloor (suspended floor)', z: 0, ph: 'e.g. Subfloor' },
+  slab:      { kind: 'rect', label: 'Slab section', legend: 'Slab on ground (no subfloor)', z: 0, def: { w: 150, h: 150, label: 'Slab' }, ph: 'e.g. Laundry and bathroom on slab', size: true },
+  pier:      { kind: 'point', label: 'Pier or stump', legend: 'Pier or stump', z: 3, ph: 'e.g. Timber stump' },
+  pierrow:   { kind: 'line', label: 'Row of piers', legend: 'Pier or stump', z: 2, ph: 'e.g. Brick piers' },
+  dwarf:     { kind: 'line', label: 'Dwarf wall', legend: 'Dwarf wall or sleeper wall', z: 2, ph: 'e.g. Brick dwarf wall' },
+  vent:      { kind: 'point', label: 'Vent', legend: 'Subfloor vent', z: 3, ph: 'e.g. Blocked by garden bed' },
+  clearance: { kind: 'rect', label: 'Low clearance', legend: 'Low clearance (restricted access)', z: 1, def: { w: 200, h: 100, label: 'Under 400 mm' }, ph: 'e.g. 250 mm clearance' },
+  subtreated:{ kind: 'rect', label: 'Treated soil', legend: 'Treated soil under the floor', z: 1, def: { w: 200, h: 150, label: 'Treated' }, ph: 'e.g. Rodded and sprayed' },
+  damage:    { kind: 'point', label: 'Timber damage', legend: 'Timber damage found', z: 3, ph: 'e.g. Bearer, north side' },
+  decay:     { kind: 'point', label: 'Decay or rot', legend: 'Fungal decay (rot)', z: 3, ph: 'e.g. Joist ends' },
+  antcap:    { kind: 'point', label: 'Ant cap problem', legend: 'Ant cap missing or damaged', z: 3, ph: 'e.g. Missing on 3 stumps' },
 };
 const SITE_PLAN_STATIONS = ['inground', 'above', 'monitor'];
 
@@ -89,10 +115,56 @@ function planPathLength(pts, closed) {
 }
 function sitePlanLength(plan, k) {
   if (!plan || !plan.mpu) return 0;
-  return ((plan.items) || []).filter(it => it.k === k).reduce((a, it) => a + planPathLength(it.pts), 0) * plan.mpu;
+  return planLayerItems(plan).filter(it => it.k === k).reduce((a, it) => a + planPathLength(it.pts), 0) * plan.mpu;
 }
 function formatPlanMetres(m) {
   return `${m < 10 ? Math.round(m * 10) / 10 : Math.round(m)} m`;
+}
+
+// The items on one view: the site ('site') or the subfloor ('sub').
+function planLayerItems(plan, layer = 'site') {
+  return ((plan && plan.items) || []).filter(it => (it.layer || 'site') === layer);
+}
+
+function sitePlanHasSubfloor(plan) {
+  return planLayerItems(plan, 'sub').length > 0;
+}
+
+// Where each pier in a row of piers sits: about every 1.8 m when the plan
+// has a scale, else every 50 plan units, both ends included.
+function pierRowPoints(pts, mpu) {
+  const gap = mpu ? Math.max(20, 1.8 / mpu) : 50, out = [];
+  (pts || []).forEach((b, i) => {
+    if (!i) { out.push(b); return; }
+    const a = pts[i - 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.round(L / gap));
+    for (let k = 1; k <= n; k++) out.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
+  });
+  return out;
+}
+
+// "28 piers or stumps, 4 vents, 1 low clearance area and 2 places timber
+// damage was found": what the subfloor plan shows.
+function sitePlanSubSummary(plan) {
+  const items = planLayerItems(plan, 'sub');
+  const count = k => items.filter(it => it.k === k).length;
+  const piers = count('pier') + items.filter(it => it.k === 'pierrow').reduce((a, it) => a + pierRowPoints(it.pts, plan.mpu).length, 0);
+  const n = (num, one, many) => `${num} ${num === 1 ? one : many}`;
+  const bits = [];
+  if (piers) bits.push(n(piers, 'pier or stump', 'piers or stumps'));
+  if (count('dwarf')) bits.push(n(count('dwarf'), 'dwarf wall', 'dwarf walls'));
+  if (count('vent')) bits.push(n(count('vent'), 'vent', 'vents'));
+  if (count('access')) bits.push(n(count('access'), 'access point', 'access points'));
+  if (count('slab')) bits.push(n(count('slab'), 'section on slab', 'sections on slab'));
+  if (count('clearance')) bits.push(n(count('clearance'), 'low clearance area', 'low clearance areas'));
+  if (count('noaccess')) bits.push(n(count('noaccess'), 'area that could not be reached', 'areas that could not be reached'));
+  if (count('subtreated')) bits.push('treated soil');
+  if (count('activity')) bits.push(n(count('activity'), 'place termite activity was found', 'places termite activity was found'));
+  if (count('damage')) bits.push(n(count('damage'), 'place timber damage was found', 'places timber damage was found'));
+  if (count('decay')) bits.push(n(count('decay'), 'place with decay', 'places with decay'));
+  if (count('moisture')) bits.push(n(count('moisture'), 'damp or leaking spot', 'damp or leaking spots'));
+  if (count('antcap')) bits.push(n(count('antcap'), 'ant cap problem', 'ant cap problems'));
+  if (count('timber')) bits.push(n(count('timber'), 'place with timber on the soil', 'places with timber on the soil'));
+  return bits.length ? joinWithAnd(bits) : '';
 }
 
 function sitePlanHasContent(plan) {
@@ -100,13 +172,13 @@ function sitePlanHasContent(plan) {
 }
 
 function sitePlanStations(plan) {
-  return ((plan && plan.items) || []).filter(it => SITE_PLAN_STATIONS.includes(it.k)).sort((a, b) => a.n - b.n);
+  return planLayerItems(plan).filter(it => SITE_PLAN_STATIONS.includes(it.k)).sort((a, b) => a.n - b.n);
 }
 
 // "12 in-ground bait stations, 2 above-ground bait stations and a
 // chemical barrier": what the plan shows, for the record and the PDF.
 function sitePlanSummary(plan) {
-  const items = (plan && plan.items) || [];
+  const items = planLayerItems(plan);
   const count = k => items.filter(it => it.k === k).length;
   const bits = [];
   [['inground', 'in-ground bait station'], ['above', 'above-ground bait station'], ['monitor', 'monitoring station']].forEach(([k, word]) => {
@@ -264,6 +336,25 @@ function drawPlanSymbol(P, k, x, y, it = {}, status) {
       P.poly([[x, y - 24], [x + 24, y], [x, y + 24], [x - 24, y]], { fill: I.amber, stroke: I.orangeDark, lw: 2 });
       P.text(x, y + 1, 'B', { size: 20, bold: true, color: '#FFFFFF' });
       break;
+    case 'pier':
+      P.poly(rectPts(x - 8, y - 8, 16, 16), { fill: '#3D5166', stroke: I.ink, lw: 1.5 });
+      break;
+    case 'vent':
+      P.poly(rectPts(x - 19, y - 10, 38, 20), { fill: I.paper, stroke: I.ink, lw: 2.5 });
+      [-9, 0, 9].forEach(dx => P.poly([[x + dx, y - 6], [x + dx, y + 6]], { stroke: I.ink, lw: 2, close: false }));
+      break;
+    case 'damage':
+      P.poly(rectPts(x - 18, y - 18, 36, 36), { fill: I.red, stroke: I.redDark, lw: 2 });
+      P.text(x, y + 1, 'D', { size: 22, bold: true, color: '#FFFFFF' });
+      break;
+    case 'decay':
+      P.circle(x, y, 19, { fill: '#8B5A2B', stroke: '#5C3B1C', lw: 2 });
+      P.text(x, y + 1, 'R', { size: 21, bold: true, color: '#FFFFFF' });
+      break;
+    case 'antcap':
+      P.poly(rectPts(x - 8, y - 2, 16, 20), { fill: '#3D5166', stroke: I.ink, lw: 1.5 });
+      P.poly([[x - 22, y - 4], [x + 22, y - 4], [x + 13, y - 17], [x - 13, y - 17]], { fill: I.amber, stroke: I.orangeDark, lw: 2 });
+      break;
     case 'text':
       P.text(x, y, it.label || 'Label', { size: 22, bold: true, color: I.ink, halo: true });
       break;
@@ -279,6 +370,10 @@ function planRectStyle(k) {
     : k === 'paving' ? { fill: '#F3F5F7', stroke: '#8899AA', lw: 2, hatch: '#D5DDE5', cross: true }
     : k === 'driveway' ? { fill: '#E6EAF0', stroke: '#8899AA', lw: 2 }
     : k === 'pool' ? { fill: '#D7ECFB', stroke: '#2D7DD2', lw: 3 }
+    : k === 'subfloor' || k === 'subfloorShape' ? { fill: '#F7F1E6', stroke: '#A58A5A', lw: 3 }
+    : k === 'slab' ? { fill: '#E9EDF2', stroke: '#8899AA', lw: 2.5, hatch: '#CFD8E1', cross: true }
+    : k === 'clearance' ? { fill: I.amberWash, stroke: I.amber, lw: 2.5, dash: [8, 6], hatch: '#F2D59A' }
+    : k === 'subtreated' ? { fill: '#EAF0FF', stroke: I.blue, lw: 2.5, dash: [8, 6], hatch: '#B9CBFF' }
     : { fill: '#F5F7FA', stroke: I.muted, lw: 2.5, dash: [5, 6], hatch: '#AAB7C4' };
 }
 
@@ -287,6 +382,8 @@ function planLineStyle(k) {
   return k === 'barrier' ? { stroke: I.blue, lw: 9 }
     : k === 'untreated' ? { stroke: I.muted, lw: 6, dash: [14, 10] }
     : k === 'retaining' ? { stroke: I.ink, lw: 6, ticks: true }
+    : k === 'pierrow' ? { stroke: '#AAB7C4', lw: 2, dash: [6, 8], piers: true }
+    : k === 'dwarf' ? { stroke: I.muted, lw: 12, inner: '#FFFFFF' }
     : { stroke: I.muted, lw: 2.5, dash: [18, 6, 3, 6] };
 }
 
@@ -324,10 +421,13 @@ function drawPlanArea(P, k, pts, label, mpu) {
   });
 }
 
-function drawPlanLine(P, k, pts) {
+function drawPlanLine(P, k, pts, mpu) {
   if (pts.length < 2) return;
   const o = planLineStyle(k);
   P.poly(pts, Object.assign({ close: false }, o));
+  // A brick dwarf wall reads as a double line.
+  if (o.inner) P.poly(pts, { stroke: o.inner, lw: 4, close: false });
+  if (o.piers) pierRowPoints(pts, mpu).forEach(q => drawPlanSymbol(P, 'pier', q[0], q[1]));
   // A retaining wall carries ticks on its low side.
   if (o.ticks) pts.forEach((a, i) => {
     if (!i) return;
@@ -358,17 +458,32 @@ function drawPlanNorth(P, north) {
 }
 
 // The whole plan. opts.statuses maps a station number to what a visit found.
+// opts.layer 'sub' draws the subfloor plan: the building's walls from the
+// site plan in grey, with the subfloor items under and over them.
 function drawSitePlan(P, plan, opts = {}) {
-  const items = ((plan && plan.items) || []).slice()
+  const layer = opts.layer || 'site';
+  const items = planLayerItems(plan, layer).slice()
     .sort((a, b) => ((SITE_PLAN_SYMBOLS[a.k] || {}).z || 0) - ((SITE_PLAN_SYMBOLS[b.k] || {}).z || 0));
+  let walls = layer !== 'sub';
+  const drawWalls = () => {
+    walls = true;
+    planLayerItems(plan, 'site').filter(it => ['house', 'outline', 'shed', 'deck'].includes(it.k)).forEach(it => {
+      const pts = it.pts || rectPts(it.x, it.y, it.w, it.h);
+      if (pts.length < 3) return;
+      P.poly(pts, { stroke: '#8899AA', lw: it.k === 'deck' ? 2 : 4, dash: it.k === 'deck' ? [10, 6] : null });
+      const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]);
+      if (it.label) P.text(Math.min(...xs) + 4, Math.min(...ys) - 14, it.label, { size: 15, color: '#8899AA', align: 'left', halo: true });
+    });
+  };
   items.forEach(it => {
     const sym = SITE_PLAN_SYMBOLS[it.k];
     if (!sym) return;
+    if (!walls && (sym.z || 0) >= 2) drawWalls();
     const mpu = plan.mpu;
     if (sym.kind === 'rect') drawPlanRect(P, it.k, it.x, it.y, it.w, it.h, it.label, mpu && sym.size ? `${formatPlanMetres(it.w * mpu).replace(' m', '')} × ${formatPlanMetres(it.h * mpu)}` : '');
-    else if (sym.kind === 'area') drawPlanArea(P, it.k, it.pts || [], it.label, mpu);
+    else if (sym.kind === 'area') drawPlanArea(P, it.k, it.pts || [], it.label, it.k === 'outline' ? mpu : 0);
     else if (sym.kind === 'line') {
-      drawPlanLine(P, it.k, it.pts || []);
+      drawPlanLine(P, it.k, it.pts || [], plan.mpu);
       const len = mpu && sym.size && it.pts && it.pts.length > 1 ? formatPlanMetres(planPathLength(it.pts) * mpu) : '';
       const words = [it.label, len].filter(Boolean).join(' · ');
       if (words && it.pts && it.pts.length > 1) {
@@ -388,15 +503,18 @@ function drawSitePlan(P, plan, opts = {}) {
       }
     }
   });
+  if (!walls) drawWalls();
   drawPlanNorth(P, plan && plan.north);
   drawPlanScaleBar(P, plan && plan.mpu);
 }
 
 // The keys a plan needs in its legend, in the order of SITE_PLAN_SYMBOLS.
-function sitePlanLegendKeys(plan) {
-  const used = new Set(((plan && plan.items) || []).map(it => it.k));
+function sitePlanLegendKeys(plan, layer = 'site') {
+  const used = new Set(planLayerItems(plan, layer).map(it => it.k));
   const words = new Set();
-  return Object.keys(SITE_PLAN_SYMBOLS).filter(k => {
+  // The subfloor's legend follows its tabs: structure, access, findings.
+  const order = layer === 'sub' ? Object.values(SITE_PLAN_SUB_TRAY).flat() : Object.keys(SITE_PLAN_SYMBOLS);
+  return order.filter(k => {
     const w = SITE_PLAN_SYMBOLS[k].legend;
     if (!used.has(k) || !w || words.has(w)) return false;
     words.add(w); return true;
@@ -408,13 +526,13 @@ function drawPlanSwatch(P, k, x, y) {
   const sym = SITE_PLAN_SYMBOLS[k];
   if (sym.kind === 'rect') drawPlanRect(P, k, x - 34, y - 22, 68, 44, '');
   else if (sym.kind === 'area') drawPlanArea(P, k, [[x - 34, y - 22], [x + 10, y - 22], [x + 10, y - 4], [x + 34, y - 4], [x + 34, y + 22], [x - 34, y + 22]], '');
-  else if (sym.kind === 'line') drawPlanLine(P, k, [[x - 36, y], [x + 36, y]]);
+  else if (sym.kind === 'line') drawPlanLine(P, k, [[x - 36, y], [x + 36, y]], k === 'pierrow' ? 0.025 : 0);
   else drawPlanSymbol(P, k, x, y, SITE_PLAN_STATIONS.includes(k) ? { n: '' } : {});
 }
 
 function sitePlanSVG(plan, opts = {}) {
   const P = svgPainter();
-  if (plan && plan.bg) P.raw(`<image href="${escapeHtml(plan.bg)}" x="0" y="0" width="${PLAN_W}" height="${PLAN_H}" preserveAspectRatio="none"/>`);
+  if (plan && plan.bg && opts.layer !== 'sub') P.raw(`<image href="${escapeHtml(plan.bg)}" x="0" y="0" width="${PLAN_W}" height="${PLAN_H}" preserveAspectRatio="none"/>`);
   if (opts.grid) {
     for (let x = 50; x < PLAN_W; x += 50) P.raw(`<line x1="${x}" y1="0" x2="${x}" y2="${PLAN_H}" stroke="${x % 250 ? '#EEF2F7' : '#DCE4EE'}" stroke-width="1.5"/>`);
     for (let y = 50; y < PLAN_H; y += 50) P.raw(`<line x1="0" y1="${y}" x2="${PLAN_W}" y2="${y}" stroke="${y % 250 ? '#EEF2F7' : '#DCE4EE'}" stroke-width="1.5"/>`);
@@ -427,9 +545,10 @@ function sitePlanSVG(plan, opts = {}) {
 // The legend as HTML, with each swatch drawn by the same code as the plan.
 function sitePlanLegendHTML(plan, opts = {}) {
   const swatch = draw => { const P = svgPainter(); draw(P); return `<svg viewBox="-42 -30 84 60" aria-hidden="true">${P.out.join('')}</svg>`; };
-  const count = k => ((plan && plan.items) || []).filter(it => it.k === k).length;
+  const count = k => planLayerItems(plan, opts.layer).filter(it => it.k === k).length;
   // opts.stationsOnly keeps just the station symbols, for the small bait card.
-  const rows = sitePlanLegendKeys(plan).filter(k => !opts.stationsOnly || SITE_PLAN_STATIONS.includes(k)).map(k => `<li>${swatch(P => drawPlanSwatch(P, k, 0, 0))}<span>${escapeHtml(SITE_PLAN_SYMBOLS[k].legend)}${SITE_PLAN_STATIONS.includes(k) ? ` (${count(k)})` : ''}</span></li>`);
+  const rows = sitePlanLegendKeys(plan, opts.layer).filter(k => !opts.stationsOnly || SITE_PLAN_STATIONS.includes(k)).map(k => `<li>${swatch(P => drawPlanSwatch(P, k, 0, 0))}<span>${escapeHtml(SITE_PLAN_SYMBOLS[k].legend)}${SITE_PLAN_STATIONS.includes(k) ? ` (${count(k)})` : ''}</span></li>`);
+  if (opts.layer === 'sub' && rows.length) rows.unshift(`<li>${swatch(P => P.poly([[-36, 0], [36, 0]], { stroke: '#8899AA', lw: 4, close: false }))}<span>Walls of the building above</span></li>`);
   if (opts.statuses) {
     const seen = new Set(Object.values(opts.statuses).map(s => s && (SITE_PLAN_STATUS[s] ? s : 'problem')));
     Object.entries(SITE_PLAN_STATUS).filter(([key]) => seen.has(key)).forEach(([key, s]) => {
@@ -444,12 +563,12 @@ function sitePlanLegendHTML(plan, opts = {}) {
 // in columns, then where each station is.
 
 // The plan in a box at x, y, w wide (4:3). Returns its height in mm.
-function drawSitePlanPdf(doc, plan, { x, y, w, statuses } = {}) {
+function drawSitePlanPdf(doc, plan, { x, y, w, statuses, layer } = {}) {
   const C = PDF_COLORS;
   const h = w * PLAN_H / PLAN_W;
   doc.setFillColor(255, 255, 255); doc.rect(x, y, w, h, 'F');
-  if (plan && plan.bg) { try { doc.addImage(plan.bg, 'JPEG', x, y, w, h); } catch (e) {} }
-  drawSitePlan(pdfPainter(doc, x, y, w / PLAN_W), plan, { statuses });
+  if (plan && plan.bg && layer !== 'sub') { try { doc.addImage(plan.bg, 'JPEG', x, y, w, h); } catch (e) {} }
+  drawSitePlan(pdfPainter(doc, x, y, w / PLAN_W), plan, { statuses, layer });
   doc.setLineDashPattern([], 0);
   doc.setDrawColor(...C.rule); doc.setLineWidth(0.3); doc.rect(x, y, w, h);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
@@ -459,9 +578,9 @@ function drawSitePlanPdf(doc, plan, { x, y, w, statuses } = {}) {
 
 // The legend at x, y, w wide, in columns: each symbol used, then the
 // station colours when a visit's statuses are given. Returns its height.
-function drawSitePlanLegendPdf(doc, plan, { x, y, w, cols = 3, statuses } = {}) {
+function drawSitePlanLegendPdf(doc, plan, { x, y, w, cols = 3, statuses, layer } = {}) {
   const C = PDF_COLORS;
-  const count = k => ((plan && plan.items) || []).filter(it => it.k === k).length;
+  const count = k => planLayerItems(plan, layer).filter(it => it.k === k).length;
   const block = (title, rows, top) => {
     if (!rows.length) return 0;
     doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
@@ -476,8 +595,10 @@ function drawSitePlanLegendPdf(doc, plan, { x, y, w, cols = 3, statuses } = {}) 
     });
     return 6 + perCol * RH;
   };
-  let h = block('LEGEND', sitePlanLegendKeys(plan).map(k => [P => drawPlanSwatch(P, k, 0, 0),
-    SITE_PLAN_SYMBOLS[k].legend + (SITE_PLAN_STATIONS.includes(k) ? ` (${count(k)})` : '')]), y);
+  const rows = sitePlanLegendKeys(plan, layer).map(k => [P => drawPlanSwatch(P, k, 0, 0),
+    SITE_PLAN_SYMBOLS[k].legend + (SITE_PLAN_STATIONS.includes(k) ? ` (${count(k)})` : '')]);
+  if (layer === 'sub') rows.unshift([P => P.poly([[-36, 0], [36, 0]], { stroke: '#8899AA', lw: 4, close: false }), 'Walls of the building above']);
+  let h = block('LEGEND', rows, y);
   if (statuses) {
     const seen = new Set(Object.values(statuses).map(st => st && (SITE_PLAN_STATUS[st] ? st : 'problem')));
     const rows = Object.entries(SITE_PLAN_STATUS).filter(([key]) => seen.has(key))
@@ -513,7 +634,7 @@ function drawSitePlanStationListPdf(doc, plan, { x, y, w, cols = 3 } = {}) {
 // A full-screen sheet with the plan, a tray of symbols by group, and a bar
 // for the selected item (its label, delete). Opened from the treatment
 // record; Save hands the plan back through sitePlanEditor.onSave.
-const sitePlanEditor = { plan: null, tool: null, group: 'build', sel: null, drawing: null, drag: null, undo: [], onSave: null, zoom: 1, cx: PLAN_W / 2, cy: PLAN_H / 2 };
+const sitePlanEditor = { plan: null, layer: 'site', tool: null, group: 'build', sel: null, drawing: null, drag: null, undo: [], onSave: null, zoom: 1, cx: PLAN_W / 2, cy: PLAN_H / 2 };
 
 function newSitePlan() {
   const d = SITE_PLAN_SYMBOLS.house.def;
@@ -527,7 +648,7 @@ function openSitePlan(plan, onSave) {
   E.plan = sitePlanHasContent(plan) ? JSON.parse(JSON.stringify(plan)) : newSitePlan();
   if (E.plan.north == null) E.plan.north = 0;
   E.tool = null; E.sel = null; E.drawing = null; E.drag = null; E.undo = []; E.onSave = onSave;
-  E.group = 'build'; E.zoom = 1; E.cx = PLAN_W / 2; E.cy = PLAN_H / 2;
+  E.layer = 'site'; E.group = 'build'; E.zoom = 1; E.cx = PLAN_W / 2; E.cy = PLAN_H / 2;
   track('screen_viewed', { screen: 'site_plan' });
   document.getElementById('sitePlanOverlay').classList.add('open');
   renderSitePlanTray();
@@ -579,6 +700,25 @@ function setSitePlanGroup(g) {
   renderSitePlanTray();
 }
 
+// Switch between the site plan and the subfloor plan. The first time, the
+// subfloor starts as the house's footprint, to adjust or delete.
+function setSitePlanLayer(layer) {
+  const E = sitePlanEditor;
+  finishSitePlanLine();
+  if (E.layer === layer) return;
+  E.layer = layer; E.tool = null; E.sel = null;
+  E.group = SITE_PLAN_TRAYS[layer][0];
+  if (layer === 'sub' && !sitePlanHasSubfloor(E.plan)) {
+    pushSitePlanUndo();
+    planLayerItems(E.plan, 'site').forEach(it => {
+      if (it.k === 'house') E.plan.items.push({ id: planId(), k: 'subfloor', layer: 'sub', x: it.x, y: it.y, w: it.w, h: it.h, label: 'Subfloor' });
+      if (it.k === 'outline' && (it.pts || []).length > 2) E.plan.items.push({ id: planId(), k: 'subfloorShape', layer: 'sub', pts: it.pts.map(q => q.slice()), label: 'Subfloor' });
+    });
+  }
+  renderSitePlanTray();
+  renderSitePlanEditor();
+}
+
 function setSitePlanTool(k) {
   const E = sitePlanEditor;
   finishSitePlanLine();
@@ -590,10 +730,12 @@ function setSitePlanTool(k) {
 
 function renderSitePlanTray() {
   const E = sitePlanEditor;
-  document.getElementById('spGroups').innerHTML = Object.entries(SITE_PLAN_GROUPS).map(([g, name]) =>
+  document.querySelectorAll('#spViews .sp-view').forEach(b => { const on = b.dataset.layer === E.layer; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  document.getElementById('spGroups').innerHTML = SITE_PLAN_TRAYS[E.layer].map(g => [g, SITE_PLAN_GROUPS[g]]).map(([g, name]) =>
     `<button type="button" role="tab" aria-selected="${E.group === g}" class="sp-group${E.group === g ? ' on' : ''}" onclick="setSitePlanGroup('${g}')">${name}</button>`).join('');
   const swatch = k => { const P = svgPainter(); drawPlanSwatch(P, k, 0, 0); return `<svg viewBox="-42 -30 84 60" aria-hidden="true">${k === 'text' ? '<text x="0" y="2" font-size="30" font-weight="800" text-anchor="middle" dominant-baseline="central" fill="#0C121C">Aa</text>' : P.out.join('')}</svg>`; };
-  document.getElementById('spTools').innerHTML = Object.entries(SITE_PLAN_SYMBOLS).filter(([, s]) => s.group === E.group).map(([k, s]) =>
+  const keys = E.layer === 'sub' ? SITE_PLAN_SUB_TRAY[E.group] || [] : Object.keys(SITE_PLAN_SYMBOLS).filter(k => SITE_PLAN_SYMBOLS[k].group === E.group);
+  document.getElementById('spTools').innerHTML = keys.map(k => [k, SITE_PLAN_SYMBOLS[k]]).map(([k, s]) =>
     `<button type="button" class="sp-tool${E.tool === k ? ' on' : ''}" aria-pressed="${E.tool === k}" onclick="setSitePlanTool('${k}')">${swatch(k)}<span>${s.label}</span></button>`).join('');
 }
 
@@ -612,14 +754,16 @@ function sitePlanHint() {
       : `Tap the plan to place it.`;
   }
   if (E.sel) return 'Drag to move it. Name it below, give its real size, or delete it.';
-  return E.zoom > 1 ? 'Zoomed in: drag an empty spot to look around.' : 'Pick a symbol below, then tap the plan. Tap something on the plan to move or name it.';
+  if (E.zoom > 1) return 'Zoomed in: drag an empty spot to look around.';
+  return E.layer === 'sub' ? 'The subfloor, under the house walls (grey). Mark the piers, vents, access and what you found.'
+    : 'Pick a symbol below, then tap the plan. Tap something on the plan to move or name it.';
 }
 
 function renderSitePlanEditor() {
   const E = sitePlanEditor;
   const sel = E.plan.items.find(it => it.id === E.sel);
   const vb = sitePlanViewBox();
-  document.getElementById('spCanvas').innerHTML = sitePlanSVG(E.plan, { grid: true, cls: 'site-plan-svg sp-edit', viewBox: vb.join(' '), after: P => {
+  document.getElementById('spCanvas').innerHTML = sitePlanSVG(E.plan, { grid: true, layer: E.layer, cls: 'site-plan-svg sp-edit', viewBox: vb.join(' '), after: P => {
     if (E.drawing) {
       const it = E.plan.items.find(x => x.id === E.drawing);
       if (it) it.pts.forEach((p, i) => P.circle(p[0], p[1], i ? 9 : 13, { fill: i ? PLAN_INK.paper : PLAN_INK.pink, stroke: PLAN_INK.pink, lw: 3 }));
@@ -636,6 +780,7 @@ function renderSitePlanEditor() {
   document.getElementById('spZoomOut').disabled = E.zoom <= 1;
   document.getElementById('spZoomIn').disabled = E.zoom >= 3;
   document.getElementById('spBgRemove').hidden = !E.plan.bg;
+  document.querySelector('#sitePlanOverlay .sp-bg').hidden = E.layer === 'sub';
   document.getElementById('spBgLabel').firstChild.textContent = E.plan.bg ? 'Change the photo underneath' : 'Trace over a map or photo';
   document.getElementById('spUndo').disabled = !E.undo.length;
   document.getElementById('spNorth').textContent = `North: ${['up', 'up-right', 'right', 'down-right', 'down', 'down-left', 'left', 'up-left'][E.plan.north || 0]}`;
@@ -660,9 +805,9 @@ function renderSitePlanEditor() {
   document.getElementById('spScaleNote').textContent = E.plan.mpu
     ? 'The plan has a scale. Lengths show on the barrier and walls, and the barrier\'s metres fill the record.'
     : 'Tip: tap the house, then type its real width, and the plan works out every length from it.';
-  document.getElementById('spLegend').innerHTML = sitePlanLegendHTML(E.plan);
-  const sum = sitePlanSummary(E.plan);
-  document.getElementById('spSummary').textContent = sum ? `The plan shows ${sum}.` : '';
+  document.getElementById('spLegend').innerHTML = sitePlanLegendHTML(E.plan, { layer: E.layer });
+  const sum = E.layer === 'sub' ? sitePlanSubSummary(E.plan) : sitePlanSummary(E.plan);
+  document.getElementById('spSummary').textContent = sum ? `The ${E.layer === 'sub' ? 'subfloor plan' : 'plan'} shows ${sum}.` : '';
 }
 
 function sitePlanBounds(it) {
@@ -763,7 +908,7 @@ const planClamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // The topmost item under a point, stations first.
 function sitePlanHit(p) {
   const E = sitePlanEditor;
-  const items = E.plan.items.slice().sort((a, b) => (SITE_PLAN_SYMBOLS[b.k].z || 0) - (SITE_PLAN_SYMBOLS[a.k].z || 0));
+  const items = planLayerItems(E.plan, E.layer).slice().sort((a, b) => (SITE_PLAN_SYMBOLS[b.k].z || 0) - (SITE_PLAN_SYMBOLS[a.k].z || 0));
   const segDist = (p, a, b) => {
     const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1;
     const t = planClamp(((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L, 0, 1);
@@ -808,7 +953,8 @@ function onSitePlanDown(e) {
     } else {
       pushSitePlanUndo();
       it = { id: planId(), k: tool, pts: [gp] };
-      if (sym.kind === 'area') it.label = 'House';
+      if (sym.kind === 'area') it.label = tool === 'subfloorShape' ? 'Subfloor' : 'House';
+      if (E.layer === 'sub') it.layer = 'sub';
       E.plan.items.push(it); E.drawing = it.id;
     }
     renderSitePlanEditor();
@@ -818,6 +964,7 @@ function onSitePlanDown(e) {
     pushSitePlanUndo();
     const gp = [planSnap(p[0]), planSnap(p[1])];
     const it = { id: planId(), k: tool, x: gp[0], y: gp[1], w: 0, h: 0, label: sym.def.label };
+    if (E.layer === 'sub') it.layer = 'sub';
     E.plan.items.push(it);
     E.drag = { mode: 'newrect', id: it.id, from: gp, moved: false };
     E.sel = it.id;
@@ -826,6 +973,7 @@ function onSitePlanDown(e) {
   if (sym) {
     pushSitePlanUndo();
     const it = { id: planId(), k: tool, x: pt[0], y: pt[1] };
+    if (E.layer === 'sub') it.layer = 'sub';
     if (sym.kind === 'station') it.n = sitePlanStations(E.plan).reduce((m, s) => Math.max(m, s.n || 0), 0) + 1;
     if (sym.kind === 'text') it.label = '';
     E.plan.items.push(it);
@@ -958,9 +1106,14 @@ function clearSitePlan() {
   if (!btn.dataset.armed) { btn.dataset.armed = '1'; btn.textContent = 'Tap again to clear'; setTimeout(() => { delete btn.dataset.armed; btn.textContent = 'Start again'; }, 3000); return; }
   delete btn.dataset.armed; btn.textContent = 'Start again';
   pushSitePlanUndo();
-  const keep = { north: E.plan.north };
-  if (E.plan.bg) keep.bg = E.plan.bg;
-  E.plan = Object.assign(newSitePlan(), keep);
+  if (E.layer === 'sub') {
+    // Only the subfloor goes; the site plan stays.
+    E.plan.items = planLayerItems(E.plan, 'site');
+  } else {
+    const keep = { north: E.plan.north, items: [...newSitePlan().items, ...planLayerItems(E.plan, 'sub')] };
+    if (E.plan.bg) keep.bg = E.plan.bg;
+    E.plan = Object.assign(newSitePlan(), keep);
+  }
   E.sel = null; E.drawing = null;
   renderSitePlanEditor();
 }

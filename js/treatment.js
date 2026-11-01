@@ -320,13 +320,22 @@ function renderTreatmentPlan() {
     return;
   }
   const sum = sitePlanSummary(plan);
+  const sub = sitePlanHasSubfloor(plan);
+  const subSum = sub ? sitePlanSubSummary(plan) : '';
   el.innerHTML = `<button type="button" class="treat-plan-view" onclick="openTreatmentSitePlan()" aria-label="Edit the site plan">${sitePlanSVG(plan)}</button>
     ${sitePlanLegendHTML(plan)}
     ${sum ? `<p class="quote-hint">The plan shows ${escapeHtml(sum)}.</p>` : ''}
-    <button type="button" class="quote-link-btn" onclick="openTreatmentSitePlan()">Edit the site plan</button>`;
+    ${sub ? `<div class="treat-plan-sub">
+      <p class="treat-plan-caption">Subfloor</p>
+      <button type="button" class="treat-plan-view" onclick="openTreatmentSitePlan('sub')" aria-label="Edit the subfloor plan">${sitePlanSVG(plan, { layer: 'sub' })}</button>
+      ${sitePlanLegendHTML(plan, { layer: 'sub' })}
+      ${subSum ? `<p class="quote-hint">The subfloor plan shows ${escapeHtml(subSum)}.</p>` : ''}
+    </div>` : ''}
+    <button type="button" class="quote-link-btn" onclick="openTreatmentSitePlan()">Edit the site plan</button>
+    ${sub ? '' : '<button type="button" class="quote-link-btn" onclick="openTreatmentSitePlan(\'sub\')">Add the subfloor</button>'}`;
 }
 
-function openTreatmentSitePlan() {
+function openTreatmentSitePlan(layer) {
   openSitePlan(treatmentPlanDraft, plan => {
     treatmentPlanDraft = sitePlanHasContent(plan) ? plan : null;
     renderTreatmentPlan();
@@ -342,6 +351,7 @@ function openTreatmentSitePlan() {
     const bQty = document.querySelector('#trMethods [data-qty="barrier"]');
     if (lm && bBox && bBox.checked && bQty && !bQty.value.trim()) bQty.value = String(lm);
   });
+  if (layer === 'sub') setSitePlanLayer('sub');
 }
 
 // A photo of the site (or of a plan drawn on paper) fills the sketch pad,
@@ -748,7 +758,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
 
   // Where, in the same row style.
   // A drawn plan prints on the last page; the row says so.
-  const planNote = sitePlanHasContent(t.plan) ? 'Drawn on the last page, with a legend' : '';
+  const planNote = !sitePlanHasContent(t.plan) ? '' : sitePlanHasSubfloor(t.plan) ? 'Site and subfloor plans on the last pages, with legends' : 'Drawn on the last page, with a legend';
   if (install) { y += 1.5; cellRow([['Where it was installed', t.areas], ['Areas not covered', t.notTreated], ['Installed to', 'AS 3660.2 and the manufacturer\'s directions'], ['Site plan', planNote]]); }
   else if (t.areas || t.notTreated || planNote) { y += 1.5; cellRow([['Areas treated', t.areas], ['Areas not treated', t.notTreated], ['Site plan', planNote]]); }
 
@@ -933,6 +943,16 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     y += drawSitePlanPdf(doc, t.plan, { x: M, y: y - 1, w: CW }) + 5;
     y += drawSitePlanLegendPdf(doc, t.plan, { x: M, y, w: CW }) + 4;
     drawSitePlanStationListPdf(doc, t.plan, { x: M, y: y + 2, w: CW });
+  }
+  // ── SUBFLOOR PLAN ── Its own page too, under the same building and scale.
+  if (drawn && sitePlanHasSubfloor(t.plan)) {
+    doc.addPage();
+    y = drawPdfRunningHeader(doc, company, docName, q.address, number);
+    section('SUBFLOOR PLAN');
+    const subSum = sitePlanSubSummary(t.plan);
+    para(`The area under the suspended floor, with the building's walls above it in grey.${subSum ? ` It shows ${subSum}.` : ''}`, { size: 9, lh: 4.3, after: 2 });
+    y += drawSitePlanPdf(doc, t.plan, { x: M, y: y - 1, w: CW, layer: 'sub' }) + 5;
+    drawSitePlanLegendPdf(doc, t.plan, { x: M, y, w: CW, layer: 'sub' });
   }
 
   drawPdfDocFooters(doc, `${install ? 'Installation certificate' : 'Certificate'} ${number}${company.name ? `  ·  ${company.name}` : ''}`);

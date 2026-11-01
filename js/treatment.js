@@ -336,6 +336,11 @@ function openTreatmentSitePlan() {
     const qty = document.querySelector('#trMethods [data-qty="bait"]');
     if (n && box && !box.checked) { box.checked = true; onTreatmentMethodToggle(box); }
     if (n && qty && !qty.value.trim()) qty.value = String(n);
+    // A plan with a scale gives the barrier's linear metres.
+    const lm = Math.round(sitePlanLength(plan, 'barrier'));
+    const bBox = document.querySelector('#trMethods input[data-key="barrier"]');
+    const bQty = document.querySelector('#trMethods [data-qty="barrier"]');
+    if (lm && bBox && bBox.checked && bQty && !bQty.value.trim()) bQty.value = String(lm);
   });
 }
 

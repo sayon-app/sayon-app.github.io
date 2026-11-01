@@ -7,8 +7,11 @@
 //   { id, k: symbol key, x, y } for a point,
 //   { ..., n } for a station (one number sequence across all station types),
 //   { ..., w, h } for a building or an area (x, y its top-left corner),
-//   { id, k, pts: [[x, y], ...] } for a line,
-//   any of them with a label ] }.
+//   { id, k, pts: [[x, y], ...] } for a line, or a closed shape (a building
+//   of any shape),
+//   any of them with a label ],
+//   mpu: metres per plan unit, once the technician gives one real size,
+//   bg: a faded JPEG data URL of a map screenshot or photo to trace over }.
 // Plan units are 1000 × 750 (4:3), top-left origin. The same drawing code
 // paints the plan in the app (SVG) and on the PDFs (jsPDF), so they match.
 
@@ -26,26 +29,41 @@ const PLAN_INK = {
   tree: '#5E7D5A',
 };
 
-// group: the tab it sits under in the editor. legend: the words in the key.
-const SITE_PLAN_GROUPS = { site: 'The site', treat: 'Treatment', stations: 'Stations', find: 'Findings' };
+// group: the tab it sits under in the editor. legend: the words in the key
+// (symbols with the same words share one line of the legend).
+const SITE_PLAN_GROUPS = { build: 'Buildings', yard: 'Yard', services: 'Services', treat: 'Treatment', stations: 'Stations', find: 'Findings' };
 const SITE_PLAN_SYMBOLS = {
-  house:     { kind: 'rect', group: 'site', label: 'Building', legend: 'House or main building', z: 0, def: { w: 400, h: 275, label: 'House' }, ph: 'e.g. House, Unit 2' },
-  shed:      { kind: 'rect', group: 'site', label: 'Garage or shed', legend: 'Garage, shed or other building', z: 0, def: { w: 175, h: 150, label: 'Garage' }, ph: 'e.g. Garage, Shed' },
-  deck:      { kind: 'rect', group: 'site', label: 'Deck or patio', legend: 'Deck, patio or verandah', z: 0, def: { w: 250, h: 125, label: 'Deck' }, ph: 'e.g. Rear deck' },
-  fence:     { kind: 'line', group: 'site', label: 'Fence', legend: 'Fence or boundary', z: 2, ph: 'e.g. Side fence' },
-  tree:      { kind: 'point', group: 'site', label: 'Tree or stump', legend: 'Tree or stump', z: 3, ph: 'e.g. Gum tree' },
-  text:      { kind: 'text', group: 'site', label: 'Label', legend: null, z: 5, ph: 'e.g. Driveway, Street' },
-  barrier:   { kind: 'line', group: 'treat', label: 'Chemical barrier', legend: 'Chemical barrier (treated soil)', z: 2, ph: 'e.g. Trenched and rodded' },
+  house:     { kind: 'rect', group: 'build', label: 'House, square', legend: 'House or main building', z: 0, def: { w: 400, h: 275, label: 'House' }, ph: 'e.g. House, Unit 2', size: true },
+  outline:   { kind: 'area', group: 'build', label: 'House, any shape', legend: 'House or main building', z: 0, ph: 'e.g. House', size: true },
+  shed:      { kind: 'rect', group: 'build', label: 'Garage or shed', legend: 'Garage, shed or other building', z: 0, def: { w: 175, h: 150, label: 'Garage' }, ph: 'e.g. Garage, Shed', size: true },
+  deck:      { kind: 'rect', group: 'build', label: 'Deck or patio', legend: 'Deck, patio or verandah', z: 0, def: { w: 250, h: 125, label: 'Deck' }, ph: 'e.g. Rear deck' },
+  text:      { kind: 'text', group: 'build', label: 'Label', legend: null, z: 5, ph: 'e.g. Street, Neighbour' },
+  garden:    { kind: 'rect', group: 'yard', label: 'Garden bed', legend: 'Garden bed', z: 0, def: { w: 250, h: 50, label: '' }, ph: 'e.g. Mulched bed' },
+  paving:    { kind: 'rect', group: 'yard', label: 'Paving or concrete', legend: 'Paving or concrete', z: 0, def: { w: 250, h: 100, label: 'Paving' }, ph: 'e.g. Rear paving' },
+  driveway:  { kind: 'rect', group: 'yard', label: 'Driveway', legend: 'Driveway or path', z: 0, def: { w: 100, h: 275, label: 'Driveway' }, ph: 'e.g. Driveway' },
+  pool:      { kind: 'rect', group: 'yard', label: 'Pool', legend: 'Pool or pond', z: 0, def: { w: 200, h: 100, label: 'Pool' }, ph: 'e.g. Pool' },
+  fence:     { kind: 'line', group: 'yard', label: 'Fence', legend: 'Fence or boundary', z: 2, ph: 'e.g. Side fence' },
+  retaining: { kind: 'line', group: 'yard', label: 'Retaining wall', legend: 'Retaining wall', z: 2, ph: 'e.g. Sleeper wall' },
+  tree:      { kind: 'point', group: 'yard', label: 'Tree or stump', legend: 'Tree or stump', z: 3, ph: 'e.g. Gum tree' },
+  tank:      { kind: 'point', group: 'yard', label: 'Water tank', legend: 'Water tank', z: 3, ph: 'e.g. Rainwater tank' },
+  hws:       { kind: 'point', group: 'services', label: 'Hot water', legend: 'Hot water system', z: 3, ph: 'e.g. Gas hot water' },
+  ac:        { kind: 'point', group: 'services', label: 'Air con unit', legend: 'Air conditioner unit', z: 3, ph: 'e.g. Split system' },
+  downpipe:  { kind: 'point', group: 'services', label: 'Downpipe', legend: 'Downpipe', z: 3, ph: 'e.g. Not connected' },
+  tap:       { kind: 'point', group: 'services', label: 'Garden tap', legend: 'Garden tap', z: 3, ph: 'e.g. Dripping' },
+  meter:     { kind: 'point', group: 'services', label: 'Meter box', legend: 'Meter box', z: 3, ph: 'e.g. Electricity meter' },
+  access:    { kind: 'point', group: 'services', label: 'Access point', legend: 'Subfloor or roof access', z: 3, ph: 'e.g. Subfloor hatch' },
+  barrier:   { kind: 'line', group: 'treat', label: 'Chemical barrier', legend: 'Chemical barrier (treated soil)', z: 2, ph: 'e.g. Trenched and rodded', size: true },
   treated:   { kind: 'point', group: 'treat', label: 'Treated spot', legend: 'Direct treatment (foam, dust or spray)', z: 3, ph: 'e.g. Foamed wall cavity' },
-  untreated: { kind: 'line', group: 'treat', label: 'Not treated', legend: 'Not treated', z: 2, ph: 'e.g. Under paving, no access' },
+  untreated: { kind: 'line', group: 'treat', label: 'Not treated', legend: 'Not treated', z: 2, ph: 'e.g. Under paving, no access', size: true },
   noaccess:  { kind: 'rect', group: 'treat', label: 'No access area', legend: 'Area not inspected or treated', z: 1, def: { w: 200, h: 100, label: 'No access' }, ph: 'e.g. Under rear deck' },
   notice:    { kind: 'point', group: 'treat', label: 'Durable notice', legend: 'Durable notice', z: 3, ph: 'e.g. Meter box' },
   inground:  { kind: 'station', group: 'stations', label: 'In-ground', legend: 'In-ground bait station', z: 4, ph: 'Where, e.g. rear left corner' },
   above:     { kind: 'station', group: 'stations', label: 'Above-ground', legend: 'Above-ground bait station', z: 4, ph: 'Where, e.g. laundry east wall' },
   monitor:   { kind: 'station', group: 'stations', label: 'Monitoring', legend: 'Monitoring station', z: 4, ph: 'Where, e.g. by the shed' },
   activity:  { kind: 'point', group: 'find', label: 'Termite activity', legend: 'Termite activity or damage found', z: 3, ph: 'e.g. Laundry door frame' },
-  moisture:  { kind: 'point', group: 'find', label: 'Moisture or leak', legend: 'Moisture, leak or conducive condition', z: 3, ph: 'e.g. Leaking tap' },
-  access:    { kind: 'point', group: 'find', label: 'Access point', legend: 'Subfloor or roof access', z: 3, ph: 'e.g. Subfloor hatch' },
+  moisture:  { kind: 'point', group: 'find', label: 'Moisture or leak', legend: 'Moisture or leak', z: 3, ph: 'e.g. Leaking shower' },
+  timber:    { kind: 'point', group: 'find', label: 'Timber on soil', legend: 'Timber on soil, woodpile or stored timber', z: 3, ph: 'e.g. Woodpile against wall' },
+  bridge:    { kind: 'point', group: 'find', label: 'Bridging', legend: 'Bridging of the barrier or slab edge', z: 3, ph: 'e.g. Soil over slab edge' },
 };
 const SITE_PLAN_STATIONS = ['inground', 'above', 'monitor'];
 
@@ -60,6 +78,21 @@ const SITE_PLAN_STATUS = {
 function sitePlanStatusStyle(status) {
   if (!status) return null;
   return SITE_PLAN_STATUS[status] || (['damaged', 'missing', 'noaccess'].includes(status) ? SITE_PLAN_STATUS.problem : null);
+}
+
+// Lengths in metres, once the plan has a scale.
+function planPathLength(pts, closed) {
+  let L = 0;
+  (pts || []).forEach((p, i) => { if (i) L += Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]); });
+  if (closed && pts && pts.length > 2) L += Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]);
+  return L;
+}
+function sitePlanLength(plan, k) {
+  if (!plan || !plan.mpu) return 0;
+  return ((plan.items) || []).filter(it => it.k === k).reduce((a, it) => a + planPathLength(it.pts), 0) * plan.mpu;
+}
+function formatPlanMetres(m) {
+  return `${m < 10 ? Math.round(m * 10) / 10 : Math.round(m)} m`;
 }
 
 function sitePlanHasContent(plan) {
@@ -79,7 +112,8 @@ function sitePlanSummary(plan) {
   [['inground', 'in-ground bait station'], ['above', 'above-ground bait station'], ['monitor', 'monitoring station']].forEach(([k, word]) => {
     const n = count(k); if (n) bits.push(`${n} ${word}${n === 1 ? '' : 's'}`);
   });
-  if (count('barrier')) bits.push('a chemical barrier');
+  const barrier = sitePlanLength(plan, 'barrier');
+  if (count('barrier')) bits.push(`a chemical barrier${barrier ? ` (about ${formatPlanMetres(barrier)})` : ''}`);
   if (count('treated')) bits.push(`${count('treated')} direct treatment spot${count('treated') === 1 ? '' : 's'}`);
   if (count('untreated') + count('noaccess')) bits.push('areas not treated');
   if (count('activity')) bits.push(`${count('activity')} place${count('activity') === 1 ? '' : 's'} termite activity or damage was found`);
@@ -196,6 +230,40 @@ function drawPlanSymbol(P, k, x, y, it = {}, status) {
       P.circle(x, y, 4, { fill: I.tree });
       break;
     }
+    case 'tank':
+      P.circle(x, y, 22, { fill: '#D7ECFB', stroke: '#2D7DD2', lw: 3 });
+      P.circle(x, y, 13, { stroke: '#2D7DD2', lw: 1.5 });
+      break;
+    case 'hws':
+      P.poly(rectPts(x - 19, y - 19, 38, 38), { fill: I.paper, stroke: I.ink, lw: 2.5 });
+      P.text(x, y + 1, 'HW', { size: 16, bold: true, color: I.ink });
+      break;
+    case 'ac':
+      P.poly(rectPts(x - 21, y - 16, 42, 32), { fill: I.paper, stroke: I.ink, lw: 2.5 });
+      P.circle(x, y, 10, { stroke: I.ink, lw: 2 });
+      P.poly([[x - 7, y - 7], [x + 7, y + 7]], { stroke: I.ink, lw: 1.5, close: false });
+      P.poly([[x + 7, y - 7], [x - 7, y + 7]], { stroke: I.ink, lw: 1.5, close: false });
+      break;
+    case 'downpipe':
+      P.circle(x, y, 11, { fill: I.muted, stroke: I.ink, lw: 2 });
+      P.circle(x, y, 4, { fill: I.paper });
+      break;
+    case 'tap':
+      P.circle(x, y + 4, 10, { fill: I.paper, stroke: '#2D7DD2', lw: 3 });
+      P.poly([[x - 11, y - 12], [x + 11, y - 12]], { stroke: '#2D7DD2', lw: 4, close: false });
+      P.poly([[x, y - 12], [x, y - 6]], { stroke: '#2D7DD2', lw: 3, close: false });
+      break;
+    case 'meter':
+      P.poly(rectPts(x - 18, y - 22, 36, 44), { fill: I.paper, stroke: I.ink, lw: 2.5 });
+      P.text(x, y + 1, 'M', { size: 20, bold: true, color: I.ink });
+      break;
+    case 'timber':
+      [-12, 0, 12].forEach(dy => P.poly(rectPts(x - 22, y + dy - 5, 44, 10), { fill: '#FCE7C4', stroke: I.orangeDark, lw: 2 }));
+      break;
+    case 'bridge':
+      P.poly([[x, y - 24], [x + 24, y], [x, y + 24], [x - 24, y]], { fill: I.amber, stroke: I.orangeDark, lw: 2 });
+      P.text(x, y + 1, 'B', { size: 20, bold: true, color: '#FFFFFF' });
+      break;
     case 'text':
       P.text(x, y, it.label || 'Label', { size: 22, bold: true, color: I.ink, halo: true });
       break;
@@ -204,9 +272,13 @@ function drawPlanSymbol(P, k, x, y, it = {}, status) {
 
 function planRectStyle(k) {
   const I = PLAN_INK;
-  return k === 'house' ? { fill: I.building, stroke: I.ink, lw: 5 }
+  return k === 'house' || k === 'outline' ? { fill: I.building, stroke: I.ink, lw: 5 }
     : k === 'shed' ? { fill: I.shed, stroke: I.muted, lw: 3.5 }
     : k === 'deck' ? { fill: I.paper, stroke: I.muted, lw: 2.5, dash: [10, 6], hatch: '#C8D5E3' }
+    : k === 'garden' ? { fill: '#EEF6EA', stroke: I.tree, lw: 2.5, hatch: '#BFD8B5', cross: false }
+    : k === 'paving' ? { fill: '#F3F5F7', stroke: '#8899AA', lw: 2, hatch: '#D5DDE5', cross: true }
+    : k === 'driveway' ? { fill: '#E6EAF0', stroke: '#8899AA', lw: 2 }
+    : k === 'pool' ? { fill: '#D7ECFB', stroke: '#2D7DD2', lw: 3 }
     : { fill: '#F5F7FA', stroke: I.muted, lw: 2.5, dash: [5, 6], hatch: '#AAB7C4' };
 }
 
@@ -214,20 +286,65 @@ function planLineStyle(k) {
   const I = PLAN_INK;
   return k === 'barrier' ? { stroke: I.blue, lw: 9 }
     : k === 'untreated' ? { stroke: I.muted, lw: 6, dash: [14, 10] }
+    : k === 'retaining' ? { stroke: I.ink, lw: 6, ticks: true }
     : { stroke: I.muted, lw: 2.5, dash: [18, 6, 3, 6] };
 }
 
-function drawPlanRect(P, k, x, y, w, h, label) {
+function drawPlanRect(P, k, x, y, w, h, label, size) {
   const o = planRectStyle(k);
   P.poly(rectPts(x, y, w, h), { fill: o.fill });
   if (o.hatch) hatchSegments(x, y, w, h, 18).forEach(seg => P.poly(seg, { stroke: o.hatch, lw: 1.5, close: false }));
+  if (o.cross) hatchSegments(-x - w, y, w, h, 18).forEach(seg => P.poly(seg.map(q => [-q[0], q[1]]), { stroke: o.hatch, lw: 1.5, close: false }));
   P.poly(rectPts(x, y, w, h), { stroke: o.stroke, lw: o.lw, dash: o.dash });
-  if (label) P.text(x + w / 2, y + h / 2, label, { size: k === 'house' ? 24 : 19, bold: k === 'house', color: k === 'house' ? PLAN_INK.ink : PLAN_INK.muted, halo: !!o.hatch });
+  if (label) P.text(x + w / 2, y + h / 2 - (size ? 12 : 0), label, { size: k === 'house' ? 24 : 19, bold: k === 'house', color: k === 'house' ? PLAN_INK.ink : PLAN_INK.muted, halo: !!o.hatch });
+  if (size) P.text(x + w / 2, y + h / 2 + (label ? 14 : 0), size, { size: 16, color: PLAN_INK.muted, halo: !!o.hatch });
+}
+
+// A building of any shape, with each wall's length once there's a scale.
+function drawPlanArea(P, k, pts, label, mpu) {
+  const o = planRectStyle(k);
+  if (pts.length < 3) { P.poly(pts, { stroke: o.stroke, lw: o.lw, close: false }); return; }
+  P.poly(pts, { fill: o.fill, stroke: o.stroke, lw: o.lw });
+  // The label goes on the shape's true centre (its centroid), sized to fit.
+  let A = 0, cx = 0, cy = 0;
+  pts.forEach((a, i) => { const b = pts[(i + 1) % pts.length], f = a[0] * b[1] - b[0] * a[1]; A += f; cx += (a[0] + b[0]) * f; cy += (a[1] + b[1]) * f; });
+  if (Math.abs(A) > 1) { cx /= 3 * A; cy /= 3 * A; } else { cx = pts[0][0]; cy = pts[0][1]; }
+  const xs = pts.map(q => q[0]);
+  const fit = (Math.max(...xs) - Math.min(...xs)) / Math.max(1, String(label || '').length * 0.62);
+  if (label) P.text(cx, cy, label, { size: Math.max(14, Math.min(24, fit)), bold: true, color: PLAN_INK.ink, halo: true });
+  if (!mpu) return;
+  pts.forEach((a, i) => {
+    const b = pts[(i + 1) % pts.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (L < 60) return;
+    // Outside the wall: away from the middle of the shape.
+    const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+    let nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L;
+    if ((mx + nx - cx) ** 2 + (my + ny - cy) ** 2 < (mx - cx) ** 2 + (my - cy) ** 2) { nx = -nx; ny = -ny; }
+    P.text(mx + nx * 22, my + ny * 22, formatPlanMetres(L * mpu), { size: 15, color: PLAN_INK.muted, halo: true });
+  });
 }
 
 function drawPlanLine(P, k, pts) {
   if (pts.length < 2) return;
-  P.poly(pts, Object.assign({ close: false }, planLineStyle(k)));
+  const o = planLineStyle(k);
+  P.poly(pts, Object.assign({ close: false }, o));
+  // A retaining wall carries ticks on its low side.
+  if (o.ticks) pts.forEach((a, i) => {
+    if (!i) return;
+    const b = pts[i - 1], L = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1;
+    const ux = (a[0] - b[0]) / L, uy = (a[1] - b[1]) / L;
+    for (let d = 10; d < L; d += 22) P.poly([[b[0] + ux * d, b[1] + uy * d], [b[0] + ux * d - uy * 12, b[1] + uy * d + ux * 12]], { stroke: o.stroke, lw: 3, close: false });
+  });
+}
+
+// A scale bar, bottom right, once the plan has a scale.
+function drawPlanScaleBar(P, mpu) {
+  if (!mpu) return;
+  const nice = [1, 2, 5, 10, 20, 50, 100].find(m => m / mpu >= 90) || 100;
+  const L = nice / mpu, x1 = PLAN_W - 30, x0 = x1 - L, yb = PLAN_H - 28;
+  P.poly(rectPts(x0, yb - 6, L, 12), { fill: PLAN_INK.paper, stroke: PLAN_INK.ink, lw: 2 });
+  P.poly(rectPts(x0, yb - 6, L / 2, 12), { fill: PLAN_INK.ink });
+  P.text(x0 + L / 2, yb - 22, `${nice} m`, { size: 17, bold: true, color: PLAN_INK.ink, halo: true });
 }
 
 // The north arrow, top right. north counts 45° steps clockwise.
@@ -247,12 +364,20 @@ function drawSitePlan(P, plan, opts = {}) {
   items.forEach(it => {
     const sym = SITE_PLAN_SYMBOLS[it.k];
     if (!sym) return;
-    if (sym.kind === 'rect') drawPlanRect(P, it.k, it.x, it.y, it.w, it.h, it.label);
+    const mpu = plan.mpu;
+    if (sym.kind === 'rect') drawPlanRect(P, it.k, it.x, it.y, it.w, it.h, it.label, mpu && sym.size ? `${formatPlanMetres(it.w * mpu).replace(' m', '')} × ${formatPlanMetres(it.h * mpu)}` : '');
+    else if (sym.kind === 'area') drawPlanArea(P, it.k, it.pts || [], it.label, mpu);
     else if (sym.kind === 'line') {
       drawPlanLine(P, it.k, it.pts || []);
-      if (it.label && it.pts && it.pts.length > 1) {
-        const [a, b] = it.pts;
-        P.text((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 - 20, it.label, { size: 19, color: PLAN_INK.muted, halo: true });
+      const len = mpu && sym.size && it.pts && it.pts.length > 1 ? formatPlanMetres(planPathLength(it.pts) * mpu) : '';
+      const words = [it.label, len].filter(Boolean).join(' · ');
+      if (words && it.pts && it.pts.length > 1) {
+        // On the longest stretch, above the line.
+        let best = 1;
+        it.pts.forEach((q, i) => { if (i && Math.hypot(q[0] - it.pts[i - 1][0], q[1] - it.pts[i - 1][1]) > Math.hypot(it.pts[best][0] - it.pts[best - 1][0], it.pts[best][1] - it.pts[best - 1][1])) best = i; });
+        const a = it.pts[best - 1], b = it.pts[best];
+        // A third of the way along, as stations often sit mid-wall.
+        P.text(a[0] + (b[0] - a[0]) * 0.33, a[1] + (b[1] - a[1]) * 0.33 - 20, words, { size: 18, color: it.k === 'barrier' ? PLAN_INK.blueDark : PLAN_INK.muted, bold: it.k === 'barrier', halo: true });
       }
     } else {
       drawPlanSymbol(P, it.k, it.x, it.y, it, opts.statuses && it.n != null ? opts.statuses[it.n] : null);
@@ -264,31 +389,39 @@ function drawSitePlan(P, plan, opts = {}) {
     }
   });
   drawPlanNorth(P, plan && plan.north);
+  drawPlanScaleBar(P, plan && plan.mpu);
 }
 
 // The keys a plan needs in its legend, in the order of SITE_PLAN_SYMBOLS.
 function sitePlanLegendKeys(plan) {
   const used = new Set(((plan && plan.items) || []).map(it => it.k));
-  return Object.keys(SITE_PLAN_SYMBOLS).filter(k => used.has(k) && SITE_PLAN_SYMBOLS[k].legend);
+  const words = new Set();
+  return Object.keys(SITE_PLAN_SYMBOLS).filter(k => {
+    const w = SITE_PLAN_SYMBOLS[k].legend;
+    if (!used.has(k) || !w || words.has(w)) return false;
+    words.add(w); return true;
+  });
 }
 
 // A legend entry's swatch, centred on x, y.
 function drawPlanSwatch(P, k, x, y) {
   const sym = SITE_PLAN_SYMBOLS[k];
   if (sym.kind === 'rect') drawPlanRect(P, k, x - 34, y - 22, 68, 44, '');
+  else if (sym.kind === 'area') drawPlanArea(P, k, [[x - 34, y - 22], [x + 10, y - 22], [x + 10, y - 4], [x + 34, y - 4], [x + 34, y + 22], [x - 34, y + 22]], '');
   else if (sym.kind === 'line') drawPlanLine(P, k, [[x - 36, y], [x + 36, y]]);
   else drawPlanSymbol(P, k, x, y, SITE_PLAN_STATIONS.includes(k) ? { n: '' } : {});
 }
 
 function sitePlanSVG(plan, opts = {}) {
   const P = svgPainter();
+  if (plan && plan.bg) P.raw(`<image href="${escapeHtml(plan.bg)}" x="0" y="0" width="${PLAN_W}" height="${PLAN_H}" preserveAspectRatio="none"/>`);
   if (opts.grid) {
     for (let x = 50; x < PLAN_W; x += 50) P.raw(`<line x1="${x}" y1="0" x2="${x}" y2="${PLAN_H}" stroke="${x % 250 ? '#EEF2F7' : '#DCE4EE'}" stroke-width="1.5"/>`);
     for (let y = 50; y < PLAN_H; y += 50) P.raw(`<line x1="0" y1="${y}" x2="${PLAN_W}" y2="${y}" stroke="${y % 250 ? '#EEF2F7' : '#DCE4EE'}" stroke-width="1.5"/>`);
   }
   drawSitePlan(P, plan, opts);
   if (opts.after) opts.after(P);
-  return `<svg class="${opts.cls || 'site-plan-svg'}" viewBox="0 0 ${PLAN_W} ${PLAN_H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Site plan">${P.out.join('')}</svg>`;
+  return `<svg class="${opts.cls || 'site-plan-svg'}" viewBox="${opts.viewBox || `0 0 ${PLAN_W} ${PLAN_H}`}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Site plan">${P.out.join('')}</svg>`;
 }
 
 // The legend as HTML, with each swatch drawn by the same code as the plan.
@@ -315,11 +448,12 @@ function drawSitePlanPdf(doc, plan, { x, y, w, statuses } = {}) {
   const C = PDF_COLORS;
   const h = w * PLAN_H / PLAN_W;
   doc.setFillColor(255, 255, 255); doc.rect(x, y, w, h, 'F');
+  if (plan && plan.bg) { try { doc.addImage(plan.bg, 'JPEG', x, y, w, h); } catch (e) {} }
   drawSitePlan(pdfPainter(doc, x, y, w / PLAN_W), plan, { statuses });
   doc.setLineDashPattern([], 0);
   doc.setDrawColor(...C.rule); doc.setLineWidth(0.3); doc.rect(x, y, w, h);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
-  doc.text('Not to scale', x + 2.5, y + h - 2.5);
+  doc.text(plan && plan.mpu ? 'Approximate scale' : 'Not to scale', x + 2.5, y + h - 2.5);
   return h;
 }
 
@@ -379,7 +513,7 @@ function drawSitePlanStationListPdf(doc, plan, { x, y, w, cols = 3 } = {}) {
 // A full-screen sheet with the plan, a tray of symbols by group, and a bar
 // for the selected item (its label, delete). Opened from the treatment
 // record; Save hands the plan back through sitePlanEditor.onSave.
-const sitePlanEditor = { plan: null, tool: null, group: 'site', sel: null, drawing: null, drag: null, undo: [], onSave: null };
+const sitePlanEditor = { plan: null, tool: null, group: 'build', sel: null, drawing: null, drag: null, undo: [], onSave: null, zoom: 1, cx: PLAN_W / 2, cy: PLAN_H / 2 };
 
 function newSitePlan() {
   const d = SITE_PLAN_SYMBOLS.house.def;
@@ -393,7 +527,7 @@ function openSitePlan(plan, onSave) {
   E.plan = sitePlanHasContent(plan) ? JSON.parse(JSON.stringify(plan)) : newSitePlan();
   if (E.plan.north == null) E.plan.north = 0;
   E.tool = null; E.sel = null; E.drawing = null; E.drag = null; E.undo = []; E.onSave = onSave;
-  E.group = 'site';
+  E.group = 'build'; E.zoom = 1; E.cx = PLAN_W / 2; E.cy = PLAN_H / 2;
   track('screen_viewed', { screen: 'site_plan' });
   document.getElementById('sitePlanOverlay').classList.add('open');
   renderSitePlanTray();
@@ -416,7 +550,10 @@ function saveSitePlan() {
   const E = sitePlanEditor;
   finishSitePlanLine();
   // A line of one point says nothing; drop it.
-  E.plan.items = E.plan.items.filter(it => SITE_PLAN_SYMBOLS[it.k].kind !== 'line' || (it.pts || []).length > 1);
+  E.plan.items = E.plan.items.filter(it => {
+    const kind = SITE_PLAN_SYMBOLS[it.k].kind;
+    return kind === 'line' ? (it.pts || []).length > 1 : kind === 'area' ? (it.pts || []).length > 2 : true;
+  });
   closeSitePlan();
   if (E.onSave) E.onSave(JSON.parse(JSON.stringify(E.plan)));
   track('site_plan_saved', { items: E.plan.items.length, stations: sitePlanStations(E.plan).length });
@@ -462,25 +599,30 @@ function renderSitePlanTray() {
 
 function sitePlanHint() {
   const E = sitePlanEditor;
-  if (E.drawing) return 'Tap each corner of the line. Tap Finish line when it\'s done.';
+  if (E.drawing) {
+    const area = SITE_PLAN_SYMBOLS[(E.plan.items.find(x => x.id === E.drawing) || {}).k || 'fence'].kind === 'area';
+    return area ? 'Tap each corner of the building in turn. Tap the first corner again, or Finish shape, to close it.' : 'Tap each corner of the line. Tap Finish line when it\'s done.';
+  }
   if (E.tool) {
     const s = SITE_PLAN_SYMBOLS[E.tool];
     return s.kind === 'rect' ? `Drag on the plan to draw the ${s.label.toLowerCase()}, or tap to drop one.`
       : s.kind === 'line' ? `Tap where the ${s.label.toLowerCase()} starts, then each corner.`
+      : s.kind === 'area' ? 'Tap each corner of the building in turn, all the way round.'
       : s.kind === 'station' ? `Tap the plan to place each ${s.label.toLowerCase()} station. They number themselves.`
       : `Tap the plan to place it.`;
   }
-  if (E.sel) return 'Drag to move it. Name it below, or delete it.';
-  return 'Pick a symbol below, then tap the plan. Tap something on the plan to move or name it.';
+  if (E.sel) return 'Drag to move it. Name it below, give its real size, or delete it.';
+  return E.zoom > 1 ? 'Zoomed in: drag an empty spot to look around.' : 'Pick a symbol below, then tap the plan. Tap something on the plan to move or name it.';
 }
 
 function renderSitePlanEditor() {
   const E = sitePlanEditor;
   const sel = E.plan.items.find(it => it.id === E.sel);
-  document.getElementById('spCanvas').innerHTML = sitePlanSVG(E.plan, { grid: true, cls: 'site-plan-svg sp-edit', after: P => {
+  const vb = sitePlanViewBox();
+  document.getElementById('spCanvas').innerHTML = sitePlanSVG(E.plan, { grid: true, cls: 'site-plan-svg sp-edit', viewBox: vb.join(' '), after: P => {
     if (E.drawing) {
       const it = E.plan.items.find(x => x.id === E.drawing);
-      if (it) it.pts.forEach(p => P.circle(p[0], p[1], 9, { fill: PLAN_INK.paper, stroke: PLAN_INK.pink, lw: 3 }));
+      if (it) it.pts.forEach((p, i) => P.circle(p[0], p[1], i ? 9 : 13, { fill: i ? PLAN_INK.paper : PLAN_INK.pink, stroke: PLAN_INK.pink, lw: 3 }));
     }
     if (!sel) return;
     const b = sitePlanBounds(sel);
@@ -488,7 +630,13 @@ function renderSitePlanEditor() {
     if (SITE_PLAN_SYMBOLS[sel.k].kind === 'rect') P.circle(sel.x + sel.w, sel.y + sel.h, 16, { fill: PLAN_INK.pink, stroke: PLAN_INK.paper, lw: 4 });
   } });
   document.getElementById('spHint').textContent = sitePlanHint();
-  document.getElementById('spFinishLine').hidden = !E.drawing;
+  const fin = document.getElementById('spFinishLine');
+  fin.hidden = !E.drawing;
+  if (E.drawing) fin.textContent = SITE_PLAN_SYMBOLS[(E.plan.items.find(x => x.id === E.drawing) || {}).k || 'fence'].kind === 'area' ? 'Finish shape' : 'Finish line';
+  document.getElementById('spZoomOut').disabled = E.zoom <= 1;
+  document.getElementById('spZoomIn').disabled = E.zoom >= 3;
+  document.getElementById('spBgRemove').hidden = !E.plan.bg;
+  document.getElementById('spBgLabel').firstChild.textContent = E.plan.bg ? 'Change the photo underneath' : 'Trace over a map or photo';
   document.getElementById('spUndo').disabled = !E.undo.length;
   document.getElementById('spNorth').textContent = `North: ${['up', 'up-right', 'right', 'down-right', 'down', 'down-left', 'left', 'up-left'][E.plan.north || 0]}`;
   const bar = document.getElementById('spSelBar');
@@ -499,7 +647,19 @@ function renderSitePlanEditor() {
     const inp = document.getElementById('spSelLabel');
     inp.placeholder = sym.ph || 'Name it';
     if (document.activeElement !== inp) inp.value = sel.label || '';
+    // The real size: one known measurement sets the scale for the whole plan.
+    const units = sitePlanItemUnits(sel);
+    const row = document.getElementById('spSelSizeRow');
+    row.hidden = !units;
+    if (units) {
+      document.getElementById('spSelSizeLabel').textContent = sym.kind === 'rect' ? 'Real width' : sym.kind === 'area' ? 'Real length of the walls, all round' : 'Real length';
+      const m = document.getElementById('spSelMetres');
+      if (document.activeElement !== m) m.value = E.plan.mpu ? String(Math.round(units * E.plan.mpu * 10) / 10) : '';
+    }
   }
+  document.getElementById('spScaleNote').textContent = E.plan.mpu
+    ? 'The plan has a scale. Lengths show on the barrier and walls, and the barrier\'s metres fill the record.'
+    : 'Tip: tap the house, then type its real width, and the plan works out every length from it.';
   document.getElementById('spLegend').innerHTML = sitePlanLegendHTML(E.plan);
   const sum = sitePlanSummary(E.plan);
   document.getElementById('spSummary').textContent = sum ? `The plan shows ${sum}.` : '';
@@ -508,7 +668,7 @@ function renderSitePlanEditor() {
 function sitePlanBounds(it) {
   const sym = SITE_PLAN_SYMBOLS[it.k];
   if (sym.kind === 'rect') return { x: it.x, y: it.y, w: it.w, h: it.h };
-  if (sym.kind === 'line') {
+  if (sym.kind === 'line' || sym.kind === 'area') {
     const xs = it.pts.map(p => p[0]), ys = it.pts.map(p => p[1]);
     return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
   }
@@ -517,9 +677,84 @@ function sitePlanBounds(it) {
   return { x: it.x - tw, y: it.y - (r || 14), w: tw * 2, h: (r || 14) * 2 };
 }
 
+// What part of the plan shows: all of it, or a zoomed-in window.
+function sitePlanViewBox() {
+  const E = sitePlanEditor, vw = PLAN_W / E.zoom, vh = PLAN_H / E.zoom;
+  E.cx = planClamp(E.cx, vw / 2, PLAN_W - vw / 2); E.cy = planClamp(E.cy, vh / 2, PLAN_H - vh / 2);
+  return [E.cx - vw / 2, E.cy - vh / 2, vw, vh];
+}
+
+function zoomSitePlan(step) {
+  const E = sitePlanEditor;
+  E.zoom = planClamp(E.zoom + step, 1, 3);
+  // Zoom in on what's selected.
+  const sel = E.plan.items.find(it => it.id === E.sel);
+  if (sel && step > 0) { const b = sitePlanBounds(sel); E.cx = b.x + b.w / 2; E.cy = b.y + b.h / 2; }
+  renderSitePlanEditor();
+}
+
+// How long the item is in plan units, for giving its real size: a
+// building's width, a line's length, a shape's walls all round.
+function sitePlanItemUnits(it) {
+  const sym = SITE_PLAN_SYMBOLS[it.k];
+  if (sym.kind === 'rect') return it.w;
+  if (sym.kind === 'line') return (it.pts || []).length > 1 ? planPathLength(it.pts) : 0;
+  if (sym.kind === 'area') return (it.pts || []).length > 2 ? planPathLength(it.pts, true) : 0;
+  return 0;
+}
+
+function onSitePlanMetres(inp) {
+  const E = sitePlanEditor;
+  const it = E.plan.items.find(x => x.id === E.sel);
+  const m = parseFloat(String(inp.value).replace(',', '.'));
+  const units = it ? sitePlanItemUnits(it) : 0;
+  if (!units) return;
+  if (!inp.dataset.undo) { pushSitePlanUndo(); inp.dataset.undo = '1'; }
+  if (m > 0 && m < 2000) E.plan.mpu = m / units;
+  else if (!String(inp.value).trim()) delete E.plan.mpu;
+  renderSitePlanEditor();
+}
+
+// A map screenshot or photo of the site goes underneath, faded so the
+// symbols stay clear, and cropped to the plan's shape.
+function loadSitePlanBackground(input) {
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = PLAN_W; c.height = PLAN_H;
+      const ctx = c.getContext('2d');
+      const sc = Math.max(PLAN_W / img.naturalWidth, PLAN_H / img.naturalHeight);
+      const w = img.naturalWidth * sc, h = img.naturalHeight * sc;
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, PLAN_W, PLAN_H);
+      ctx.drawImage(img, (PLAN_W - w) / 2, (PLAN_H - h) / 2, w, h);
+      ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(0, 0, PLAN_W, PLAN_H);
+      let url = c.toDataURL('image/jpeg', 0.6);
+      if (url.length > 260000) url = c.toDataURL('image/jpeg', 0.4);
+      pushSitePlanUndo();
+      sitePlanEditor.plan.bg = url;
+      renderSitePlanEditor();
+    };
+    img.onerror = () => showToast('Could not open that picture', 'error');
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeSitePlanBackground() {
+  pushSitePlanUndo();
+  delete sitePlanEditor.plan.bg;
+  renderSitePlanEditor();
+}
+
 function sitePlanPoint(e) {
   const r = document.querySelector('#spCanvas svg').getBoundingClientRect();
-  return [(e.clientX - r.left) / r.width * PLAN_W, (e.clientY - r.top) / r.height * PLAN_H];
+  const [vx, vy, vw, vh] = sitePlanViewBox();
+  return [vx + (e.clientX - r.left) / r.width * vw, vy + (e.clientY - r.top) / r.height * vh];
 }
 
 const planSnap = (v, g = PLAN_GRID) => Math.round(v / g) * g;
@@ -538,6 +773,15 @@ function sitePlanHit(p) {
     const kind = SITE_PLAN_SYMBOLS[it.k].kind;
     if (kind === 'rect') return p[0] >= it.x && p[0] <= it.x + it.w && p[1] >= it.y && p[1] <= it.y + it.h;
     if (kind === 'line') return it.pts.some((a, i) => i && segDist(p, it.pts[i - 1], a) < 24);
+    if (kind === 'area') {
+      // Inside the shape (ray casting), or on one of its walls.
+      let inside = false;
+      for (let i = 0, j = it.pts.length - 1; i < it.pts.length; j = i++) {
+        const [xi, yi] = it.pts[i], [xj, yj] = it.pts[j];
+        if ((yi > p[1]) !== (yj > p[1]) && p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi) inside = !inside;
+      }
+      return inside || it.pts.some((a, i) => segDist(p, it.pts[(i || it.pts.length) - 1], a) < 20);
+    }
     if (kind === 'text') { const b = sitePlanBounds(it); return p[0] >= b.x && p[0] <= b.x + b.w && Math.abs(p[1] - it.y) < 26; }
     return Math.hypot(p[0] - it.x, p[1] - it.y) < 38;
   }) || null;
@@ -551,17 +795,20 @@ function onSitePlanDown(e) {
   const tool = E.tool, sym = tool && SITE_PLAN_SYMBOLS[tool];
   const pt = [planClamp(planSnap(p[0], PLAN_GRID / 2), 10, PLAN_W - 10), planClamp(planSnap(p[1], PLAN_GRID / 2), 10, PLAN_H - 10)];
   e.currentTarget.setPointerCapture(e.pointerId);
-  if (sym && sym.kind === 'line') {
+  if (sym && (sym.kind === 'line' || sym.kind === 'area')) {
     const gp = [planSnap(p[0]), planSnap(p[1])].map((v, i) => planClamp(v, 0, i ? PLAN_H : PLAN_W));
     let it = E.drawing && E.plan.items.find(x => x.id === E.drawing);
     if (it) {
       const last = it.pts[it.pts.length - 1];
-      // Tapping the last corner again finishes the line.
+      // Tapping the last corner again finishes the line; tapping the first
+      // corner closes a shape.
       if (Math.hypot(last[0] - gp[0], last[1] - gp[1]) < 20) { finishSitePlanLine(); return; }
+      if (sym.kind === 'area' && it.pts.length > 2 && Math.hypot(it.pts[0][0] - gp[0], it.pts[0][1] - gp[1]) < 30) { finishSitePlanLine(); return; }
       pushSitePlanUndo(); it.pts.push(gp);
     } else {
       pushSitePlanUndo();
       it = { id: planId(), k: tool, pts: [gp] };
+      if (sym.kind === 'area') it.label = 'House';
       E.plan.items.push(it); E.drawing = it.id;
     }
     renderSitePlanEditor();
@@ -598,7 +845,8 @@ function onSitePlanDown(e) {
   }
   const hit = sitePlanHit(p);
   E.sel = hit ? hit.id : null;
-  E.drag = hit ? { mode: 'move', id: hit.id, start: p, orig: JSON.parse(JSON.stringify(hit)), moved: false, before: JSON.stringify(E.plan) } : null;
+  E.drag = hit ? { mode: 'move', id: hit.id, start: p, orig: JSON.parse(JSON.stringify(hit)), moved: false, before: JSON.stringify(E.plan) }
+    : E.zoom > 1 ? { mode: 'pan', sx: e.clientX, sy: e.clientY, cx: E.cx, cy: E.cy } : null;
   renderSitePlanEditor();
 }
 
@@ -606,6 +854,13 @@ function onSitePlanMove(e) {
   const E = sitePlanEditor, d = E.drag;
   if (!d) return;
   e.preventDefault();
+  if (d.mode === 'pan') {
+    const r = document.querySelector('#spCanvas svg').getBoundingClientRect();
+    E.cx = d.cx - (e.clientX - d.sx) / r.width * PLAN_W / E.zoom;
+    E.cy = d.cy - (e.clientY - d.sy) / r.height * PLAN_H / E.zoom;
+    renderSitePlanEditor();
+    return;
+  }
   const p = sitePlanPoint(e);
   const it = E.plan.items.find(x => x.id === d.id);
   if (!it) return;
@@ -626,7 +881,7 @@ function onSitePlanMove(e) {
     if (kind === 'rect') {
       it.x = planClamp(planSnap(d.orig.x + dx), 0, PLAN_W - it.w);
       it.y = planClamp(planSnap(d.orig.y + dy), 0, PLAN_H - it.h);
-    } else if (kind === 'line') {
+    } else if (kind === 'line' || kind === 'area') {
       dx = planSnap(dx); dy = planSnap(dy);
       it.pts = d.orig.pts.map(q => [planClamp(q[0] + dx, 0, PLAN_W), planClamp(q[1] + dy, 0, PLAN_H)]);
     } else {
@@ -663,7 +918,7 @@ function finishSitePlanLine() {
   if (!E.drawing) return;
   const it = E.plan.items.find(x => x.id === E.drawing);
   E.drawing = null;
-  if (it && it.pts.length < 2) E.plan.items = E.plan.items.filter(x => x !== it);
+  if (it && it.pts.length < (SITE_PLAN_SYMBOLS[it.k].kind === 'area' ? 3 : 2)) E.plan.items = E.plan.items.filter(x => x !== it);
   else if (it) E.sel = it.id;
   E.tool = null;
   renderSitePlanTray();
@@ -703,7 +958,9 @@ function clearSitePlan() {
   if (!btn.dataset.armed) { btn.dataset.armed = '1'; btn.textContent = 'Tap again to clear'; setTimeout(() => { delete btn.dataset.armed; btn.textContent = 'Start again'; }, 3000); return; }
   delete btn.dataset.armed; btn.textContent = 'Start again';
   pushSitePlanUndo();
-  E.plan = Object.assign(newSitePlan(), { north: E.plan.north });
+  const keep = { north: E.plan.north };
+  if (E.plan.bg) keep.bg = E.plan.bg;
+  E.plan = Object.assign(newSitePlan(), keep);
   E.sel = null; E.drawing = null;
   renderSitePlanEditor();
 }

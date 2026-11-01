@@ -747,6 +747,8 @@
       <div class="sp-canvas-tools">
         <button type="button" class="quote-link-btn" id="spUndo" onclick="undoSitePlan()">Undo</button>
         <button type="button" class="quote-link-btn" id="spNorth" onclick="rotateSitePlanNorth()">North: up</button>
+        <button type="button" class="quote-link-btn sp-zoom" id="spZoomOut" onclick="zoomSitePlan(-1)" aria-label="Zoom out">−</button>
+        <button type="button" class="quote-link-btn sp-zoom" id="spZoomIn" onclick="zoomSitePlan(1)" aria-label="Zoom in">+</button>
         <button type="button" class="quote-btn primary sp-finish" id="spFinishLine" onclick="finishSitePlanLine()" hidden>Finish line</button>
       </div>
       <div class="sp-selbar" id="spSelBar" hidden>
@@ -755,9 +757,20 @@
           <input class="job-input" id="spSelLabel" oninput="onSitePlanLabel(this)" onfocus="onSitePlanLabelFocus(this)" aria-label="Name or where">
           <button type="button" class="quote-link-btn sp-delete" onclick="deleteSitePlanItem()">Delete</button>
         </div>
+        <label class="sp-selrow sp-size" id="spSelSizeRow" hidden>
+          <span id="spSelSizeLabel">Real width</span>
+          <input class="job-input" id="spSelMetres" type="number" min="0" step="any" inputmode="decimal" placeholder="metres" oninput="onSitePlanMetres(this)" onfocus="onSitePlanLabelFocus(this)">
+          <span>m</span>
+        </label>
       </div>
+      <p class="quote-hint sp-scale-note" id="spScaleNote"></p>
       <div class="sp-groups" id="spGroups" role="tablist" aria-label="Symbols"></div>
       <div class="sp-tools" id="spTools"></div>
+      <div class="sp-bg">
+        <label class="quote-link-btn sp-bg-btn" id="spBgLabel">Trace over a map or photo<input type="file" accept="image/*" hidden onchange="loadSitePlanBackground(this)"></label>
+        <button type="button" class="link-btn" id="spBgRemove" onclick="removeSitePlanBackground()" hidden>Remove it</button>
+        <p class="quote-hint">Free: take a screenshot of the property in your phone's Maps app on satellite view, then pick it here and trace the house and yard.</p>
+      </div>
       <div class="sp-key">
         <div class="job-field-label">Legend, as it prints on the certificate</div>
         <div id="spLegend"></div>

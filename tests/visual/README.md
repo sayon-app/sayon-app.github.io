@@ -42,3 +42,7 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 ## Send gaps
 
 `tests/send-gaps/e2e.js <outDir>` adds two photos whose upload fails, opens the check sheet and expects the "only on this phone" gap, taps Back up now once failing and once working, then starts a fill against a slow canned AI and taps Keep for later, expecting the note under Waiting notes and in the draft.
+
+## Full chain
+
+`tests/full-chain/e2e.js <outDir> [width]` runs a whole job by tapping the real buttons on a phone: business setup, job details on the dashboard, the agreement signed on the phone, a typed note filled by a canned AI, the after-fill fixes, sign-off, the report sent, the quote sent, the client's accepted answer with a signature, the treatment record, the certificate emailed, then a reload. It checks that areas a finding names aren't marked "nothing found", that PDF file names keep the whole address, and that nothing is lost on reload. It writes a screenshot per step and the PDFs that were emailed to `<outDir>`. Run it at 390 and 320.

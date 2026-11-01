@@ -2124,6 +2124,6 @@ function buildQuotePDF(q) {
 
   drawPdfDocFooters(doc, `Quote ${q.number || ''}${company.name ? `  ·  ${company.name}` : ''}`);
 
-  const safe = (q.address || 'Property').replace(/[^\w]+/g, '_').substring(0, 25);
+  const safe = fileNamePart(q.address) || 'Property';
   return { blob: doc.output('blob'), fname: `SAYON_Quote_${(q.number || '').replace(/[^\w-]+/g, '')}_${safe}.pdf` };
 }

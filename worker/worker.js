@@ -4,6 +4,35 @@
  * The API keys are stored as Cloudflare secrets and never exposed to the
  * browser or public repo. See worker/README.md for setup and deploy steps.
  *
+ * CHANGES FROM v9.6 -> v9.7:
+ * - Team (plan key `pro`) and Business (plan key `business`) are charged
+ *   per inspector. Checkout takes `seats` for them (Team 2 to 9, Business
+ *   10 to 200) and charges that quantity of the plan's per-inspector price.
+ *   The webhook stores the quantity in `subscriptions.seats`.
+ * - Each seat on Team or Business brings 800 AI fills a month, shared by
+ *   the whole business. Solo stays at 800 and the trial at 50.
+ * - The daily email limit on Team and Business is 200 per seat.
+ * - POST /stripe/update-seats {seats}: the owner changes how many inspectors
+ *   they pay for. Never fewer than are on the team or invited. Adding seats
+ *   charges the rest of the period straight away and only happens if that
+ *   payment goes through; removing them takes the unused part off the next
+ *   bill. Neither is allowed to add seats while a payment is overdue.
+ * - Every plan bought or switched to must fit the people already on the
+ *   team or invited (409 otherwise).
+ * - The subscription webhook reads the subscription back from Stripe, so a
+ *   late or repeated event can't undo a newer change.
+ * - Choosing another plan while already paying switches the Stripe
+ *   subscription in place (new price and seat count, the difference
+ *   charged now) instead of opening the Billing Portal, so a team can't be
+ *   moved onto fewer seats than it has people. Turn off "switch plans" and
+ *   "change quantity" in the Portal's settings so both go through the app.
+ * - /stripe/subscription-status also returns `seats`, `per_seat` (whether
+ *   the plan is charged per inspector) and `seat_plans` (true from this
+ *   version on, so the app only offers Team and Business once this Worker
+ *   is deployed).
+ * - Needs supabase/team-seats.sql (the `seats` column). Until it runs,
+ *   every business reads as 1 seat.
+ *
  * CHANGES FROM v9.5 -> v9.6:
  * - An Anthropic-side rate limit or outage (429, 529, 5xx) comes back to
  *   the app as the Worker's own 502 upstream_error, so the app's 429
@@ -219,13 +248,34 @@ const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
 // Pricing Strategy doc (Starter/Pro/Business) plus a 'trial' tier for the
 // 14-day free trial. 'business' is "unlimited" in the sales copy but still
 // fair-use capped here - see the pricing doc's rationale.
+// For Team (pro) and Business the number is per inspector, multiplied by
+// the seats paid for (see planLimit).
 const PLAN_LIMITS = {
   trial: 50,
   starter: 800,
-  pro: 400,
-  business: 2000,
+  pro: 800,
+  business: 800,
 };
 const DEFAULT_PLAN_LIMIT = PLAN_LIMITS.trial;
+
+// Plans charged per inspector, and how many inspectors each can be bought
+// for at Checkout or changed to later.
+const SEAT_RANGE = {
+  pro: { min: 2, max: 9 },
+  business: { min: 10, max: 200 },
+};
+
+function seatCount(sub) {
+  const n = parseInt(sub && sub.seats, 10);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+// The business's monthly AI allowance: per seat on Team and Business,
+// shared by everyone on the team.
+function planLimit(sub) {
+  const base = PLAN_LIMITS[sub.plan] ?? DEFAULT_PLAN_LIMIT;
+  return SEAT_RANGE[sub.plan] ? base * seatCount(sub) : base;
+}
 
 // Paid plans the app can ask Checkout for, and the secret holding each
 // plan's Stripe Price ID.
@@ -605,7 +655,7 @@ async function checkPlanAndUsage(userId, env, reserve = true) {
     }
 
     if (!reserve) return { allowed: true, reservation: null };
-    const limit = PLAN_LIMITS[sub.plan] ?? DEFAULT_PLAN_LIMIT;
+    const limit = planLimit(sub);
     const reservation = await reserveAiCall(sub, limit, env);
     if (reservation === 'limit') {
       return { allowed: false, status: 429, message: 'Monthly AI usage limit reached for your plan — upgrade or wait for next billing period' };
@@ -726,9 +776,12 @@ async function handleStripeRoute(pathname, request, user, env, origin) {
         status: sub.status,
         trial_ends_at: sub.trial_ends_at,
         ai_calls_used_this_period: effectiveUsed,
-        limit: PLAN_LIMITS[sub.plan] ?? DEFAULT_PLAN_LIMIT,
+        limit: planLimit(sub),
         stripe_customer_id: sub.stripe_customer_id || null,
         subscribed: !!sub.stripe_subscription_id,
+        seats: seatCount(sub),
+        per_seat: !!SEAT_RANGE[sub.plan],
+        seat_plans: true,
       });
     }
 
@@ -748,6 +801,14 @@ async function handleStripeRoute(pathname, request, user, env, origin) {
       const plan = body.plan;
       const priceId = PLAN_PRICE_ENV[plan] && env[PLAN_PRICE_ENV[plan]];
       if (!priceId) return reply(400, { message: 'Unknown plan' });
+      let quantity = 1;
+      if (SEAT_RANGE[plan]) {
+        quantity = parseInt(body.seats, 10);
+        const { min, max } = SEAT_RANGE[plan];
+        if (!Number.isFinite(quantity) || quantity < min || quantity > max) {
+          return reply(400, { message: `Choose between ${min} and ${max} inspectors` });
+        }
+      }
 
       // Already paying: a second Checkout would start a second, parallel
       // subscription. Send them to the Billing Portal to switch plans instead.
@@ -762,6 +823,33 @@ async function handleStripeRoute(pathname, request, user, env, origin) {
           console.error('Stripe subscriptions lookup failed: ' + (err && err.message ? err.message : String(err)));
         }
       }
+      // Already paying with the subscription recorded: switch it in place,
+      // so the seat count and the team are checked here rather than left
+      // to the Billing Portal (which could put a team on one seat).
+      if (alreadyPaying && sub.stripe_subscription_id && sub.status !== 'canceled') {
+        if (plan === sub.plan) return reply(400, { message: 'You are already on this plan' });
+        if (sub.status === 'past_due') return reply(402, { message: PAST_DUE_MESSAGE });
+        const tooBig = await teamTooBig(businessId, SEAT_RANGE[plan] ? quantity : 1, env);
+        if (tooBig) return reply(tooBig.status, tooBig.payload);
+        const stripeSub = await stripeRequest(env, 'GET', `/subscriptions/${encodeURIComponent(sub.stripe_subscription_id)}`);
+        const item = stripeSub.items && stripeSub.items.data && stripeSub.items.data[0];
+        if (!item) return reply(502, { message: 'Billing request failed' });
+        // The switch only happens if the payment for it goes through: a
+        // declined card leaves the plan as it was.
+        let updated;
+        try {
+          updated = await stripeRequest(env, 'POST', `/subscriptions/${encodeURIComponent(sub.stripe_subscription_id)}`, {
+            items: [{ id: item.id, price: priceId, quantity }],
+            proration_behavior: 'always_invoice',
+            payment_behavior: 'error_if_incomplete',
+          });
+        } catch (err) {
+          if (err.status === 402) return reply(402, { message: DECLINED_MESSAGE });
+          throw err;
+        }
+        await syncSubscription(updated, env, businessId);
+        return reply(200, { switched: true, plan });
+      }
       if (alreadyPaying) {
         const portal = await stripeRequest(env, 'POST', '/billing_portal/sessions', {
           customer: sub.stripe_customer_id,
@@ -770,13 +858,18 @@ async function handleStripeRoute(pathname, request, user, env, origin) {
         return reply(200, { url: portal.url });
       }
 
+      // A new plan has to fit the team that's already there (a trial of
+      // three can't buy Solo, a cancelled team of nine can't come back on two).
+      const tooBig = await teamTooBig(businessId, quantity, env);
+      if (tooBig) return reply(tooBig.status, tooBig.payload);
+
       const customerId = sub.stripe_customer_id || await createStripeCustomer(businessId, user, env);
 
       const session = await stripeRequest(env, 'POST', '/checkout/sessions', {
         mode: 'subscription',
         customer: customerId,
         client_reference_id: businessId,
-        line_items: [{ price: priceId, quantity: 1 }],
+        line_items: [{ price: priceId, quantity }],
         success_url: safeReturnUrl(body.successUrl, 'success'),
         cancel_url: safeReturnUrl(body.cancelUrl, 'cancelled'),
         allow_promotion_codes: 'true',
@@ -784,6 +877,42 @@ async function handleStripeRoute(pathname, request, user, env, origin) {
         subscription_data: { metadata: { business_id: businessId } },
       });
       return reply(200, { url: session.url });
+    }
+
+    if (pathname === '/stripe/update-seats') {
+      const range = SEAT_RANGE[sub.plan];
+      if (!range || !sub.stripe_subscription_id || !['active', 'past_due'].includes(sub.status)) {
+        return reply(400, { message: 'Only a paid Team or Business plan is charged per inspector' });
+      }
+      const seats = parseInt(body.seats, 10);
+      if (!Number.isFinite(seats) || seats < range.min || seats > range.max) {
+        return reply(400, { message: `Choose between ${range.min} and ${range.max} inspectors` });
+      }
+      const current = seatCount(sub);
+      if (seats === current) return reply(200, { seats });
+      if (seats > current && sub.status === 'past_due') return reply(402, { message: PAST_DUE_MESSAGE });
+      const tooBig = await teamTooBig(businessId, seats, env);
+      if (tooBig) return reply(tooBig.status, tooBig.payload);
+
+      const stripeSub = await stripeRequest(env, 'GET', `/subscriptions/${encodeURIComponent(sub.stripe_subscription_id)}`);
+      const item = stripeSub.items && stripeSub.items.data && stripeSub.items.data[0];
+      if (!item) return reply(502, { message: 'Billing request failed' });
+      // More seats: the rest of this period is charged now, and the change
+      // only happens if that payment goes through. Fewer: the unused part
+      // comes off the next bill (so adding them back later isn't charged twice).
+      let updated;
+      try {
+        updated = await stripeRequest(env, 'POST', `/subscriptions/${encodeURIComponent(sub.stripe_subscription_id)}`, seats > current
+          ? { items: [{ id: item.id, quantity: seats }], proration_behavior: 'always_invoice', payment_behavior: 'error_if_incomplete' }
+          : { items: [{ id: item.id, quantity: seats }], proration_behavior: 'create_prorations' });
+      } catch (err) {
+        if (err.status === 402) return reply(402, { message: DECLINED_MESSAGE });
+        throw err;
+      }
+      // The webhook writes this too; writing it now means the app shows the
+      // new number straight away.
+      await syncSubscription(updated, env, businessId);
+      return reply(200, { seats });
     }
 
     if (pathname === '/stripe/create-portal-session') {
@@ -800,6 +929,37 @@ async function handleStripeRoute(pathname, request, user, env, origin) {
     console.error(`stripe route ${pathname} failed: ` + (err && err.message ? err.message : String(err)));
     return reply(502, { message: 'Billing request failed' });
   }
+}
+
+const PAST_DUE_MESSAGE = 'Your last payment didn\'t go through. Update your card in Manage first';
+const DECLINED_MESSAGE = 'The payment didn\'t go through, so nothing changed. Check your card in Manage and try again';
+
+// A reply refusing a plan for `cap` inspectors when more people than that
+// are on the team or invited, or null when the team fits.
+async function teamTooBig(businessId, cap, env) {
+  const taken = await seatsTaken(businessId, env);
+  if (taken === null) return { status: 500, payload: { message: 'Could not count your team' } };
+  if (taken > cap) {
+    return { status: 409, payload: { message: `You have ${taken} people on your team or invited. Take some off in Your team first`, taken } };
+  }
+  return null;
+}
+
+// People on the team plus invites still waiting: each holds a seat.
+// Null when either count can't be read.
+async function seatsTaken(businessId, env) {
+  const count = async (path) => {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      method: 'HEAD',
+      headers: { ...serviceHeadersFor(env), 'Prefer': 'count=exact' },
+    });
+    if (!res.ok) return null;
+    const total = parseInt(((res.headers.get('Content-Range') || '').split('/')[1]), 10);
+    return Number.isFinite(total) ? total : null;
+  };
+  const members = await count(`team_members?business_id=eq.${businessId}&select=id`);
+  const invites = await count(`invites?business_id=eq.${businessId}&status=eq.pending&select=id`);
+  return members === null || invites === null ? null : members + invites;
 }
 
 async function isBusinessOwner(businessId, userId, env) {
@@ -865,9 +1025,15 @@ async function handleStripeWebhook(request, env) {
         break;
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
-      case 'customer.subscription.deleted':
-        await syncSubscription(obj, env);
+      case 'customer.subscription.deleted': {
+        // Events can arrive late or twice, so the subscription is read from
+        // Stripe as it is now rather than as the event saw it.
+        let current = obj;
+        try { current = await stripeRequest(env, 'GET', `/subscriptions/${encodeURIComponent(obj.id)}`); }
+        catch (err) { if (err.status !== 404) throw err; }
+        await syncSubscription(current, env);
         break;
+      }
       default:
         // Not an event we act on - acknowledge so Stripe doesn't retry it.
         break;
@@ -914,6 +1080,11 @@ async function syncSubscription(stripeSub, env, fallbackBusinessId) {
   };
   if (plan) patch.plan = plan;
   else console.error(`stripe webhook: price ${priceId} doesn't match any STRIPE_PRICE_* secret - plan left unchanged`);
+  // How many inspectors are paid for. Only written when the seats column
+  // exists (supabase/team-seats.sql), so the patch still lands before then.
+  const quantity = stripeSub.items && stripeSub.items.data && stripeSub.items.data[0] && stripeSub.items.data[0].quantity;
+  const paidPlan = plan || existing.plan;
+  if ('seats' in existing) patch.seats = SEAT_RANGE[paidPlan] && quantity > 0 ? quantity : 1;
 
   // A brand-new paid subscription starts a fresh allowance rather than
   // carrying over what was used during the trial.
@@ -983,7 +1154,9 @@ async function stripeRequest(env, method, path, params) {
   const res = await fetch(`${STRIPE_API}${path}`, init);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(`Stripe ${method} ${path} failed (HTTP ${res.status}): ${data.error && data.error.message || 'unknown error'}`);
+    const err = new Error(`Stripe ${method} ${path} failed (HTTP ${res.status}): ${data.error && data.error.message || 'unknown error'}`);
+    err.status = res.status; // 402: the card was declined
+    throw err;
   }
   return data;
 }
@@ -1094,7 +1267,8 @@ async function reserveEmailSend(sub, env) {
     console.warn('send-email: subscriptions has no emails_sent_today column yet, so there is no daily limit');
     return 'unlimited';
   }
-  const limit = sub.status === 'trialing' ? EMAIL_DAILY_LIMIT_TRIAL : EMAIL_DAILY_LIMIT_PAID;
+  const limit = sub.status === 'trialing' ? EMAIL_DAILY_LIMIT_TRIAL
+    : EMAIL_DAILY_LIMIT_PAID * (SEAT_RANGE[sub.plan] ? seatCount(sub) : 1);
   const today = new Date().toISOString().slice(0, 10);
   let row = sub;
   for (let attempt = 0; attempt < 5; attempt++) {

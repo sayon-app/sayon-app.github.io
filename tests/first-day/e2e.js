@@ -90,10 +90,10 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   check(/Your free trial has ended/.test(await line()), 'trial ended is named');
   state.sub = { plan: 'pro', status: 'past_due', ai_calls_used_this_period: 12, limit: 400, stripe_customer_id: 'c', stripe_subscription_id: 's', current_period_end: new Date(Date.now() + 3 * 86400000).toISOString() };
   check(/last payment failed/.test(await line()), 'a failed payment is named');
-  state.sub = { plan: 'pro', status: 'active', ai_calls_used_this_period: 12, limit: 400, stripe_customer_id: 'c', stripe_subscription_id: 's' };
+  state.sub = { plan: 'starter', status: 'active', ai_calls_used_this_period: 12, limit: 800, stripe_customer_id: 'c', stripe_subscription_id: 's' };
   await line();
   const rows = await p.evaluate(() => [...document.querySelectorAll('#billingPanel [data-plan]')].map(r => r.dataset.plan + ':' + r.querySelector('button').textContent + (r.classList.contains('current-plan') ? '*' : '')));
-  check(rows.join() === 'starter:Switch,pro:Current plan*,business:Switch', 'the current plan is marked and the others say Switch: ' + rows.join());
+  check(rows.join() === 'starter:Current plan*,pro:Switch,business:Switch' && await p.evaluate(() => [...document.querySelectorAll('#billingPanel [data-seat-plan]')].every(r => r.hidden)), 'Solo is current and Team and Business wait for the per-inspector Worker: ' + rows.join());
   await p.evaluate(() => { toggleDrawer(); openMenuPage('billingPanel'); }); await p.waitForTimeout(500);
   await p.screenshot({ path: `${OUT}/4-billing-current.png`, fullPage: false });
   await p.evaluate(() => { showMenuPage(null); toggleDrawer(); });
@@ -112,7 +112,7 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   state.sub = { plan: 'starter', status: 'active', ai_calls_used_this_period: 0, limit: 150, stripe_customer_id: 'c', stripe_subscription_id: 's' };
   await confirming;
   const t = await takeToasts();
-  check(state.statusCalls >= 2 && t.some(x => /Subscription updated/.test(x)) && /Starter plan/.test(await p.evaluate(() => document.getElementById('billingStatusText').textContent)), 'then shows the plan once Stripe has it (' + state.statusCalls + ' checks)');
+  check(state.statusCalls >= 2 && t.some(x => /Subscription updated/.test(x)) && /Solo plan/.test(await p.evaluate(() => document.getElementById('billingStatusText').textContent)), 'then shows the plan once Stripe has it (' + state.statusCalls + ' checks)');
 
   // 7. Test mode is hidden unless the business allows it; help is in the drawer.
   const misc = await p.evaluate(() => { restoreTestModeSetting(); return { testRow: document.getElementById('testModeRow').hidden, help: !!document.querySelector('.drawer-help[href^="mailto:"]'), owner: isBusinessOwner() }; });
@@ -137,8 +137,8 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   }
   // 10. Website.
   await p.goto(`http://localhost:${PORT}/site/`); await p.waitForTimeout(1000);
-  const site = await p.evaluate(() => ({ trial: [...document.querySelectorAll('a.btn-main')].every(a => /signup=1/.test(a.href)), plans: /Starter: about 20 inspections/.test(document.body.innerText), faq: /Who owns my reports/.test(document.body.innerText) && /How do I cancel/.test(document.body.innerText), stats: !/45 min/.test(document.body.innerText), samples: !!document.querySelector('a[href$="sample-report.pdf"]'), contact: !!document.querySelector('footer a[href^="mailto:"]'), team: /One account per business/.test(document.body.textContent) }));
-  check(Object.values(site).every(Boolean), 'website: trial buttons to sign-up, three plans, new FAQ, no unproven minutes, samples, contact: ' + JSON.stringify(site));
+  const site = await p.evaluate(() => ({ trial: [...document.querySelectorAll('a.btn-main')].every(a => /signup=1/.test(a.href)), plans: /About 40 inspections a month/.test(document.body.innerText) && document.querySelectorAll('#pricing .price').length === 1, faq: /Who owns my reports/.test(document.body.innerText) && /How do I cancel/.test(document.body.innerText), stats: !/45 min/.test(document.body.innerText), samples: !!document.querySelector('a[href$="sample-report.pdf"]'), contact: !!document.querySelector('footer a[href^="mailto:"]'), team: /One account per business/.test(document.body.textContent) }));
+  check(Object.values(site).every(Boolean), 'website: trial buttons to sign-up, Solo plan only, new FAQ, no unproven minutes, samples, contact: ' + JSON.stringify(site));
   await p.screenshot({ path: `${OUT}/7-site.png`, fullPage: true });
 
   check(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));

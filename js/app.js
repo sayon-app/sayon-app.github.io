@@ -2121,6 +2121,7 @@ window.addEventListener('load', () => {
         document.getElementById('authScreen').style.display = 'flex';
         // The website's "Start your free trial" lands on the sign-up card.
         showAuth(new URLSearchParams(window.location.search).get('signup') ? 'authSignUp' : 'authSignIn');
+        applyInviteToSignUp();
       }
     }, 600);
   }, 2200);
@@ -8760,6 +8761,7 @@ function showMenuPage(panelId) {
   // The plan can change in Stripe or with a different sign-in, so Billing
   // always shows it fresh.
   if (panelId === 'billingPanel') loadBillingStatus();
+  if (panelId === 'teamPanel') loadTeam();
   if (panelId === 'settingsPanel') { restoreTestModeSetting(); renderLearnedList(); }
   if (panel) track('screen_viewed', { screen: 'menu_' + panelId });
 }
@@ -9640,8 +9642,11 @@ async function loadBillingStatus() {
     billingStatusCache = sub;
     const planLabel = planDisplayLabel(sub.plan);
     if (el) el.textContent = billingStatusLine(sub, planLabel);
-    if (manageBtn) manageBtn.style.display = sub.stripe_customer_id ? '' : 'none';
+    const owner = !authBusiness || isBusinessOwner();
+    if (manageBtn) manageBtn.style.display = sub.stripe_customer_id && owner ? '' : 'none';
+    showPlanOptions(sub, owner);
     markCurrentPlan(sub);
+    renderProfileMenu();
     return sub;
   } catch (e) {
     if (!authUser || authUser.id !== forUser) return;
@@ -9659,6 +9664,7 @@ async function loadBillingStatus() {
 // never changes; only what we show for it does.
 function planDisplayLabel(plan) {
   if (plan === 'starter') return 'Solo';
+  if (plan === 'pro') return 'Team';
   if (!plan) return 'Trial';
   return plan.charAt(0).toUpperCase() + plan.slice(1);
 }
@@ -9674,7 +9680,104 @@ function billingStatusLine(sub, planLabel) {
   if (sub.status === 'past_due') return `${planLabel} plan, but the last payment failed. Update your card in Manage${sub.current_period_end ? ` before ${when(sub.current_period_end)}` : ''} or AI fills stop.`;
   if (sub.status === 'canceled' || sub.status === 'cancelled') return `Your ${planLabel} plan has ended. Choose a plan below to keep using AI fills; your reports stay in your account either way.`;
   if (sub.cancel_at_period_end && sub.current_period_end) return `${planLabel} plan, ending on ${when(sub.current_period_end)}. ${billingUsageText(sub)}`;
-  return `${planLabel} plan. ${billingUsageText(sub)}`;
+  return `${planLabel} plan${sub.per_seat ? ` for ${sub.seats} inspector${sub.seats === 1 ? '' : 's'}` : ''}. ${billingUsageText(sub)}`;
+}
+
+// Team and Business are charged per inspector. They're offered only once
+// the Worker says it can charge that way (seat_plans), and only the owner
+// sees the plans to choose from.
+const SEAT_PLANS = {
+  pro: { input: 'seatsPro', total: 'seatTotalPro', min: 2, max: 9, perMonth: 79, yearly: false },
+  business: { input: 'seatsBusiness', total: 'seatTotalBusiness', min: 10, max: 200, perMonth: 69, yearly: true },
+};
+
+function showPlanOptions(sub, owner) {
+  const seatPlans = !!(sub && sub.seat_plans);
+  document.querySelectorAll('#billingPanel [data-plan]').forEach(row => {
+    row.hidden = !owner || (row.hasAttribute('data-seat-plan') && !seatPlans);
+  });
+  document.getElementById('billingOwnerOnly').hidden = owner;
+  document.getElementById('seatPlansSoon').hidden = seatPlans || !owner;
+  document.getElementById('billingSeatTerms').hidden = !seatPlans || !owner;
+  Object.keys(SEAT_PLANS).forEach(plan => {
+    const input = document.getElementById(SEAT_PLANS[plan].input);
+    // The current plan's row starts at the places already paid for.
+    if (input && sub && sub.plan === plan && sub.per_seat) input.value = sub.seats;
+    onSeatInput(plan);
+  });
+}
+
+// The number typed, kept inside the plan's range.
+function seatInputValue(plan) {
+  const cfg = SEAT_PLANS[plan];
+  const n = parseInt(document.getElementById(cfg.input).value, 10);
+  return Number.isFinite(n) ? Math.min(cfg.max, Math.max(cfg.min, n)) : cfg.min;
+}
+
+function onSeatInput(plan) {
+  const cfg = SEAT_PLANS[plan];
+  const n = seatInputValue(plan);
+  const total = document.getElementById(cfg.total);
+  if (total) total.textContent = planPriceText(plan, n);
+  const sub = billingStatusCache;
+  // On the current plan the button saves a new number of places.
+  if (sub && sub.plan === plan && sub.per_seat && ['active', 'past_due'].includes(sub.status)) {
+    const row = document.querySelector(`#billingPanel [data-plan="${plan}"]`);
+    const btn = row && row.querySelector('button');
+    if (btn) {
+      const changed = n !== sub.seats;
+      btn.textContent = changed ? `Change to ${n}` : 'Current plan';
+      btn.disabled = !changed;
+    }
+  }
+}
+
+function choosePlan(plan) {
+  const sub = billingStatusCache;
+  if (SEAT_PLANS[plan] && sub && sub.plan === plan && sub.per_seat && ['active', 'past_due'].includes(sub.status)) {
+    updateSeats(seatInputValue(plan));
+    return;
+  }
+  const seats = SEAT_PLANS[plan] ? seatInputValue(plan) : undefined;
+  const paying = sub && sub.plan && sub.plan !== 'trial' && sub.subscribed && ['active', 'past_due'].includes(sub.status);
+  if (paying && !confirm(`Switch to ${planDisplayLabel(plan)}${seats ? ` for ${seats} inspectors` : ''} at ${planPriceText(plan, seats)}? It's charged now, less the unused part of your current plan, and only happens if the payment goes through.`)) return;
+  openCheckout(plan, seats);
+}
+
+// "$316 a month" / "$9,936 a year" for a plan and number of inspectors.
+function planPriceText(plan, seats) {
+  const money = v => '$' + v.toLocaleString('en-AU');
+  const cfg = SEAT_PLANS[plan];
+  if (!cfg) return '$89 a month';
+  return cfg.yearly ? `${money(seats * cfg.perMonth * 12)} a year` : `${money(seats * cfg.perMonth)} a month`;
+}
+
+let seatChangeInFlight = false;
+async function updateSeats(seats) {
+  const sub = billingStatusCache;
+  if (!sub || seatChangeInFlight) return;
+  const more = seats > sub.seats;
+  const ask = more
+    ? `Pay for ${seats} inspectors instead of ${sub.seats} (${planPriceText(sub.plan, seats)})? The extra places are charged now for the rest of what you've paid for.`
+    : `Pay for ${seats} inspectors instead of ${sub.seats} (${planPriceText(sub.plan, seats)})? The unused part comes off your next bill.`;
+  if (!confirm(ask)) return;
+  seatChangeInFlight = true;
+  try {
+    const res = await workerFetch('/stripe/update-seats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seats }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { showToast(data.message || 'Couldn\'t change your places. Try again', 'error'); return; }
+    showToast(`You now pay for ${seats} inspectors`, 'success');
+    track('seats_changed', { plan: sub.plan, seats });
+    await loadBillingStatus();
+  } catch (e) {
+    showToast('Couldn\'t change your places. Check your signal and try again', 'error');
+  } finally {
+    seatChangeInFlight = false;
+  }
 }
 
 // The plan list says which row is the current plan, and the other buttons
@@ -9687,6 +9790,8 @@ function markCurrentPlan(sub) {
     row.classList.toggle('current-plan', current);
     if (btn) btn.textContent = current ? 'Current plan' : paying ? 'Switch' : 'Upgrade';
     if (btn) btn.disabled = !!current;
+    // A per-inspector plan's own row can still change its number of places.
+    if (current && SEAT_PLANS[sub.plan] && sub.per_seat) onSeatInput(sub.plan);
   });
 }
 
@@ -9716,11 +9821,11 @@ function billingReturnUrl(marker) {
 // customers for the same business.
 let checkoutInFlight = false;
 
-async function openCheckout(plan) {
+async function openCheckout(plan, seats) {
   if (!authUser) { showToast('Sign in first', 'error'); return; }
   if (checkoutInFlight) return;
   checkoutInFlight = true;
-  track('checkout_opened', { plan });
+  track('checkout_opened', { plan, seats });
   let status = 0;
   try {
     const res = await workerFetch('/stripe/create-checkout-session', {
@@ -9728,6 +9833,7 @@ async function openCheckout(plan) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         plan,
+        seats,
         successUrl: billingReturnUrl('success'),
         cancelUrl: billingReturnUrl('cancelled'),
       }),
@@ -9736,11 +9842,20 @@ async function openCheckout(plan) {
     const rawBody = await res.text();
     let data;
     try { data = JSON.parse(rawBody); } catch { throw new Error(rawBody.slice(0, 200) || `HTTP ${res.status}`); }
+    // Already paying: the Worker switched the plan without leaving the app.
+    if (res.ok && data.switched) {
+      showToast(`You're now on ${planDisplayLabel(data.plan || plan)}`, 'success');
+      await loadBillingStatus();
+      return;
+    }
     if (!res.ok || !data.url) throw new Error(data && data.message || rawBody || `HTTP ${res.status}`);
     window.location.href = data.url;
   } catch (e) {
+    // 400, 402 and 409 carry a reason worth reading: the number of
+    // inspectors, a declined card, or a team too big for the plan.
     showToast(status === 403
       ? 'Only the business owner can change the plan.'
+      : (status === 400 || status === 402 || status === 409) && e.message ? e.message
       : 'Couldn\'t open checkout. Check your signal and try again.', 'error');
     console.warn('openCheckout failed:', e.message);
   } finally {
@@ -9939,7 +10054,9 @@ async function signUp() {
   const btn      = document.getElementById('suBtn');
 
   errEl.textContent = '';
-  if (!name || !business || !email || !password) { errEl.textContent = 'Please fill in all fields.'; return; }
+  // Joining from an invite link: the business is theirs to join, not to name.
+  const joining = document.getElementById('suBusinessField').hidden;
+  if (!name || (!business && !joining) || !email || !password) { errEl.textContent = 'Please fill in all fields.'; return; }
   // Receipts and password resets go to this address, so a typo locks the
   // account out of both.
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { errEl.textContent = 'That email address doesn\'t look right. Check it: your receipts and password resets go there.'; return; }
@@ -9948,11 +10065,11 @@ async function signUp() {
   btn.disabled = true; btn.textContent = 'Creating account…';
   try {
     // Store business name locally — survives the email confirmation redirect
-    localStorage.setItem('korva_pending_business', business);
+    if (!joining) localStorage.setItem('korva_pending_business', business);
 
     const data = await supabaseAuth('signup', {
       email, password,
-      data: { name, business_name: business },
+      data: joining ? { name } : { name, business_name: business },
     });
     if (data.error) {
       if (data.error.code === 'user_already_exists' || /already (registered|exists)/i.test(data.error.message || '')) {
@@ -10242,6 +10359,280 @@ async function ensureOwnerTeamMember() {
   } catch(e) { console.warn('ensureOwnerTeamMember error:', e); }
 }
 
+// The secret from an invite link, kept until sign-in uses it (it has to
+// survive the sign-up and any reload in between).
+const PENDING_INVITE_KEY = 'korva_pending_invite';
+
+function pendingInviteToken() {
+  try { return localStorage.getItem(PENDING_INVITE_KEY) || ''; } catch (e) { return ''; }
+}
+function clearPendingInvite() {
+  try { localStorage.removeItem(PENDING_INVITE_KEY); } catch (e) {}
+}
+
+// With an invite link's secret on this phone: the business id once they've
+// joined it, null when there's nothing to join (carry on and make their own
+// business), or false when it can't be settled now (no signal, or no free
+// place yet), so no business of their own is made and the next sign-in
+// tries again.
+async function acceptTeamInvite() {
+  const token = pendingInviteToken();
+  if (!token) return null;
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/accept_invite`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ p_token: token }) });
+  } catch (e) {
+    console.warn('acceptTeamInvite failed:', e);
+    return false;
+  }
+  if (res.ok) {
+    const id = await res.json().catch(() => null);
+    clearPendingInvite();
+    if (typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)) return id;
+    showToast('That invite link didn\'t work for this account (it may have expired or been replaced), so you have an account of your own. Email SAYON if you should be on their team', 'info');
+    return null;
+  }
+  const err = await res.json().catch(() => ({}));
+  if (/NO_SEATS/.test(err.message || '')) {
+    showToast('The business that invited you has no free inspector place right now. Ask them to add one, then open SAYON again', 'info');
+    return false;
+  }
+  if (res.status >= 500) return false;
+  // Anything else (the database not set up for teams yet): carry on as before.
+  clearPendingInvite();
+  return null;
+}
+
+// ── YOUR TEAM ────────────────────────────────────────────────────────────
+// The owner invites inspectors by email and sends them a sign-up link. On
+// Team and Business each person takes one paid inspector place, the owner
+// included; a pending invite holds one too. The database does the counting
+// (invite_member and accept_invite in supabase/team-seats.sql); this page
+// shows it and the Worker refuses fewer places than people.
+
+// Must match business_seat_cap() in supabase/team-seats.sql.
+function teamPlaceCap(sub) {
+  if (!sub) return null;
+  if (sub.status === 'canceled' || sub.status === 'cancelled') return 0;
+  if (sub.plan === 'trial') return 3;
+  if (sub.plan === 'starter') return 1;
+  return Math.max(1, sub.seats || 1);
+}
+
+let teamCache = { members: [], invites: [] };
+
+async function loadTeam() {
+  const list = document.getElementById('teamList');
+  const placesEl = document.getElementById('teamPlacesText');
+  if (!authBusiness || !isBusinessOwner()) {
+    placesEl.textContent = 'Your business owner looks after the team.';
+    list.innerHTML = '';
+    return;
+  }
+  placesEl.textContent = 'Loading…';
+  try {
+    const [mRes, iRes, sub] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/team_members?business_id=eq.${authBusiness.id}&select=user_id,role,name,email&order=joined_at.asc`, { headers: getAuthHeaders() }),
+      fetch(`${SUPABASE_URL}/rest/v1/invites?business_id=eq.${authBusiness.id}&status=eq.pending&select=id,email&order=created_at.asc`, { headers: getAuthHeaders() }),
+      billingStatusCache ? Promise.resolve(billingStatusCache) : loadBillingStatus(),
+    ]);
+    if (!mRes.ok || !iRes.ok) throw new Error('HTTP ' + (mRes.ok ? iRes.status : mRes.status));
+    teamCache = { members: await mRes.json(), invites: await iRes.json() };
+    renderTeam(sub);
+  } catch (e) {
+    console.warn('loadTeam failed:', e.message);
+    placesEl.textContent = navigator.onLine ? 'Couldn\'t load your team. Close this page and open it again' : 'Your team loads when you have signal.';
+  }
+}
+
+function renderTeam(sub) {
+  const { members, invites } = teamCache;
+  const cap = teamPlaceCap(sub);
+  const taken = members.length + invites.length;
+  const placesEl = document.getElementById('teamPlacesText');
+  const plan = sub ? planDisplayLabel(sub.plan) : '';
+  if (cap === null) placesEl.textContent = `${taken} on your team.`;
+  else if (sub.plan === 'starter') placesEl.textContent = 'Solo is for one inspector. To add inspectors, move to Team in Billing.';
+  else if (sub.plan === 'trial') placesEl.textContent = `${taken} of ${cap} places used. The free trial lets you try SAYON with up to ${cap} people; Team takes up to 9.`;
+  else placesEl.textContent = `${taken} of ${cap} inspector places used on your ${plan} plan.`;
+  const full = cap !== null && taken >= cap;
+  document.getElementById('teamInviteBtn').disabled = full;
+  document.getElementById('teamInviteEmail').disabled = full;
+  document.getElementById('teamMorePlaces').hidden = !full;
+
+  const rows = members.map(m => {
+    const you = m.user_id === authUser.id;
+    const who = escapeHtml(m.name && m.name !== m.email ? m.name : m.email || 'Inspector');
+    return `<div class="team-row">
+      <div class="team-row-text"><div class="team-row-name">${who}${you ? ' (you)' : ''}</div>
+      <div class="team-row-sub">${escapeHtml(m.email || '')}${m.role === 'owner' ? ' · Owner' : ''}</div></div>
+      ${you || m.role === 'owner' ? '' : `<button class="link-btn team-row-btn" data-id="${escapeHtml(m.user_id)}" onclick="removeTeamMember(this.dataset.id)">Remove</button>`}
+    </div>`;
+  });
+  invites.forEach(i => {
+    rows.push(`<div class="team-row team-row-pending">
+      <div class="team-row-text"><div class="team-row-name">${escapeHtml(i.email)}</div>
+      <div class="team-row-sub">Invited, not signed up yet</div></div>
+      <button class="link-btn team-row-btn" data-id="${escapeHtml(i.id)}" onclick="shareTeamInvite(this.dataset.id)">Send link</button>
+      <button class="link-btn team-row-btn" data-id="${escapeHtml(i.id)}" onclick="cancelTeamInvite(this.dataset.id)">Cancel</button>
+    </div>`);
+  });
+  document.getElementById('teamList').innerHTML = rows.join('');
+}
+
+async function inviteTeamMember() {
+  const input = document.getElementById('teamInviteEmail');
+  const email = input.value.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { showToast('That email address doesn\'t look right', 'error'); input.focus(); return; }
+  const btn = document.getElementById('teamInviteBtn');
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/invite_member`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ p_email: email }) });
+    const answer = res.ok ? await res.json() : null;
+    const result = answer && answer.status;
+    const say = {
+      invited: null,
+      already_invited: 'They\'re already invited. Tap Send link to send it again',
+      already_member: 'They\'re already on your team',
+      no_seats: 'Every inspector place is taken. Add more in Billing first',
+      bad_email: 'That email address doesn\'t look right',
+      not_owner: 'Only the business owner can invite people',
+    };
+    if (!result || !(result in say)) { showToast('Couldn\'t send the invite. Check your signal and try again', 'error'); return; }
+    if (result !== 'invited') { showToast(say[result], result === 'already_invited' ? 'info' : 'error'); return; }
+    input.value = '';
+    track('team_invite_sent');
+    await loadTeam();
+    await sendInviteLink(email, answer.token);
+  } catch (e) {
+    showToast('Couldn\'t send the invite. Check your signal and try again', 'error');
+  } finally {
+    btn.disabled = false;
+    if (billingStatusCache) renderTeam(billingStatusCache);
+  }
+}
+
+// The sign-up link for an invited inspector. Its secret is what lets them
+// join, so it's only ever in the link the owner sends; the sign-up card
+// looks up the business and email from it.
+function teamInviteLink(token) {
+  const u = new URL(window.location.origin + window.location.pathname);
+  u.searchParams.set('signup', '1');
+  u.searchParams.set('invite', token);
+  return u.toString();
+}
+
+// "Send link" on a waiting invite: a fresh link (the old one stops working).
+async function shareTeamInvite(inviteId) {
+  const inv = teamCache.invites.find(x => x.id === inviteId);
+  if (!inv) return;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/invite_link`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ p_invite_id: inviteId }) });
+    const token = res.ok ? await res.json() : null;
+    if (!token) throw new Error('HTTP ' + res.status);
+    await sendInviteLink(inv.email, token);
+  } catch (e) {
+    showToast('Couldn\'t make a new link. Check your signal and try again', 'error');
+  }
+}
+
+async function sendInviteLink(email, token) {
+  const biz = getCompanyDetails().name || authBusiness?.name || 'our business';
+  const link = teamInviteLink(token);
+  const text = `You're invited to use SAYON with ${biz}. Sign up with ${email} here and you'll join our account. The link works for 14 days:`;
+  try {
+    if (navigator.share) { await navigator.share({ title: 'Join ' + biz + ' on SAYON', text, url: link }); return; }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+  }
+  try {
+    await navigator.clipboard.writeText(`${text} ${link}`);
+    showToast('The sign-up link is copied: paste it into a text or email to them', 'success');
+  } catch (e) {
+    showToast(`Send them this sign-up link: ${link}`, 'info');
+  }
+}
+
+async function removeTeamMember(userId) {
+  const m = teamCache.members.find(x => x.user_id === userId);
+  if (!m || userId === authUser.id) return;
+  if (!confirm(`Take ${m.name || m.email} off your team? They can't use SAYON with your business after this. Their reports stay in their account.`)) return;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/team_members?business_id=eq.${authBusiness.id}&user_id=eq.${encodeURIComponent(userId)}`, { method: 'DELETE', headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    showToast('Taken off your team. That frees an inspector place; change how many you pay for in Billing', 'success');
+    loadTeam();
+  } catch (e) {
+    showToast('Couldn\'t take them off. Check your signal and try again', 'error');
+  }
+}
+
+async function cancelTeamInvite(id) {
+  const i = teamCache.invites.find(x => x.id === id);
+  if (!i || !confirm(`Cancel the invite for ${i.email}?`)) return;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/invites?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    showToast('Invite cancelled', 'success');
+    loadTeam();
+  } catch (e) {
+    showToast('Couldn\'t cancel the invite. Check your signal and try again', 'error');
+  }
+}
+
+// The sign-up card, opened from an invite link (?signup=1&invite=<secret>):
+// the database says which business and email the secret is for, and the
+// card fills those in, so there's nothing to set up. The secret is kept for
+// sign-in and taken out of the address bar.
+async function applyInviteToSignUp() {
+  const params = new URLSearchParams(window.location.search);
+  const token = (params.get('invite') || '').trim();
+  if (!/^[0-9a-f]{64}$/.test(token)) return;
+  params.delete('invite');
+  history.replaceState(null, '', window.location.pathname + (params.toString() ? '?' + params : '') + window.location.hash);
+  try { localStorage.setItem(PENDING_INVITE_KEY, token); } catch (e) {}
+  let invite = null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+      body: JSON.stringify({ p_token: token }),
+    });
+    if (res.ok) invite = await res.json();
+  } catch (e) { /* no signal: a plain sign-up card, and sign-in still tries the secret */ }
+  const sub = document.getElementById('suSubtitle');
+  if (!invite || !invite.business || !invite.email) {
+    if (invite === null) clearPendingInvite();
+    if (invite === null) sub.textContent = 'That invite link has expired or been replaced. Ask for a new one, or sign up as your own business.';
+    return;
+  }
+  inviteSignUp = { business: String(invite.business).slice(0, 120), email: String(invite.email) };
+  document.getElementById('suEmail').value = inviteSignUp.email;
+  showInviteSignUp(true);
+}
+
+// The invite's business and email while the sign-up card is joining one.
+let inviteSignUp = null;
+
+// Joining shows the business by name and hides the Business Name box. A
+// different email can't use the invite, so changing it brings the box back.
+function showInviteSignUp(joining) {
+  const field = document.getElementById('suBusinessField');
+  field.hidden = joining;
+  if (joining) document.getElementById('suBusiness').value = '';
+  document.getElementById('suTitle').textContent = joining ? `Join ${inviteSignUp.business} on SAYON` : 'Create your account';
+  document.getElementById('suSubtitle').textContent = joining
+    ? `${inviteSignUp.business} has added you. Sign up with this email and you'll join their account, with their company details on your reports.`
+    : `This email wasn't invited, so this sets up a business of your own. To join ${inviteSignUp.business}, use ${inviteSignUp.email}.`;
+}
+
+function onSignUpEmailInput() {
+  if (!inviteSignUp) return;
+  const joining = document.getElementById('suEmail').value.trim().toLowerCase() === inviteSignUp.email.toLowerCase();
+  if (joining === document.getElementById('suBusinessField').hidden) return;
+  showInviteSignUp(joining);
+}
+
 // ── BUSINESS LOAD ────────────────────────────────────────────────────────
 // FIX: loadBusiness() used to be a plain check-then-create with no lock -
 // "is authBusiness already set? no -> look for an existing business row ->
@@ -10335,6 +10726,23 @@ async function _lookUpBusiness() {
         }
       }
     } else {
+      return;
+    }
+
+    // Invited by a business owner (Your team): join that business instead
+    // of making one. A failed check is not "no invite", so nothing is made.
+    const joined = await acceptTeamInvite();
+    if (joined === false) return;
+    if (joined) {
+      const bizRes = await fetch(`${SUPABASE_URL}/rest/v1/businesses?id=eq.${joined}&limit=1`, { headers: getAuthHeaders() });
+      const bizRows = bizRes.ok ? await bizRes.json() : [];
+      if (bizRows.length) {
+        authBusiness = bizRows[0];
+        localStorage.removeItem('korva_pending_business');
+        showToast(`You've joined ${authBusiness.name} on SAYON`, 'success');
+        track('team_invite_accepted');
+        loadBillingStatus();
+      }
       return;
     }
 
@@ -10491,6 +10899,10 @@ function renderProfileMenu() {
   }
   const bizBtn = document.getElementById('profileYourBusiness');
   if (bizBtn) bizBtn.hidden = !canEditBusiness();
+  // Your team needs a business of your own and a Worker that knows about
+  // inspector places (supabase/team-seats.sql is applied before it).
+  const teamBtn = document.getElementById('profileYourTeam');
+  if (teamBtn) teamBtn.hidden = !(authBusiness && isBusinessOwner() && billingStatusCache && billingStatusCache.seat_plans);
 }
 function openBillingFromProfile() {
   openMenuPage('billingPanel');

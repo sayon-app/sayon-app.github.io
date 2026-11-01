@@ -2,7 +2,7 @@
 // node screens.js <outDir> [widths=320,390,430] [scenario=heavy]
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2], WIDTHS = (process.argv[3] || '320,390,430').split(',').map(Number), SCN = process.argv[4] || 'heavy';
-const PORT = '8765', SP = process.env.JSPDF_DIR || '/tmp/jspdf', uid = 'u-owner';
+const PORT = process.env.PORT || '8765', SP = process.env.JSPDF_DIR || '/tmp/jspdf', uid = 'u-owner';
 const sess = { access_token:'a.b.c', refresh_token:'r', expires_at: Math.floor(Date.now()/1000)+3600, user:{ id: uid, email:'office@example.com', user_metadata:{ name:'Alex Example', business_name:'Example Pest Co' } } };
 const sc = require('./scenarios.js').find(s => s.name === SCN);
 const probe = () => {

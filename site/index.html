@@ -21,13 +21,15 @@
     --ink2: #3D5166;
     --navy: #0B1520;
     --navy2: #12212F;
-    --teal: #14B8A6;
-    --teal-hi: #5EEAD4;
-    --teal-ink: #0F766E;
+    --teal: #2F6BFF;
+    --teal-hi: #9DB8FF;
+    --teal-ink: #1D4ED8;
     --line: #D8E2ED;
     --soft: #F3F7FA;
-    --fade: linear-gradient(180deg, #2DD4BF 0%, #14B8A6 45%, #0D9488 100%);
+    --fade: linear-gradient(180deg, #5B8CFF 0%, #2F6BFF 45%, #1F4FE0 100%);
+    --pink: #FF3D8B;
   }
+  .logo-dot { fill: var(--pink); stroke: var(--pink); }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Inter', system-ui, sans-serif; color: var(--ink); background: #fff; line-height: 1.55; }
   h1, h2, h3, .brand { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.01em; }
@@ -35,14 +37,14 @@
   .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
 
   .btn { display: inline-block; padding: 14px 24px; border-radius: 12px; font-weight: 700; text-decoration: none; font-size: 16px; }
-  .btn-main { background: var(--fade); color: #fff; box-shadow: 0 6px 20px rgba(20,184,166,0.35); }
-  .btn-ghost { border: 1.5px solid rgba(94,234,212,0.5); color: #E6FFFA; }
+  .btn-main { background: var(--fade); color: #fff; box-shadow: 0 6px 20px rgba(47,107,255,0.35); }
+  .btn-ghost { border: 1.5px solid rgba(157,184,255,0.5); color: #EEF3FF; }
 
   /* Header and hero */
   .hero { background: radial-gradient(ellipse at 70% 0%, #13324A 0%, var(--navy) 60%); color: #F4F8FB; padding-bottom: 72px; }
   .nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
   .brand { display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 800; letter-spacing: 1.5px; text-decoration: none; }
-  .brand-mark { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: rgba(20,184,166,0.15); color: var(--teal-hi); box-shadow: 0 0 18px rgba(20,184,166,0.45); }
+  .brand-mark { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: rgba(47,107,255,0.15); color: var(--teal-hi); box-shadow: 0 0 18px rgba(47,107,255,0.45); }
   .nav-link { color: var(--teal-hi); font-weight: 600; text-decoration: none; font-size: 15px; }
   .hero-body { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 48px; align-items: center; padding-top: 48px; }
   .kicker { color: var(--teal-hi); font-weight: 600; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px; }
@@ -52,8 +54,8 @@
   .hero-note { margin-top: 16px; font-size: 14px; color: #8FA3B5; }
 
   /* A phone-shaped sketch of a note becoming a report */
-  .phone { background: var(--navy2); border: 1px solid rgba(94,234,212,0.25); border-radius: 28px; padding: 22px; box-shadow: 0 24px 60px rgba(0,0,0,0.45); }
-  .bubble { background: rgba(20,184,166,0.12); border: 1px solid rgba(94,234,212,0.3); border-radius: 14px; padding: 14px; font-size: 14px; color: #DDF7F2; margin-bottom: 14px; }
+  .phone { background: var(--navy2); border: 1px solid rgba(157,184,255,0.25); border-radius: 28px; padding: 22px; box-shadow: 0 24px 60px rgba(0,0,0,0.45); }
+  .bubble { background: rgba(47,107,255,0.12); border: 1px solid rgba(157,184,255,0.3); border-radius: 14px; padding: 14px; font-size: 14px; color: #DDF7F2; margin-bottom: 14px; }
   .bubble small { display: block; color: var(--teal-hi); font-weight: 600; margin-bottom: 6px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
   .field { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 14px; }
   .field span:first-child { color: #8FA3B5; }
@@ -73,7 +75,7 @@
   .card p { color: var(--ink2); }
 
   .chain { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-  .chain .link { background: #fff; border: 1.5px solid rgba(20,184,166,0.45); color: var(--teal-ink); font-weight: 600; padding: 10px 16px; border-radius: 999px; }
+  .chain .link { background: #fff; border: 1.5px solid rgba(47,107,255,0.45); color: var(--teal-ink); font-weight: 600; padding: 10px 16px; border-radius: 999px; }
   .chain .arrow { color: var(--teal); font-weight: 700; }
 
   .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
@@ -121,7 +123,7 @@
   <div class="wrap">
     <nav class="nav">
       <a class="brand" href="#">
-        <span class="brand-mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="4" r="2" fill="currentColor"/></svg></span>
+        <span class="brand-mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle class="logo-dot" cx="12" cy="4" r="2" fill="currentColor"/></svg></span>
         SAYON
       </a>
       <a class="nav-link" href="https://sayon-app.github.io/">Sign in</a>

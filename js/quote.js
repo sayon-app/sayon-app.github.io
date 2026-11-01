@@ -1839,7 +1839,7 @@ function drawPdfNumberedTitle(doc, y, title, num) {
   return y + 15;
 }
 
-// A table's heading row: a pale teal band, so tables print light.
+// A table's heading row: a pale blue band, so tables print light.
 function drawPdfTableHeadRule(doc, x, y, w) {
   const C = PDF_COLORS;
   doc.setFillColor(...C.accentLight); doc.rect(x, y, w, 8, 'F');

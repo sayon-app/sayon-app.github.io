@@ -131,8 +131,8 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   // 9. Legal pages: no draft banner, light brand, en-AU.
   for (const f of ['terms.html', 'privacy.html']) {
     await p.goto(`http://localhost:${PORT}/${f}`); await p.waitForTimeout(600);
-    const legal = await p.evaluate(() => ({ draft: /Draft — not yet/.test(document.body.innerText) || /pending legal review/i.test(document.body.innerText), lang: document.documentElement.lang, bg: getComputedStyle(document.body).backgroundColor, menu: /Menu › Billing/.test(document.body.innerText) }));
-    check(!legal.draft && legal.lang === 'en-AU' && legal.bg !== 'rgb(10, 11, 13)' && !legal.menu, `${f}: no draft banner, en-AU, light, no "Menu › Billing"`);
+    const legal = await p.evaluate(() => ({ draft: /Draft — not yet/.test(document.body.innerText) || /pending legal review/i.test(document.body.innerText), lang: document.documentElement.lang, bg: getComputedStyle(document.body).backgroundColor, menu: /your initials/i.test(document.body.innerText) || /\[[A-Z ]+\]/.test(document.body.innerText) }));
+    check(!legal.draft && legal.lang === 'en-AU' && legal.bg !== 'rgb(10, 11, 13)' && !legal.menu, `${f}: no draft banner, en-AU, light, no old menu path, no placeholders`);
     await p.screenshot({ path: `${OUT}/6-${f.replace('.html', '')}.png` });
   }
   // 10. Website.

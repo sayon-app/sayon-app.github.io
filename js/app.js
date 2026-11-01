@@ -7502,7 +7502,7 @@ Please arrange safe access to all areas on the day, including the roof space, th
 You will receive a written report by email after the inspection. It is for your use only and must not be relied on by anyone else without our written consent.
 
 7. Voice notes and your details
-The inspector may speak notes into a phone app during the inspection, and the phone may pick up conversation nearby. A speech-to-text service turns what it hears into written notes for your report. The recording is not kept. If you would rather not be recorded, tell the inspector and they will type their notes instead. Your details and the report are only used and shared as needed to provide this service.
+The inspector may speak notes into a phone app during the inspection, and the phone may pick up conversation nearby. A speech-to-text service turns what it hears into written notes, and an AI service drafts the report from those notes and from photos; the inspector checks everything before it is issued. These services include providers outside Australia, mainly in the United States. The recording is not kept. If you would rather not be recorded, tell the inspector and they will type their notes instead. Your details and the report are only used and shared as needed to provide this service, as set out in SAYON's privacy policy at sayon-app.github.io/privacy.html.
 
 8. Fee
 {fee}
@@ -10295,7 +10295,7 @@ async function endSessionOnDevice() {
 // phone's copy.
 const DELETE_ACCOUNT_BLOCKERS = {
   ACTIVE_SUBSCRIPTION: 'Your plan is still active. Cancel it in Menu › Billing › Manage first, then delete your account.',
-  HAS_TEAM: `Other people are still linked to your business, so it can\'t be deleted from the app yet. Email ${SUPPORT_EMAIL} to have them removed first.`,
+  HAS_TEAM: 'Other people are still on your team. Remove them in Menu › Your team first, then delete your account.',
 };
 
 async function deleteAccountRpc(dryRun) {
@@ -10311,28 +10311,46 @@ async function deleteAccountRpc(dryRun) {
 }
 
 async function deleteMyPhotos() {
-  const prefix = authUser.id + '/';
-  // Bounded: if a delete ever reports success but removes nothing, the
-  // same files would be listed again and this would never finish.
-  for (let round = 0; round < 50; round++) {
-    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${PHOTO_BUCKET}`, {
+  await deleteMyFiles(PHOTO_BUCKET);
+  // The PDFs behind client links: <user id>/<link folder>/<file>.pdf.
+  await deleteMyFiles(CLIENT_DOCS_BUCKET, true);
+}
+
+// Deletes everything under <user id>/ in a bucket, through the storage
+// policies. With nested, each folder under it is emptied too.
+async function deleteMyFiles(bucket, nested) {
+  const listFolder = async prefix => {
+    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${bucket}`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ prefix, limit: 1000, offset: 0 }),
     });
-    if (!res.ok) throw new Error('list photos ' + res.status);
-    const files = (await res.json()).filter(f => f.id).map(f => prefix + f.name);
+    // The client-docs bucket may never have been set up: nothing of ours in it.
+    if (nested && (res.status === 400 || res.status === 404)) return [];
+    if (!res.ok) throw new Error(`list ${bucket} ` + res.status);
+    return res.json();
+  };
+  const top = authUser.id + '/';
+  const folders = nested ? (await listFolder(top)).filter(f => !f.id).map(f => top + f.name + '/') : [top];
+  for (const prefix of folders) await deleteFolder(bucket, prefix, listFolder);
+}
+
+async function deleteFolder(bucket, prefix, listFolder) {
+  // Bounded: if a delete ever reports success but removes nothing, the
+  // same files would be listed again and this would never finish.
+  for (let round = 0; round < 50; round++) {
+    const files = (await listFolder(prefix)).filter(f => f.id).map(f => prefix + f.name);
     if (!files.length) return;
-    const del = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}`, {
+    const del = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
       body: JSON.stringify({ prefixes: files }),
     });
-    if (!del.ok) throw new Error('delete photos ' + del.status);
+    if (!del.ok) throw new Error(`delete ${bucket} ` + del.status);
     const removed = await del.json().catch(() => null);
-    if (Array.isArray(removed) && removed.length === 0) throw new Error('delete photos removed nothing');
+    if (Array.isArray(removed) && removed.length === 0) throw new Error(`delete ${bucket} removed nothing`);
   }
-  throw new Error('delete photos did not finish');
+  throw new Error(`delete ${bucket} did not finish`);
 }
 
 async function deleteMyAccount() {

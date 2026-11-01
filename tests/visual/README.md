@@ -1,0 +1,48 @@
+# Visual review bench
+
+Renders every client PDF and screenshots the app so a person (or a model) can look at the actual pages for orphaned headings, awkward page breaks, overflow, clipping and broken states. Used for the 2026-10-30 review; before and after images are in `docs/visual-review/2026-10-30/`.
+
+Sample jobs (`scenarios.js`, made-up names and addresses):
+- `standard`: a typical pre-purchase job with two findings and a few photos.
+- `heavy`: everything long at once: a long business name, client and address, five findings, borers, decay, many photos and quote lines.
+- `clean`: a near-empty annual inspection with nothing found.
+
+Run from the repo root:
+
+```
+sh tests/visual/setup.sh                       # jsPDF + the app's fonts into /tmp
+python3 -m http.server 8765 &
+export NODE_PATH=/opt/node-tools/node_modules
+node tests/visual/pdfs.js /tmp/vr/pdf          # report, agreement (signed and unsigned), quote (open and accepted), certificate per job
+node tests/visual/screens.js /tmp/vr/screens 320,390 heavy   # sign-in, menus, sheets, quote, treatment, website, sign page
+node tests/visual/scrollshots.js /tmp/vr/strips 375 heavy     # each report step, scrolled top to bottom and stitched
+for f in /tmp/vr/pdf/*.pdf; do pdftoppm -r 50 -png "$f" "${f%.pdf}"; done
+```
+
+Then look at the images. `screens.js` also writes `probe.json`, which flags a page that scrolls sideways and page errors; its OFFSCREEN lines for the closed drawer and CLIPPED lines for long text inside an input are expected. `ONLY=heavy` limits `pdfs.js` to one job.
+
+Things the 2026-10-30 review found, to check again after PDF or layout changes: a section title left at the foot of a page, text style leaking across a page break, long business names in the letterhead, names on signature lines, a signature or the closing words alone on the last page, and answer buttons at 375 px wide.
+
+## Client link
+
+`tests/client-link/e2e.js <outDir>` runs the quote link end to end against canned Supabase and Worker routes: Send from the quote screen makes the link and emails it, the check sheet reuses it, the client accepts (and another declines) on `sign.html`, and the app reads the answer back. Same setup as above (`setup.sh`, the server on :8765). It writes screenshots and the accepted quote PDF to `<outDir>`.
+
+## After-extract sheet
+
+`tests/extract-sheet/e2e.js <outDir>` checks the "From your note" sheet: the Before you leave gaps with their one-tap fixes, the Record and Get it signed buttons, the read-back text, and that the send sheet's fixes still work. Screenshots at 390 and 320.
+
+## Last visit
+
+`tests/last-visit/e2e.js <outDir>` saves a report, starts a new job at the same address typed differently, and checks the offer, Not now, Start from it (property details copied, findings and risk not, termite history written) and the Since last visit sheet.
+
+## Photos while talking
+
+`tests/talk-photo/e2e.js <outDir>` takes a photo from the voice popover between two stretches of speech about a gum tree, then a second photo a minute later about nothing in particular, fills the report from the standard scenario and checks that the first photo lands on the gum-tree finding with the right sentence as its caption, the second stays in the Findings photos, and both survive a reload.
+
+## Send gaps
+
+`tests/send-gaps/e2e.js <outDir>` adds two photos whose upload fails, opens the check sheet and expects the "only on this phone" gap, taps Back up now once failing and once working, then starts a fill against a slow canned AI and taps Keep for later, expecting the note under Waiting notes and in the draft.
+
+## Full chain
+
+`tests/full-chain/e2e.js <outDir> [width]` runs a whole job by tapping the real buttons on a phone: business setup, job details on the dashboard, the agreement signed on the phone, a typed note filled by a canned AI, the after-fill fixes, sign-off, the report sent, the quote sent, the client's accepted answer with a signature, the treatment record, the certificate emailed, then a reload. It checks that areas a finding names aren't marked "nothing found", that PDF file names keep the whole address, and that nothing is lost on reload. It writes a screenshot per step and the PDFs that were emailed to `<outDir>`. Run it at 390 and 320.

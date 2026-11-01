@@ -837,6 +837,6 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   para(closing, { size: 7, lh: 3.2, color: C.inkMuted });
 
   drawPdfDocFooters(doc, `${install ? 'Installation certificate' : 'Certificate'} ${number}${company.name ? `  ·  ${company.name}` : ''}`);
-  const safe = (q.address || 'Property').replace(/[^\w]+/g, '_').substring(0, 25);
+  const safe = fileNamePart(q.address) || 'Property';
   return { blob: doc.output('blob'), fname: `SAYON_${install ? 'Installation' : 'Treatment'}_Certificate_${number.replace(/[^\w-]+/g, '')}_${safe}.pdf` };
 }

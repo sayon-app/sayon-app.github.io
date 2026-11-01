@@ -7772,6 +7772,11 @@ function updateAgreementSignButton() {
     li.classList.toggle('now', !done && !nowSet);
     if (!done) nowSet = true;
   });
+  // The bar under the header: one segment per step, filled once it's done.
+  const bar = document.getElementById('agreementProgress');
+  if (bar) [...bar.children].forEach((seg, i) => seg.classList.toggle('done', steps[i][1]));
+  const by = document.getElementById('agreementSigBy');
+  if (by) by.textContent = named ? document.getElementById('agreementSignerName').value.trim() : 'Client';
   const need = [!typed && 'choose the inspection type', !agreed && 'tick that the client has read it',
     !named && "enter the client's name", !drawn && 'get their signature'].filter(Boolean);
   const needEl = document.getElementById('agreementSignNeed');
@@ -12337,7 +12342,7 @@ const COLOUR_VISION_ACCENTS = {
 function setColourVisionMode(mode) {
   const colours = COLOUR_VISION_ACCENTS[mode];
   const root = document.documentElement.style;
-  // The default teal lives in the stylesheet (light and dark differ), so
+  // The default blue lives in the stylesheet (light and dark differ), so
   // "none" clears the override rather than setting a colour of its own.
   if (!colours) ['--accent', '--accent2', '--accent3', '--accent-rgb'].forEach(k => root.removeProperty(k));
   else {
@@ -13015,7 +13020,7 @@ function showToast(msg, type = 'default', action) {
     success: svgIcon('<path d="M20 6 9 17l-5-5"/>'),
     error: svgIcon('<path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'),
     info: svgIcon('<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>'),
-    default: svgIcon('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="4" r="2" fill="currentColor"/>'),
+    default: svgIcon('<circle cx="12" cy="12" r="9"/><circle class="logo-dot" cx="12" cy="4" r="2" fill="currentColor"/>'),
   };
 
   t.innerHTML = `${icons[type] || icons.default}<span>${escapeHtml(String(msg))}</span>`;
@@ -13927,10 +13932,10 @@ const PDF_COLORS = {
   ink:         [12,  18,  28],
   inkLight:    [36,  48,  64],
   inkMuted:    [72,  86, 104],
-  // Accent — the logo teal
-  accent:      [20,  184, 166],
-  accentDark:  [15,  118, 110],
-  accentLight: [200, 238, 234],
+  // Accent: the brand's electric blue
+  accent:      [47,  107, 255],
+  accentDark:  [29,  78,  216],
+  accentLight: [214, 226, 255],
   // Structure
   rule:        [208, 218, 228],
   ruleLight:   [230, 237, 244],
@@ -13939,7 +13944,7 @@ const PDF_COLORS = {
   // Status
   danger:      [192,  48,  38],
   warn:        [175, 112,  16],
-  safe:        [15,  118, 110],
+  safe:        [21,  128,  61],
   // Cover
   coverDark:   [10,  15,  22],
   coverMid:    [20,  30,  46],
@@ -13953,13 +13958,13 @@ function pdfTracked(doc, text, x, y, { cs = 0.35, align } = {}) {
   return w;
 }
 
-// A rule that runs from teal through mint and fades into the page, like the
-// lines on the app's section headers. jsPDF has no gradients, so it is drawn
-// as thin steps. wash: a pale teal band that fades straight into the page.
+// A rule that runs from blue through a lighter blue and fades into the page,
+// like the lines on the app's section headers. jsPDF has no gradients, so it
+// is drawn as thin steps. wash: a pale blue band that fades into the page.
 function drawPdfFadeRule(doc, x, y, w, h, { wash = false } = {}) {
   const white = [255, 255, 255];
-  const from = wash ? [228, 245, 242] : PDF_COLORS.accent;
-  const mid = wash ? [240, 250, 248] : [94, 234, 212];
+  const from = wash ? [226, 234, 255] : PDF_COLORS.accent;
+  const mid = wash ? [241, 245, 255] : [125, 162, 255];
   const steps = Math.max(12, Math.round(w / 1.5)), sw = w / steps;
   const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
   for (let i = 0; i < steps; i++) {
@@ -13970,7 +13975,7 @@ function drawPdfFadeRule(doc, x, y, w, h, { wash = false } = {}) {
 }
 
 // The business's mark: the uploaded logo, else its initials (or S for
-// SAYON) in a teal tile. size is the square it fits in, in mm.
+// SAYON) in a blue tile. size is the square it fits in, in mm.
 function drawPdfCompanyMark(doc, company, x = 15, y = 12, size = 17) {
   const C = PDF_COLORS;
   if (company.logo) {
@@ -13993,7 +13998,7 @@ function drawPdfCompanyMark(doc, company, x = 15, y = 12, size = 17) {
 
 // The letterhead at the top of every client document: the business's mark,
 // name and details on the left, the document and date on the right, over a
-// teal rule. White, so it prints cleanly in black and white. Returns the y
+// blue rule. White, so it prints cleanly in black and white. Returns the y
 // below it.
 function drawPdfLetterhead(doc, company, { docLabel, date }) {
   const C = PDF_COLORS;
@@ -14177,7 +14182,7 @@ async function buildReportPdf() {
   function compactHeader(sectionLabel) {
     pageNum++;
     // A light running header: who prepared it and for which property on the
-    // left, the part of the report on the right, over a thin teal rule.
+    // left, the part of the report on the right, over a thin blue rule.
     const companyName = (getCompanyDetails().name || '').trim();
     doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...C.ink);
     doc.text(companyName || reportKindTitle(), M, 10);
@@ -14204,7 +14209,7 @@ async function buildReportPdf() {
     const num = no || '';
     if (y + 19 + keep > 277) newPage();
     gap(4);
-    // As on the app's section headers: a teal line above, a soft teal wash
+    // As on the app's section headers: a blue line above, a soft blue wash
     // and a fine line below, all fading out to the right.
     drawPdfFadeRule(doc, M, y - 2.5, CW, 0.7);
     drawPdfFadeRule(doc, M, y - 1.8, CW, 10.6, { wash: true });
@@ -14279,7 +14284,7 @@ async function buildReportPdf() {
     if (y > 268) newPage();
     gap(4);
     const col = level==='HIGH' ? C.danger : level==='MEDIUM' ? C.warn : C.safe;
-    const bgTint = level==='HIGH' ? [253,242,240] : level==='MEDIUM' ? [253,247,234] : [232,248,245];
+    const bgTint = level==='HIGH' ? [253,242,240] : level==='MEDIUM' ? [253,247,234] : [233,248,238];
 
     // Tinted background box
     doc.setFillColor(...bgTint); doc.roundedRect(M, y, CW, 18, 2, 2, 'F');
@@ -14564,7 +14569,7 @@ async function buildReportPdf() {
   const riskLvl   = reportData.riskLevel || null;
   const riskBadgeY = gy + 10;
   const riskCol    = riskLvl==='HIGH' ? C.danger : riskLvl==='MEDIUM' ? C.warn : riskLvl==='LOW' ? C.safe : C.inkMuted;
-  const riskBgCol  = riskLvl==='HIGH' ? [253,242,240] : riskLvl==='MEDIUM' ? [253,247,234] : riskLvl==='LOW' ? [232,248,245] : [248,246,243];
+  const riskBgCol  = riskLvl==='HIGH' ? [253,242,240] : riskLvl==='MEDIUM' ? [253,247,234] : riskLvl==='LOW' ? [233,248,238] : [248,246,243];
 
   if (riskBadgeY < 262) {
     const rh = 22;
@@ -14671,7 +14676,7 @@ async function buildReportPdf() {
   sectionTitle('SUMMARY', REPORT_PARTS.summary);
   {
     const { groups, next } = reportSummary();
-    const TONE = { bad: [C.danger, [253,242,240]], warn: [C.warn, [253,247,234]], good: [C.safe, [232,248,245]], none: [C.inkMuted, C.rowAlt] };
+    const TONE = { bad: [C.danger, [253,242,240]], warn: [C.warn, [253,247,234]], good: [C.safe, [233,248,238]], none: [C.inkMuted, C.rowAlt] };
     const QW = CW - 72, chipW = 34, chipX = W - M - 26 - chipW;
     groups.forEach(g => {
       if (y + 22 > 276) newPage();
@@ -15210,7 +15215,7 @@ async function buildReportPdf() {
   function tcHeading(text) {
     if (y > 262) newPage();
     gap(4);
-    // Subtle teal left bar for each clause heading
+    // Subtle blue left bar for each clause heading
     doc.setFillColor(...C.accent); doc.rect(M, y-1, 2, 8, 'F');
     doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...C.ink);
     doc.text(text, M+6, y+5); y += 11;

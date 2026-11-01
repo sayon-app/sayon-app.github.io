@@ -14,7 +14,7 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   await require('../visual/fonts-route.js')(ctx);
   await ctx.route(/cdnjs\.cloudflare\.com\/ajax\/libs\/jspdf/, r => r.fulfill({ body: fs.readFileSync(SP + '/package/dist/jspdf.umd.min.js'), contentType: 'application/javascript' }));
   await ctx.route(/sentry|posthog|maps\.googleapis/, r => r.fulfill({ status: 200, body: '' }));
-  const state = { sub: { plan: 'trial', status: 'trialing', ai_calls_used_this_period: 0, limit: 50, trial_ends_at: new Date(Date.now() + 5 * 86400000).toISOString() }, subStatus: 200, statusCalls: 0, signupError: null, bizSettings: {} };
+  const state = { sub: { plan: 'trial', status: 'trialing', ai_calls_used_this_period: 0, limit: 50, trial_ends_at: new Date(Date.now() + 5 * 86400000).toISOString() }, subStatus: 200, statusCalls: 0, signupError: null, signupCalls: [], bizSettings: {} };
   await ctx.route(/workers\.dev/, r => {
     const path = r.request().url().replace(/^https:\/\/[^/]+/, '');
     if (path.startsWith('/stripe/subscription-status')) { state.statusCalls++; return state.subStatus === 200 ? r.fulfill({ json: state.sub }) : r.fulfill({ status: state.subStatus, body: 'no' }); }
@@ -24,7 +24,7 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
     const req = r.request(), u = req.url(), m = req.method();
     if (u.includes('/auth/v1/signup')) {
       if (state.signupError) return r.fulfill({ status: 422, json: state.signupError });
-      const body = JSON.parse(req.postData()); return r.fulfill({ json: { access_token: 'a.b.c', refresh_token: 'r', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'u-' + body.email.split('@')[0], email: body.email, user_metadata: body.data } } });
+      const body = JSON.parse(req.postData()); state.signupCalls.push(body); return r.fulfill({ json: { access_token: 'a.b.c', refresh_token: 'r', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'u-' + body.email.split('@')[0], email: body.email, user_metadata: body.data } } });
     }
     if (u.includes('/auth/v1/')) return r.fulfill({ json: {} });
     if (u.includes('/rest/v1/businesses')) {
@@ -51,6 +51,12 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   // 2. A typo in the email is caught; a duplicate account points to sign in.
   await p.fill('#suName', 'Sam Newby'); await p.fill('#suBusiness', 'Newby Pest Management'); await p.fill('#suEmail', 'sam@gmial'); await p.fill('#suPassword', 'longenough1');
   await p.click('#suBtn'); await p.waitForTimeout(300);
+  const unticked = await p.evaluate(() => ({ err: document.getElementById('suError').textContent, terms: document.querySelector('.auth-consent a[href="terms.html"]')?.target, privacy: document.querySelector('.auth-consent a[href="privacy.html"]')?.target }));
+  check(/Tick the box to agree to the Terms of Service and Privacy Policy/.test(unticked.err) && !state.signupCalls.length, 'sign-up waits for the Terms and Privacy tick-box: ' + unticked.err);
+  check(unticked.terms === '_blank' && unticked.privacy === '_blank', 'the tick-box links open the Terms and Privacy pages in a new tab');
+  await p.screenshot({ path: `${OUT}/1b-consent.png` });
+  await p.check('#suConsent');
+  await p.click('#suBtn'); await p.waitForTimeout(300);
   check(/doesn't look right/.test(await p.textContent('#suError')), 'a bad email address is caught before sign-up: ' + (await p.textContent('#suError')).slice(0, 50));
   state.signupError = { code: 422, error_code: 'user_already_exists', msg: 'User already registered' };
   await p.fill('#suEmail', 'sam@example.com'); await p.click('#suBtn'); await p.waitForTimeout(800);
@@ -65,6 +71,8 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   await p.evaluate(() => showAuth('authSignUp'));
   await p.fill('#suEmail', 'sam@example.com'); await p.fill('#suPassword', 'longenough1'); await p.click('#suBtn'); await p.waitForTimeout(2500);
   check(await p.evaluate(() => document.getElementById('onboardScreen').style.display === 'flex'), 'a new account sees the business set-up');
+  const sent = state.signupCalls[state.signupCalls.length - 1].data;
+  check(sent.terms_version === 3 && sent.privacy_version === 6 && !isNaN(Date.parse(sent.terms_accepted_at)), 'the sign-up records which Terms and Privacy versions were agreed to, and when: ' + JSON.stringify(sent));
   const labels = await p.evaluate(() => [...document.querySelectorAll('#ob-panel-0 .auth-label')].map(l => l.textContent.trim()));
   check(labels.some(l => /Licence.*can wait/.test(l)) && labels.some(l => /Phone.*can wait/.test(l)), 'licence and phone are marked as able to wait');
   await p.evaluate(() => { obNext(0); obNext(1); obFinish(); }); await p.waitForTimeout(1200);
@@ -79,7 +87,7 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   // 4. Another person signs up on this phone: they still set up their business.
   await p.evaluate(() => { localStorage.removeItem('korva_session'); });
   await p.goto(`http://localhost:${PORT}/?signup=1`); await p.waitForTimeout(3200); await hookToasts();
-  await p.fill('#suName', 'Jo Other'); await p.fill('#suBusiness', 'Other Pest Co'); await p.fill('#suEmail', 'jo@example.com'); await p.fill('#suPassword', 'longenough1'); await p.click('#suBtn'); await p.waitForTimeout(2500);
+  await p.fill('#suName', 'Jo Other'); await p.fill('#suBusiness', 'Other Pest Co'); await p.fill('#suEmail', 'jo@example.com'); await p.fill('#suPassword', 'longenough1'); await p.check('#suConsent'); await p.click('#suBtn'); await p.waitForTimeout(2500);
   check(await p.evaluate(() => document.getElementById('onboardScreen').style.display === 'flex'), 'a second person on the same phone still sets up their business');
   await p.evaluate(() => { obNext(0); obNext(1); obFinish(); }); await p.waitForTimeout(1200);
 
@@ -133,6 +141,10 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
     await p.goto(`http://localhost:${PORT}/${f}`); await p.waitForTimeout(600);
     const legal = await p.evaluate(() => ({ draft: /Draft — not yet/.test(document.body.innerText) || /pending legal review/i.test(document.body.innerText), lang: document.documentElement.lang, bg: getComputedStyle(document.body).backgroundColor, menu: /your initials/i.test(document.body.innerText) || /\[[A-Z ]+\]/.test(document.body.innerText) }));
     check(!legal.draft && legal.lang === 'en-AU' && legal.bg !== 'rgb(10, 11, 13)' && !legal.menu, `${f}: no draft banner, en-AU, light, no old menu path, no placeholders`);
+    // The version a new account ticks at sign-up must match the page.
+    const pageVersion = Number(((await p.textContent('.updated')) || '').match(/Version (\d+)/)?.[1]);
+    const ticked = Number(fs.readFileSync(require('path').join(__dirname, '../../js/app.js'), 'utf8').match(new RegExp(`LEGAL_VERSIONS = \\{[^}]*${f.replace('.html', '')}: (\\d+)`))?.[1]);
+    check(pageVersion && pageVersion === ticked, `${f}: sign-up records the page's version (page ${pageVersion}, sign-up ${ticked})`);
     await p.screenshot({ path: `${OUT}/6-${f.replace('.html', '')}.png` });
   }
   // 10. Website.

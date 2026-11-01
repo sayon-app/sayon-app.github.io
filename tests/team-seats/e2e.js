@@ -199,9 +199,10 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     check(await p.evaluate(() => !document.getElementById('suBusinessField').hidden && /wasn't invited/.test(document.getElementById('suSubtitle').textContent)), 'changing the email brings back the business box and says why');
     await p.fill('#suEmail', 'tech@acme.test');
     check(await p.evaluate(() => document.getElementById('suBusinessField').hidden), 'putting the invited email back hides it again');
-    await p.fill('#suName', 'Tia Tech'); await p.fill('#suPassword', 'longenough1'); await p.click('#suBtn'); await p.waitForTimeout(2800);
+    await p.fill('#suName', 'Tia Tech'); await p.fill('#suPassword', 'longenough1'); await p.check('#suConsent'); await p.click('#suBtn'); await p.waitForTimeout(2800);
     const su = st.calls.find(c => c.path.includes('/auth/v1/signup'));
     check(su && !su.body.data.business_name, 'the sign-up doesn\'t name a business of their own');
+    check(su.body.data.terms_version === 3 && su.body.data.privacy_version === 6 && su.body.data.terms_accepted_at, 'an invited inspector\'s sign-up records the Terms and Privacy versions too');
     const acc = st.calls.find(c => c.path.includes('/rpc/accept_invite'));
     check(acc && acc.body.p_token === TOKEN, 'sign-in sends the secret to accept_invite');
     const joined = await p.evaluate(() => ({ biz: authBusiness && authBusiness.id, ob: document.getElementById('onboardScreen').style.display, panel1: document.getElementById('ob-panel-1').style.display, kept: localStorage.getItem('korva_pending_invite'), toasts: window.__toasts.slice() }));
@@ -227,7 +228,7 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     const { ctx, p, st, errs } = await setup(b, { user: null, sub: trial({ seat_plans: true }) });
     st.acceptReturns = 'NO_SEATS'; st.invite = { business: 'Acme Pest', email: 'tech@acme.test' };
     await p.goto(`http://localhost:${PORT}/?signup=1&invite=${TOKEN}`); await p.waitForTimeout(3400); await p.hookToasts();
-    await p.fill('#suName', 'Tia Tech'); await p.fill('#suPassword', 'longenough1'); await p.click('#suBtn'); await p.waitForTimeout(2800);
+    await p.fill('#suName', 'Tia Tech'); await p.fill('#suPassword', 'longenough1'); await p.check('#suConsent'); await p.click('#suBtn'); await p.waitForTimeout(2800);
     const ns = await p.evaluate(() => ({ biz: authBusiness, kept: localStorage.getItem('korva_pending_invite'), toasts: window.__toasts.slice() }));
     check(!ns.biz && !st.madeBusiness && ns.kept === 'a'.repeat(64) && ns.toasts.some(t => /no free inspector place/.test(t)), 'no free place: nothing is made, they are told, and the next sign-in tries again');
     check(!errs.length, 'no page errors ' + errs.join('; '));
@@ -239,7 +240,7 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     const { ctx, p, st, errs } = await setup(b, { user: null, sub: trial({ seat_plans: true }) });
     await p.goto(`http://localhost:${PORT}/?signup=1`); await p.waitForTimeout(3200);
     check(await p.evaluate(() => document.getElementById('suTitle').textContent === 'Create your account' && !document.getElementById('suBusinessField').hidden), 'a plain sign-up card is unchanged');
-    await p.fill('#suName', 'Sol Owner'); await p.fill('#suBusiness', 'Sol Pest'); await p.fill('#suEmail', 'sol@x.test'); await p.fill('#suPassword', 'longenough1'); await p.click('#suBtn'); await p.waitForTimeout(2800);
+    await p.fill('#suName', 'Sol Owner'); await p.fill('#suBusiness', 'Sol Pest'); await p.fill('#suEmail', 'sol@x.test'); await p.fill('#suPassword', 'longenough1'); await p.check('#suConsent'); await p.click('#suBtn'); await p.waitForTimeout(2800);
     check(!st.calls.some(c => c.path.includes('/rpc/accept_invite')) && st.madeBusiness, 'no invite link: no invite is looked for, and their own business is made');
     check(!errs.length, 'no page errors ' + errs.join('; '));
     await ctx.close();

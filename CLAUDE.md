@@ -16,6 +16,7 @@ Read only the files your task needs. `js/app.js` is about 9,200 lines, so jump t
 | `js/photo-markup.js` | Mark up a report photo (circle, arrow, draw, label) from the photo viewer |
 | `js/treatment.js` | Treatment record and the one-page certificate PDF |
 | `js/bait.js` | Bait station visits after a baiting system goes in: the visit sheet, the client's visit report PDF, the job's due date |
+| `js/site-plan.js` | The drawn site plan on the treatment record: symbols, legend, the editor, and the plan page on the certificates and bait visit reports |
 | `js/business-sync.js` | Syncs company details and quote prices to Supabase `businesses.settings` |
 | `css/app.css`, `css/quote.css` | Styles |
 | `service-worker.js` | Offline cache. **Bump `CACHE_VERSION` (korva-vNN) whenever cached files change** |

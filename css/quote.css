@@ -582,6 +582,15 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 .sp-bg-btn { cursor: pointer; }
 .sp-bg .quote-hint { flex-basis: 100%; margin: 0; }
 .sp-selrow[hidden], #spBgRemove[hidden] { display: none; }
+.sp-turn { margin-top: 8px; font-size: 13px; color: var(--text2); }
+.sp-turn-label { flex: 1; }
+.sp-turn .job-input { flex: 0 0 64px; max-width: 64px; text-align: center; }
+.sp-turn-btn { min-width: 44px; min-height: 42px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.sp-part { margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(var(--pink-rgb), 0.45); }
+.sp-part .sp-size { margin-top: 0; margin-bottom: 8px; }
+.sp-part-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.sp-part-btns .quote-link-btn { min-height: 40px; }
+.sp-part[hidden], .sp-part-btns .quote-link-btn[hidden] { display: none; }
 .sp-views { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1.5px solid var(--accent); border-radius: 12px; overflow: hidden; }
 .sp-view { min-height: 40px; border: 0; background: var(--surface); font: inherit; font-size: 14px; font-weight: 800; color: var(--accent2); cursor: pointer; }
 .sp-view.on { background: var(--accent); color: #fff; }

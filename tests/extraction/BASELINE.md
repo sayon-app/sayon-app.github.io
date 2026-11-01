@@ -138,3 +138,19 @@ Runner: `run-api.mjs` on the real API (`claude-sonnet-5`, effort medium), tags `
 `night3`/`night4` (rules 5–6 added, only the cases they touch): `townhouse-strata` 100%, `negation-traps` 100%, `wet-day-partial` 98% (put the flooded rear subfloor in noAccessAreas instead of hinderedAreas once), `subfloor-all-clear` weep holes still wrong in 2 of 3 runs. The whole bench was not re-run on the final prompt (budget); rules 5 and 6 only touch the slab-edge cover and the re-inspection interval.
 
 Still open: `subfloor-all-clear` weep holes (worth a code guard: ignore weepHoles from a note that only covers the subfloor), and soldier caste words ("major", "minor") reading as severity.
+
+## 2026-11-02: first live voice test of the new prompt
+
+The owner read Test A of the voice test script (one house, six areas) as one long note on the phone with test mode on, against the prompt that went live in #300. The note and the app's answer came from `public.test_notes`; it is now the case `live-script-one-note`. The call took 48.5 s.
+
+**The app's answer: 91/94.** Everything in the script landed (postcode from "4-3-double-zero", Kordon from "Cordon... in store 2015", Coptotermes acinaciformis from "Asinaceiformes", "termite workings" kept with "no damage visible", the 32-no-22 correction, "severe" and "structurally compromised" dropped, the two-week return visit kept out of the re-inspection interval) except two things:
+- constructionEra "1985-2003" for "built around 1985": a boundary year, and the earlier range carries the stronger asbestos warning.
+- borerType "Not identified" when no beetle was named and the inspector never said that.
+
+**Prompt changes:** a year on the line between two eras takes the earlier range; borerType "Not identified" only when the inspector says they couldn't identify it.
+
+**After** (effort medium, the app's setting): `live-script-one-note` 94/94 on both runs; `borer-only`, `borers-rot`, `negation-traps`, `old-damage-treated` 100%.
+
+**Effort low, to see whether it cuts the wait** (13 runs on 11 cases): long note 35-38 s against 43-52 s at medium, short notes 10-31 s against 22-26 s, so roughly 20-30% faster. It cost accuracy: 3 misses in 13 runs (an activity grade "high" in a `house-test-1` finding, borerActivity null once on `live-script-one-note`, the screwed-shut roof void missing from highRiskAreas on `negation-traps`), against none in 6 medium runs. Not worth switching; the app stays at medium.
+
+Cost: 18 calls, about $1.70.

@@ -9717,9 +9717,8 @@ function seatInputValue(plan) {
 function onSeatInput(plan) {
   const cfg = SEAT_PLANS[plan];
   const n = seatInputValue(plan);
-  const money = v => '$' + v.toLocaleString('en-AU');
   const total = document.getElementById(cfg.total);
-  if (total) total.textContent = cfg.yearly ? `${money(n * cfg.perMonth * 12)} a year` : `${money(n * cfg.perMonth)} a month`;
+  if (total) total.textContent = planPriceText(plan, n);
   const sub = billingStatusCache;
   // On the current plan the button saves a new number of places.
   if (sub && sub.plan === plan && sub.per_seat && ['active', 'past_due'].includes(sub.status)) {
@@ -9741,8 +9740,16 @@ function choosePlan(plan) {
   }
   const seats = SEAT_PLANS[plan] ? seatInputValue(plan) : undefined;
   const paying = sub && sub.plan && sub.plan !== 'trial' && sub.subscribed && ['active', 'past_due'].includes(sub.status);
-  if (paying && !confirm(`Switch to ${planDisplayLabel(plan)}${seats ? ` for ${seats} inspectors` : ''}? The difference for the rest of what you've paid for is charged straight away.`)) return;
+  if (paying && !confirm(`Switch to ${planDisplayLabel(plan)}${seats ? ` for ${seats} inspectors` : ''} at ${planPriceText(plan, seats)}? It's charged now, less the unused part of your current plan, and only happens if the payment goes through.`)) return;
   openCheckout(plan, seats);
+}
+
+// "$316 a month" / "$9,936 a year" for a plan and number of inspectors.
+function planPriceText(plan, seats) {
+  const money = v => '$' + v.toLocaleString('en-AU');
+  const cfg = SEAT_PLANS[plan];
+  if (!cfg) return '$89 a month';
+  return cfg.yearly ? `${money(seats * cfg.perMonth * 12)} a year` : `${money(seats * cfg.perMonth)} a month`;
 }
 
 let seatChangeInFlight = false;
@@ -9751,8 +9758,8 @@ async function updateSeats(seats) {
   if (!sub || seatChangeInFlight) return;
   const more = seats > sub.seats;
   const ask = more
-    ? `Pay for ${seats} inspectors instead of ${sub.seats}? The extra places are charged straight away for the rest of what you've paid for.`
-    : `Pay for ${seats} inspectors instead of ${sub.seats}? The lower number starts at your next bill.`;
+    ? `Pay for ${seats} inspectors instead of ${sub.seats} (${planPriceText(sub.plan, seats)})? The extra places are charged now for the rest of what you've paid for.`
+    : `Pay for ${seats} inspectors instead of ${sub.seats} (${planPriceText(sub.plan, seats)})? The unused part comes off your next bill.`;
   if (!confirm(ask)) return;
   seatChangeInFlight = true;
   try {
@@ -9844,11 +9851,11 @@ async function openCheckout(plan, seats) {
     if (!res.ok || !data.url) throw new Error(data && data.message || rawBody || `HTTP ${res.status}`);
     window.location.href = data.url;
   } catch (e) {
-    // 400 and 409 carry a reason worth reading: the number of inspectors,
-    // or a team too big for the plan.
+    // 400, 402 and 409 carry a reason worth reading: the number of
+    // inspectors, a declined card, or a team too big for the plan.
     showToast(status === 403
       ? 'Only the business owner can change the plan.'
-      : (status === 400 || status === 409) && e.message ? e.message
+      : (status === 400 || status === 402 || status === 409) && e.message ? e.message
       : 'Couldn\'t open checkout. Check your signal and try again.', 'error');
     console.warn('openCheckout failed:', e.message);
   } finally {
@@ -10047,7 +10054,9 @@ async function signUp() {
   const btn      = document.getElementById('suBtn');
 
   errEl.textContent = '';
-  if (!name || !business || !email || !password) { errEl.textContent = 'Please fill in all fields.'; return; }
+  // Joining from an invite link: the business is theirs to join, not to name.
+  const joining = document.getElementById('suBusinessField').hidden;
+  if (!name || (!business && !joining) || !email || !password) { errEl.textContent = 'Please fill in all fields.'; return; }
   // Receipts and password resets go to this address, so a typo locks the
   // account out of both.
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { errEl.textContent = 'That email address doesn\'t look right. Check it: your receipts and password resets go there.'; return; }
@@ -10056,11 +10065,11 @@ async function signUp() {
   btn.disabled = true; btn.textContent = 'Creating account…';
   try {
     // Store business name locally — survives the email confirmation redirect
-    localStorage.setItem('korva_pending_business', business);
+    if (!joining) localStorage.setItem('korva_pending_business', business);
 
     const data = await supabaseAuth('signup', {
       email, password,
-      data: { name, business_name: business },
+      data: joining ? { name } : { name, business_name: business },
     });
     if (data.error) {
       if (data.error.code === 'user_already_exists' || /already (registered|exists)/i.test(data.error.message || '')) {
@@ -10350,28 +10359,48 @@ async function ensureOwnerTeamMember() {
   } catch(e) { console.warn('ensureOwnerTeamMember error:', e); }
 }
 
-// The business id when a pending invite matched this account and they've
-// joined it, null when there's nothing to join, false when it couldn't be
-// checked (no signal), so the caller doesn't make a business of their own.
+// The secret from an invite link, kept until sign-in uses it (it has to
+// survive the sign-up and any reload in between).
+const PENDING_INVITE_KEY = 'korva_pending_invite';
+
+function pendingInviteToken() {
+  try { return localStorage.getItem(PENDING_INVITE_KEY) || ''; } catch (e) { return ''; }
+}
+function clearPendingInvite() {
+  try { localStorage.removeItem(PENDING_INVITE_KEY); } catch (e) {}
+}
+
+// With an invite link's secret on this phone: the business id once they've
+// joined it, null when there's nothing to join (carry on and make their own
+// business), or false when it can't be settled now (no signal, or no free
+// place yet), so no business of their own is made and the next sign-in
+// tries again.
 async function acceptTeamInvite() {
+  const token = pendingInviteToken();
+  if (!token) return null;
+  let res;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/accept_invite`, { method: 'POST', headers: getAuthHeaders(), body: '{}' });
-    if (res.ok) {
-      const id = await res.json().catch(() => null);
-      return typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id) ? id : null;
-    }
-    // Not set up in the database yet (team-seats.sql): carry on as before.
-    if (res.status === 404) return null;
-    const err = await res.json().catch(() => ({}));
-    if (/NO_SEATS/.test(err.message || '')) {
-      showToast('The business that invited you has no free inspector places, so you have a business of your own for now. Ask them to add a place', 'info');
-      return null;
-    }
-    return false;
+    res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/accept_invite`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ p_token: token }) });
   } catch (e) {
     console.warn('acceptTeamInvite failed:', e);
     return false;
   }
+  if (res.ok) {
+    const id = await res.json().catch(() => null);
+    clearPendingInvite();
+    if (typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)) return id;
+    showToast('That invite link didn\'t work for this account (it may have expired or been replaced), so you have an account of your own. Email SAYON if you should be on their team', 'info');
+    return null;
+  }
+  const err = await res.json().catch(() => ({}));
+  if (/NO_SEATS/.test(err.message || '')) {
+    showToast('The business that invited you has no free inspector place right now. Ask them to add one, then open SAYON again', 'info');
+    return false;
+  }
+  if (res.status >= 500) return false;
+  // Anything else (the database not set up for teams yet): carry on as before.
+  clearPendingInvite();
+  return null;
 }
 
 // ── YOUR TEAM ────────────────────────────────────────────────────────────
@@ -10444,7 +10473,7 @@ function renderTeam(sub) {
     rows.push(`<div class="team-row team-row-pending">
       <div class="team-row-text"><div class="team-row-name">${escapeHtml(i.email)}</div>
       <div class="team-row-sub">Invited, not signed up yet</div></div>
-      <button class="link-btn team-row-btn" data-email="${escapeHtml(i.email)}" onclick="shareTeamInvite(this.dataset.email)">Send link</button>
+      <button class="link-btn team-row-btn" data-id="${escapeHtml(i.id)}" onclick="shareTeamInvite(this.dataset.id)">Send link</button>
       <button class="link-btn team-row-btn" data-id="${escapeHtml(i.id)}" onclick="cancelTeamInvite(this.dataset.id)">Cancel</button>
     </div>`);
   });
@@ -10459,7 +10488,8 @@ async function inviteTeamMember() {
   btn.disabled = true;
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/invite_member`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ p_email: email }) });
-    const result = res.ok ? await res.json() : null;
+    const answer = res.ok ? await res.json() : null;
+    const result = answer && answer.status;
     const say = {
       invited: null,
       already_invited: 'They\'re already invited. Tap Send link to send it again',
@@ -10473,7 +10503,7 @@ async function inviteTeamMember() {
     input.value = '';
     track('team_invite_sent');
     await loadTeam();
-    shareTeamInvite(email);
+    await sendInviteLink(email, answer.token);
   } catch (e) {
     showToast('Couldn\'t send the invite. Check your signal and try again', 'error');
   } finally {
@@ -10482,20 +10512,34 @@ async function inviteTeamMember() {
   }
 }
 
-// The sign-up link for an invited inspector: it opens the sign-up card
-// filled in with their email and the business they're joining.
-function teamInviteLink(email) {
+// The sign-up link for an invited inspector. Its secret is what lets them
+// join, so it's only ever in the link the owner sends; the sign-up card
+// looks up the business and email from it.
+function teamInviteLink(token) {
   const u = new URL(window.location.origin + window.location.pathname);
   u.searchParams.set('signup', '1');
-  u.searchParams.set('email', email);
-  u.searchParams.set('join', getCompanyDetails().name || authBusiness?.name || '');
+  u.searchParams.set('invite', token);
   return u.toString();
 }
 
-async function shareTeamInvite(email) {
+// "Send link" on a waiting invite: a fresh link (the old one stops working).
+async function shareTeamInvite(inviteId) {
+  const inv = teamCache.invites.find(x => x.id === inviteId);
+  if (!inv) return;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/invite_link`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ p_invite_id: inviteId }) });
+    const token = res.ok ? await res.json() : null;
+    if (!token) throw new Error('HTTP ' + res.status);
+    await sendInviteLink(inv.email, token);
+  } catch (e) {
+    showToast('Couldn\'t make a new link. Check your signal and try again', 'error');
+  }
+}
+
+async function sendInviteLink(email, token) {
   const biz = getCompanyDetails().name || authBusiness?.name || 'our business';
-  const link = teamInviteLink(email);
-  const text = `You're invited to use SAYON with ${biz}. Sign up with ${email} here and you'll join our account:`;
+  const link = teamInviteLink(token);
+  const text = `You're invited to use SAYON with ${biz}. Sign up with ${email} here and you'll join our account. The link works for 14 days:`;
   try {
     if (navigator.share) { await navigator.share({ title: 'Join ' + biz + ' on SAYON', text, url: link }); return; }
   } catch (e) {
@@ -10503,9 +10547,9 @@ async function shareTeamInvite(email) {
   }
   try {
     await navigator.clipboard.writeText(`${text} ${link}`);
-    showToast('Invite saved. The sign-up link is copied: paste it into a text or email to them', 'success');
+    showToast('The sign-up link is copied: paste it into a text or email to them', 'success');
   } catch (e) {
-    showToast(`Invite saved. Send them this link: ${link}`, 'info');
+    showToast(`Send them this sign-up link: ${link}`, 'info');
   }
 }
 
@@ -10536,18 +10580,57 @@ async function cancelTeamInvite(id) {
   }
 }
 
-// The sign-up card, opened from an invite link: their email filled in and
-// the business they're joining named, so there's nothing to set up.
-function applyInviteToSignUp() {
+// The sign-up card, opened from an invite link (?signup=1&invite=<secret>):
+// the database says which business and email the secret is for, and the
+// card fills those in, so there's nothing to set up. The secret is kept for
+// sign-in and taken out of the address bar.
+async function applyInviteToSignUp() {
   const params = new URLSearchParams(window.location.search);
-  const join = (params.get('join') || '').trim().slice(0, 120);
-  const email = (params.get('email') || '').trim().slice(0, 254);
-  if (!join || !email) return;
-  document.getElementById('suEmail').value = email;
-  document.getElementById('suBusiness').value = join;
-  document.getElementById('suBusinessField').hidden = true;
-  document.getElementById('suTitle').textContent = `Join ${join} on SAYON`;
-  document.getElementById('suSubtitle').textContent = `${join} has added you. Sign up with this email and you'll join their account, with their company details on your reports.`;
+  const token = (params.get('invite') || '').trim();
+  if (!/^[0-9a-f]{64}$/.test(token)) return;
+  params.delete('invite');
+  history.replaceState(null, '', window.location.pathname + (params.toString() ? '?' + params : '') + window.location.hash);
+  try { localStorage.setItem(PENDING_INVITE_KEY, token); } catch (e) {}
+  let invite = null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+      body: JSON.stringify({ p_token: token }),
+    });
+    if (res.ok) invite = await res.json();
+  } catch (e) { /* no signal: a plain sign-up card, and sign-in still tries the secret */ }
+  const sub = document.getElementById('suSubtitle');
+  if (!invite || !invite.business || !invite.email) {
+    if (invite === null) clearPendingInvite();
+    if (invite === null) sub.textContent = 'That invite link has expired or been replaced. Ask for a new one, or sign up as your own business.';
+    return;
+  }
+  inviteSignUp = { business: String(invite.business).slice(0, 120), email: String(invite.email) };
+  document.getElementById('suEmail').value = inviteSignUp.email;
+  showInviteSignUp(true);
+}
+
+// The invite's business and email while the sign-up card is joining one.
+let inviteSignUp = null;
+
+// Joining shows the business by name and hides the Business Name box. A
+// different email can't use the invite, so changing it brings the box back.
+function showInviteSignUp(joining) {
+  const field = document.getElementById('suBusinessField');
+  field.hidden = joining;
+  if (joining) document.getElementById('suBusiness').value = '';
+  document.getElementById('suTitle').textContent = joining ? `Join ${inviteSignUp.business} on SAYON` : 'Create your account';
+  document.getElementById('suSubtitle').textContent = joining
+    ? `${inviteSignUp.business} has added you. Sign up with this email and you'll join their account, with their company details on your reports.`
+    : `This email wasn't invited, so this sets up a business of your own. To join ${inviteSignUp.business}, use ${inviteSignUp.email}.`;
+}
+
+function onSignUpEmailInput() {
+  if (!inviteSignUp) return;
+  const joining = document.getElementById('suEmail').value.trim().toLowerCase() === inviteSignUp.email.toLowerCase();
+  if (joining === document.getElementById('suBusinessField').hidden) return;
+  showInviteSignUp(joining);
 }
 
 // ── BUSINESS LOAD ────────────────────────────────────────────────────────

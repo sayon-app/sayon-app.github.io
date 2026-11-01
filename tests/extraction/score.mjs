@@ -17,6 +17,18 @@ const allStrings = (v, out = []) => {
   return out;
 };
 const textOf = v => allStrings(v).join(' | ').toLowerCase();
+// Whether text t contains term. With negationOk, an occurrence straight
+// after "no ", "not " or "without " doesn't count, so a banned "live
+// termites" doesn't trip on the inspector's own "no live termites".
+const NEGATION = /(?:\bno|\bnot|\bwithout|\bnil)\s+$/;
+const has = (t, term, negationOk) => {
+  const w = term.toLowerCase();
+  if (!negationOk) return t.includes(w);
+  for (let i = t.indexOf(w); i >= 0; i = t.indexOf(w, i + 1)) {
+    if (!NEGATION.test(t.slice(Math.max(0, i - 12), i))) return true;
+  }
+  return false;
+};
 
 // One check against one object (the whole output, or one finding).
 function runCheck(c, obj) {
@@ -30,7 +42,7 @@ function runCheck(c, obj) {
       if (isEmpty(v)) return { ok: !!c.nullOk, got: v };
       const t = textOf(v);
       const missing = (c.all || []).filter(group => !group.some(alt => t.includes(alt.toLowerCase())));
-      const banned = (c.none || []).filter(term => t.includes(term.toLowerCase()));
+      const banned = (c.none || []).filter(term => has(t, term, c.negationOk));
       return { ok: !missing.length && !banned.length, got: v,
         why: [missing.length && `missing ${missing.map(g => g.join('/')).join(', ')}`, banned.length && `contains ${banned.join(', ')}`].filter(Boolean).join('; ') };
     }
@@ -42,7 +54,7 @@ function runCheck(c, obj) {
     }
     case 'forbidAnywhere': {
       const t = textOf(obj);
-      const hits = c.terms.filter(term => t.includes(term.toLowerCase()));
+      const hits = c.terms.filter(term => has(t, term, c.negationOk));
       return { ok: !hits.length, got: hits.join(', ') || 'none' };
     }
     case 'every': {

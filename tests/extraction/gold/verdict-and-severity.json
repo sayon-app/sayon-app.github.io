@@ -1,0 +1,480 @@
+{
+ "id": "verdict-and-severity",
+ "transcript": "transcripts/verdict-and-severity.txt",
+ "checks": [
+  {
+   "id": "inspection-type",
+   "kind": "equals",
+   "path": "inspectionType",
+   "values": [
+    "Pre-Purchase — Timber Pest"
+   ],
+   "weight": 2,
+   "why": "'pre purchase timber pest'"
+  },
+  {
+   "id": "client-name",
+   "kind": "mentions",
+   "path": "clientName",
+   "all": [
+    [
+     "megan"
+    ],
+    [
+     "doyle"
+    ]
+   ],
+   "weight": 1,
+   "why": "'Megan Doyle'"
+  },
+  {
+   "id": "address",
+   "kind": "mentions",
+   "path": "propertyStreetAddress",
+   "all": [
+    [
+     "27"
+    ],
+    [
+     "bottlebrush"
+    ]
+   ],
+   "weight": 1,
+   "why": "'27 Bottlebrush Road'"
+  },
+  {
+   "id": "state",
+   "kind": "equals",
+   "path": "propertyState",
+   "values": [
+    "QLD"
+   ],
+   "weight": 1,
+   "why": "'Queensland'"
+  },
+  {
+   "id": "walls",
+   "kind": "equals",
+   "path": "wallConstruction",
+   "values": [
+    "Weatherboard"
+   ],
+   "weight": 1,
+   "why": "'weatherboard house'"
+  },
+  {
+   "id": "floor",
+   "kind": "equals",
+   "path": "floorType",
+   "values": [
+    "Elevated timber (stumps)"
+   ],
+   "weight": 2,
+   "why": "'on stumps high set'"
+  },
+  {
+   "id": "roof",
+   "kind": "mentions",
+   "path": "roofType",
+   "all": [
+    [
+     "corrugated",
+     "iron",
+     "tin",
+     "metal"
+    ]
+   ],
+   "none": [
+    "colorbond",
+    "tile"
+   ],
+   "weight": 1,
+   "why": "'tin roof'"
+  },
+  {
+   "id": "era",
+   "kind": "equals",
+   "path": "constructionEra",
+   "values": [
+    "1945-1965"
+   ],
+   "weight": 2,
+   "why": "'built in the 1950s'"
+  },
+  {
+   "id": "one-finding",
+   "kind": "count",
+   "path": "findings",
+   "min": 1,
+   "max": 1,
+   "weight": 3,
+   "why": "one place: the front left bearer"
+  },
+  {
+   "id": "bearer-finding",
+   "kind": "findingMatch",
+   "checks": [
+    {
+     "kind": "equals",
+     "path": "termiteActivity",
+     "values": [
+      "ACTIVE"
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "activityLocation",
+     "all": [
+      [
+       "bearer"
+      ]
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "timberAffected",
+     "all": [
+      [
+       "bearer"
+      ]
+     ]
+    },
+    {
+     "kind": "equals",
+     "path": "structuralConcern",
+     "values": [
+      "YES"
+     ]
+    }
+   ],
+   "weight": 3,
+   "why": "live termites in the front left bearer, builder or engineer referral"
+  },
+  {
+   "id": "bearer-front-left",
+   "kind": "mentions",
+   "path": "findings",
+   "all": [
+    [
+     "front"
+    ],
+    [
+     "left"
+    ]
+   ],
+   "weight": 1,
+   "why": "'the front bearer on the left side'"
+  },
+  {
+   "id": "species",
+   "kind": "every",
+   "path": "findings",
+   "checks": [
+    {
+     "kind": "equals",
+     "path": "species",
+     "values": [
+      "Coptotermes acinaciformis",
+      "Coptotermes spp."
+     ]
+    }
+   ],
+   "weight": 3,
+   "why": "'looks like copter terms acinaciformis': either the species or, being unsure, the genus"
+  },
+  {
+   "id": "damage-observation-kept",
+   "kind": "every",
+   "path": "findings",
+   "checks": [
+    {
+     "kind": "mentions",
+     "path": "damageDescription",
+     "all": [
+      [
+       "eaten"
+      ]
+     ]
+    }
+   ],
+   "weight": 2,
+   "why": "'eaten through for about a metre' is the observation to keep"
+  },
+  {
+   "id": "damage-no-severity",
+   "kind": "every",
+   "path": "findings",
+   "checks": [
+    {
+     "kind": "mentions",
+     "path": "damageDescription",
+     "none": [
+      "minor",
+      "moderate",
+      "severe",
+      "extensive",
+      "significant",
+      "extreme",
+      "major",
+      "heavy",
+      "massive",
+      "worst",
+      "heaps"
+     ],
+     "nullOk": true
+    }
+   ],
+   "weight": 3,
+   "why": "severity words dropped, even when the inspector says them"
+  },
+  {
+   "id": "damage-no-verdict",
+   "kind": "every",
+   "path": "findings",
+   "checks": [
+    {
+     "kind": "mentions",
+     "path": "damageDescription",
+     "none": [
+      "compromised",
+      "structurally",
+      "unsafe",
+      "needs replacing",
+      "replace"
+     ],
+     "nullOk": true
+    }
+   ],
+   "weight": 3,
+   "why": "no structural verdict and no repair call in the finding"
+  },
+  {
+   "id": "no-severity",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "minor",
+    "moderate",
+    "severe",
+    "extensive",
+    "significant",
+    "extreme",
+    "major",
+    "heavy",
+    "massive",
+    "worst one"
+   ],
+   "weight": 3,
+   "why": "severity and 'worst one' dropped everywhere"
+  },
+  {
+   "id": "no-verdict",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "compromised",
+    "structurally",
+    "unsafe"
+   ],
+   "weight": 3,
+   "why": "never a structural verdict, in any field"
+  },
+  {
+   "id": "no-species-risk",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "because of that species",
+    "because of the species",
+    "worst termite",
+    "species risk"
+   ],
+   "weight": 3,
+   "why": "never rate risk by species"
+  },
+  {
+   "id": "risk-high",
+   "kind": "equals",
+   "path": "riskLevel",
+   "values": [
+    "HIGH"
+   ],
+   "weight": 3,
+   "why": "live termites in a structural timber with a builder referral; 'extreme' is not a level and the species is not a reason"
+  },
+  {
+   "id": "ant-capping",
+   "kind": "equals",
+   "path": "antCapping",
+   "values": [
+    "GAPS"
+   ],
+   "weight": 2,
+   "why": "'missing on about half of them and the rest are rusted with gaps'"
+  },
+  {
+   "id": "ant-capping-details",
+   "kind": "mentions",
+   "path": "antCappingDetails",
+   "all": [
+    [
+     "half",
+     "missing"
+    ]
+   ],
+   "weight": 1,
+   "why": "what was said about the caps"
+  },
+  {
+   "id": "timber-soil",
+   "kind": "equals",
+   "path": "timberSoil",
+   "values": [
+    "YES"
+   ],
+   "weight": 2,
+   "why": "'timber off cuts lying on the soil'"
+  },
+  {
+   "id": "area-subfloor",
+   "kind": "equals",
+   "path": "areaStatus.subfloor",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'open underneath', went under the house"
+  },
+  {
+   "id": "area-interior",
+   "kind": "equals",
+   "path": "areaStatus.interior",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'I inspected all rooms'"
+  },
+  {
+   "id": "area-roofvoid",
+   "kind": "equals",
+   "path": "areaStatus.roofvoid",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'roof void inspected'"
+  },
+  {
+   "id": "result-subfloor",
+   "kind": "equals",
+   "path": "areaResult.subfloor",
+   "values": [
+    "FOUND"
+   ],
+   "weight": 2,
+   "why": "live termites in the bearer"
+  },
+  {
+   "id": "result-interior",
+   "kind": "equals",
+   "path": "areaResult.interior",
+   "values": [
+    "CLEAR",
+    null
+   ],
+   "weight": 1,
+   "why": "'no activity seen in the rooms'"
+  },
+  {
+   "id": "treatment-yes",
+   "kind": "equals",
+   "path": "treatmentRecommended",
+   "values": [
+    "YES"
+   ],
+   "weight": 2,
+   "why": "'treat the live termites in the front bearer'"
+  },
+  {
+   "id": "treatment-type",
+   "kind": "mentions",
+   "path": "treatmentType",
+   "all": [
+    [
+     "bearer"
+    ]
+   ],
+   "none": [
+    "chemical",
+    "barrier",
+    "bait",
+    "reticulation",
+    "soil treatment",
+    "termidor",
+    "dust",
+    "foam",
+    "physical"
+   ],
+   "weight": 3,
+   "why": "the target, and no method was said"
+  },
+  {
+   "id": "builder-engineer",
+   "kind": "mentions",
+   "all": [
+    [
+     "builder",
+     "engineer"
+    ]
+   ],
+   "weight": 2,
+   "why": "'get a builder or an engineer to check the bearer and the floor above it'"
+  },
+  {
+   "id": "other-recs",
+   "kind": "mentions",
+   "path": "otherRecommendations",
+   "all": [
+    [
+     "off cut",
+     "offcut",
+     "off-cut",
+     "timber"
+    ],
+    [
+     "ant cap"
+    ]
+   ],
+   "weight": 2,
+   "why": "remove the off cuts, replace the ant caps"
+  },
+  {
+   "id": "frequency",
+   "kind": "mentions",
+   "path": "inspectionFrequency",
+   "all": [
+    [
+     "3 month",
+     "three month"
+    ]
+   ],
+   "none": [
+    "week"
+   ],
+   "weight": 2,
+   "why": "'reinspect in three months'"
+  },
+  {
+   "id": "no-mishearings",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "copter terms"
+   ],
+   "weight": 1,
+   "why": "'copter terms' is Coptotermes"
+  },
+  {
+   "id": "builder-not-verdict",
+   "kind": "manual",
+   "description": "The report refers the bearer and floor to a builder or engineer without saying the structure is compromised, unsafe or in need of replacement."
+  }
+ ]
+}

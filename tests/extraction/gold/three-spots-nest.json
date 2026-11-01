@@ -1,0 +1,566 @@
+{
+ "id": "three-spots-nest",
+ "transcript": "transcripts/three-spots-nest.txt",
+ "checks": [
+  {
+   "id": "inspection-type",
+   "kind": "equals",
+   "path": "inspectionType",
+   "values": [
+    "Pre-Purchase — Combined Building & Pest"
+   ],
+   "weight": 2,
+   "why": "'pre purchase building and pest'"
+  },
+  {
+   "id": "client-name",
+   "kind": "mentions",
+   "path": "clientName",
+   "all": [
+    [
+     "daniel"
+    ],
+    [
+     "okafor"
+    ]
+   ],
+   "weight": 1,
+   "why": "'Daniel Okafor'"
+  },
+  {
+   "id": "address",
+   "kind": "mentions",
+   "path": "propertyStreetAddress",
+   "all": [
+    [
+     "42"
+    ],
+    [
+     "wattlebird"
+    ]
+   ],
+   "weight": 1,
+   "why": "'42 Wattlebird Crescent'"
+  },
+  {
+   "id": "suburb",
+   "kind": "mentions",
+   "path": "propertySuburb",
+   "all": [
+    [
+     "hornsby"
+    ]
+   ],
+   "weight": 1,
+   "why": "'Hornsby'"
+  },
+  {
+   "id": "state",
+   "kind": "equals",
+   "path": "propertyState",
+   "values": [
+    "NSW"
+   ],
+   "weight": 1,
+   "why": "'NSW'"
+  },
+  {
+   "id": "postcode",
+   "kind": "equals",
+   "path": "propertyPostcode",
+   "values": [
+    "2077"
+   ],
+   "weight": 1,
+   "why": "'2077'"
+  },
+  {
+   "id": "height",
+   "kind": "equals",
+   "path": "height",
+   "values": [
+    "Double storey"
+   ],
+   "weight": 1,
+   "why": "'two storey'"
+  },
+  {
+   "id": "walls",
+   "kind": "equals",
+   "path": "wallConstruction",
+   "values": [
+    "Rendered masonry"
+   ],
+   "weight": 1,
+   "why": "'rendered brick'"
+  },
+  {
+   "id": "floor-slab",
+   "kind": "mentions",
+   "path": "floorType",
+   "all": [
+    [
+     "slab"
+    ]
+   ],
+   "none": [
+    "timber",
+    "suspended"
+   ],
+   "weight": 2,
+   "why": "'on a concrete slab'"
+  },
+  {
+   "id": "roof-terracotta",
+   "kind": "mentions",
+   "path": "roofType",
+   "all": [
+    [
+     "terracotta"
+    ]
+   ],
+   "none": [
+    "concrete",
+    "colorbond"
+   ],
+   "weight": 1,
+   "why": "'tiled roof terracotta tiles'"
+  },
+  {
+   "id": "facade-west",
+   "kind": "equals",
+   "path": "facadeDirection",
+   "values": [
+    "West"
+   ],
+   "weight": 1,
+   "why": "'the house faces west'"
+  },
+  {
+   "id": "three-findings",
+   "kind": "count",
+   "path": "findings",
+   "min": 3,
+   "max": 3,
+   "weight": 3,
+   "why": "kitchen window frame, garage door jamb, stump in the back yard: three places"
+  },
+  {
+   "id": "kitchen-finding",
+   "kind": "findingMatch",
+   "checks": [
+    {
+     "kind": "equals",
+     "path": "termiteActivity",
+     "values": [
+      "ACTIVE"
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "activityLocation",
+     "all": [
+      [
+       "kitchen"
+      ],
+      [
+       "window"
+      ]
+     ]
+    },
+    {
+     "kind": "equals",
+     "path": "species",
+     "values": [
+      "Coptotermes acinaciformis"
+     ]
+    },
+    {
+     "kind": "equals",
+     "path": "structuralConcern",
+     "values": [
+      "YES"
+     ]
+    },
+    {
+     "kind": "equals",
+     "path": "nestLocated",
+     "values": [
+      null,
+      "NO"
+     ]
+    }
+   ],
+   "weight": 3,
+   "why": "live workers in the kitchen window frame, named Coptotermes acinaciformis, builder referral, no nest there"
+  },
+  {
+   "id": "garage-finding",
+   "kind": "findingMatch",
+   "checks": [
+    {
+     "kind": "equals",
+     "path": "termiteActivity",
+     "values": [
+      "INACTIVE"
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "activityLocation",
+     "all": [
+      [
+       "garage"
+      ]
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "damageDescription",
+     "all": [
+      [
+       "mud"
+      ]
+     ]
+    },
+    {
+     "kind": "absent",
+     "path": "species"
+    },
+    {
+     "kind": "equals",
+     "path": "nestLocated",
+     "values": [
+      null,
+      "NO"
+     ]
+    }
+   ],
+   "weight": 3,
+   "why": "'old mud packing... dry nothing alive so that's inactive'; no species said for it"
+  },
+  {
+   "id": "stump-finding",
+   "kind": "findingMatch",
+   "checks": [
+    {
+     "kind": "equals",
+     "path": "termiteActivity",
+     "values": [
+      "ACTIVE"
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "activityLocation",
+     "all": [
+      [
+       "stump"
+      ]
+     ]
+    },
+    {
+     "kind": "equals",
+     "path": "nestLocated",
+     "values": [
+      "YES"
+     ]
+    },
+    {
+     "kind": "equals",
+     "path": "structuralConcern",
+     "values": [
+      "NO",
+      null
+     ]
+    }
+   ],
+   "weight": 3,
+   "why": "'I found the nest in it... live termites everywhere'; a stump in the yard is not a building"
+  },
+  {
+   "id": "stump-distance",
+   "kind": "mentions",
+   "path": "findings",
+   "all": [
+    [
+     "20 m",
+     "20m",
+     "20 metre",
+     "twenty"
+    ]
+   ],
+   "weight": 1,
+   "why": "'about 20 m from the house' belongs in the stump's activityLocation"
+  },
+  {
+   "id": "no-severity-in-findings",
+   "kind": "every",
+   "path": "findings",
+   "checks": [
+    {
+     "kind": "mentions",
+     "path": "damageDescription",
+     "none": [
+      "minor",
+      "moderate",
+      "severe",
+      "extensive",
+      "significant",
+      "extreme",
+      "major",
+      "heavy",
+      "massive"
+     ],
+     "nullOk": true
+    }
+   ],
+   "weight": 2,
+   "why": "no severity said"
+  },
+  {
+   "id": "kitchen-reading",
+   "kind": "mentions",
+   "path": "moistureMeterReadings",
+   "all": [
+    [
+     "30"
+    ]
+   ],
+   "weight": 1,
+   "why": "'reading 30% on the frame'"
+  },
+  {
+   "id": "existing-system",
+   "kind": "equals",
+   "path": "existingSystem",
+   "values": [
+    "No System Found"
+   ],
+   "weight": 2,
+   "why": "'there's no termite management system'"
+  },
+  {
+   "id": "durable-notice-no",
+   "kind": "equals",
+   "path": "durableNoticePresent",
+   "values": [
+    "NO"
+   ],
+   "weight": 2,
+   "why": "'no durable notice in the meter box'"
+  },
+  {
+   "id": "area-subfloor-na",
+   "kind": "equals",
+   "path": "areaStatus.subfloor",
+   "values": [
+    "NA"
+   ],
+   "weight": 2,
+   "why": "'it's a slab so no subfloor'"
+  },
+  {
+   "id": "area-roofvoid",
+   "kind": "equals",
+   "path": "areaStatus.roofvoid",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'roof void inspected fully'"
+  },
+  {
+   "id": "area-exterior",
+   "kind": "equals",
+   "path": "areaStatus.exterior",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'exterior inspected all the way around'"
+  },
+  {
+   "id": "result-roofvoid-clear",
+   "kind": "equals",
+   "path": "areaResult.roofvoid",
+   "values": [
+    "CLEAR"
+   ],
+   "weight": 1,
+   "why": "'no activity'"
+  },
+  {
+   "id": "result-interior-found",
+   "kind": "equals",
+   "path": "areaResult.interior",
+   "values": [
+    "FOUND"
+   ],
+   "weight": 2,
+   "why": "live termites in the kitchen window frame"
+  },
+  {
+   "id": "result-outbuildings-found",
+   "kind": "equals",
+   "path": "areaResult.outbuildings",
+   "values": [
+    "FOUND"
+   ],
+   "weight": 1,
+   "why": "the garage counts as an outbuilding, mud packing in its door jamb"
+  },
+  {
+   "id": "result-site-found",
+   "kind": "equals",
+   "path": "areaResult.site",
+   "values": [
+    "FOUND"
+   ],
+   "weight": 1,
+   "why": "nest in a stump in the back yard"
+  },
+  {
+   "id": "slab-edge-clear",
+   "kind": "equals",
+   "path": "slabEdge",
+   "values": [
+    "CLEAR"
+   ],
+   "weight": 2,
+   "why": "'slab edge visible all the way round'"
+  },
+  {
+   "id": "weep-holes-clear",
+   "kind": "equals",
+   "path": "weepHoles",
+   "values": [
+    "CLEAR"
+   ],
+   "weight": 2,
+   "why": "'weep holes clear'"
+  },
+  {
+   "id": "treatment-yes",
+   "kind": "equals",
+   "path": "treatmentRecommended",
+   "values": [
+    "YES"
+   ],
+   "weight": 2,
+   "why": "'treat the nest... then install a termite management system'"
+  },
+  {
+   "id": "treatment-targets",
+   "kind": "mentions",
+   "path": "treatmentType",
+   "all": [
+    [
+     "stump",
+     "nest"
+    ],
+    [
+     "kitchen",
+     "window"
+    ]
+   ],
+   "none": [
+    "chemical",
+    "barrier",
+    "bait",
+    "reticulation",
+    "soil treatment",
+    "termidor",
+    "dust",
+    "foam",
+    "physical"
+   ],
+   "weight": 3,
+   "why": "targets the stump nest and the kitchen frame; 'termite management system' was said but no method"
+  },
+  {
+   "id": "builder-recorded",
+   "kind": "mentions",
+   "all": [
+    [
+     "builder"
+    ]
+   ],
+   "weight": 1,
+   "why": "'the builder to check the kitchen window frame and the wall framing'"
+  },
+  {
+   "id": "risk-high",
+   "kind": "equals",
+   "path": "riskLevel",
+   "values": [
+    "HIGH"
+   ],
+   "weight": 3,
+   "why": "'overall risk is high'"
+  },
+  {
+   "id": "frequency",
+   "kind": "mentions",
+   "path": "inspectionFrequency",
+   "all": [
+    [
+     "3 month",
+     "three month"
+    ],
+    [
+     "12 month",
+     "twelve month"
+    ]
+   ],
+   "none": [
+    "week"
+   ],
+   "weight": 2,
+   "why": "'reinspect in three months then every 12 months'"
+  },
+  {
+   "id": "no-severity",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "minor",
+    "moderate",
+    "severe",
+    "extensive",
+    "significant",
+    "extreme",
+    "major",
+    "heavy",
+    "massive"
+   ],
+   "weight": 3,
+   "why": "no severity said"
+  },
+  {
+   "id": "no-verdict",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "compromised",
+    "structurally",
+    "unsafe"
+   ],
+   "weight": 3,
+   "why": "never a structural verdict"
+  },
+  {
+   "id": "no-mishearings",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "copter terms",
+    "door jam "
+   ],
+   "weight": 2,
+   "why": "'copter terms' is Coptotermes, 'door jam' is door jamb"
+  },
+  {
+   "id": "species-not-risk",
+   "kind": "manual",
+   "description": "Nothing rates the risk by the species; the high rating is the inspector's own and rests on live termites in the house and a nest on the block."
+  }
+ ]
+}

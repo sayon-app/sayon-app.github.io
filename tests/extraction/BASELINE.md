@@ -112,3 +112,29 @@ Of the 14 new cases, 12 scored 100% on both runs straight away. Two needed work:
 One known minor gap, not chased: `deck-schedorhinotermes`'s `nest-hedge-kept` (weight 1) — a hedged nest location not tied to any finding (the retaining wall itself is clear) doesn't reliably survive anywhere in `damageDescription`, failing 2 of 2 runs. Worth a look if it recurs in real reports.
 
 No weight-3 check failed on the final runs of any of the 28 cases (14 old + 14 new).
+
+## 2026-11-01: overnight run, 8 new cases, six prompt rules
+
+Runner: `run-api.mjs` on the real API (`claude-sonnet-5`, effort medium), tags `night0`–`night4` in `out/`. About 90 calls in all, roughly 1.39M tokens in and 0.30M out: about $9 at $3 / $15 per million tokens.
+
+**Two keys fixed before scoring** (both failed a correct answer):
+- `old-damage-treated`: `no-live-termites` and `finding-damage-what-seen` tripped on the inspector's own "no live termites". `score.mjs` now takes `negationOk: true` on a check, which ignores a banned term straight after "no", "not", "without" or "nil"; both checks use it.
+- `piers-paving-pool`: `finding-damage-tubes` didn't accept "shelter tubing".
+
+**Baseline** (`night0`, the prompt as merged, 1 run per case, keys fixed): 26 of 28 cases at 100%. `house-test-2` 147/149 (the subfloor finding said only "No damage visible" and lost the "termite workings" that were seen) and `deck-schedorhinotermes` 75/76 (the known `nest-hedge-kept` gap).
+
+**8 new cases** (`night1`, 2 runs each), written to probe what the bench didn't cover: three findings with one nest (`three-spots-nest`), every site and weather field (`site-conditions-tools`), heavy mishearings with a retracted system (`garbled-kordon`), one-area notes (`subfloor-all-clear`, `roofvoid-only`), structural verdicts, severity and species-based risk said out loud (`verdict-and-severity`), asides and chatter (`chatter-and-asides`), and negation traps (`negation-traps`). Six scored 100% on both runs. Two real gaps: `subfloor-all-clear` set `weepHoles` CLEAR from "vents are clear" (2 of 2; in the app that would overwrite an earlier "weep holes bridged"), and `negation-traps` marked the interior CLEAR although old borer holes were reported in a bedroom (2 of 2).
+
+**Prompt changes** (all in `SYSTEM_PROMPT`):
+1. damageDescription names the evidence seen (workings, mud leads, shelter tubes) and keeps "No damage visible" after it, never on its own.
+2. A nest said to be "probably in the retaining wall" but not found: nestLocated NO, the hedge kept in a finding's damageDescription.
+3. Subfloor vents are not weep holes (in both the weepHoles and subfloorVentilation rules).
+4. "All clear" about termites doesn't outweigh borers, decay or delignification in the same area: still FOUND.
+5. Not seeing the slab edge or 75 mm zone under a garden bed is the conducive condition, not an obstruction.
+6. A return visit to finish unreached areas ("come back in two weeks when it's dry") goes in otherRecommendations, not inspectionFrequency.
+
+**After** (`night2`, rules 1–4, all 36 cases, 1 run each plus a second run on the four cases the rules aimed at): 3151/3178 (99.2%). Fixed: `house-test-2` 100% on 2 of 2 (workings kept), `deck-schedorhinotermes` `nest-hedge-kept` now passes 2 of 2, `negation-traps` interior FOUND 1 of 2, `subfloor-all-clear` weep holes 1 of 2. One-off misses elsewhere: `townhouse-strata` (garden bed logged as an exterior obstruction, the 75 mm zone wording), `wet-day-partial` (the two-week return visit in inspectionFrequency, otherRecommendations empty), `deck-schedorhinotermes` (the model added "major and minor" for the two soldier sizes, which trips the severity check).
+
+`night3`/`night4` (rules 5–6 added, only the cases they touch): `townhouse-strata` 100%, `negation-traps` 100%, `wet-day-partial` 98% (put the flooded rear subfloor in noAccessAreas instead of hinderedAreas once), `subfloor-all-clear` weep holes still wrong in 2 of 3 runs. The whole bench was not re-run on the final prompt (budget); rules 5 and 6 only touch the slab-edge cover and the re-inspection interval.
+
+Still open: `subfloor-all-clear` weep holes (worth a code guard: ignore weepHoles from a note that only covers the subfloor), and soldier caste words ("major", "minor") reading as severity.

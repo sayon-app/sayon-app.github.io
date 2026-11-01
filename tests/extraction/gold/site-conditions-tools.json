@@ -1,0 +1,598 @@
+{
+ "id": "site-conditions-tools",
+ "transcript": "transcripts/site-conditions-tools.txt",
+ "checks": [
+  {
+   "id": "inspection-type",
+   "kind": "equals",
+   "path": "inspectionType",
+   "values": [
+    "Annual — Existing Building"
+   ],
+   "weight": 2,
+   "why": "'annual termite inspection'"
+  },
+  {
+   "id": "client-name",
+   "kind": "mentions",
+   "path": "clientName",
+   "all": [
+    [
+     "priya"
+    ],
+    [
+     "raman"
+    ]
+   ],
+   "weight": 1,
+   "why": "'the owner Priya Raman'"
+  },
+  {
+   "id": "client-email",
+   "kind": "mentions",
+   "path": "clientEmail",
+   "all": [
+    [
+     "priya.raman@gmail.com"
+    ]
+   ],
+   "weight": 1,
+   "why": "her email"
+  },
+  {
+   "id": "address",
+   "kind": "mentions",
+   "path": "propertyStreetAddress",
+   "all": [
+    [
+     "18"
+    ],
+    [
+     "paperbark"
+    ]
+   ],
+   "weight": 1,
+   "why": "'unit 3 18 Paperbark Lane'"
+  },
+  {
+   "id": "address-unit",
+   "kind": "mentions",
+   "all": [
+    [
+     "unit 3",
+     "3/18",
+     "3 / 18"
+    ]
+   ],
+   "weight": 1,
+   "why": "the unit number must survive somewhere in the address"
+  },
+  {
+   "id": "suburb",
+   "kind": "mentions",
+   "path": "propertySuburb",
+   "all": [
+    [
+     "mount gravatt",
+     "mt gravatt"
+    ]
+   ],
+   "weight": 1,
+   "why": "'Mount Gravatt'"
+  },
+  {
+   "id": "state",
+   "kind": "equals",
+   "path": "propertyState",
+   "values": [
+    "QLD"
+   ],
+   "weight": 2,
+   "why": "'Queensland'"
+  },
+  {
+   "id": "postcode",
+   "kind": "equals",
+   "path": "propertyPostcode",
+   "values": [
+    "4122"
+   ],
+   "weight": 1,
+   "why": "'4122'"
+  },
+  {
+   "id": "people-present",
+   "kind": "equals",
+   "path": "peoplePresent",
+   "values": [
+    "Tenant"
+   ],
+   "weight": 2,
+   "why": "'the tenant let me in and was here the whole time'"
+  },
+  {
+   "id": "structure",
+   "kind": "equals",
+   "path": "structureType",
+   "values": [
+    "Duplex"
+   ],
+   "weight": 1,
+   "why": "'it's a duplex'"
+  },
+  {
+   "id": "height",
+   "kind": "equals",
+   "path": "height",
+   "values": [
+    "Single storey"
+   ],
+   "weight": 1,
+   "why": "'single storey'"
+  },
+  {
+   "id": "walls",
+   "kind": "equals",
+   "path": "wallConstruction",
+   "values": [
+    "Brick veneer"
+   ],
+   "weight": 1,
+   "why": "'brick veneer'"
+  },
+  {
+   "id": "roof",
+   "kind": "mentions",
+   "path": "roofType",
+   "all": [
+    [
+     "colorbond"
+    ]
+   ],
+   "weight": 1,
+   "why": "'Colorbond roof'"
+  },
+  {
+   "id": "era",
+   "kind": "equals",
+   "path": "constructionEra",
+   "values": [
+    "Post-2003"
+   ],
+   "weight": 2,
+   "why": "'built about 2008'"
+  },
+  {
+   "id": "facade",
+   "kind": "equals",
+   "path": "facadeDirection",
+   "values": [
+    "North-east"
+   ],
+   "weight": 1,
+   "why": "'front faces north east'"
+  },
+  {
+   "id": "occupancy",
+   "kind": "equals",
+   "path": "occupancyStatus",
+   "values": [
+    "Tenanted"
+   ],
+   "weight": 2,
+   "why": "'it's tenanted'"
+  },
+  {
+   "id": "furnishing",
+   "kind": "equals",
+   "path": "furnishing",
+   "values": [
+    "Fully furnished"
+   ],
+   "weight": 1,
+   "why": "'fully furnished'"
+  },
+  {
+   "id": "weather",
+   "kind": "equals",
+   "path": "weatherConditions",
+   "values": [
+    "Overcast"
+   ],
+   "weight": 1,
+   "why": "'overcast'"
+  },
+  {
+   "id": "temperature",
+   "kind": "mentions",
+   "path": "temperature",
+   "all": [
+    [
+     "24"
+    ]
+   ],
+   "weight": 1,
+   "why": "'24 degrees'"
+  },
+  {
+   "id": "humidity",
+   "kind": "mentions",
+   "path": "humidity",
+   "all": [
+    [
+     "78"
+    ]
+   ],
+   "weight": 1,
+   "why": "'humidity about 78%'"
+  },
+  {
+   "id": "rain-24h",
+   "kind": "mentions",
+   "path": "rainLast24h",
+   "all": [
+    [
+     "12"
+    ]
+   ],
+   "weight": 1,
+   "why": "'12 mm of rain overnight'"
+  },
+  {
+   "id": "recent-weather",
+   "kind": "equals",
+   "path": "recentWeather",
+   "values": [
+    "Prolonged wet period"
+   ],
+   "weight": 2,
+   "why": "'it's been a really wet month'"
+  },
+  {
+   "id": "tools",
+   "kind": "mentions",
+   "path": "toolsUsed",
+   "all": [
+    [
+     "moisture meter"
+    ],
+    [
+     "thermal camera"
+    ],
+    [
+     "movement detector",
+     "termatrac"
+    ],
+    [
+     "sounding"
+    ]
+   ],
+   "weight": 2,
+   "why": "moisture meter, thermal camera, Termatrac (a movement detector), tapped the skirtings (sounding tool)"
+  },
+  {
+   "id": "slope",
+   "kind": "equals",
+   "path": "siteSlope",
+   "values": [
+    "Slopes towards the building"
+   ],
+   "weight": 2,
+   "why": "'the block falls towards the house from the back'"
+  },
+  {
+   "id": "surroundings",
+   "kind": "equals",
+   "path": "siteSurroundings",
+   "values": [
+    "Next to bushland or a reserve"
+   ],
+   "weight": 1,
+   "why": "'a creek and bushland behind the back fence'"
+  },
+  {
+   "id": "three-readings",
+   "kind": "count",
+   "path": "moistureMeterReadings",
+   "min": 3,
+   "max": 3,
+   "weight": 2,
+   "why": "laundry 14%, kitchen 13%, back bedroom 22%"
+  },
+  {
+   "id": "bedroom-reading",
+   "kind": "mentions",
+   "path": "moistureMeterReadings",
+   "all": [
+    [
+     "22"
+    ]
+   ],
+   "weight": 1,
+   "why": "'back bedroom wall 22%'"
+  },
+  {
+   "id": "moisture-yes",
+   "kind": "equals",
+   "path": "moistureReadings",
+   "values": [
+    "YES"
+   ],
+   "weight": 2,
+   "why": "'22% which is a bit high'"
+  },
+  {
+   "id": "leak-yes",
+   "kind": "equals",
+   "path": "waterLeaks",
+   "values": [
+    "YES"
+   ],
+   "weight": 2,
+   "why": "the broken downpipe dumping water against the wall is the water source"
+  },
+  {
+   "id": "leak-location",
+   "kind": "mentions",
+   "path": "leakLocation",
+   "all": [
+    [
+     "downpipe"
+    ]
+   ],
+   "weight": 2,
+   "why": "'the downpipe on the back corner is broken'"
+  },
+  {
+   "id": "site-drainage-poor",
+   "kind": "equals",
+   "path": "siteDrainage",
+   "values": [
+    "POOR"
+   ],
+   "weight": 2,
+   "why": "block falls towards the house, downpipe dumping water against the wall"
+  },
+  {
+   "id": "no-real-findings",
+   "kind": "count",
+   "path": "findings",
+   "min": 0,
+   "max": 1,
+   "weight": 3,
+   "why": "'no termites anywhere on the property': at most one NONE entry"
+  },
+  {
+   "id": "only-none-finding",
+   "kind": "every",
+   "path": "findings",
+   "checks": [
+    {
+     "kind": "equals",
+     "path": "termiteActivity",
+     "values": [
+      "NONE"
+     ]
+    }
+   ],
+   "weight": 3,
+   "why": "the cold patch was damp, not termites"
+  },
+  {
+   "id": "existing-system",
+   "kind": "equals",
+   "path": "existingSystem",
+   "values": [
+    "Chemical Barrier"
+   ],
+   "weight": 3,
+   "why": "'Termidor chemical barrier' on the notice"
+  },
+  {
+   "id": "existing-system-other",
+   "kind": "mentions",
+   "path": "existingSystemOther",
+   "all": [
+    [
+     "termidor"
+    ],
+    [
+     "2019"
+    ]
+   ],
+   "weight": 2,
+   "why": "'Termidor chemical barrier 2019'"
+  },
+  {
+   "id": "durable-notice",
+   "kind": "equals",
+   "path": "durableNoticePresent",
+   "values": [
+    "YES"
+   ],
+   "weight": 2,
+   "why": "'durable notice in the meter box'"
+  },
+  {
+   "id": "slab-edge",
+   "kind": "equals",
+   "path": "slabEdge",
+   "values": [
+    "OBSTRUCTED"
+   ],
+   "weight": 2,
+   "why": "'garden bed along the back wall covering the slab edge'"
+  },
+  {
+   "id": "weep-holes",
+   "kind": "equals",
+   "path": "weepHoles",
+   "values": [
+    "BRIDGED"
+   ],
+   "weight": 2,
+   "why": "'covering the slab edge and the weep holes'"
+  },
+  {
+   "id": "soft-landscaping",
+   "kind": "equals",
+   "path": "softLandscaping",
+   "values": [
+    "YES"
+   ],
+   "weight": 1,
+   "why": "garden bed against the back wall"
+  },
+  {
+   "id": "zone-75",
+   "kind": "equals",
+   "path": "zone75mmVisible",
+   "values": [
+    "NO"
+   ],
+   "weight": 1,
+   "why": "the garden bed hides the slab edge"
+  },
+  {
+   "id": "area-interior",
+   "kind": "equals",
+   "path": "areaStatus.interior",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'interior inspected all rooms'"
+  },
+  {
+   "id": "area-exterior",
+   "kind": "equals",
+   "path": "areaStatus.exterior",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 2,
+   "why": "walked all the way round; the garden bed is a conducive condition, not an obstruction"
+  },
+  {
+   "id": "area-roofvoid",
+   "kind": "equals",
+   "path": "areaStatus.roofvoid",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'roof void inspected fully'"
+  },
+  {
+   "id": "no-hindered",
+   "kind": "absent",
+   "path": "hinderedAreas",
+   "weight": 2,
+   "why": "nothing stopped the inspection"
+  },
+  {
+   "id": "no-obstructions",
+   "kind": "absent",
+   "path": "obstructions",
+   "weight": 2,
+   "why": "nothing stopped the inspection"
+  },
+  {
+   "id": "no-high-risk",
+   "kind": "absent",
+   "path": "highRiskAreas",
+   "weight": 2,
+   "why": "every area was reached"
+  },
+  {
+   "id": "risk-medium",
+   "kind": "equals",
+   "path": "riskLevel",
+   "values": [
+    "MEDIUM"
+   ],
+   "weight": 3,
+   "why": "'risk medium'"
+  },
+  {
+   "id": "treatment-not-yes",
+   "kind": "equals",
+   "path": "treatmentRecommended",
+   "values": [
+    "NO",
+    null
+   ],
+   "weight": 3,
+   "why": "no termites, no treatment discussed"
+  },
+  {
+   "id": "treatment-type-empty",
+   "kind": "absent",
+   "path": "treatmentType",
+   "weight": 3,
+   "why": "nothing to quote"
+  },
+  {
+   "id": "other-recs",
+   "kind": "mentions",
+   "path": "otherRecommendations",
+   "all": [
+    [
+     "downpipe"
+    ],
+    [
+     "garden bed"
+    ]
+   ],
+   "weight": 2,
+   "why": "fix the downpipe, pull the garden bed back, drainage, recheck the moisture"
+  },
+  {
+   "id": "frequency",
+   "kind": "mentions",
+   "path": "inspectionFrequency",
+   "all": [
+    [
+     "12 month",
+     "twelve month",
+     "annual",
+     "every year"
+    ]
+   ],
+   "weight": 1,
+   "why": "'reinspect in 12 months'"
+  },
+  {
+   "id": "no-species",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "coptotermes",
+    "schedorhinotermes",
+    "nasutitermes",
+    "heterotermes",
+    "microcerotermes",
+    "cryptotermes",
+    "mastotermes",
+    "porotermes"
+   ],
+   "weight": 3,
+   "why": "no termites"
+  },
+  {
+   "id": "no-live-termites",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "live termites",
+    "active termites"
+   ],
+   "weight": 3,
+   "why": "no termites",
+   "negationOk": true
+  },
+  {
+   "id": "cold-patch-not-termites",
+   "kind": "manual",
+   "description": "The thermal camera's cold patch reads as damp with no movement on the Termatrac, never as suspected termites."
+  }
+ ]
+}

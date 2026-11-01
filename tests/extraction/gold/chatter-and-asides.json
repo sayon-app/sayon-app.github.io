@@ -1,0 +1,293 @@
+{
+ "id": "chatter-and-asides",
+ "transcript": "transcripts/chatter-and-asides.txt",
+ "checks": [
+  {
+   "id": "client-name",
+   "kind": "mentions",
+   "path": "clientName",
+   "all": [
+    [
+     "nguyen"
+    ]
+   ],
+   "nullOk": true,
+   "weight": 1,
+   "why": "'the Nguyen job'"
+  },
+  {
+   "id": "address",
+   "kind": "mentions",
+   "path": "propertyStreetAddress",
+   "all": [
+    [
+     "64"
+    ],
+    [
+     "tallowwood"
+    ]
+   ],
+   "weight": 1,
+   "why": "'64 Tallowwood Street'"
+  },
+  {
+   "id": "area-subfloor",
+   "kind": "equals",
+   "path": "areaStatus.subfloor",
+   "values": [
+    "PARTIAL"
+   ],
+   "weight": 3,
+   "why": "front half inspected, back half not reached (200 mm clearance)"
+  },
+  {
+   "id": "no-interior",
+   "kind": "absent",
+   "path": "areaStatus.interior",
+   "weight": 2,
+   "why": "the hallway cracks were the client's question, not an inspection of the interior"
+  },
+  {
+   "id": "restricted-low-clearance",
+   "kind": "mentions",
+   "path": "restrictedAccess",
+   "all": [
+    [
+     "low clearance"
+    ]
+   ],
+   "none": [
+    "restricted access"
+   ],
+   "weight": 2,
+   "why": "entered the subfloor, so 'Low clearance', never 'Restricted access'"
+  },
+  {
+   "id": "hindered-back",
+   "kind": "mentions",
+   "path": "hinderedAreas",
+   "all": [
+    [
+     "back"
+    ]
+   ],
+   "weight": 2,
+   "why": "'the back half of the subfloor'"
+  },
+  {
+   "id": "hindered-detail",
+   "kind": "mentions",
+   "path": "hinderedAreasDetail",
+   "all": [
+    [
+     "clearance"
+    ]
+   ],
+   "weight": 1,
+   "why": "low clearance"
+  },
+  {
+   "id": "high-risk-back",
+   "kind": "mentions",
+   "path": "highRiskAreas",
+   "all": [
+    [
+     "back"
+    ]
+   ],
+   "weight": 2,
+   "why": "the back half was not reached"
+  },
+  {
+   "id": "no-no-access",
+   "kind": "absent",
+   "path": "noAccessAreas",
+   "weight": 2,
+   "why": "low clearance is hindered access, not a permanent restriction"
+  },
+  {
+   "id": "no-findings",
+   "kind": "count",
+   "path": "findings",
+   "min": 0,
+   "max": 0,
+   "weight": 3,
+   "why": "no termites; the cracks are not termites"
+  },
+  {
+   "id": "no-cracks-verdict",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "settl",
+    "crack"
+   ],
+   "weight": 3,
+   "why": "the 'house settling' remark is a structural opinion and not part of the inspection"
+  },
+  {
+   "id": "no-dog",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "dog"
+   ],
+   "weight": 2,
+   "why": "the dog wandering under the house did not restrict anything"
+  },
+  {
+   "id": "no-phone-chatter",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "five minutes",
+    "mate"
+   ],
+   "weight": 2,
+   "why": "talk to someone else is not dictation"
+  },
+  {
+   "id": "ant-capping",
+   "kind": "equals",
+   "path": "antCapping",
+   "values": [
+    "GAPS"
+   ],
+   "weight": 2,
+   "why": "'a couple at the back are rusted through with holes in them'"
+  },
+  {
+   "id": "ant-capping-details",
+   "kind": "mentions",
+   "path": "antCappingDetails",
+   "all": [
+    [
+     "rust"
+    ]
+   ],
+   "weight": 1,
+   "why": "'rusted through'"
+  },
+  {
+   "id": "subfloor-drainage",
+   "kind": "equals",
+   "path": "subfloorDrainage",
+   "values": [
+    "POOR"
+   ],
+   "weight": 2,
+   "why": "'water pooling under the laundry'"
+  },
+  {
+   "id": "leak-yes",
+   "kind": "equals",
+   "path": "waterLeaks",
+   "values": [
+    "YES"
+   ],
+   "weight": 2,
+   "why": "'I think the laundry tub waste is leaking'"
+  },
+  {
+   "id": "leak-location",
+   "kind": "mentions",
+   "path": "leakLocation",
+   "all": [
+    [
+     "laundry"
+    ],
+    [
+     "tub",
+     "waste"
+    ]
+   ],
+   "weight": 2,
+   "why": "keeps the fixture"
+  },
+  {
+   "id": "moisture-yes",
+   "kind": "equals",
+   "path": "moistureReadings",
+   "values": [
+    "YES"
+   ],
+   "weight": 2,
+   "why": "'a lot of moisture', wet soil, 35%"
+  },
+  {
+   "id": "reading",
+   "kind": "mentions",
+   "path": "moistureMeterReadings",
+   "all": [
+    [
+     "35"
+    ]
+   ],
+   "weight": 1,
+   "why": "'laundry floor joist 35%'"
+  },
+  {
+   "id": "borers-none",
+   "kind": "equals",
+   "path": "borerActivity",
+   "values": [
+    "NONE"
+   ],
+   "weight": 1,
+   "why": "'no borers'"
+  },
+  {
+   "id": "decay-no",
+   "kind": "equals",
+   "path": "decayFound",
+   "values": [
+    "NO"
+   ],
+   "weight": 1,
+   "why": "'no rot'"
+  },
+  {
+   "id": "result-subfloor",
+   "kind": "equals",
+   "path": "areaResult.subfloor",
+   "values": [
+    "CLEAR",
+    null
+   ],
+   "weight": 1,
+   "why": "nothing found in the part seen"
+  },
+  {
+   "id": "no-risk",
+   "kind": "absent",
+   "path": "riskLevel",
+   "weight": 3,
+   "why": "a one-area note never sets the risk"
+  },
+  {
+   "id": "no-inspection-type",
+   "kind": "absent",
+   "path": "inspectionType",
+   "weight": 1,
+   "why": "not said"
+  },
+  {
+   "id": "no-weep-holes",
+   "kind": "absent",
+   "path": "weepHoles",
+   "weight": 2,
+   "why": "not raised"
+  },
+  {
+   "id": "no-slab-edge",
+   "kind": "absent",
+   "path": "slabEdge",
+   "weight": 2,
+   "why": "not raised"
+  },
+  {
+   "id": "no-timber-soil",
+   "kind": "absent",
+   "path": "timberSoil",
+   "weight": 1,
+   "why": "not raised"
+  }
+ ]
+}

@@ -1,0 +1,433 @@
+{
+ "id": "garbled-kordon",
+ "transcript": "transcripts/garbled-kordon.txt",
+ "checks": [
+  {
+   "id": "inspection-type",
+   "kind": "equals",
+   "path": "inspectionType",
+   "values": [
+    "Pre-Purchase — Timber Pest"
+   ],
+   "weight": 2,
+   "why": "'pre purchase pest'"
+  },
+  {
+   "id": "client-name",
+   "kind": "mentions",
+   "path": "clientName",
+   "all": [
+    [
+     "kowalski"
+    ]
+   ],
+   "weight": 1,
+   "why": "'Mr and Mrs Kowalski'"
+  },
+  {
+   "id": "address",
+   "kind": "mentions",
+   "path": "propertyStreetAddress",
+   "all": [
+    [
+     "9"
+    ],
+    [
+     "callistemon"
+    ]
+   ],
+   "weight": 1,
+   "why": "'9 Callistemon Court'"
+  },
+  {
+   "id": "state",
+   "kind": "equals",
+   "path": "propertyState",
+   "values": [
+    "VIC"
+   ],
+   "weight": 1,
+   "why": "'Victoria'"
+  },
+  {
+   "id": "postcode",
+   "kind": "equals",
+   "path": "propertyPostcode",
+   "values": [
+    "3030"
+   ],
+   "weight": 1,
+   "why": "'3030'"
+  },
+  {
+   "id": "height",
+   "kind": "equals",
+   "path": "height",
+   "values": [
+    "Single storey"
+   ],
+   "weight": 1,
+   "why": "'single story'"
+  },
+  {
+   "id": "walls",
+   "kind": "equals",
+   "path": "wallConstruction",
+   "values": [
+    "Brick veneer"
+   ],
+   "weight": 2,
+   "why": "'brick vineer' is brick veneer"
+  },
+  {
+   "id": "floor-slab",
+   "kind": "mentions",
+   "path": "floorType",
+   "all": [
+    [
+     "slab"
+    ]
+   ],
+   "none": [
+    "timber"
+   ],
+   "weight": 1,
+   "why": "'concrete slab'"
+  },
+  {
+   "id": "existing-system",
+   "kind": "equals",
+   "path": "existingSystem",
+   "values": [
+    "Physical Barrier"
+   ],
+   "weight": 3,
+   "why": "'it's just the cordon barrier only': the reticulation was a misreading, corrected"
+  },
+  {
+   "id": "existing-system-other",
+   "kind": "mentions",
+   "path": "existingSystemOther",
+   "all": [
+    [
+     "kordon"
+    ]
+   ],
+   "none": [
+    "homeguard",
+    "home guard",
+    "reticulation",
+    "cordon"
+   ],
+   "weight": 3,
+   "why": "Kordon, the brand dictated as 'cordon'; HomeGuard was retracted"
+  },
+  {
+   "id": "existing-system-year",
+   "kind": "mentions",
+   "path": "existingSystemOther",
+   "all": [
+    [
+     "2016"
+    ]
+   ],
+   "weight": 1,
+   "why": "'installed 2016'"
+  },
+  {
+   "id": "durable-notice",
+   "kind": "equals",
+   "path": "durableNoticePresent",
+   "values": [
+    "YES"
+   ],
+   "weight": 2,
+   "why": "'the durable no this in the meter box' is the durable notice"
+  },
+  {
+   "id": "no-retracted-system",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "home guard",
+    "homeguard",
+    "reticulation"
+   ],
+   "weight": 3,
+   "why": "'no sorry scratch that there's no reticulation'"
+  },
+  {
+   "id": "no-real-findings",
+   "kind": "count",
+   "path": "findings",
+   "min": 0,
+   "max": 1,
+   "weight": 3,
+   "why": "no activity anywhere"
+  },
+  {
+   "id": "only-none-finding",
+   "kind": "every",
+   "path": "findings",
+   "checks": [
+    {
+     "kind": "equals",
+     "path": "termiteActivity",
+     "values": [
+      "NONE"
+     ]
+    }
+   ],
+   "weight": 3,
+   "why": "no activity anywhere"
+  },
+  {
+   "id": "area-exterior",
+   "kind": "equals",
+   "path": "areaStatus.exterior",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "walked round the outside"
+  },
+  {
+   "id": "area-outbuildings",
+   "kind": "equals",
+   "path": "areaStatus.outbuildings",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'the garage is attached at the front left inspected'"
+  },
+  {
+   "id": "area-interior",
+   "kind": "equals",
+   "path": "areaStatus.interior",
+   "values": [
+    "PARTIAL"
+   ],
+   "weight": 2,
+   "why": "floating floorboards hid the bottom of the lounge room skirtings"
+  },
+  {
+   "id": "area-roofvoid",
+   "kind": "equals",
+   "path": "areaStatus.roofvoid",
+   "values": [
+    "PARTIAL"
+   ],
+   "weight": 2,
+   "why": "'the sarking along the eaves meant I couldn't get to the edges'"
+  },
+  {
+   "id": "restricted-roof-sarking",
+   "kind": "mentions",
+   "path": "restrictedAccess",
+   "all": [
+    [
+     "insulation or sarking"
+    ]
+   ],
+   "weight": 2,
+   "why": "the app's label for sarking"
+  },
+  {
+   "id": "restricted-interior-coverings",
+   "kind": "mentions",
+   "path": "restrictedAccess",
+   "all": [
+    [
+     "floor or wall coverings"
+    ]
+   ],
+   "weight": 1,
+   "why": "the app's label for floor coverings"
+  },
+  {
+   "id": "hindered-roof",
+   "kind": "mentions",
+   "path": "hinderedAreas",
+   "all": [
+    [
+     "roof"
+    ]
+   ],
+   "weight": 2,
+   "why": "the roof void edges"
+  },
+  {
+   "id": "no-no-access",
+   "kind": "absent",
+   "path": "noAccessAreas",
+   "weight": 2,
+   "why": "nothing was locked or permanently closed off"
+  },
+  {
+   "id": "result-roofvoid",
+   "kind": "equals",
+   "path": "areaResult.roofvoid",
+   "values": [
+    "CLEAR"
+   ],
+   "weight": 1,
+   "why": "'no activity no borers no decay'"
+  },
+  {
+   "id": "result-outbuildings",
+   "kind": "equals",
+   "path": "areaResult.outbuildings",
+   "values": [
+    "CLEAR"
+   ],
+   "weight": 1,
+   "why": "'no activity'"
+  },
+  {
+   "id": "borers-none",
+   "kind": "equals",
+   "path": "borerActivity",
+   "values": [
+    "NONE"
+   ],
+   "weight": 1,
+   "why": "'no borers'"
+  },
+  {
+   "id": "decay-no",
+   "kind": "equals",
+   "path": "decayFound",
+   "values": [
+    "NO"
+   ],
+   "weight": 1,
+   "why": "'no decay'"
+  },
+  {
+   "id": "weep-holes",
+   "kind": "equals",
+   "path": "weepHoles",
+   "values": [
+    "CLEAR"
+   ],
+   "weight": 2,
+   "why": "'weep holds clear'"
+  },
+  {
+   "id": "timber-soil",
+   "kind": "equals",
+   "path": "timberSoil",
+   "values": [
+    "YES"
+   ],
+   "weight": 2,
+   "why": "sleeper garden edge sitting in the soil against the brickwork"
+  },
+  {
+   "id": "non-durable",
+   "kind": "equals",
+   "path": "nonDurableTimber",
+   "values": [
+    "YES"
+   ],
+   "weight": 2,
+   "why": "'untreated pine'"
+  },
+  {
+   "id": "non-durable-details",
+   "kind": "mentions",
+   "path": "nonDurableTimberDetails",
+   "all": [
+    [
+     "pine"
+    ]
+   ],
+   "weight": 1,
+   "why": "'untreated pine'"
+  },
+  {
+   "id": "non-durable-where",
+   "kind": "mentions",
+   "path": "nonDurableTimberWhere",
+   "all": [
+    [
+     "front"
+    ]
+   ],
+   "weight": 1,
+   "why": "'along the front'"
+  },
+  {
+   "id": "other-recs",
+   "kind": "mentions",
+   "path": "otherRecommendations",
+   "all": [
+    [
+     "sleeper",
+     "edge",
+     "pine",
+     "timber"
+    ]
+   ],
+   "weight": 2,
+   "why": "replace the sleeper edge and pull it off the wall"
+  },
+  {
+   "id": "treatment-not-yes",
+   "kind": "equals",
+   "path": "treatmentRecommended",
+   "values": [
+    "NO",
+    null
+   ],
+   "weight": 3,
+   "why": "no termites, no treatment"
+  },
+  {
+   "id": "treatment-type-empty",
+   "kind": "absent",
+   "path": "treatmentType",
+   "weight": 3,
+   "why": "no treatment"
+  },
+  {
+   "id": "risk-low",
+   "kind": "equals",
+   "path": "riskLevel",
+   "values": [
+    "LOW"
+   ],
+   "weight": 3,
+   "why": "'risk low'"
+  },
+  {
+   "id": "frequency",
+   "kind": "mentions",
+   "path": "inspectionFrequency",
+   "all": [
+    [
+     "12 month",
+     "twelve month",
+     "annual",
+     "every year"
+    ]
+   ],
+   "weight": 1,
+   "why": "'reinspect every 12 months'"
+  },
+  {
+   "id": "no-mishearings",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "vineer",
+    "durable no this",
+    "term might",
+    "weep holds",
+    "man hole",
+    "cordon"
+   ],
+   "weight": 3,
+   "why": "dictation slips are corrected"
+  }
+ ]
+}

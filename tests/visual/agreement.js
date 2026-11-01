@@ -2,7 +2,7 @@
 // through, so the step states show), and signed. Phone and desktop, light
 // and dark. node agreement.js <outDir>
 const { chromium } = require('playwright'); const fs = require('fs');
-const OUT = process.argv[2] || '/tmp/agr', PORT = '8765', SP = process.env.JSPDF_DIR || '/tmp/jspdf', uid = 'u-owner';
+const OUT = process.argv[2] || '/tmp/agr', PORT = process.env.PORT || '8765', SP = process.env.JSPDF_DIR || '/tmp/jspdf', uid = 'u-owner';
 const sess = { access_token:'a.b.c', refresh_token:'r', expires_at: Math.floor(Date.now()/1000)+3600, user:{ id: uid, email:'office@example.com', user_metadata:{ name:'Alex Example', business_name:'Example Pest Co' } } };
 const sc = require('./scenarios.js').find(s => s.name === 'standard');
 (async () => {

@@ -254,12 +254,12 @@ select.quote-input { cursor: pointer; }
    with an ink top bar and white cards. */
 body:not(.dark-screen) .quote-topbar { background: var(--ink); border-bottom: none; }
 body:not(.dark-screen) .quote-topbar-title { color: var(--on-ink); }
-body:not(.dark-screen) .quote-back { color: #5EEAD4; }
+body:not(.dark-screen) .quote-back { color: var(--accent-glow); }
 body:not(.dark-screen) .quote-save-state { color: var(--on-ink2); }
 body:not(.dark-screen) .quote-card { border-color: transparent; box-shadow: 0 14px 36px rgba(0,0,0,0.35); }
 body:not(.dark-screen) .quote-company-gaps { background: #FFF6E0; border-color: #F0C25A; color: #5C3D00; }
-/* Teal glow details, as on the report: cards glow off their top edge and
-   each card's heading trails a fading teal line. */
+/* Blue glow details, as on the report: cards glow off their top edge and
+   each card's heading trails a fading blue line. */
 body:not(.dark-screen) .quote-card {
   box-shadow: 0 14px 36px rgba(0,0,0,0.35), 0 0 0 1px rgba(var(--glow),0.18), 0 -10px 40px -14px rgba(var(--glow),0.7);
 }
@@ -351,14 +351,14 @@ body:not(.dark-screen) .quote-fold > summary .quote-card-title { padding: 0; bor
    13 the detail under it. ── */
 .quote-head { padding: 8px 2px 10px; }
 .quote-hero-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.quote-hero-kicker { font-size: 11px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: #5EEAD4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quote-hero-kicker { font-size: 11px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: var(--accent-glow); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .quote-hero-pill {
   flex-shrink: 0; padding: 5px 11px; border-radius: 999px;
   font-size: 12px; font-weight: 700; white-space: nowrap;
   background: rgba(255,255,255,0.1); color: var(--on-ink);
 }
-.quote-hero-pill.wait { background: rgba(94,234,212,0.14); color: #5EEAD4; }
-.quote-hero-pill.good { background: #2DD4BF; color: var(--ink); box-shadow: 0 0 18px rgba(45,212,191,0.45); }
+.quote-hero-pill.wait { background: rgba(var(--accent-glow-rgb),0.14); color: var(--accent-glow); }
+.quote-hero-pill.good { background: var(--accent-hi); color: var(--ink); box-shadow: 0 0 18px rgba(var(--accent-hi-rgb),0.45); }
 .quote-hero-pill.warn { background: rgba(240,180,41,0.18); color: #F7C948; }
 .quote-hero-pill.bad { background: rgba(255,107,95,0.18); color: #FF8A80; }
 .quote-hero-name {
@@ -367,7 +367,7 @@ body:not(.dark-screen) .quote-fold > summary .quote-card-title { padding: 0; bor
 }
 .quote-hero-name.empty { color: var(--on-ink2); font-size: 22px; text-decoration: underline dashed rgba(255,255,255,0.3); text-underline-offset: 6px; }
 .quote-hero-addr { display: flex; align-items: flex-start; gap: 6px; margin-top: 8px; font-size: 15px; line-height: 1.35; color: var(--on-ink2); }
-.quote-hero-addr .icon { flex-shrink: 0; margin-top: 2px; color: #5EEAD4; }
+.quote-hero-addr .icon { flex-shrink: 0; margin-top: 2px; color: var(--accent-glow); }
 
 /* Section titles, in place of the small caps. */
 .quote-card-title { font: 700 17px 'Space Grotesk', sans-serif; letter-spacing: -0.2px; text-transform: none; color: var(--text); }
@@ -392,7 +392,7 @@ body:not(.dark-screen) .quote-card-title { color: var(--text); }
   font: 700 12px 'Inter', sans-serif; color: var(--text3);
   background: var(--surface2); border: 2px solid var(--border2);
 }
-.qp-step.done .qp-dot { background: linear-gradient(145deg, #2DD4BF, var(--accent2)); border-color: transparent; color: #fff; }
+.qp-step.done .qp-dot { background: var(--green-fill); border-color: transparent; color: #fff; }
 .qp-step.now .qp-dot { border-color: var(--accent); color: var(--accent2); background: #fff; box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.16); }
 .qp-step.warn .qp-dot { border-color: #E0A100; color: #8a5a00; background: #FFF6E0; }
 .qp-step.bad .qp-dot { border-color: var(--risk); color: var(--risk); background: #FDECEA; }
@@ -415,10 +415,10 @@ body:not(.dark-screen) .quote-card-title { color: var(--text); }
 .quote-hero-problem {
   display: flex; flex-direction: column; gap: 4px; width: 100%;
   margin-top: 14px; padding: 11px 14px; text-align: left; cursor: pointer;
-  border: 1px solid rgba(94,234,212,0.22); border-left: 3px solid #2DD4BF; border-radius: 12px;
-  background: linear-gradient(135deg, rgba(45,212,191,0.14), rgba(45,212,191,0.03));
+  border: 1px solid rgba(var(--accent-glow-rgb),0.22); border-left: 3px solid var(--accent-hi); border-radius: 12px;
+  background: linear-gradient(135deg, rgba(var(--accent-hi-rgb),0.14), rgba(var(--accent-hi-rgb),0.03));
 }
-.quote-hero-problem-label { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #5EEAD4; }
+.quote-hero-problem-label { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--accent-glow); }
 .quote-hero-problem-text { font-size: 14.5px; line-height: 1.45; color: var(--on-ink); }
 
 /* The folded work row carries the total. */
@@ -456,7 +456,7 @@ body:not(.dark-screen) .quote-card-title { color: var(--text); }
 .qp-body > .fsub:first-child { margin-top: 0; }
 .quote-fold .quote-totals { margin-top: 0; }
 
-/* A one-per-line box shown as a list: a teal bullet per line. */
+/* A one-per-line box shown as a list: a blue bullet per line. */
 .qlist {
   padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px;
   background: var(--surface2); cursor: pointer;

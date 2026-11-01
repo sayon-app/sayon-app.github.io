@@ -609,7 +609,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     doc.setFont(font.fontName, font.fontStyle); doc.setFontSize(size); doc.setTextColor(color);
   };
   // Lighter headings than the quote's numbered ones, so most certificates
-  // fit one page. Teal like the report's subheads, with a clear gap above
+  // fit one page. Blue like the report's subheads, with a clear gap above
   // so a heading never sits on the table or box before it.
   const section = title => {
     ensure(24);

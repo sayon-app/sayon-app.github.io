@@ -5288,3 +5288,26 @@ body:not(.dark-screen) .agreement-banner.last-visit-banner .agreement-banner-btn
 .last-visit-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 14px; line-height: 1.4; color: var(--text); overflow-wrap: anywhere; }
 .last-visit-cols small { display: block; font-size: 11px; color: var(--text2); font-weight: 600; }
 .last-visit-row.changed .last-visit-cols > div:last-child { font-weight: 700; }
+
+/* Billing: how many inspectors on Team and Business */
+.seat-pick { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12.5px; color: var(--text2); }
+.seat-pick label { font-weight: 600; }
+.seat-pick .seat-input { width: 76px; min-height: 40px; padding: 8px 10px; text-align: center; }
+.seat-total { color: var(--text); font-weight: 600; }
+.settings-row[hidden], .auth-field[hidden] { display: none; }
+
+/* Your team */
+.team-places { padding: 4px 0 8px; font-size: 12.5px; color: var(--text2); }
+.team-list { border-top: 1px solid var(--border); }
+.team-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.team-row-text { flex: 1; min-width: 0; }
+.team-row-name { font-size: 13px; font-weight: 650; color: var(--text); overflow-wrap: anywhere; }
+.team-row-sub { font-size: 11.5px; color: var(--text3); overflow-wrap: anywhere; }
+.team-row-pending .team-row-name { color: var(--text2); }
+.team-row-btn { flex: none; font-size: 12.5px; }
+.team-row-btn + .team-row-btn { margin-left: 4px; }
+.team-invite { display: flex; gap: 8px; align-items: center; padding: 6px 0; }
+.team-invite .job-input { flex: 1; min-width: 0; }
+.team-help { padding: 4px 0 8px; }
+.team-more { margin-top: 4px; }
+.team-more[hidden] { display: none; }

@@ -66,19 +66,19 @@
 
     <!-- Sign Up -->
     <div class="auth-card" id="authSignUp" style="display:none">
-      <h2 class="auth-title">Create your account</h2>
-      <p class="auth-subtitle">14 days free, no card needed. Set up SAYON for your business.</p>
+      <h2 class="auth-title" id="suTitle">Create your account</h2>
+      <p class="auth-subtitle" id="suSubtitle">14 days free, no card needed. Set up SAYON for your business.</p>
       <div class="auth-field">
         <label class="auth-label" for="suName">Your Name</label>
         <input class="auth-input" id="suName" type="text" placeholder="e.g. Luke Smith" autocomplete="name">
       </div>
-      <div class="auth-field">
+      <div class="auth-field" id="suBusinessField">
         <label class="auth-label" for="suBusiness">Business Name</label>
         <input class="auth-input" id="suBusiness" type="text" placeholder="e.g. ABC Pest Control">
       </div>
       <div class="auth-field">
         <label class="auth-label" for="suEmail">Email</label>
-        <input class="auth-input" id="suEmail" type="email" placeholder="you@company.com" autocomplete="email">
+        <input class="auth-input" id="suEmail" type="email" placeholder="you@company.com" autocomplete="email" oninput="onSignUpEmailInput()">
       </div>
       <div class="auth-field">
         <label class="auth-label" for="suPassword">Password</label>
@@ -874,6 +874,7 @@
         </div>
         <div class="menu-account-actions">
           <button class="profile-dropdown-item" id="profileYourBusiness" onclick="openBusinessFromProfile()">Your business</button>
+          <button class="profile-dropdown-item" id="profileYourTeam" onclick="openMenuPage('teamPanel')" hidden>Your team</button>
           <button class="profile-dropdown-item" onclick="openBillingFromProfile()">Billing</button>
           <button class="profile-dropdown-item profile-signout" onclick="signOutFromProfile()">Sign out</button>
         </div>
@@ -931,14 +932,68 @@
               <div class="settings-row-title">Solo — $89/mo</div>
               <div class="settings-row-desc">About 40 inspections a month (800 AI fills). Suits a full-time solo inspector.</div>
             </div>
-            <button class="job-action-btn settings-primary-btn" onclick="openCheckout('starter')">Upgrade</button>
+            <button class="job-action-btn settings-primary-btn" onclick="choosePlan('starter')">Upgrade</button>
+          </div>
+          <!-- Team and Business show once the Worker can charge per inspector
+               (its plan status says seat_plans). Plan keys stay pro and business. -->
+          <div class="settings-row" data-plan="pro" data-seat-plan hidden>
+            <div class="settings-row-text">
+              <div class="settings-row-title">Team — $79 per inspector a month</div>
+              <div class="settings-row-desc">2 to 9 inspectors. About 40 inspections a month each (800 AI fills per inspector), shared across the team.</div>
+              <div class="seat-pick">
+                <label for="seatsPro">Inspectors</label>
+                <input class="job-input seat-input" id="seatsPro" type="number" inputmode="numeric" min="2" max="9" value="2" oninput="onSeatInput('pro')" onchange="this.value = seatInputValue('pro'); onSeatInput('pro')">
+                <span class="seat-total" id="seatTotalPro"></span>
+              </div>
+            </div>
+            <button class="job-action-btn settings-primary-btn" onclick="choosePlan('pro')">Upgrade</button>
+          </div>
+          <div class="settings-row" data-plan="business" data-seat-plan hidden>
+            <div class="settings-row-text">
+              <div class="settings-row-title">Business — $69 per inspector a month</div>
+              <div class="settings-row-desc">10 or more inspectors, billed yearly. About 40 inspections a month each, shared across the business.</div>
+              <div class="seat-pick">
+                <label for="seatsBusiness">Inspectors</label>
+                <input class="job-input seat-input" id="seatsBusiness" type="number" inputmode="numeric" min="10" max="200" value="10" oninput="onSeatInput('business')" onchange="this.value = seatInputValue('business'); onSeatInput('business')">
+                <span class="seat-total" id="seatTotalBusiness"></span>
+              </div>
+            </div>
+            <button class="job-action-btn settings-primary-btn" onclick="choosePlan('business')">Upgrade</button>
+          </div>
+          <div class="settings-row" id="billingOwnerOnly" hidden>
+            <div class="settings-row-text">
+              <div class="settings-row-desc">Your business owner looks after the plan. Ask them if you need more AI fills.</div>
+            </div>
           </div>
           <div class="settings-row">
             <div class="settings-row-text">
-              <div class="settings-row-desc">Prices are monthly in Australian dollars, no GST. Cancel any time in Manage, and your plan runs to the end of the month you've paid for. The free trial is 14 days with 50 AI fills (about 3 to 5 inspections), and no card is needed. Paying opens in your browser; come back to SAYON afterwards and your plan shows here.</div>
-              <div class="settings-row-desc">Team and Business plans, priced per inspector, are coming soon.</div>
+              <div class="settings-row-desc" id="billingTermsText">Prices are monthly in Australian dollars, no GST. Cancel any time in Manage, and your plan runs to the end of the month you've paid for. The free trial is 14 days with 50 AI fills (about 3 to 5 inspections), and no card is needed. Paying opens in your browser; come back to SAYON afterwards and your plan shows here.</div>
+              <div class="settings-row-desc" id="billingSeatTerms" hidden>Business is billed yearly. On Team and Business everyone on your team takes an inspector place, you included. Adding places is charged straight away for the rest of what you've paid for, and only happens if the payment goes through. For fewer places, the unused part comes off your next bill.</div>
+              <div class="settings-row-desc" id="seatPlansSoon">Team and Business plans, priced per inspector, are coming soon.</div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Your team: opened from the account (initials) button by the
+           business owner, so it has no row in the menu list -->
+      <div class="saved-panel settings-panel menu-row-hidden" id="teamPanel">
+        <button class="panel-label panel-label-toggle" onclick="openMenuPage('teamPanel')" id="teamPanelToggle">
+          <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+          <span class="panel-title">Your team</span>
+          <span class="job-panel-summary"></span>
+          <svg class="icon panel-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <div class="job-panel-body">
+          <div class="settings-row-desc team-places" id="teamPlacesText">Loading…</div>
+          <div class="team-list" id="teamList"></div>
+          <div class="settings-group-title">Add an inspector</div>
+          <div class="team-invite">
+            <input class="job-input" id="teamInviteEmail" type="email" inputmode="email" autocomplete="off" placeholder="Their email address" aria-label="Their email address" onkeydown="if (event.key === 'Enter') inviteTeamMember()">
+            <button class="job-action-btn settings-primary-btn" id="teamInviteBtn" onclick="inviteTeamMember()">Invite</button>
+          </div>
+          <div class="settings-row-desc team-help">Send them the sign-up link SAYON gives you. When they sign up with that email, they join your business: your company details, logo and prices on every PDF, with their own reports and the AI fills shared.</div>
+          <button class="job-action-btn settings-primary-btn team-more" id="teamMorePlaces" onclick="openMenuPage('billingPanel')" hidden>More inspector places in Billing</button>
         </div>
       </div>
 

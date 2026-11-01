@@ -22,6 +22,7 @@ const APP_SHELL = [
   './index.html',
   './css/app.css',
   './js/app.js',
+  './js/photo-markup.js',
   './css/quote.css',
   './js/quote.js',
   './js/treatment.js',

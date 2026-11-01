@@ -582,3 +582,9 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 .sp-bg-btn { cursor: pointer; }
 .sp-bg .quote-hint { flex-basis: 100%; margin: 0; }
 .sp-selrow[hidden], #spBgRemove[hidden] { display: none; }
+.sp-views { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1.5px solid var(--accent); border-radius: 12px; overflow: hidden; }
+.sp-view { min-height: 40px; border: 0; background: var(--surface); font: inherit; font-size: 14px; font-weight: 800; color: var(--accent2); cursor: pointer; }
+.sp-view.on { background: var(--accent); color: #fff; }
+.treat-plan-sub { margin-top: 14px; }
+.treat-plan-caption { margin: 0 0 6px; font-size: 13px; font-weight: 800; color: var(--text); }
+.sp-bg[hidden] { display: none; }

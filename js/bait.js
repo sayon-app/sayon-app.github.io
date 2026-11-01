@@ -131,10 +131,30 @@ function renderBaitBlock(q) {
   return `<div class="qp-cert bait-card${b.finished ? ' sent' : ''}" id="qpBait">
       <div class="qp-cert-title">Bait station visits</div>
       <p class="qp-cert-text">${status}</p>
+      ${baitPlanHTML(q, b.last)}
       ${rows ? `<div class="bait-visits">${rows}</div>` : ''}
       <div class="quote-step-actions">
         <button class="${b.finished || (newest[0] && !newest[0].sentAt) ? 'quote-link-btn' : 'quote-btn primary'}" onclick="openBaitVisit()">${b.finished ? 'Record another visit' : 'Record a visit'}</button>
       </div>
+    </div>`;
+}
+
+// The site plan with each station coloured by what a visit found, so the
+// card shows where the activity is at a glance.
+function baitStatusesOf(v) {
+  const out = {};
+  ((v && v.stations) || []).forEach(s => { if (s.status) out[s.n] = s.status; });
+  return out;
+}
+
+function baitPlanHTML(q, v) {
+  const plan = q.treatment && q.treatment.plan;
+  if (typeof sitePlanStations !== 'function' || !sitePlanStations(plan).length) return '';
+  const statuses = v ? baitStatusesOf(v) : null;
+  return `<div class="bait-plan">
+      ${sitePlanSVG(plan, { statuses })}
+      <div class="bait-plan-caption">${v ? `Stations as found on ${escapeHtml(formatAnswerDate(v.date))}` : 'Stations as installed'}</div>
+      ${sitePlanLegendHTML(plan, { statuses, stationsOnly: true })}
     </div>`;
 }
 
@@ -148,8 +168,12 @@ function draftBaitVisit(q, prev) {
   const signedIn = (typeof authUser !== 'undefined' && authUser && authUser.user_metadata && authUser.user_metadata.name) || '';
   const count = parseInt(t.methods.bait, 10) || 0;
   // The stations and where they are carry over; what was found doesn't.
+  // A first visit takes them from the site plan when one was drawn.
+  const drawn = typeof sitePlanStations === 'function' ? sitePlanStations(t.plan) : [];
+  const drawnWhere = n => { const d = drawn.find(x => x.n === n); return d ? (d.label || '').trim() : ''; };
   const stations = prev && prev.stations && prev.stations.length
-    ? prev.stations.map(s => ({ n: s.n, where: s.where || '', status: '', bait: '', note: '' }))
+    ? prev.stations.map(s => ({ n: s.n, where: s.where || drawnWhere(s.n), status: '', bait: '', note: '' }))
+    : drawn.length ? drawn.slice(0, 99).map(d => ({ n: d.n, where: (d.label || '').trim(), status: '', bait: '', note: '' }))
     : Array.from({ length: Math.min(count, 99) }, (_, i) => ({ n: i + 1, where: '', status: '', bait: '', note: '' }));
   // The bait the last visit used, else the one the treatment record named.
   const fromRecord = (t.products || []).find(p => BAIT_PRODUCT_RE.test(`${p.name || ''} ${p.active || ''}`));
@@ -557,7 +581,8 @@ function buildBaitVisitPDF(q, v) {
 
   // ── WHAT WE FOUND ──
   section('WHAT WE FOUND');
-  para(baitVisitSummary(v), { size: 9.5, lh: 4.6, after: 2 });
+  const mapped = typeof sitePlanStations === 'function' && sitePlanStations(t.plan).length > 0;
+  para(baitVisitSummary(v) + (mapped ? ' The station map on the last page shows where each station is and what was found there.' : ''), { size: 9.5, lh: 4.6, after: 2 });
   const feeding = stations.filter(s => BAIT_FEEDING.includes(s.status)).length;
   const p = v.product || {};
   const bait = [p.name, p.name && p.active ? `(${p.active})` : p.active].filter(Boolean).join(' ');
@@ -643,6 +668,17 @@ function buildBaitVisitPDF(q, v) {
   drawPdfSignature(doc, { x: M + (colW + 8) * 2, y, w: colW, caption: 'Date' });
   y += 9;
   para(closing, { size: 7, lh: 3.2, color: C.inkMuted });
+
+  // ── STATION MAP ── The site plan on a page of its own, each station
+  // coloured by what this visit found.
+  if (mapped) {
+    doc.addPage();
+    y = drawPdfRunningHeader(doc, company, docName, q.address, number);
+    section('STATION MAP');
+    para(`Each station is coloured by what was found on ${formatLongDate(v.date)}.`, { size: 9, lh: 4.3, after: 2 });
+    y += drawSitePlanPdf(doc, t.plan, { x: M, y: y - 1, w: CW, statuses: baitStatusesOf(v) }) + 5;
+    y += drawSitePlanLegendPdf(doc, t.plan, { x: M, y, w: CW, statuses: baitStatusesOf(v) }) + 4;
+  }
 
   drawPdfDocFooters(doc, `Bait station visit ${number}${company.name ? `  ·  ${company.name}` : ''}`);
   const safe = fileNamePart(q.address) || 'Property';

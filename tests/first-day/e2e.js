@@ -137,8 +137,8 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   }
   // 10. Website.
   await p.goto(`http://localhost:${PORT}/site/`); await p.waitForTimeout(1000);
-  const site = await p.evaluate(() => ({ trial: [...document.querySelectorAll('a.btn-main')].every(a => /signup=1/.test(a.href)), plans: /About 40 inspections a month/.test(document.body.innerText) && document.querySelectorAll('#pricing .price').length === 1, faq: /Who owns my reports/.test(document.body.innerText) && /How do I cancel/.test(document.body.innerText), stats: !/45 min/.test(document.body.innerText), samples: !!document.querySelector('a[href$="sample-report.pdf"]'), contact: !!document.querySelector('footer a[href^="mailto:"]'), team: /One account per business/.test(document.body.textContent) }));
-  check(Object.values(site).every(Boolean), 'website: trial buttons to sign-up, Solo plan only, new FAQ, no unproven minutes, samples, contact: ' + JSON.stringify(site));
+  const site = await p.evaluate(() => ({ trial: [...document.querySelectorAll('a.btn-main')].every(a => /signup=1/.test(a.href)), plans: /About 40 inspections a month/.test(document.body.innerText) && [...document.querySelectorAll('#pricing .price h3')].map(h => h.textContent).join() === 'Solo,Team,Business' && /\$79/.test(document.body.innerText) && /\$828 per inspector a year/.test(document.body.innerText), faq: /Who owns my reports/.test(document.body.innerText) && /How do I cancel/.test(document.body.innerText), stats: !/45 min/.test(document.body.innerText), samples: !!document.querySelector('a[href$="sample-report.pdf"]'), contact: !!document.querySelector('footer a[href^="mailto:"]'), team: /open Your team and add an inspector/.test(document.body.textContent) }));
+  check(Object.values(site).every(Boolean), 'website: trial buttons to sign-up, Solo, Team and Business plans, new FAQ, no unproven minutes, samples, contact: ' + JSON.stringify(site));
   await p.screenshot({ path: `${OUT}/7-site.png`, fullPage: true });
 
   check(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));

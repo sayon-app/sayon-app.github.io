@@ -9002,16 +9002,17 @@ function renderDocStrips() {
   });
 }
 
-// What the dock's tabs show about the job. This job: a ring that fills with
-// the report's required answers, a tick once it's done.
+// What the dock's tabs show about the job. This job: how much of the
+// report's required answers are in, as a number, a tick once it's done.
 function syncDockReport(pct, locked) {
-  const ring = document.getElementById('tabReportRing');
-  if (!ring) return;
+  const badge = document.getElementById('tabReportRing');
+  if (!badge) return;
   const done = locked || pct >= 100;
-  ring.style.setProperty('--ring', pct);
-  ring.classList.toggle('done', done);
-  ring.classList.toggle('empty', !done && !pct);
-  ring.closest('.tab').setAttribute('aria-label', done ? 'This job, report done' : `This job, report ${pct}% filled in`);
+  const n = Math.max(0, Math.min(99, Math.round(pct || 0)));
+  badge.querySelector('.tab-progress-pct').textContent = n + '%';
+  badge.classList.toggle('done', done);
+  badge.classList.toggle('empty', !done && !n);
+  badge.closest('.tab').setAttribute('aria-label', done ? 'This job, report done' : `This job, report ${n}% filled in`);
 }
 
 // Dashboard: how many jobs need the inspector. Quote: a dot in the colour of

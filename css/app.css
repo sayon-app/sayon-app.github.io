@@ -5114,8 +5114,9 @@ body:not(:has(#dashboardOverlay.open)):not(:has(#sidebarPanel.open)) .tab[data-t
   box-shadow: inset 0 0 0 1px rgba(var(--accent-glow-rgb),0.35), 0 0 18px rgba(var(--glow),0.25);
 }
 
-/* What each tab knows. Jobs: how many need the inspector. This job: a ring
-   that fills as the report does, a tick when it's done. */
+/* What each tab knows. Jobs: how many need the inspector. This job: how much
+   of the report is filled in, as a number (a part-filled ring read as a
+   loading spinner that never finished), and a green tick when it's done. */
 .tab-count {
   position: absolute; top: -6px; left: calc(100% - 6px);
   min-width: 17px; height: 17px; padding: 0 4px; box-sizing: border-box; border-radius: 9px;
@@ -5124,14 +5125,18 @@ body:not(:has(#dashboardOverlay.open)):not(:has(#sidebarPanel.open)) .tab[data-t
   box-shadow: 0 0 0 2px rgb(14,24,33);
 }
 .tab-count[hidden] { display: none; }
-.tab-ring { position: absolute; top: -6px; left: calc(100% - 7px); width: 16px; height: 16px; border-radius: 50%; background: rgb(14,24,33); }
-.tab-ring circle { fill: none; stroke: rgba(255,255,255,0.2); stroke-width: 3; }
-.tab-ring .tab-ring-fill { stroke: var(--accent-glow); stroke-linecap: round; stroke-dasharray: var(--ring, 0) 100; transform: rotate(-90deg); transform-origin: 10px 10px; transition: stroke-dasharray 0.4s ease; }
-.tab-ring .tab-ring-tick { fill: none; stroke: var(--accent-ink); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
-.tab-ring.done { background: var(--accent-hi); }
-.tab-ring.done circle { stroke: transparent; }
-.tab-ring.done .tab-ring-tick { opacity: 1; }
-.tab-ring.empty { display: none; }
+.tab-progress {
+  position: absolute; top: -7px; left: calc(100% - 8px);
+  min-width: 17px; height: 17px; padding: 0 4px; box-sizing: border-box; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgb(14,24,33); color: var(--on-ink); font: 800 9.5px 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.28), 0 0 0 2px rgb(14,24,33);
+}
+.tab-progress-tick { display: none; width: 13px; height: 13px; fill: none; stroke: #FFFFFF; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
+.tab-progress.done { padding: 0; width: 17px; background: var(--green-fill); box-shadow: 0 0 0 2px rgb(14,24,33); }
+.tab-progress.done .tab-progress-pct { display: none; }
+.tab-progress.done .tab-progress-tick { display: block; }
+.tab-progress.empty { display: none; }
 
 /* The mic: a round button in the middle of the dock. */
 .tabbar-inner > .mic-dock {

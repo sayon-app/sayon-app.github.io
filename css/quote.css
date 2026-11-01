@@ -519,3 +519,72 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
   .quote-guide .qp-folds .fgroup-icon { display: none; }
 }
 .signature-pad-wrap.treat-sketch-wrap { border: 1.5px solid var(--border); border-radius: 14px; }
+
+/* ── SITE PLAN (js/site-plan.js) ── The plan itself stays on white, like the
+   signature pads, in both themes, so it looks the same as on the PDF. */
+.site-plan-svg { display: block; width: 100%; height: auto; background: #fff; border-radius: 10px; }
+.site-plan-legend { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+.site-plan-legend li { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 1.3; color: var(--text2); }
+.site-plan-legend svg { flex: none; width: 34px; height: 24px; background: #fff; border-radius: 4px; }
+.treat-plan-empty {
+  display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left; cursor: pointer;
+  padding: 16px; border: 1.5px dashed var(--accent-edge); border-radius: 14px; background: var(--accent-wash); color: var(--text);
+  font: inherit;
+}
+.treat-plan-empty-title { font-size: 15px; font-weight: 800; color: var(--accent2); }
+.treat-plan-empty-text { font-size: 13px; line-height: 1.45; color: var(--text2); }
+.treat-plan-view { display: block; width: 100%; padding: 0; border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden; background: #fff; cursor: pointer; }
+.treat-plan .quote-hint { margin: 8px 0 2px; }
+.treat-plan > .quote-link-btn { margin-top: 4px; }
+#trSketchMore > :not(summary) { margin: 0 14px 12px; }
+
+/* The editor */
+#sitePlanOverlay .page-sheet-body.sp-body { gap: 8px; padding-top: 10px; }
+.sp-hint { margin: 0; min-height: 36px; font-size: 13px; line-height: 1.4; color: var(--text2); }
+.sp-canvas { position: relative; border: 1.5px solid var(--border2); border-radius: 12px; overflow: hidden; background: #fff; touch-action: none; user-select: none; -webkit-user-select: none; }
+.sp-canvas svg { border-radius: 0; cursor: crosshair; }
+.sp-canvas-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sp-canvas-tools .quote-link-btn:disabled { opacity: 0.4; }
+.sp-finish { margin-left: auto; min-height: 40px; padding: 8px 16px; }
+.sp-selbar { padding: 10px; border: 1.5px solid rgba(var(--pink-rgb), 0.45); border-radius: 12px; background: rgba(var(--pink-rgb), 0.05); }
+.sp-selname { font-size: 12px; font-weight: 800; letter-spacing: 0.02em; color: var(--pink-text); margin-bottom: 6px; }
+.sp-selrow { display: flex; gap: 8px; align-items: center; }
+.sp-selrow .job-input { flex: 1; min-width: 0; min-height: 42px; }
+.sp-delete { color: var(--risk); }
+.sp-groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 3px; border-radius: 12px; background: var(--surface3); }
+.sp-group { min-height: 38px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--text2); cursor: pointer; }
+.sp-group.on { background: var(--surface); color: var(--accent2); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+.sp-tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.sp-tool {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 66px; padding: 6px 4px; border: 1.5px solid var(--border); border-radius: 12px;
+  background: var(--surface); font: inherit; font-size: 12px; font-weight: 700; color: var(--text); cursor: pointer;
+}
+.sp-tool svg { width: 44px; height: 30px; background: #fff; border-radius: 6px; }
+.sp-tool.on { border-color: var(--accent); background: var(--accent-wash); box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.25); color: var(--accent2); }
+.sp-key { padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; }
+.sp-key .site-plan-legend { margin-top: 4px; }
+.sp-key .quote-hint { margin: 8px 0 0; }
+.sp-key #spLegend:empty::after { content: 'Symbols you place show here.'; font-size: 12.5px; color: var(--text3); }
+.sp-foot { display: flex; justify-content: space-between; }
+
+/* On the bait card: the stations as last found */
+.bait-plan { margin: 8px 0 10px; }
+.bait-plan .site-plan-svg { border: 1px solid var(--border); }
+.bait-plan-caption { margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--text3); }
+.sp-finish[hidden] { display: none; }
+.sp-zoom { min-width: 44px; font-size: 18px; font-weight: 800; }
+.sp-zoom:disabled { opacity: 0.4; }
+.sp-size { margin-top: 8px; font-size: 13px; color: var(--text2); }
+.sp-size .job-input { max-width: 110px; }
+.sp-scale-note { margin: 0; }
+.sp-bg { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 12px; border: 1px dashed var(--border2); border-radius: 12px; }
+.sp-bg-btn { cursor: pointer; }
+.sp-bg .quote-hint { flex-basis: 100%; margin: 0; }
+.sp-selrow[hidden], #spBgRemove[hidden] { display: none; }
+.sp-views { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1.5px solid var(--accent); border-radius: 12px; overflow: hidden; }
+.sp-view { min-height: 40px; border: 0; background: var(--surface); font: inherit; font-size: 14px; font-weight: 800; color: var(--accent2); cursor: pointer; }
+.sp-view.on { background: var(--accent); color: #fff; }
+.treat-plan-sub { margin-top: 14px; }
+.treat-plan-caption { margin: 0 0 6px; font-size: 13px; font-weight: 800; color: var(--text); }
+.sp-bg[hidden] { display: none; }

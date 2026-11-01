@@ -634,8 +634,26 @@
       <section class="sheet-sec">
         <div class="sheet-sec-head">
           <span class="sheet-sec-num" aria-hidden="true">3</span>
-          <div><h3 class="sheet-sec-title">Where</h3></div>
+          <div><h3 class="sheet-sec-title">The site and where</h3><p class="sheet-sec-sub">Filled from the report. It tells anyone reading the certificate what the site is like.</p></div>
         </div>
+      <div class="job-field">
+        <div class="job-field-label">Building</div>
+        <input class="job-input" id="trSiteBuilding" placeholder="e.g. Single storey brick veneer house">
+      </div>
+      <div class="job-row">
+        <div class="job-field">
+          <div class="job-field-label">Floor and footings</div>
+          <input class="job-input" id="trSiteFloor" placeholder="e.g. Concrete slab">
+        </div>
+        <div class="job-field">
+          <div class="job-field-label">System already there</div>
+          <input class="job-input" id="trSiteExisting" placeholder="e.g. None found">
+        </div>
+      </div>
+      <div class="job-field">
+        <div class="job-field-label">Surrounds</div>
+        <input class="job-input" id="trSiteSurrounds" placeholder="e.g. Garden beds against the walls, flat block">
+      </div>
       <div class="job-field">
         <div class="job-field-label">Areas treated</div>
         <textarea class="job-input" id="trAreas" rows="2" placeholder="e.g. Laundry east wall; perimeter of the building"></textarea>
@@ -646,15 +664,20 @@
       </div>
       <div class="job-field">
         <div class="job-field-label">Site plan</div>
+        <div class="treat-plan" id="trPlan"></div>
+      </div>
+      <details class="sheet-more" id="trSketchMore">
+        <summary>Or draw it by hand, or on a photo</summary>
         <div class="signature-pad-wrap treat-sketch-wrap">
           <canvas class="signature-canvas" id="trSketchCanvas" width="640" height="480"></canvas>
-          <div class="signature-placeholder" id="trSketchPlaceholder">Optional: sketch the building and mark where the treatment and the notice went</div>
+          <div class="signature-placeholder" id="trSketchPlaceholder">Sketch the building and mark where the treatment and the notice went</div>
         </div>
         <div class="treat-sketch-actions">
           <label class="signature-clear-btn">Draw on a photo<input type="file" accept="image/*" hidden onchange="loadTreatmentSketchPhoto(this)"></label>
-          <button class="signature-clear-btn" onclick="treatmentSketch.clear()">Clear plan</button>
+          <button class="signature-clear-btn" onclick="treatmentSketch.clear()">Clear drawing</button>
         </div>
-      </div>
+        <p class="quote-hint sheet-hint">The certificate uses the drawn site plan above when there is one.</p>
+      </details>
       </section>
       <section class="sheet-sec">
         <div class="sheet-sec-head">
@@ -707,6 +730,61 @@
       <button class="extract-btn" id="trSaveBtn" onclick="saveTreatmentRecord()">Save treatment record</button>
       <button class="link-btn send-review-cancel" onclick="closeTreatmentRecord()">Cancel</button>
       </section>
+    </div>
+  </div>
+</div>
+
+<!-- SITE PLAN (js/site-plan.js): the drawn plan with its legend, from the treatment record -->
+<div class="page-sheet-overlay" id="sitePlanOverlay">
+  <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="spTitle">
+    <div class="page-sheet-header">
+      <span class="page-sheet-title" id="spTitle">Site plan</span>
+      <button class="voice-popover-close" onclick="closeSitePlan()" aria-label="Close without saving"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+    </div>
+    <div class="page-sheet-body sp-body">
+      <div class="sp-views" id="spViews" role="tablist" aria-label="Which plan">
+        <button type="button" role="tab" class="sp-view on" data-layer="site" onclick="setSitePlanLayer('site')">Site</button>
+        <button type="button" role="tab" class="sp-view" data-layer="sub" onclick="setSitePlanLayer('sub')">Subfloor</button>
+      </div>
+      <p class="sp-hint" id="spHint"></p>
+      <div class="sp-canvas" id="spCanvas"></div>
+      <div class="sp-canvas-tools">
+        <button type="button" class="quote-link-btn" id="spUndo" onclick="undoSitePlan()">Undo</button>
+        <button type="button" class="quote-link-btn" id="spNorth" onclick="rotateSitePlanNorth()">North: up</button>
+        <button type="button" class="quote-link-btn sp-zoom" id="spZoomOut" onclick="zoomSitePlan(-1)" aria-label="Zoom out">−</button>
+        <button type="button" class="quote-link-btn sp-zoom" id="spZoomIn" onclick="zoomSitePlan(1)" aria-label="Zoom in">+</button>
+        <button type="button" class="quote-btn primary sp-finish" id="spFinishLine" onclick="finishSitePlanLine()" hidden>Finish line</button>
+      </div>
+      <div class="sp-selbar" id="spSelBar" hidden>
+        <div class="sp-selname" id="spSelName"></div>
+        <div class="sp-selrow">
+          <input class="job-input" id="spSelLabel" oninput="onSitePlanLabel(this)" onfocus="onSitePlanLabelFocus(this)" aria-label="Name or where">
+          <button type="button" class="quote-link-btn sp-delete" onclick="deleteSitePlanItem()">Delete</button>
+        </div>
+        <label class="sp-selrow sp-size" id="spSelSizeRow" hidden>
+          <span id="spSelSizeLabel">Real width</span>
+          <input class="job-input" id="spSelMetres" type="number" min="0" step="any" inputmode="decimal" placeholder="metres" oninput="onSitePlanMetres(this)" onfocus="onSitePlanLabelFocus(this)">
+          <span>m</span>
+        </label>
+      </div>
+      <p class="quote-hint sp-scale-note" id="spScaleNote"></p>
+      <div class="sp-groups" id="spGroups" role="tablist" aria-label="Symbols"></div>
+      <div class="sp-tools" id="spTools"></div>
+      <div class="sp-bg">
+        <label class="quote-link-btn sp-bg-btn" id="spBgLabel">Trace over a map or photo<input type="file" accept="image/*" hidden onchange="loadSitePlanBackground(this)"></label>
+        <button type="button" class="link-btn" id="spBgRemove" onclick="removeSitePlanBackground()" hidden>Remove it</button>
+        <p class="quote-hint">Free: take a screenshot of the property in your phone's Maps app on satellite view, then pick it here and trace the house and yard.</p>
+      </div>
+      <div class="sp-key">
+        <div class="job-field-label">Legend, as it prints on the certificate</div>
+        <div id="spLegend"></div>
+        <p class="quote-hint" id="spSummary"></p>
+      </div>
+      <button class="extract-btn" onclick="saveSitePlan()">Save site plan</button>
+      <div class="sp-foot">
+        <button class="link-btn" onclick="closeSitePlan()">Cancel</button>
+        <button class="link-btn" id="spClear" onclick="clearSitePlan()">Start again</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2430,6 +2508,7 @@
 <script src="js/quote.js"></script>
 <script src="js/treatment.js"></script>
 <script src="js/bait.js"></script>
+<script src="js/site-plan.js"></script>
 <script src="js/business-sync.js"></script>
 </body>
 </html>

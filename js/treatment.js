@@ -4,7 +4,9 @@
 // supervisor, supervisorLicence, pest, weather, equipment, methods:
 // { key: qty }, products: [{ name, active, batch, labelPhoto (JPEG data URL
 // of the drum label), rate, amount, life, where }],
-// areas, notTreated, sketch (JPEG data URL of the site plan), notice:
+// areas, notTreated, site: { building, floor, surrounds, existing }, plan
+// (the drawn site plan, see js/site-plan.js), sketch (JPEG data URL of a
+// hand-drawn plan, used when there's no drawn one), notice:
 // 'new'|'updated'|'none', noticeWhere, cautions, nextInspection, warranty,
 // notes, signature, at }. It's kept with the quote, so it syncs with the
 // report, and gives the client a treatment certificate PDF.
@@ -161,6 +163,8 @@ function draftTreatment(q) {
     products: [{ name: name || '', active: name ? TREATMENT_PRODUCTS[name] : '', batch: '', rate: '', amount: '', life: '', where: '' }],
     areas: places.join('; '),
     notTreated: '',
+    site: treatmentSiteFromReport(rd),
+    plan: null,
     notice: 'new',
     noticeWhere: 'Meter box',
     cautions: TREATMENT_DEFAULT_CAUTIONS,
@@ -175,6 +179,20 @@ function treatmentWarrantyFromQuote(q) {
   const service = ((q.plan && q.plan.service) || '').trim();
   if (!service || /^none$/i.test(service)) return '';
   return `${service} free service period, while the recommended timber pest inspections are carried out.`;
+}
+
+// What the site is like, from the report: building, floor, surrounds and
+// any termite management system already there.
+function treatmentSiteFromReport(rd) {
+  const join = (...v) => v.map(x => String(x || '').trim()).filter(x => x && !/^(n\/a|unknown|not specified)$/i.test(x)).join(', ');
+  const sys = String(rd.existingSystem || '').trim();
+  const existing = !sys ? '' : /^no system found$/i.test(sys) ? 'None found' : join(sys, rd.existingSystemOther);
+  return {
+    building: join(rd.structureType, rd.wallConstruction, rd.roofType && !/roof/i.test(rd.roofType) ? `${rd.roofType} roof` : rd.roofType),
+    floor: join(rd.floorType),
+    surrounds: join(rd.siteSurroundings, rd.siteSlope),
+    existing,
+  };
 }
 
 const TREATMENT_DEFAULT_CAUTIONS = 'Keep people and pets away from treated areas until the treatment has dried. ' +
@@ -258,6 +276,13 @@ function openTreatmentRecord() {
       </label>`;
   }).join('');
   renderTreatmentProducts(t.products && t.products.length ? t.products : [{}]);
+  const site = t.site || treatmentSiteFromReport(treatmentSourceReport());
+  document.getElementById('trSiteBuilding').value = site.building || '';
+  document.getElementById('trSiteFloor').value = site.floor || '';
+  document.getElementById('trSiteSurrounds').value = site.surrounds || '';
+  document.getElementById('trSiteExisting').value = site.existing || '';
+  treatmentPlanDraft = sitePlanHasContent(t.plan) ? JSON.parse(JSON.stringify(t.plan)) : null;
+  renderTreatmentPlan();
   document.getElementById('trAreas').value = t.areas || '';
   document.getElementById('trNotTreated').value = t.notTreated || '';
   document.getElementById('trNotice').value = t.notice || 'new';
@@ -276,7 +301,57 @@ function openTreatmentRecord() {
   }
   treatmentSketch.ctx.strokeStyle = SIGNATURE_INK;
   treatmentSketch.show(t.sketch || '');
+  document.getElementById('trSketchMore').open = !!t.sketch && !treatmentPlanDraft;
   updateTreatmentSaveBtn();
+}
+
+// ── THE SITE PLAN ON THE RECORD ── The drawn plan (js/site-plan.js) is kept
+// here until the record is saved.
+let treatmentPlanDraft = null;
+
+function renderTreatmentPlan() {
+  const el = document.getElementById('trPlan');
+  const plan = treatmentPlanDraft;
+  if (!sitePlanHasContent(plan)) {
+    el.innerHTML = `<button type="button" class="treat-plan-empty" onclick="openTreatmentSitePlan()">
+        <span class="treat-plan-empty-title">Draw the site plan</span>
+        <span class="treat-plan-empty-text">Place the building, the barrier, each bait and monitoring station, the notice and what you found. It prints on the certificate with a legend.</span>
+      </button>`;
+    return;
+  }
+  const sum = sitePlanSummary(plan);
+  const sub = sitePlanHasSubfloor(plan);
+  const subSum = sub ? sitePlanSubSummary(plan) : '';
+  el.innerHTML = `<button type="button" class="treat-plan-view" onclick="openTreatmentSitePlan()" aria-label="Edit the site plan">${sitePlanSVG(plan)}</button>
+    ${sitePlanLegendHTML(plan)}
+    ${sum ? `<p class="quote-hint">The plan shows ${escapeHtml(sum)}.</p>` : ''}
+    ${sub ? `<div class="treat-plan-sub">
+      <p class="treat-plan-caption">Subfloor</p>
+      <button type="button" class="treat-plan-view" onclick="openTreatmentSitePlan('sub')" aria-label="Edit the subfloor plan">${sitePlanSVG(plan, { layer: 'sub' })}</button>
+      ${sitePlanLegendHTML(plan, { layer: 'sub' })}
+      ${subSum ? `<p class="quote-hint">The subfloor plan shows ${escapeHtml(subSum)}.</p>` : ''}
+    </div>` : ''}
+    <button type="button" class="quote-link-btn" onclick="openTreatmentSitePlan()">Edit the site plan</button>
+    ${sub ? '' : '<button type="button" class="quote-link-btn" onclick="openTreatmentSitePlan(\'sub\')">Add the subfloor</button>'}`;
+}
+
+function openTreatmentSitePlan(layer) {
+  openSitePlan(treatmentPlanDraft, plan => {
+    treatmentPlanDraft = sitePlanHasContent(plan) ? plan : null;
+    renderTreatmentPlan();
+    // The stations drawn fill an empty station count, and tick baiting.
+    const n = sitePlanStations(plan).filter(s => s.k !== 'monitor').length;
+    const box = document.querySelector('#trMethods input[data-key="bait"]');
+    const qty = document.querySelector('#trMethods [data-qty="bait"]');
+    if (n && box && !box.checked) { box.checked = true; onTreatmentMethodToggle(box); }
+    if (n && qty && !qty.value.trim()) qty.value = String(n);
+    // A plan with a scale gives the barrier's linear metres.
+    const lm = Math.round(sitePlanLength(plan, 'barrier'));
+    const bBox = document.querySelector('#trMethods input[data-key="barrier"]');
+    const bQty = document.querySelector('#trMethods [data-qty="barrier"]');
+    if (lm && bBox && bBox.checked && bQty && !bQty.value.trim()) bQty.value = String(lm);
+  });
+  if (layer === 'sub') setSitePlanLayer('sub');
 }
 
 // A photo of the site (or of a plan drawn on paper) fills the sketch pad,
@@ -526,6 +601,8 @@ function saveTreatmentRecord() {
     products: readTreatmentProducts().filter(p => Object.values(p).some(Boolean)),
     areas: v('trAreas'),
     notTreated: v('trNotTreated'),
+    site: { building: v('trSiteBuilding'), floor: v('trSiteFloor'), surrounds: v('trSiteSurrounds'), existing: v('trSiteExisting') },
+    plan: treatmentPlanDraft,
     sketch: treatmentSketchImage(),
     notice: v('trNotice'),
     noticeWhere: v('trNotice') === 'none' ? '' : v('trNoticeWhere'),
@@ -680,8 +757,17 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   });
 
   // Where, in the same row style.
-  if (install) { y += 1.5; cellRow([['Where it was installed', t.areas], ['Areas not covered', t.notTreated], ['Installed to', 'AS 3660.2 and the manufacturer\'s directions']]); }
-  else if (t.areas || t.notTreated) { y += 1.5; cellRow([['Areas treated', t.areas], ['Areas not treated', t.notTreated]]); }
+  // A drawn plan prints on the last page; the row says so.
+  const planNote = !sitePlanHasContent(t.plan) ? '' : sitePlanHasSubfloor(t.plan) ? 'Site and subfloor plans on the last pages, with legends' : 'Drawn on the last page, with a legend';
+  if (install) { y += 1.5; cellRow([['Where it was installed', t.areas], ['Areas not covered', t.notTreated], ['Installed to', 'AS 3660.2 and the manufacturer\'s directions'], ['Site plan', planNote]]); }
+  else if (t.areas || t.notTreated || planNote) { y += 1.5; cellRow([['Areas treated', t.areas], ['Areas not treated', t.notTreated], ['Site plan', planNote]]); }
+
+  // ── THE SITE ──
+  const site = t.site || {};
+  if (site.building || site.floor || site.surrounds || site.existing) {
+    section('THE SITE');
+    cellRow([['Building', site.building], ['Floor and footings', site.floor], ['Surrounds', site.surrounds], ['System already there', site.existing]]);
+  }
 
   // ── PRODUCTS ──
   const products = (t.products || []).filter(p => p.name || p.active);
@@ -732,11 +818,15 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     y += 4;
   }
 
+  const drawn = sitePlanHasContent(t.plan);
+
   // ── DURABLE NOTICE AND SITE PLAN ── The wording on the notice itself
-  // (AS 3660.1, NCC 3.1.4.4) in a grid, with the site plan beside it.
-  section(t.sketch ? 'DURABLE NOTICE AND SITE PLAN' : 'DURABLE NOTICE');
-  const planW = t.sketch ? 64 : 0, planH = planW * 0.75;
-  const boxW = t.sketch ? CW - planW - 5 : CW, ncols = t.sketch ? 2 : 3;
+  // (AS 3660.1, NCC 3.1.4.4) in a grid, with a hand-drawn plan beside it
+  // when there's no drawn one.
+  const sketch = !drawn && t.sketch;
+  section(sketch ? 'DURABLE NOTICE AND SITE PLAN' : 'DURABLE NOTICE');
+  const planW = sketch ? 64 : 0, planH = planW * 0.75;
+  const boxW = sketch ? CW - planW - 5 : CW, ncols = sketch ? 2 : 3;
   const cellW = (boxW - 8 - (ncols - 1) * 5) / ncols;
   const methodNames = Object.keys(t.methods || {}).filter(k => !install || systems.includes(k)).map(k => TREATMENT_METHODS[k] && TREATMENT_METHODS[k].label).filter(Boolean);
   // Chemical life only when a chemical was applied, not on a baiting-only
@@ -774,9 +864,9 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     doc.text(noticeLines[i], x, ny + 3.8);
     if (i % ncols === ncols - 1 || i === noticeCells.length - 1) ny += rowHs[Math.floor(i / ncols)];
   });
-  if (t.sketch) {
+  if (sketch) {
     const px = M + CW - planW;
-    try { doc.addImage(t.sketch, 'JPEG', px, top, planW, planH); } catch (e) {}
+    try { doc.addImage(sketch, 'JPEG', px, top, planW, planH); } catch (e) {}
     doc.setDrawColor(...C.rule); doc.setLineWidth(0.3); doc.rect(px, top, planW, planH);
   }
   y = top + boxH + 3.5;
@@ -842,6 +932,28 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     y += 5;
   }
   para(closing, { size: 7, lh: 3.2, color: C.inkMuted });
+
+  // ── SITE PLAN ── A page of its own, so the plan is big enough to read.
+  if (drawn) {
+    doc.addPage();
+    y = drawPdfRunningHeader(doc, company, docName, q.address, number);
+    section('SITE PLAN');
+    const sum = sitePlanSummary(t.plan);
+    if (sum) para(`The plan shows ${sum}.`, { size: 9, lh: 4.3, after: 2 });
+    y += drawSitePlanPdf(doc, t.plan, { x: M, y: y - 1, w: CW }) + 5;
+    y += drawSitePlanLegendPdf(doc, t.plan, { x: M, y, w: CW }) + 4;
+    drawSitePlanStationListPdf(doc, t.plan, { x: M, y: y + 2, w: CW });
+  }
+  // ── SUBFLOOR PLAN ── Its own page too, under the same building and scale.
+  if (drawn && sitePlanHasSubfloor(t.plan)) {
+    doc.addPage();
+    y = drawPdfRunningHeader(doc, company, docName, q.address, number);
+    section('SUBFLOOR PLAN');
+    const subSum = sitePlanSubSummary(t.plan);
+    para(`The area under the suspended floor, with the building's walls above it in grey.${subSum ? ` It shows ${subSum}.` : ''}`, { size: 9, lh: 4.3, after: 2 });
+    y += drawSitePlanPdf(doc, t.plan, { x: M, y: y - 1, w: CW, layer: 'sub' }) + 5;
+    drawSitePlanLegendPdf(doc, t.plan, { x: M, y, w: CW, layer: 'sub' });
+  }
 
   drawPdfDocFooters(doc, `${install ? 'Installation certificate' : 'Certificate'} ${number}${company.name ? `  ·  ${company.name}` : ''}`);
   const safe = fileNamePart(q.address) || 'Property';

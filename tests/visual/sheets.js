@@ -1,6 +1,6 @@
-// Screenshots of the pre-inspection agreement sheet: not signed (part way
-// through, so the step states show), and signed. Phone and desktop, light
-// and dark. node agreement.js <outDir>
+// Screenshots of the long sheets: the pre-inspection agreement (part way
+// through, ready, signed) and the treatment record. Phone and desktop, light
+// and dark. node sheets.js <outDir>   (PORT=8766 to shoot another checkout)
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2] || '/tmp/agr', PORT = process.env.PORT || '8765', SP = process.env.JSPDF_DIR || '/tmp/jspdf', uid = 'u-owner';
 const sess = { access_token:'a.b.c', refresh_token:'r', expires_at: Math.floor(Date.now()/1000)+3600, user:{ id: uid, email:'office@example.com', user_metadata:{ name:'Alex Example', business_name:'Example Pest Co' } } };
@@ -44,6 +44,24 @@ const sc = require('./scenarios.js').find(s => s.name === 'standard');
     await p.evaluate(() => openAgreementSheet());
     await p.waitForTimeout(500);
     await p.screenshot({ path: `${OUT}/${tag}-4-signed.png`, clip: { x: 0, y: 0, width: W, height: 1100 } });
+    // Treatment record, opened from an accepted quote.
+    await p.evaluate(() => {
+      closeAgreementSheet();
+      reportData.sent = { at: Date.now(), to: 'sam@example.com' }; saveCurrentReport(true);
+      openQuoteFromReport();
+      quoteState.items = [newQuoteItem('bait_install', { qty: 12 }), newQuoteItem('bait_monitor')];
+      quoteState.answer = { status: 'accepted', by: 'Sam Taylor', date: todayIsoDate(), method: 'signed', note: '', at: Date.now(), hash: quoteContentHash(quoteState) };
+      persistQuote(); openTreatmentRecord();
+      document.getElementById('trTech').value = 'Alex Example'; updateTreatmentSaveBtn();
+    });
+    await p.waitForTimeout(600);
+    await p.screenshot({ path: `${OUT}/${tag}-5-treatment-top.png`, clip: { x: 0, y: 0, width: W, height: 1100 } });
+    for (const [i, sel] of ['#treatmentOverlay .page-sheet-body'].entries()) {
+      const el = p.locator(sel); const box = await el.boundingBox();
+      await p.evaluate(sel => { const b = document.querySelector(sel); b.style.overflow = 'visible'; b.style.flex = 'none';
+        const sh = b.closest('.page-sheet'); sh.style.position = 'relative'; sh.style.inset = 'auto'; sh.closest('.page-sheet-overlay').style.position = 'absolute'; sh.closest('.page-sheet-overlay').style.overflow = 'visible'; }, sel);
+      await p.screenshot({ path: `${OUT}/${tag}-6-treatment-full.png`, fullPage: true });
+    }
     await ctx.close();
   }
   await b.close();

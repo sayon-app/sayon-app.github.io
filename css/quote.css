@@ -202,6 +202,9 @@ select.quote-input { cursor: pointer; }
 .treat-method-qty { width: 92px; flex-shrink: 0; }
 .treat-product { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; }
 .treat-product .quote-link-btn, .treat-add-product { align-self: flex-start; }
+.treat-method { min-height: 50px; padding: 10px 12px; border-radius: 12px; font-size: 14px; transition: background 0.2s, border-color 0.2s; }
+.treat-method:has(input[type=checkbox]:checked) { border-color: rgba(var(--accent-rgb), 0.55); background: rgba(var(--accent-rgb), 0.07); }
+.treat-product { padding: 12px; border-radius: 12px; background: var(--surface2); }
 
 /* Bait station visits (js/bait.js): a card under the certificate, and the
    visit sheet's station list, one row per station with its finding as chips. */
@@ -515,3 +518,4 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
   .quote-guide .qp-folds .quote-fold > .quote-add-btn { width: calc(100% - 16px); }
   .quote-guide .qp-folds .fgroup-icon { display: none; }
 }
+.signature-pad-wrap.treat-sketch-wrap { border: 1.5px solid var(--border); border-radius: 14px; }

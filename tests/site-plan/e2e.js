@@ -155,17 +155,41 @@ let shotN = 0;
   check(await p.evaluate(() => sitePlanEditor.plan.items.some(i => i.k === 'moisture')), 'a moisture marker goes down');
   await tap(p.locator('#spUndo'), 'Undo');
   check(await p.evaluate(() => !sitePlanEditor.plan.items.some(i => i.k === 'moisture')), 'Undo takes it back');
+  // The subfloor: its own view under the same house, starting as the house's footprint.
+  await tap(p.locator('#spViews .sp-view', { hasText: 'Subfloor' }), 'Subfloor view'); await p.waitForTimeout(200);
+  const sub0 = await p.evaluate(() => ({ layer: sitePlanEditor.layer, items: planLayerItems(sitePlanEditor.plan, 'sub').map(i => i.k + ':' + i.x + ',' + i.y + ',' + i.w + ',' + i.h), tabs: [...document.querySelectorAll('#spGroups .sp-group')].map(b => b.textContent) }));
+  console.log('subfloor:', JSON.stringify(sub0));
+  check(sub0.layer === 'sub' && sub0.items.length === 2 && sub0.items[0] === 'subfloor:300,225,400,275' && /^subfloorShape/.test(sub0.items[1]) && sub0.tabs.join() === 'Structure,Access,Findings', 'the subfloor view starts with the footprints of the house and the studio, and its own tabs');
+  await tool('Structure', 'Row of piers'); await tapPlan(350, 300); await tapPlan(650, 300); await tap(p.locator('#spFinishLine'), 'Finish pier row');
+  await tool('Structure', 'Row of piers'); await tapPlan(350, 425); await tapPlan(650, 425); await tap(p.locator('#spFinishLine'), 'Finish pier row 2');
+  await tool('Structure', 'Dwarf wall'); await tapPlan(300, 362); await tapPlan(700, 362); await tap(p.locator('#spFinishLine'), 'Finish dwarf wall');
+  await tool('Structure', 'Vent'); await tapPlan(500, 225);
+  await tool('Structure', 'Vent'); await tapPlan(500, 500);
+  await tool('Access', 'Access point'); await tapPlan(325, 475); await p.fill('#spSelLabel', 'Hatch in laundry');
+  await tool('Access', 'Low clearance'); await dragPlan(575, 225, 700, 300);
+  await tool('Findings', 'Timber damage'); await tapPlan(600, 375); await p.fill('#spSelLabel', 'Bearer');
+  await tool('Findings', 'Ant cap problem'); await tapPlan(400, 300);
+  const sub1 = await p.evaluate(() => ({ summary: document.getElementById('spSummary').textContent, legend: [...document.querySelectorAll('#spLegend li')].map(li => li.textContent), siteHit: sitePlanHit([700, 600]) }));
+  console.log('subfloor drawn:', JSON.stringify(sub1));
+  check(/1[0-9] piers or stumps, 1 dwarf wall, 2 vents, 1 access point, 1 low clearance area, 1 place timber damage was found and 1 ant cap problem/.test(sub1.summary), 'the subfloor is summed up: ' + sub1.summary);
+  check(sub1.legend.includes('Subfloor (suspended floor)') && sub1.legend.includes('Pier or stump') && sub1.legend.includes('Low clearance (restricted access)') && !sub1.legend.some(l => /bait station/.test(l)), 'the subfloor has its own legend, without the site plan symbols');
+  check(!sub1.siteHit, 'site plan symbols can\'t be picked up from the subfloor view');
+  await p.evaluate(() => { sitePlanEditor.sel = null; renderSitePlanEditor(); document.querySelector('#sitePlanOverlay .page-sheet-body').scrollTop = 0; });
+  await shot('editor-subfloor');
+  await tap(p.locator('#spViews .sp-view', { hasText: 'Site' }), 'Site view');
+  check(await p.evaluate(() => sitePlanEditor.layer === 'site' && [...document.querySelectorAll('#spLegend li')].some(li => /bait station/.test(li.textContent))), 'back on the site view, its legend returns');
   await tap(p.locator('#sitePlanOverlay .extract-btn', { hasText: 'Save site plan' }), 'Save site plan'); await p.waitForTimeout(300);
 
   // 3. Back on the record: the plan, its legend, and the station count.
-  const rec = await p.evaluate(() => ({ open: document.getElementById('sitePlanOverlay').classList.contains('open'), svg: !!document.querySelector('#trPlan svg'), legend: document.querySelectorAll('#trPlan .site-plan-legend li').length, bait: document.querySelector('#trMethods input[data-key="bait"]').checked, qty: document.querySelector('#trMethods [data-qty="bait"]').value }));
+  const rec = await p.evaluate(() => ({ open: document.getElementById('sitePlanOverlay').classList.contains('open'), svg: !!document.querySelector('#trPlan svg'), legend: document.querySelectorAll('#trPlan > .site-plan-legend li').length, bait: document.querySelector('#trMethods input[data-key="bait"]').checked, qty: document.querySelector('#trMethods [data-qty="bait"]').value }));
   console.log('record:', JSON.stringify(rec));
   check(!rec.open && rec.svg && rec.legend === 16, 'the record shows the plan and its legend');
+  check(await p.evaluate(() => !!document.querySelector('#trPlan .treat-plan-sub svg') && /subfloor plan shows/.test(document.querySelector('#trPlan .treat-plan-sub').textContent)), 'and the subfloor plan under it');
   check(rec.bait && rec.qty === '10', 'the 10 bait stations drawn fill the station count');
   await p.evaluate(() => document.getElementById('trPlan').scrollIntoView({ block: 'start' })); await shot('record-plan');
   await sign('#trSigCanvas');
   await tap(p.locator('#trSaveBtn'), 'Save treatment record'); await p.waitForTimeout(600);
-  const t = await p.evaluate(() => ({ plan: quoteState.treatment.plan && quoteState.treatment.plan.items.length, site: quoteState.treatment.site }));
+  const t = await p.evaluate(() => ({ plan: quoteState.treatment.plan && planLayerItems(quoteState.treatment.plan).length, site: quoteState.treatment.site }));
   check(t.plan === 25 && /Concrete slab/.test(t.site.floor), 'the plan and the site are kept with the treatment record');
 
   // 4. The certificates carry the plan, the legend and where each station is.
@@ -175,10 +199,11 @@ let shotN = 0;
     const name = install ? 'installation-certificate' : 'treatment-certificate';
     const text = await pdfShots(pdf.b64, name);
     console.log(name, pdf.fname, pdf.pages, 'pages');
-    check(pdf.pages === 2, `${name}: the certificate keeps page 1, and the plan gets page 2`);
+    check(pdf.pages === 3, `${name}: the certificate keeps page 1, the site plan gets page 2 and the subfloor page 3`);
     if (text) {
       check(/SITE PLAN/.test(text) && /LEGEND/.test(text) && /In-ground bait station \(8\)/.test(text) && /Above-ground bait station \(2\)/.test(text) && /Durable notice/.test(text), `${name}: the plan prints with its legend`);
       check(/WHERE EACH STATION IS/.test(text) && /Front left corner/.test(text) && /Approximate scale/.test(text) && /44 m/.test(text), `${name}: station locations under the plan`);
+      check(/SUBFLOOR PLAN/.test(text) && /Pier or stump/.test(text) && /Ant cap missing or damaged/.test(text) && /Walls of the building above/.test(text), `${name}: the subfloor plan prints with its own legend`);
       check(/THE SITE/.test(text) && /Brick/.test(text) && /Concrete slab/.test(text) && /None found/.test(text), `${name}: the site details print`);
     }
   }

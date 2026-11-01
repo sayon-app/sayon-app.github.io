@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>Sign your inspection agreement</title>
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
 <!-- The client's page for a link sent from the app: a pre-inspection
      agreement to sign (supabase/remote-signing.sql), or a treatment quote to
      accept or decline (supabase/client-link.sql). No account: the link's id
@@ -20,6 +22,8 @@
   .wrap { max-width: 680px; margin: 0 auto; padding: 24px 16px 64px; }
   .head { margin-bottom: 18px; }
   .company { font-size: 14px; font-weight: 700; color: var(--accent); letter-spacing: 0.02em; }
+  .from { font-size: 13px; color: var(--ink2); margin-top: 6px; line-height: 1.5; }
+  .from a { color: var(--accent); }
   h1 { font-size: 24px; line-height: 1.25; margin: 4px 0 6px; }
   .meta { color: var(--ink2); font-size: 15px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
@@ -169,6 +173,24 @@ function makePad(canvas, hint, onChange) {
   };
 }
 
+// Who sent this and how to reach them, so "contact your inspector" has a
+// number on it.
+function fromLine(doc) {
+  const p = el('p', 'from');
+  const who = [doc.inspector, doc.company].filter(Boolean).join(', ');
+  p.appendChild(document.createTextNode(who ? `Sent by ${who}. ` : ''));
+  const ways = [];
+  if (doc.phone) { const a = el('a', null, doc.phone); a.href = 'tel:' + String(doc.phone).replace(/[^\d+]/g, ''); ways.push(a); }
+  if (doc.email) { const a = el('a', null, doc.email); a.href = 'mailto:' + doc.email; ways.push(a); }
+  if (ways.length) {
+    p.appendChild(document.createTextNode('Questions? '));
+    ways.forEach((a, i) => { if (i) p.appendChild(document.createTextNode(' or ')); p.appendChild(a); });
+    p.appendChild(document.createTextNode('.'));
+  }
+  if (!p.textContent) p.hidden = true;
+  return p;
+}
+
 function renderForm(doc) {
   app.textContent = '';
   const head = el('div', 'head');
@@ -176,6 +198,7 @@ function renderForm(doc) {
   head.appendChild(el('h1', null, 'Pre-inspection agreement'));
   const meta = [doc.address, doc.inspectionDate && `Inspection ${formatDate(doc.inspectionDate)}`].filter(Boolean).join(' · ');
   if (meta) head.appendChild(el('p', 'meta', meta));
+  head.appendChild(fromLine(doc));
   app.appendChild(head);
 
   const textCard = el('div', 'card');
@@ -243,6 +266,7 @@ function renderQuote(doc) {
   head.appendChild(el('h1', null, 'Treatment quote'));
   const meta = [doc.address, doc.number && `Quote ${doc.number}`, doc.validUntil && `Valid until ${formatDate(doc.validUntil)}`].filter(Boolean).join(' · ');
   if (meta) head.appendChild(el('p', 'meta', meta));
+  head.appendChild(fromLine(doc));
   app.appendChild(head);
 
   const card = (title) => { const c = el('div', 'card'); if (title) c.appendChild(el('h2', 'sec', title)); app.appendChild(c); return c; };
@@ -394,6 +418,6 @@ function renderQuote(doc) {
   }
 })();
 </script>
-<div class="foot">Sent with SAYON · <a href="privacy.html">Privacy</a></div>
+<div class="foot">Sent with <a href="site/">SAYON</a>, the reporting app your inspector uses · <a href="privacy.html">Privacy</a></div>
 </body>
 </html>

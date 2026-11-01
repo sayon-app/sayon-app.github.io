@@ -111,6 +111,9 @@ function storeQuoteOnReport(q, cloud) {
   const entry = reports.find(r => r.id === q.reportKey);
   if (!entry) return;
   entry.quote = q;
+  // A new save of the report, so another device takes the quote in.
+  entry.cloudSavedAt = cloudBaseOf(entry);
+  entry.savedAt = Date.now();
   if (setSavedReports(reports) && cloud) supabaseSave(entry);
 }
 function quotePriceMemory() { return readJSON(quotePricesStorageKey(), {}); }
@@ -819,7 +822,7 @@ function closeQuote() {
   if (quoteReturnTo === 'app') {
     document.getElementById('app').style.display = 'flex';
     resumeSendReview();
-  } else document.getElementById('mainMenu').style.display = 'flex';
+  } else openApp('inspect');
 }
 
 // ── RENDERING ───────────────────────────────────────────────────────────────
@@ -1633,7 +1636,8 @@ function quoteLinkDoc(q, files) {
   const plan = q.plan || {};
   const lines = v => (v || '').split('\n').map(s => s.trim()).filter(Boolean);
   return {
-    kind: 'quote', company: company.name || '', client: (q.client || '').trim(), address: q.address || '', number: q.number || '',
+    kind: 'quote', company: company.name || '', phone: company.phone || '', email: company.email || '',
+    client: (q.client || '').trim(), address: q.address || '', number: q.number || '',
     date: isoDate(new Date(issued)), validUntil: isoDate(new Date(issued + validDays * 86400000)), inspector: q.inspector || '',
     gst: q.gst !== false,
     items: q.items.map(it => ({ desc: it.desc || '', detail: it.detail || '', qty: it.qty, unit: pluralUnit(it.unit, it.qty),

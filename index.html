@@ -67,7 +67,7 @@
     <!-- Sign Up -->
     <div class="auth-card" id="authSignUp" style="display:none">
       <h2 class="auth-title">Create your account</h2>
-      <p class="auth-subtitle">Set up SAYON for your business</p>
+      <p class="auth-subtitle">14 days free, no card needed. Set up SAYON for your business.</p>
       <div class="auth-field">
         <label class="auth-label" for="suName">Your Name</label>
         <input class="auth-input" id="suName" type="text" placeholder="e.g. Luke Smith" autocomplete="name">
@@ -131,6 +131,7 @@
     </div>
 
     <p class="auth-footer">By continuing you agree to SAYON's <a href="terms.html" target="_blank">Terms of Service</a> and <a href="privacy.html" target="_blank">Privacy Policy</a></p>
+    <p class="auth-footer">Need a hand? <a href="mailto:sayon.application@gmail.com?subject=SAYON%20help">Email SAYON</a></p>
   </div>
 </div>
 
@@ -154,17 +155,17 @@
     <div class="auth-card ob-panel" id="ob-panel-0">
       <div class="auth-badge" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/><path d="M9 10h.01M15 10h.01"/></svg></div>
       <h2 class="auth-title" id="obBusinessTitle">Set up your business</h2>
-      <p class="auth-subtitle">This appears on every report, quote and certificate you send to clients.</p>
+      <p class="auth-subtitle">This appears on every report, quote and certificate you send to clients. Only the name is needed now; the rest can be added later from your initials, top right.</p>
       <div class="auth-field">
         <label class="auth-label" for="ob-companyName">Business Name</label>
         <input class="auth-input" id="ob-companyName" placeholder="e.g. ABC Pest Control">
       </div>
       <div class="auth-field">
-        <label class="auth-label" for="ob-licence">Pest Licence No.</label>
+        <label class="auth-label" for="ob-licence">Pest Licence No. <span class="auth-label-optional">(can wait)</span></label>
         <input class="auth-input" id="ob-licence" placeholder="e.g. PL12345">
       </div>
       <div class="auth-field">
-        <label class="auth-label" for="ob-phone">Business Phone</label>
+        <label class="auth-label" for="ob-phone">Business Phone <span class="auth-label-optional">(can wait)</span></label>
         <input class="auth-input" id="ob-phone" type="tel" onchange="tidyPhoneInput(this)" placeholder="e.g. 0400 000 000">
       </div>
       <div class="auth-field">
@@ -704,7 +705,7 @@
       <span class="progress-ring-label" id="progressRingLabel" style="display:none">Complete</span>
     </div>
   </header>
-  <div class="ai-busy-bar" role="status" aria-live="polite"><span id="aiBusyText">Filling in the report…</span></div>
+  <div class="ai-busy-bar" role="status" aria-live="polite"><span id="aiBusyText">Filling in the report…</span><button type="button" class="ai-keep-btn" id="aiKeepBtn" hidden onclick="keepNoteForLater()">Keep for later</button></div>
 
   <!-- DRAWER OVERLAY -->
   <div class="drawer-overlay" id="drawerOverlay" onclick="toggleDrawer()"></div>
@@ -921,34 +922,20 @@
               <li>reading a compliance plate from a photo</li>
               <li>checking a photo when you tap Analyze</li>
             </ul>
-            <p>Listening while you talk is free and never counts. A typical inspection uses about 5 to 10 AI fills.</p>
+            <p>Listening while you talk is free and never counts. A typical inspection uses about 10 to 20 AI fills.</p>
             <p><strong>If you run out,</strong> nothing is lost. Your notes stay in the report and you can keep typing it by hand. AI fills come back on the 1st of each month, and upgrading gives you the bigger number straight away.</p>
           </div>
-          <div class="settings-row">
+          <div class="settings-row" data-plan="starter">
             <div class="settings-row-text">
-              <div class="settings-row-title">Starter — $49/mo <span style="font-weight:400;opacity:.65">(draft pricing)</span></div>
-              <div class="settings-row-desc">About 20 inspections a month (150 AI fills). Suits a part-time inspector, or about one inspection a day.</div>
+              <div class="settings-row-title">Solo — $89/mo</div>
+              <div class="settings-row-desc">About 40 inspections a month (800 AI fills). Suits a full-time solo inspector.</div>
             </div>
             <button class="job-action-btn settings-primary-btn" onclick="openCheckout('starter')">Upgrade</button>
           </div>
           <div class="settings-row">
             <div class="settings-row-text">
-              <div class="settings-row-title">Pro — $99/mo <span style="font-weight:400;opacity:.65">(draft pricing)</span></div>
-              <div class="settings-row-desc">About 55 inspections a month (400 AI fills). Suits a full-time inspector doing 2 to 3 a day.</div>
-            </div>
-            <button class="job-action-btn settings-primary-btn" onclick="openCheckout('pro')">Upgrade</button>
-          </div>
-          <div class="settings-row">
-            <div class="settings-row-text">
-              <div class="settings-row-title">Business — $199/mo <span style="font-weight:400;opacity:.65">(draft pricing)</span></div>
-              <div class="settings-row-desc">About 280 inspections a month (2000 AI fills). Suits a busy business doing lots of inspections.</div>
-            </div>
-            <button class="job-action-btn settings-primary-btn" onclick="openCheckout('business')">Upgrade</button>
-          </div>
-          <div class="settings-row">
-            <div class="settings-row-text">
-              <div class="settings-row-desc">Prices are monthly in Australian dollars, no GST. Cancel any time in Manage, and your plan runs to the end of the month you've paid for. The free trial is 14 days with 50 AI fills (about 7 inspections), and no card is needed.</div>
-              <div class="settings-row-desc" style="font-style:italic">Pricing shown is a draft for review, not final.</div>
+              <div class="settings-row-desc">Prices are monthly in Australian dollars, no GST. Cancel any time in Manage, and your plan runs to the end of the month you've paid for. The free trial is 14 days with 50 AI fills (about 3 to 5 inspections), and no card is needed. Paying opens in your browser; come back to SAYON afterwards and your plan shows here.</div>
+              <div class="settings-row-desc">Team and Business plans, priced per inspector, are coming soon.</div>
             </div>
           </div>
         </div>
@@ -1013,10 +1000,10 @@
           <div class="settings-group-title">Voice</div>
           <div class="settings-row">
             <div class="settings-row-text">
-              <div class="settings-row-title">Second transcription (trial)</div>
+              <div class="settings-row-title">Second transcription (experimental)</div>
               <div class="settings-row-desc">Also sends the recording to a more accurate transcription service and shows its version for you to check. Nothing changes unless you apply it. Off by default while it's tried on more phones.</div>
             </div>
-            <button type="button" class="toggle-switch" id="toggleAudioCapture" onclick="toggleAudioCaptureSetting()" aria-label="Second transcription (trial)"></button>
+            <button type="button" class="toggle-switch" id="toggleAudioCapture" onclick="toggleAudioCaptureSetting()" aria-label="Second transcription (experimental)"></button>
           </div>
           <div class="settings-row">
             <div class="settings-row-text">
@@ -1067,6 +1054,13 @@
         </div>
       </div>
 
+
+      <!-- Help: one real address, the same one the legal pages give. -->
+      <a class="panel-label drawer-help" href="mailto:sayon.application@gmail.com?subject=SAYON%20help">
+        <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
+        <span class="panel-title">Help and support</span>
+        <span class="job-panel-summary">Email us</span>
+      </a>
 
       <div class="drawer-legal"><a href="terms.html" target="_blank" rel="noopener">Terms of Service</a> · <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a></div>
 
@@ -1844,6 +1838,13 @@
       </svg>
       <span id="voiceBtnText">Tap to Speak</span>
     </button>
+    <!-- A photo taken while talking lands on the finding being described
+         once the note is filled in (see PHOTOS WHILE TALKING in js/app.js). -->
+    <button type="button" class="voice-photo-btn" id="voicePhotoBtn" onclick="takePhotoWhileTalking()">
+      <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      <span id="voicePhotoBtnText">Photo of what you're describing</span>
+    </button>
+    <input type="file" id="talkPhotoInput" accept="image/*" capture="environment" multiple style="display:none" onchange="handleTalkPhotoFiles(this)">
 
     <div class="waveform" id="waveform">
       <div class="wave-bar"></div><div class="wave-bar"></div>
@@ -1884,7 +1885,7 @@
     </div>
 
     <!-- Server-side (Whisper) transcription suggestion — experimental,
-         opt-in (Settings → "Second transcription (trial)"), and
+         opt-in (Settings → "Second transcription (experimental)"), and
          suggest-and-confirm for the same reason the AI cleanup panel above
          is: this has never run in real field conditions yet, and silently
          replacing a transcript the technician can already see and trust is

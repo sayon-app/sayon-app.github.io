@@ -90,8 +90,12 @@ let lastActiveAccountUserId = null;
 // ══════════════════════════════════════════════════════════════════════════
 const OB_KEY = 'korva_onboarded_v1';
 
+// Per account, and decided from the data too: a new person on a phone that
+// was used before still sets up their business, and an existing customer on
+// a new phone (whose details come down with the account) doesn't repeat it.
+function obKey() { return authUser && authUser.id ? `${OB_KEY}:${authUser.id}` : OB_KEY; }
 function shouldShowOnboarding() {
-  return !localStorage.getItem(OB_KEY);
+  return !localStorage.getItem(obKey()) && !getCompanyDetails().updatedAt;
 }
 
 function showOnboarding() {
@@ -257,7 +261,7 @@ function obRunDemo() {
 }
 
 function obFinish() {
-  localStorage.setItem(OB_KEY, '1');
+  try { localStorage.setItem(obKey(), '1'); } catch (e) {}
   document.getElementById('onboardScreen').style.display = 'none';
   document.getElementById('mainMenu').style.display      = 'flex';
   // Open the job details so they can start a new job immediately
@@ -1103,6 +1107,133 @@ function accessSpotPhotos() {
 
 function restoreResState() { renderAccessSummary(); }
 
+// ── PHOTOS WHILE TALKING ─────────────────────────────────────────────────
+// The inspector describes a spot and photographs it in the same breath.
+// A photo taken from the voice popover is kept with the words heard around
+// the moment it was taken (reportData.photosBySection.findings[i].heard),
+// and once the note has filled the report it moves onto the finding whose
+// place those words name, with the sentence as its caption. One that
+// matches no finding stays in the Findings photos, caption blank.
+const TALK_WINDOW_BEFORE_MS = 30000, TALK_WINDOW_AFTER_MS = 20000;
+let speechTimeline = []; // [{ t, text }] for the open report, this session
+
+function speechHeard(text) {
+  const t = Date.now();
+  const clean = String(text || '').trim();
+  if (!clean) return;
+  speechTimeline.push({ t, text: clean });
+  if (speechTimeline.length > 400) speechTimeline = speechTimeline.slice(-300);
+  // Words said just after the photo belong to it too.
+  let touched = false;
+  for (const p of getSectionPhotos('findings')) {
+    if (p.heard && !p.heard.placed && t - p.heard.at <= TALK_WINDOW_AFTER_MS) { p.heard.text = heardAround(p.heard.at); touched = true; }
+  }
+  if (touched) saveDraft();
+}
+
+function heardAround(at) {
+  // Each stretch of speech on its own line, so a caption can be one of them.
+  return speechTimeline.filter(e => e.t >= at - TALK_WINDOW_BEFORE_MS && e.t <= at + TALK_WINDOW_AFTER_MS).map(e => e.text).join('\n').trim();
+}
+
+function takePhotoWhileTalking() {
+  const input = document.getElementById('talkPhotoInput');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+async function handleTalkPhotoFiles(input) {
+  const files = Array.from(input.files || []);
+  input.value = '';
+  if (!files.length) return;
+  const at = Date.now();
+  const before = new Set(getSectionPhotos('findings').map(p => p.id));
+  await handleSectionPhotoFiles(files, 'findings');
+  const added = getSectionPhotos('findings').filter(p => !before.has(p.id));
+  added.forEach(p => { p.heard = { at, text: heardAround(at) }; });
+  if (added.length) {
+    showToast(added.length === 1 ? 'Photo kept. It lands on the finding you\'re describing once the note is filled in' : `${added.length} photos kept for the findings you're describing`, 'success');
+    renderSectionPhotoGrid('findings');
+    saveDraft();
+  }
+  updateTalkPhotoButton();
+}
+
+function talkPhotosWaiting() {
+  return getSectionPhotos('findings').filter(p => p.heard && !p.heard.placed);
+}
+
+function updateTalkPhotoButton() {
+  const btn = document.getElementById('voicePhotoBtn'), label = document.getElementById('voicePhotoBtnText');
+  if (!btn || !label) return;
+  const n = talkPhotosWaiting().length;
+  btn.classList.toggle('has-photos', n > 0);
+  label.textContent = n ? `${n} photo${n === 1 ? '' : 's'} waiting for the fill · take another` : 'Photo of what you\'re describing';
+}
+
+// Words that say where a finding is, for matching speech to a finding.
+const talkPlaceWords = t => keyWords(t).filter(w => !PLACE_FILLER.has(w) && !TALK_SKIP.has(w));
+const TALK_SKIP = new Set(['termite', 'termites', 'live', 'active', 'activity', 'there', 'here', 'yeah', 'okay', 'right', 'just', 'like', 'some', 'then', 'also', 'have', 'been', 'were', 'what', 'about', 'looks', 'look', 'found', 'photo', 'picture', 'taking', 'take']);
+
+// The finding the heard words name best: the most place words in common,
+// at least two, or one when only one finding has a place at all.
+function findingForHeard(text, findings) {
+  const said = new Set(talkPlaceWords(text));
+  if (!said.size) return null;
+  const placed = findings.filter(f => f && f.id && f.termiteActivity !== 'NONE' && (f.activityLocation || f.damageDescription || f.timberAffected));
+  let best = null, bestScore = 0, second = 0;
+  for (const f of placed) {
+    const words = new Set(talkPlaceWords([f.activityLocation, f.timberAffected, f.damageDescription].join(' ')));
+    let score = 0; words.forEach(w => { if (said.has(w)) score++; });
+    if (score > bestScore) { second = bestScore; bestScore = score; best = f; }
+    else if (score > second) second = score;
+  }
+  if (!best || bestScore === second) return null;
+  if (bestScore >= 2 || (bestScore === 1 && placed.length === 1)) return best;
+  return null;
+}
+
+// The sentence of the heard words that names the finding, tidied for a
+// caption: fillers out, first letter up, cut at a reasonable length.
+function talkCaption(text, finding) {
+  const want = new Set(talkPlaceWords([finding.activityLocation, finding.timberAffected, finding.damageDescription].join(' ')));
+  const parts = String(text).split(/\n+|(?<=[.!?])\s+|\s+(?=(?:and then|then|so|okay|right|um|next)\b)/i).map(s => s.trim()).filter(Boolean);
+  // The stretch that names the finding best.
+  let pick = '', pickScore = 0;
+  for (const part of parts) { const n = talkPlaceWords(part).filter(w => want.has(w)).length; if (n > pickScore) { pickScore = n; pick = part; } }
+  if (!pick) pick = parts[0] || '';
+  pick = pick.replace(/\b(um+|uh+|erm)\b[,.]?\s*/gi, ' ').replace(/^(?:\s*(?:okay|ok|right|so|yeah|like|and|then|well)\b[,.]?\s*)+/i, '').replace(/\s+/g, ' ').replace(/^[\s,.;:-]+|[\s,;:-]+$/g, '').trim();
+  if (pick.length > 110) pick = pick.slice(0, 107).replace(/\s+\S*$/, '') + '…';
+  return pick ? pick.charAt(0).toUpperCase() + pick.slice(1) : '';
+}
+
+function placeTalkPhotos() {
+  const waiting = talkPhotosWaiting();
+  if (!waiting.length) return 0;
+  const findings = reportData.findings || [];
+  let moved = 0;
+  for (const p of waiting) {
+    const text = p.heard.text || heardAround(p.heard.at);
+    const f = findingForHeard(text, findings);
+    if (!f) continue;
+    const section = findingPhotoSection(f.id);
+    if (getSectionPhotos(section).length >= sectionPhotoLimit(section)) continue;
+    reportData.photosBySection.findings = getSectionPhotos('findings').filter(x => x.id !== p.id);
+    if (!p.caption) p.caption = talkCaption(text, f);
+    p.heard.placed = f.id;
+    getSectionPhotos(section).push(p);
+    moved++;
+  }
+  if (moved) {
+    renderSectionPhotoGrid('findings');
+    renderFindingsUI();
+    showToast(moved === 1 ? 'Your photo is on the finding you described' : `${moved} photos are on the findings you described`, 'success');
+  }
+  updateTalkPhotoButton();
+  return moved;
+}
+
 // Findings with termite activity or evidence where "Refer to a builder or
 // engineer?" has no answer. A blank is never read as "no referral".
 function findingsMissingReferral() {
@@ -1705,6 +1836,7 @@ HINDERED AND RESTRICTED ACCESS: five fields, each with one meaning. The report s
 - hinderedAreas: HINDERED access: the areas or parts the inspector could not fully inspect because of temporary obstructions or low clearance, whether they got in or not. Name only the limited areas and parts ("Roof void: outer edges and corners, low clearance. Subfloor: back section behind stored items. Bedrooms: walls behind furniture"). It is NOT a list of what was inspected, and it never names an area that was fully inspected. Null when the note states nothing was in the way, and also null when the note simply does not raise the subject.
 - hinderedAreasDetail: what hindered access in hinderedAreas ("low clearance; stored items; furniture against walls"). Null when hinderedAreas is null.
 - highRiskAreas: places the inspector could NOT inspect and would want checked once access exists ("back section of the subfloor behind the stored items", "roof void outer edges"). Every place in noAccessAreas belongs here too. An unreached area stays here even when evidence was seen at its edge. It is never a place where activity WAS found and inspected (that is a finding), never a clear area, and never an area the note does not mention.
+- A garden bed, soil, paving or mulch that covers or bridges the slab edge or weep holes while the inspector still walked and saw that stretch of the exterior is NOT an obstruction: that area stays fully inspected, and the cover goes in slabEdge, weepHoles, softLandscaping/hardLandscaping and zone75mmVisible/zone25mmVisible instead. Use obstructions/hinderedAreas/highRiskAreas there only when it actually stopped the inspector from reaching or seeing that part.
 
 TERMITE FINDINGS (findings is always an array; it holds termites only):
 - One entry per distinct place where live termites or termite evidence was found. A new entry when the location, the status or the species changes ("and over near the...", "separately", "also"). Never merge two places into one entry, and never put a finding's details in another finding.
@@ -1985,7 +2117,11 @@ window.addEventListener('load', () => {
 
       const hasSession = await restoreAuthSession();
       if (hasSession) { enterApp(); }
-      else { document.getElementById('authScreen').style.display = 'flex'; showAuth('authSignIn'); }
+      else {
+        document.getElementById('authScreen').style.display = 'flex';
+        // The website's "Start your free trial" lands on the sign-up card.
+        showAuth(new URLSearchParams(window.location.search).get('signup') ? 'authSignUp' : 'authSignIn');
+      }
     }, 600);
   }, 2200);
 });
@@ -2033,7 +2169,7 @@ function openApp(appName) {
     if (restored) lastLocalSaveAt = Date.now();
     updateSyncStatus();
     // pull any cloud reports not on this device, then sort out photo storage
-    supabaseSyncOnOpen().finally(tidyPhotoStorage);
+    supabaseSyncOnOpen().then(pushUnsyncedReports).finally(tidyPhotoStorage);
     processPendingNotes();
   }
 }
@@ -2939,7 +3075,7 @@ function whisperApply() {
     text = correctKnownMishearings(text);
     const stopAt = text.search(VOICE_STOP_LIVE_RE);
     if (stopAt >= 0) text = text.slice(0, stopAt).trim();
-    if (text) currentTranscript += text + ' ';
+    if (text) { currentTranscript += text + ' '; speechHeard(text); }
     pulseWave();
     if (stopAt >= 0 && isRecording) {
       stopRecording();
@@ -3068,6 +3204,9 @@ function startRecording() {
       }
       currentTranscript += final;
       pendingInterim = interim;
+      // Each phrase goes to the draft as it lands, so a tab the phone kills
+      // mid-dictation loses the current sentence at most.
+      if (final) { speechHeard(final); saveDraft(); }
       pulseWave();
       const box = document.getElementById('transcriptBox');
       box.textContent = currentTranscript + interim;
@@ -3542,13 +3681,21 @@ async function requestExtraction(text) {
     saveTestNote(text, parsed, null, seconds());
     return parsed;
   } catch (err) {
-    const reason = err.noSignal ? 'no_signal' : err.tooLong ? 'too_long' : err.badAnswer ? 'bad_answer'
+    const reason = err.kept ? 'kept_for_later' : err.noSignal ? 'no_signal' : err.tooLong ? 'too_long' : err.badAnswer ? 'bad_answer'
       : err.status ? 'http_' + err.status : 'other';
     track('note_failed', { reason, seconds: seconds() });
     saveTestNote(text, null, reason, seconds());
     if (!err.noSignal && ![401, 402, 429].includes(err.status)) reportError(new Error('Extraction failed: ' + reason), 'extraction');
     throw err;
   }
+}
+
+// The fill in flight, so "Keep for later" on the busy bar can stop it.
+let activeExtraction = null;
+function keepNoteForLater() {
+  if (!activeExtraction) return;
+  activeExtraction.kept = true;
+  activeExtraction.controller.abort();
 }
 
 async function callExtraction(text) {
@@ -3558,6 +3705,7 @@ async function callExtraction(text) {
   const learned = learnedPromptBlock();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), EXTRACTION_TIMEOUT_MS);
+  const mine = activeExtraction = { controller, kept: false };
   let res, rawBody;
   try {
     res = await workerFetch('', {
@@ -3586,9 +3734,11 @@ async function callExtraction(text) {
     rawBody = await res.text();
   } catch (err) {
     // fetch() only rejects when the request never got an answer.
+    if (mine.kept) throw Object.assign(noSignal('kept for later'), { kept: true });
     throw noSignal(err && err.name === 'AbortError' ? 'no answer in time' : 'no connection');
   } finally {
     clearTimeout(timer);
+    if (activeExtraction === mine) activeExtraction = null;
   }
 
   // The worker refuses a request (expired sign-in, plan ended, usage
@@ -3930,8 +4080,13 @@ function mergeLearned(a, b) {
 // save is dropped silently: testing must never get in the way of the report.
 const TEST_MODE_KEY = 'korva_test_mode';
 
+// The switch is for checking the AI on a business set up for it
+// (businesses.settings.testMode), not for every customer.
+function testModeAllowed() {
+  return isBusinessOwner() && !!(authBusiness && authBusiness.settings && authBusiness.settings.testMode);
+}
 function testModeOn() {
-  try { return localStorage.getItem(TEST_MODE_KEY) === '1' && isBusinessOwner(); } catch (e) { return false; }
+  try { return localStorage.getItem(TEST_MODE_KEY) === '1' && testModeAllowed(); } catch (e) { return false; }
 }
 
 function saveTestNote(transcript, extraction, problem, seconds) {
@@ -3955,10 +4110,10 @@ function showTestModeBadge() {
   if (badge) badge.hidden = !testModeOn();
 }
 
-// The row only shows for the business owner.
+// The row only shows where test mode is allowed (see testModeAllowed).
 function restoreTestModeSetting() {
   const row = document.getElementById('testModeRow');
-  if (row) row.hidden = !isBusinessOwner();
+  if (row) row.hidden = !testModeAllowed();
   const btn = document.getElementById('toggleTestMode');
   if (btn) {
     const on = testModeOn();
@@ -3979,6 +4134,7 @@ function isNoteSpecificProblem(err) {
 function extractionProblem(err) {
   switch (err && err.status) {
     case 401: return 'Your sign-in has expired. Close SAYON, open it again and sign in';
+    case 403: return 'Your account is still being set up. Close SAYON and open it again';
     case 402: return 'Your SAYON plan has ended. Subscribe in Menu › Billing';
     case 429: return 'This month\'s AI fills are used up. Your note is kept. Upgrade in Menu › Billing, or they come back on the 1st';
     case 413: return 'A note is too long for the AI in one go. Delete it and say it again in shorter parts';
@@ -4109,7 +4265,10 @@ async function runFill({ whileRecording = false } = {}) {
       if (!isRecording) document.getElementById('extractBtn').disabled = false;
       return false;
     }
-    if (isNoteSpecificProblem(err)) {
+    if (err.kept) {
+      setAI('ready', 'Note saved');
+      showToast('Note saved under Waiting notes. Tap Fill in now when you\'re ready', 'info');
+    } else if (isNoteSpecificProblem(err)) {
       const waiting = getPendingNotes()[getPendingNotes().length - 1];
       if (waiting) { waiting.problem = extractionProblem(err); saveDraft(); renderPendingNotes(); }
       setAI('ready', 'Note saved');
@@ -4223,7 +4382,7 @@ async function processPendingNotes(manual) {
   pendingNotesRunning = true;
   renderPendingNotes();
   setAI('thinking', 'Filling in saved notes...');
-  let filled = 0, stillNoSignal = false, stuck = 0;
+  let filled = 0, stillNoSignal = false, stuck = 0, kept = false;
   try {
     // Oldest first. A note with a problem of its own (too long, an answer
     // that isn't JSON) is marked and skipped so it can't block the notes
@@ -4235,6 +4394,7 @@ async function processPendingNotes(manual) {
       try {
         extracted = await requestExtraction(note.text);
       } catch (err) {
+        if (err.kept) { kept = true; break; }
         if (err.noSignal) { stillNoSignal = true; break; }
         if (isNoteSpecificProblem(err)) {
           note.problem = extractionProblem(err);
@@ -4271,6 +4431,7 @@ async function processPendingNotes(manual) {
   // Fill in now shows what the notes filled; processTranscript() shows its
   // own sheet when it ran the queue.
   if (filled && manual && !extractSummaryOwned && reportData === target) showExtractSummary(before);
+  else if (kept) showToast('Your notes are kept under Waiting notes. Tap Fill in now when you\'re ready', 'info');
   else if (stillNoSignal && manual) showToast('Still no signal — the notes will fill in when you\'re back online', 'info');
   if (stuck && (manual || !filled)) showToast(`${stuck} note${stuck !== 1 ? 's' : ''} couldn't be read — see the reason under the note`, 'error');
 }
@@ -5004,8 +5165,9 @@ function populateFields(data, transcript) {
     setTimeout(() => {
       if (reportData !== target) { resolve(); return; }
       autoReveal(data);
-      saveDraft();
       ensureTreatmentForLiveTermites();
+      placeTalkPhotos();
+      saveDraft();
       resolve();
     }, entries.length * 70 + 50);
   });
@@ -7644,7 +7806,8 @@ async function sendAgreementLink() {
   if (!navigator.onLine) { showToast('Sending a link needs signal. Try again when you have it', 'error'); return; }
   const values = agreementFormValues();
   const company = getCompanyDetails();
-  const doc = { company: company.name || '', client: signerName, address: getFullAddress(),
+  const doc = { company: company.name || '', phone: company.phone || '', email: company.email || '',
+    inspector: (document.getElementById('jobInspector') || {}).value?.trim() || '', client: signerName, address: getFullAddress(),
     inspectionDate: values.inspectionDate, standard: values.standard, text: values.text };
   const btn = document.getElementById('agreementLinkBtn');
   if (btn) btn.disabled = true;
@@ -7687,7 +7850,7 @@ async function sendAgreementLinkOn() {
       const company = getCompanyDetails().name || 'your inspector';
       const sent = await sendPdfsDirect({ files: [file], to,
         subject: `Please sign: pre-inspection agreement for ${getFullAddress() || 'your inspection'}`,
-        body: `${agreementLinkMessage(r)}\n\n${agreementLinkUrl(r.id)}\n\nA copy of the agreement is attached.\n\n${company}` });
+        body: `${agreementLinkMessage(r)}\n\n${agreementLinkUrl(r.id)}\n\nA copy of the agreement is attached.\n\nKind regards,\n${[(document.getElementById('jobInspector') || {}).value?.trim(), company].filter(Boolean).join('\n')}` });
       if (sent) {
         r.emailedTo = to; r.emailedAt = Date.now();
         saveDraft(); renderAgreementRemote();
@@ -8312,7 +8475,7 @@ async function handleSectionPhotoFiles(fileList, section) {
       const id = genPhotoId();
       await putPhotoBlob(id, blob);
       existing.push({ id, width, height, caption: '' });
-    } catch(e) { showToast('Could not process photo', 'error'); }
+    } catch(e) { showToast(photoStoreProblem(e), 'error'); }
   }
   if (replacing && existing.length) reportData.photosBySection[section] = existing;
   renderSectionPhotoGrid(section);
@@ -8652,6 +8815,7 @@ function toggleVoicePopover() {
   const isOpen = popover.classList.toggle('open');
   fab.classList.toggle('open', isOpen);
   showTestModeBadge();
+  if (isOpen) updateTalkPhotoButton();
 
   // If closing while in notes-dictation mode, reset to default
   if (!isOpen && activeNotesTargetKey) {
@@ -9428,6 +9592,8 @@ function clearSession() {
 // breaking silently.
 const KORVA_WORKER_URL = 'https://korva.byronguyatt2.workers.dev';
 let billingStatusCache = null;
+// Where "contact us" points, everywhere in the app.
+const SUPPORT_EMAIL = 'sayon.application@gmail.com';
 
 function resetBillingDisplay() {
   const el = document.getElementById('billingStatusText');
@@ -9437,8 +9603,12 @@ function resetBillingDisplay() {
   billingStatusCache = null;
 }
 
-// "12 of 150 AI fills used this month, about 20 inspections left. They come
-// back on 1 Nov." The Worker starts a new count each calendar month (UTC).
+// A real job takes 8 to 20 fills (the pricing doc's measurement); plans are
+// sized at 20 so a busy job never comes up short.
+const FILLS_PER_INSPECTION = 20;
+
+// "12 of 800 AI fills used this month, about 39 inspections left. They come
+// back on 1 Dec." The Worker starts a new count each calendar month (UTC).
 // A trial ends before its count matters, so it doesn't say when they come back.
 function billingUsageText(sub, trial) {
   const used = sub.ai_calls_used_this_period ?? 0;
@@ -9449,7 +9619,7 @@ function billingUsageText(sub, trial) {
   const now = new Date();
   const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const when = next.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
-  const inspections = Math.floor(left / 7);
+  const inspections = Math.floor(left / FILLS_PER_INSPECTION);
   const leftText = left === 0 ? 'none left' : `about ${inspections} inspection${inspections === 1 ? '' : 's'} left`;
   return `${used} of ${limit} AI fills used${period}, ${leftText}.` + (trial ? '' : ` They come back on ${when}.`);
 }
@@ -9468,23 +9638,71 @@ async function loadBillingStatus() {
     // Signed out, or into another account, while this was loading.
     if (!authUser || authUser.id !== forUser) return;
     billingStatusCache = sub;
-    const planLabel = (sub.plan || 'trial').charAt(0).toUpperCase() + (sub.plan || 'trial').slice(1);
-    if (el) {
-      if (sub.status === 'trialing') {
-        const daysLeft = sub.trial_ends_at ? Math.max(0, Math.ceil((new Date(sub.trial_ends_at) - Date.now()) / 86400000)) : null;
-        el.textContent = `Free trial${daysLeft !== null ? `, ${daysLeft} day${daysLeft === 1 ? '' : 's'} left` : ''}. ${billingUsageText(sub, true)}`;
-      } else {
-        el.textContent = `${planLabel} plan. ${billingUsageText(sub)}`;
-      }
-    }
+    const planLabel = planDisplayLabel(sub.plan);
+    if (el) el.textContent = billingStatusLine(sub, planLabel);
     if (manageBtn) manageBtn.style.display = sub.stripe_customer_id ? '' : 'none';
+    markCurrentPlan(sub);
+    return sub;
   } catch (e) {
     if (!authUser || authUser.id !== forUser) return;
-    // Expected right now — the Stripe Worker routes aren't deployed yet.
-    // Fails quietly to a plain message rather than breaking the Billing panel.
-    if (el) el.textContent = 'Billing isn\'t set up yet — check back soon.';
-    console.warn('loadBillingStatus unavailable (expected until Stripe Worker is deployed):', e.message);
+    // Say which it is: no signal, an account still being set up, or a
+    // failure to try again, never "billing isn't set up".
+    const status = parseInt((String(e.message).match(/HTTP (\d+)/) || [])[1], 10);
+    if (el) el.textContent = !navigator.onLine ? 'No signal, so your plan can\'t be checked right now. It still works offline.'
+      : status === 403 ? 'Your account is still being set up. Close SAYON and open it again'
+      : 'Couldn\'t load your plan. Close this panel and open Billing again';
+    console.warn('loadBillingStatus failed:', e.message);
   }
+}
+
+// Display name for a stored plan key. The stored key (trial/starter/pro/business)
+// never changes; only what we show for it does.
+function planDisplayLabel(plan) {
+  if (plan === 'starter') return 'Solo';
+  if (!plan) return 'Trial';
+  return plan.charAt(0).toUpperCase() + plan.slice(1);
+}
+
+// The one line under Current Plan, for each state the plan can be in.
+function billingStatusLine(sub, planLabel) {
+  const when = iso => iso ? new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : '';
+  if (sub.status === 'trialing') {
+    const daysLeft = sub.trial_ends_at ? Math.max(0, Math.ceil((new Date(sub.trial_ends_at) - Date.now()) / 86400000)) : null;
+    if (daysLeft === 0) return 'Your free trial has ended. Choose a plan below to keep using AI fills; your reports and notes are all still here.';
+    return `Free trial${daysLeft !== null ? `, ${daysLeft} day${daysLeft === 1 ? '' : 's'} left` : ''}. ${billingUsageText(sub, true)}`;
+  }
+  if (sub.status === 'past_due') return `${planLabel} plan, but the last payment failed. Update your card in Manage${sub.current_period_end ? ` before ${when(sub.current_period_end)}` : ''} or AI fills stop.`;
+  if (sub.status === 'canceled' || sub.status === 'cancelled') return `Your ${planLabel} plan has ended. Choose a plan below to keep using AI fills; your reports stay in your account either way.`;
+  if (sub.cancel_at_period_end && sub.current_period_end) return `${planLabel} plan, ending on ${when(sub.current_period_end)}. ${billingUsageText(sub)}`;
+  return `${planLabel} plan. ${billingUsageText(sub)}`;
+}
+
+// The plan list says which row is the current plan, and the other buttons
+// read Switch rather than Upgrade for someone already paying.
+function markCurrentPlan(sub) {
+  const paying = sub && sub.plan && sub.plan !== 'trial' && ['active', 'past_due'].includes(sub.status);
+  document.querySelectorAll('#billingPanel [data-plan]').forEach(row => {
+    const btn = row.querySelector('button');
+    const current = paying && row.dataset.plan === sub.plan;
+    row.classList.toggle('current-plan', current);
+    if (btn) btn.textContent = current ? 'Current plan' : paying ? 'Switch' : 'Upgrade';
+    if (btn) btn.disabled = !!current;
+  });
+}
+
+// Back from Stripe Checkout: the webhook that records the payment can land
+// a few seconds after the redirect. Until it does, the panel would still
+// offer Upgrade, and a second tap could start a second subscription.
+async function confirmBillingAfterCheckout() {
+  const el = document.getElementById('billingStatusText');
+  if (el) el.textContent = 'Confirming your payment…';
+  for (let i = 0; i < 10; i++) {
+    const sub = await loadBillingStatus();
+    if (sub && (sub.status !== 'trialing' || sub.subscribed)) { showToast('Subscription updated — thanks!', 'success'); return; }
+    if (el && i < 9) el.textContent = 'Confirming your payment…';
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  showToast('Payment received. Your plan shows here once Stripe confirms it, usually within a minute', 'info');
 }
 
 // Strips any existing query string / hash and attaches a `billing=` marker
@@ -9543,8 +9761,7 @@ function handleBillingReturn() {
     if (!billing) return;
 
     if (billing === 'success') {
-      showToast('Subscription updated — thanks!', 'success');
-      loadBillingStatus();
+      confirmBillingAfterCheckout();
     } else if (billing === 'cancelled') {
       showToast('Checkout cancelled — no changes made', 'info');
     } else if (billing === 'updated') {
@@ -9585,6 +9802,9 @@ async function supabaseAuth(endpoint, body) {
     headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
     body: JSON.stringify(body),
   });
+  // Supabase itself being down is not a refusal: callers treat a thrown
+  // error like no signal and keep the saved sign-in.
+  if (res.status >= 500) throw new Error(`Supabase auth HTTP ${res.status}`);
   const data = await res.json().catch(() => ({}));
   // FIX: callers (signIn/signUp) were written against the older OAuth2-style
   // error shape ({error: {message: '...'}}) and checked `if (data.error)`.
@@ -9720,6 +9940,9 @@ async function signUp() {
 
   errEl.textContent = '';
   if (!name || !business || !email || !password) { errEl.textContent = 'Please fill in all fields.'; return; }
+  // Receipts and password resets go to this address, so a typo locks the
+  // account out of both.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { errEl.textContent = 'That email address doesn\'t look right. Check it: your receipts and password resets go there.'; return; }
   if (password.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; return; }
 
   btn.disabled = true; btn.textContent = 'Creating account…';
@@ -9731,7 +9954,14 @@ async function signUp() {
       email, password,
       data: { name, business_name: business },
     });
-    if (data.error) { errEl.textContent = data.error.message || 'Sign up failed.'; return; }
+    if (data.error) {
+      if (data.error.code === 'user_already_exists' || /already (registered|exists)/i.test(data.error.message || '')) {
+        errEl.innerHTML = 'There\'s already a SAYON account for this email. <button type="button" class="auth-inline-link" onclick="signInAs(document.getElementById(\'suEmail\').value)">Sign in</button> or <button type="button" class="auth-inline-link" onclick="showAuth(\'authForgot\')">reset the password</button>.';
+        return;
+      }
+      errEl.textContent = data.error.code === 'weak_password' ? 'That password is too easy to guess. Try a longer one.' : (data.error.message || 'Sign up failed.');
+      return;
+    }
 
     if (data.access_token) {
       // Email confirmation is disabled on this project, so Supabase already handed back
@@ -9759,6 +9989,13 @@ async function signUp() {
   } finally {
     btn.disabled = false; btn.textContent = 'Create Account';
   }
+}
+
+// Back to the sign-in card with the email already typed.
+function signInAs(email) {
+  const el = document.getElementById('siEmail');
+  if (el && email) el.value = email.trim();
+  showAuth('authSignIn');
 }
 
 // ── SIGN IN ──────────────────────────────────────────────────────────────
@@ -9912,7 +10149,7 @@ async function endSessionOnDevice() {
 // phone's copy.
 const DELETE_ACCOUNT_BLOCKERS = {
   ACTIVE_SUBSCRIPTION: 'Your plan is still active. Cancel it in Menu › Billing › Manage first, then delete your account.',
-  HAS_TEAM: 'Other people are still linked to your business, so it can\'t be deleted from the app yet. Contact SAYON support to have them removed first.',
+  HAS_TEAM: `Other people are still linked to your business, so it can\'t be deleted from the app yet. Email ${SUPPORT_EMAIL} to have them removed first.`,
 };
 
 async function deleteAccountRpc(dryRun) {
@@ -10119,18 +10356,24 @@ async function _lookUpBusiness() {
       authBusiness = Array.isArray(created) ? created[0] : created;
       localStorage.removeItem('korva_pending_business');
 
-      // Add owner as team member
-      await fetch(`${SUPABASE_URL}/rest/v1/team_members`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          business_id: authBusiness.id,
-          user_id: authUser.id,
-          role: 'owner',
-          name: meta.name || authUser.email,
-          email: authUser.email,
-        }),
-      });
+      // Add owner as team member. The Worker refuses every AI call until
+      // this row exists, so a failed insert is tried once more here rather
+      // than left for the next launch.
+      let tm = null;
+      try {
+        tm = await fetch(`${SUPABASE_URL}/rest/v1/team_members`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            business_id: authBusiness.id,
+            user_id: authUser.id,
+            role: 'owner',
+            name: meta.name || authUser.email,
+            email: authUser.email,
+          }),
+        });
+      } catch (e) { console.warn('team_members insert failed:', e); }
+      if (!tm || !tm.ok) await ensureOwnerTeamMember();
       loadBillingStatus();
     }
 }
@@ -10223,12 +10466,9 @@ function enterApp() {
   supabaseSyncOnOpen();
   checkAddressMove();
 
-  // New users see onboarding; returning users go straight to the menu
-  if (shouldShowOnboarding()) {
-    showOnboarding();
-  } else {
-    document.getElementById('mainMenu').style.display = 'flex';
-  }
+  // New users see onboarding; returning users go straight into the app.
+  if (shouldShowOnboarding()) showOnboarding();
+  else openApp('inspect');
 }
 
 function renderProfileMenu() {
@@ -10324,6 +10564,8 @@ async function restoreAuthSession() {
       startAuthAutoRefresh();
       return true;
     }
+    // Refused: say so, or "did I lose my report?" is the first thought.
+    setTimeout(() => showToast('Your sign-in expired. Sign in again; your work is still on this phone', 'info'), 900);
   }
 
   clearSession();
@@ -10561,7 +10803,8 @@ async function supabaseSyncOnOpen() {
   if (!authSession) return;
   await flushPendingDeletes();
   const deleting = new Set(getPendingDeletes().map(d => d.id));
-  const cloudReports = (await supabaseLoadAll() || []).filter(c => c && !deleting.has(c.id));
+  const archived = new Set(getArchivedReportIds());
+  const cloudReports = (await supabaseLoadAll() || []).filter(c => c && !deleting.has(c.id) && !archived.has(c.id));
   if (cloudReports.length === 0) return;
   const local = getSavedReports();
   const byId = new Map(local.map(r => [r.id, r]));
@@ -10588,6 +10831,30 @@ async function supabaseSyncOnOpen() {
     }
   }
   for (const c of clashes) await keepBothCopies(byId.get(c.id));
+}
+
+// A report saved on this phone that the account doesn't have yet: saved
+// with no signal, or while the account refused it. cloudSavedAt is 0 until
+// the first save lands and null on reports from before it was recorded.
+function notInAccount(entry) {
+  return !!entry && entry.cloudSavedAt != null && (entry.savedAt || 0) > entry.cloudSavedAt;
+}
+function inAccount(entry) {
+  return !!entry && entry.cloudSavedAt != null && entry.cloudSavedAt >= (entry.savedAt || 0);
+}
+// Those reports go up the next time the app is online and in front, so a
+// job finished in a subfloor is never left only on the phone.
+let pushUnsyncedRunning = false;
+async function pushUnsyncedReports() {
+  if (!authSession || !navigator.onLine || pushUnsyncedRunning) return;
+  pushUnsyncedRunning = true;
+  try {
+    const waiting = getSavedReports().filter(r => r && r.reportData && notInAccount(r));
+    let landed = 0;
+    for (const r of waiting) { if (await supabaseSave(r, true)) landed++; }
+    if (landed) { renderSavedList(); updateSyncStatus(); }
+  } catch (e) { console.warn('pushUnsyncedReports:', e); }
+  finally { pushUnsyncedRunning = false; }
 }
 
 // saveDraft() is called on nearly every keystroke and on every signature
@@ -10680,7 +10947,7 @@ function updateSyncStatus(state) {
   textEl.textContent = 'Not saved yet';
 }
 
-window.addEventListener('online', () => { updateSyncStatus(); processPendingNotes(); });
+window.addEventListener('online', () => { updateSyncStatus(); processPendingNotes(); pushUnsyncedReports(); });
 window.addEventListener('offline', () => updateSyncStatus());
 
 // Make sure a pending debounced save is never lost if the app is backgrounded
@@ -10690,13 +10957,14 @@ window.addEventListener('offline', () => updateSyncStatus());
 document.addEventListener('visibilitychange', async () => {
   if (document.hidden) {
     flushDraftSave();
-    if (updateReloadPending && !document.body.classList.contains('ai-busy')) location.reload();
+    if (updateReloadPending && !isRecording && !document.body.classList.contains('ai-busy')) location.reload();
     return;
   }
   // An app left open for days never navigates, so ask for a new version here.
   if (swRegistration) swRegistration.update().catch(() => {});
   await maybeRefreshAuthSession();
   processPendingNotes();
+  pushUnsyncedReports();
   checkAddressMove();
 });
 window.addEventListener('pagehide', flushDraftSave);
@@ -10790,16 +11058,68 @@ function getSavedReports() {
   }
 }
 
-function setSavedReports(reports) {
+function setSavedReports(reports, retrying) {
   try {
     localStorage.setItem(reportsStorageKey(), JSON.stringify(reports));
     return true;
   } catch (e) {
     console.error('Failed to save reports', e);
     reportError(e, 'save_reports');
-    showToast('Could not save — storage full or unavailable', 'error');
+    // Full phone: older jobs already in the account can leave the phone to
+    // make room, then this save is tried once more.
+    if (isQuotaError(e) && !retrying && freeStorageFor(reports)) return setSavedReports(reports, true);
+    showToast(isQuotaError(e)
+      ? 'Could not save: this phone\'s storage is full. Back up from Menu › Data, then delete old jobs'
+      : 'Could not save — storage full or unavailable', 'error');
     return false;
   }
+}
+
+function isQuotaError(e) {
+  return !!e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22 || e.code === 1014 || /quota/i.test(String(e.message || '')));
+}
+function photoStoreProblem(e) {
+  return isQuotaError(e) ? 'This phone\'s storage is full. Free some space or remove old jobs, then add the photo again' : 'Could not process photo';
+}
+
+// ── OLDER JOBS KEPT IN THE ACCOUNT ONLY ───────────────────────────────────
+// When the phone is full, finished jobs that the account already holds are
+// taken off the phone (their ids kept here, so the next sync doesn't bring
+// them straight back). Bring them back clears the list and syncs again.
+function archivedReportsKey() {
+  return (authUser && authUser.id) ? `korva_archived_reports_${authUser.id}` : 'korva_archived_reports';
+}
+function getArchivedReportIds() {
+  try { const v = JSON.parse(localStorage.getItem(archivedReportsKey()) || '[]'); return Array.isArray(v) ? v : []; }
+  catch (e) { return []; }
+}
+function setArchivedReportIds(ids) {
+  try { if (ids.length) localStorage.setItem(archivedReportsKey(), JSON.stringify(ids)); else localStorage.removeItem(archivedReportsKey()); } catch (e) {}
+}
+// Takes the oldest finished, backed-up jobs out of `reports` (in place)
+// after the inspector agrees. Returns true when something was removed.
+function freeStorageFor(reports) {
+  if (!authSession) return false;
+  const candidates = reports
+    .filter(r => r && r.id !== currentReportId && r.reportData && r.reportData.issue && inAccount(r))
+    .sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0));
+  if (!candidates.length) return false;
+  const n = Math.max(1, Math.ceil(candidates.length / 2));
+  const going = candidates.slice(0, n);
+  const ok = confirm(`This phone's storage is full. Take the ${n === 1 ? 'oldest finished job' : `${n} oldest finished jobs`} off this phone? ${n === 1 ? 'It stays' : 'They stay'} in your account and can be brought back from Saved Reports.`);
+  if (!ok) return false;
+  const ids = new Set(going.map(r => r.id));
+  for (let i = reports.length - 1; i >= 0; i--) if (ids.has(reports[i].id)) reports.splice(i, 1);
+  setArchivedReportIds([...new Set([...getArchivedReportIds(), ...ids])]);
+  showToast(`${n} older job${n === 1 ? '' : 's'} now kept in your account only`, 'info');
+  return true;
+}
+async function restoreArchivedReports() {
+  if (!navigator.onLine) { showToast('No signal. Try again when you have one', 'error'); return; }
+  setArchivedReportIds([]);
+  await supabaseSyncOnOpen();
+  renderSavedList();
+  refreshDashboardIfOpen();
 }
 
 function calculateCompletion() {
@@ -10815,9 +11135,10 @@ function calculateCompletion() {
 // field filled), Sent, Complete vN or Amending vN.
 function savedReportStatus(r) {
   const d = r.reportData || {};
-  if (d.issue) return d.amending
-    ? { label: `Amending v${d.issue.version}`, tone: 'amending' }
-    : { label: `Complete v${d.issue.version}`, tone: 'complete' };
+  if (d.issue) {
+    const v = d.issue.version ? ` v${d.issue.version}` : '';
+    return d.amending ? { label: `Amending${v}`, tone: 'amending' } : { label: `Complete${v}`, tone: 'complete' };
+  }
   if (d.sent) return { label: 'Sent', tone: 'sent' };
   if ((r.completion || 0) >= 100) return { label: 'Ready', tone: 'ready' };
   return { label: 'Draft', tone: 'draft' };
@@ -11059,9 +11380,14 @@ function deleteReport(id, event) {
   const index = all.findIndex(r => r.id === id);
   const deleted = all[index];
   if (!deleted) return;
-  // A finished job has gone to the client, so it's asked about first.
-  if (deleted.reportData && deleted.reportData.issue &&
-      !confirm(`Delete the finished report for ${deleted.address || 'this property'}? Its quote and photos go too.`)) return;
+  // Always asked: the delete button sits beside the row's tap target, and
+  // the account copy goes with it.
+  const where = deleted.address || 'this property';
+  const finished = deleted.reportData && deleted.reportData.issue;
+  const extra = notInAccount(deleted) ? ' It isn\'t in your account yet, so it can\'t be brought back.' : '';
+  if (!confirm(finished
+    ? `Delete the finished report for ${where}? Its quote and photos go too.${extra}`
+    : `Delete the job at ${where}? Its report, quote and photos go too.${extra}`)) return;
   if (!setSavedReports(all.filter(r => r.id !== id))) return;
   const wasOpen = currentReportId === id;
   if (wasOpen) startBlankReport();
@@ -11366,6 +11692,7 @@ function startBlankReport() {
 
 function resetReportState() {
   reportData = {};
+  speechTimeline = [];
   setAI('ready', 'AI ready');
   fieldNotes = {};
   pendingSpeciesMatch = null;
@@ -11856,8 +12183,12 @@ function renderSavedList() {
   const allReports = getSavedReports();
   const summary = document.getElementById('savedPanelSummary');
 
+  const archived = getArchivedReportIds().length;
+  const archivedNote = archived
+    ? `<div class="saved-archived">${archived} older job${archived === 1 ? ' is' : 's are'} kept in your account only. <button class="link-btn" onclick="restoreArchivedReports()">Bring ${archived === 1 ? 'it' : 'them'} back</button></div>`
+    : '';
   if (allReports.length === 0) {
-    list.innerHTML = SAVED_EMPTY_HTML;
+    list.innerHTML = SAVED_EMPTY_HTML + archivedNote;
     if (summary) summary.textContent = 'None saved';
     return;
   }
@@ -11904,12 +12235,13 @@ function renderSavedList() {
             ${statusTag}
             ${answerTag}
             ${pending ? `<span class="saved-item-pending">${pending} note${pending !== 1 ? 's' : ''} to fill in</span>` : ''}
+            ${notInAccount(r) ? '<span class="saved-item-unsynced">Not in your account yet</span>' : ''}
           </div>
         </div>
         <button class="saved-item-delete" onclick="deleteReport('${r.id}', event)" title="Delete">✕</button>
       </div>
     `;
-  }).join('');
+  }).join('') + archivedNote;
 }
 
 // Safe inside text and inside quoted attributes (value="…", src="…").
@@ -11930,6 +12262,10 @@ function setAI(state, text) {
   updateVoiceHud();
   const busyText = document.getElementById('aiBusyText');
   if (busyText && busy) busyText.textContent = text;
+  // A fill can take a while on a slow connection. The inspector doesn't
+  // have to stand there: the note can wait with the others.
+  const keep = document.getElementById('aiKeepBtn');
+  if (keep) keep.hidden = !(busy && /Filling in/.test(text));
 }
 
 // action: optional { label, run } adds a button to the toast (e.g. Undo).
@@ -12249,7 +12585,32 @@ function reportPrepGaps(from = 'send') {
   if (pending) push('pending', `${pending} voice note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
   if (!reportData.inspectorSignature) push('signature', 'The inspector hasn\'t signed');
   if (!reportData.agreement) push('agreement', 'No pre-inspection agreement is recorded', from === 'extract' ? fixBtn('agreement', 'Get it signed') : '');
+  // Photos the account never received are only on this phone: the PDF
+  // has them today, but a lost phone or another device's copy won't.
+  const onlyHere = photosOnlyOnThisPhone().length;
+  if (onlyHere && authSession) push('photos', `${onlyHere} photo${onlyHere === 1 ? ' is' : 's are'} only on this phone, not in your account yet`,
+    fixBtn('photos', navigator.onLine ? 'Back up now' : 'Back up when online'));
   return gaps;
+}
+
+function photosOnlyOnThisPhone() {
+  return allReportPhotos(reportData).filter(p => !p.path);
+}
+
+// "Back up now" on the check sheet: the photos go up, and the sheet is
+// drawn again with the gap gone or a reason it isn't.
+async function backUpPhotosFromGap(from) {
+  const reopen = () => from === 'send' ? openSendReview() : showExtractSummary(extractSummaryBefore);
+  if (!navigator.onLine) { showToast('You\'re offline. The photos back up on their own once you\'re online', 'warn'); return; }
+  const before = photosOnlyOnThisPhone().length;
+  showToast(`Backing up ${before} photo${before === 1 ? '' : 's'}…`, 'info');
+  let changed = false;
+  try { changed = await uploadPendingPhotos(reportData); } catch (e) { reportError(e, 'photo_backup_gap'); }
+  if (changed) { saveDraft(); if (currentReportId) saveCurrentReport(true); }
+  const left = photosOnlyOnThisPhone().length;
+  if (!left) showToast('Photos are in your account', 'success');
+  else showToast(`${left} photo${left === 1 ? '' : 's'} couldn\'t be backed up. Check your connection and try again`, 'error');
+  reopen();
 }
 
 // ── GAPS BEFORE YOU LEAVE ───────────────────────────────────────────────
@@ -12707,6 +13068,7 @@ function fixReportGap(kind, from = 'send') {
   const leave = () => from === 'send' ? closeSendReview() : closeExtractSummary();
   if (kind === 'quote') { leave(); sendAfterQuote = true; openQuoteFromReport(); return; }
   if (kind === 'agreement') { leave(); openAgreementSheet(); return; }
+  if (kind === 'photos') { backUpPhotosFromGap(from); return; }
   if (kind.startsWith('finding:')) { leave(); addFindingForArea(kind.slice(8)); return; }
   if (kind === 'clear') markRemainingAreasClear();
   else markRemainingAreasInspected(kind === 'na' ? 'NA' : 'INSPECTED');

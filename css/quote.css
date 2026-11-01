@@ -100,7 +100,8 @@ select.quote-input { cursor: pointer; }
 .quote-field.wide { grid-column: 1 / -1; }
 
 .quote-system-choice { background: var(--surface2); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
-.quote-system-q { font-size: 13px; margin-bottom: 8px; }
+.quote-system-q { font-size: 13px; margin-bottom: 8px; font-weight: 600; color: var(--text); }
+.quote-system-rec { font-size: 12.5px; line-height: 1.45; color: var(--text2); margin-bottom: 10px; padding-left: 10px; border-left: 2px solid var(--border2); }
 .quote-item-source { font-size: 12px; color: var(--text3); }
 .quote-items-empty { font-size: 13px; color: var(--text3); padding: 6px 0 10px; }
 
@@ -164,6 +165,7 @@ select.quote-input { cursor: pointer; }
   flex-direction: column;
   gap: 14px;
 }
+.quote-empty .quote-btn { flex: none; }
 
 .quote-lock-note {
   margin: 0 0 12px;
@@ -221,7 +223,6 @@ body:not(.dark-screen) .quote-back { color: #5EEAD4; }
 body:not(.dark-screen) .quote-save-state { color: var(--on-ink2); }
 body:not(.dark-screen) .quote-card { border-color: transparent; box-shadow: 0 14px 36px rgba(0,0,0,0.35); }
 body:not(.dark-screen) .quote-company-gaps { background: #FFF6E0; border-color: #F0C25A; color: #5C3D00; }
-body:not(.dark-screen) .quote-empty { color: var(--on-ink2); }
 /* Teal glow details, as on the report: cards glow off their top edge and
    each card's heading trails a fading teal line. */
 body:not(.dark-screen) .quote-card {
@@ -388,7 +389,7 @@ body:not(.dark-screen) .quote-card-title { color: var(--text); }
 /* The folded work row carries the total. */
 .quote-work-total { flex-shrink: 0; font: 700 17px 'Space Grotesk', sans-serif; color: var(--accent2); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .quote-work-fold[open] > summary { border-bottom: 1px solid var(--border); margin-bottom: 2px; }
-.quote-work-fold[open] .quote-work-total { visibility: hidden; }
+.quote-work-fold[open] .quote-work-total { display: none; }
 .qi-row { min-height: 52px; }
 
 /* Treatment plan: steps as text, time and service period as chips. */
@@ -470,3 +471,15 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 .quote-guide > .qp > .qp-step > .qp-body { min-width: 0; }
 .quote-card.quote-guide { padding: 14px 12px; }
 .quote-guide > .qp > .qp-step { gap: 10px; }
+
+/* Small phones (320 wide): the guide's side line and nested folds left the
+   line names about 90 px, one word to a line. Less padding, no fold icons. */
+@media (max-width: 359px) {
+  .quote-shell { padding-left: 10px; padding-right: 10px; }
+  .quote-card.quote-guide { padding: 12px 10px; }
+  .quote-guide > .qp > .qp-step { gap: 8px; }
+  .quote-guide .qp-folds .quote-fold > summary { padding: 10px 8px; gap: 8px; }
+  .quote-guide .qp-folds .quote-fold > :not(summary) { margin-left: 8px; margin-right: 8px; }
+  .quote-guide .qp-folds .quote-fold > .quote-add-btn { width: calc(100% - 16px); }
+  .quote-guide .qp-folds .fgroup-icon { display: none; }
+}

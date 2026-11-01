@@ -9817,7 +9817,8 @@ async function supabaseAuth(endpoint, body) {
   // failed sign-in hit this, 100% reproducibly, regardless of connectivity.
   // Normalizing here means every existing `data.error` / `data.error.message`
   // check downstream keeps working, whichever shape Supabase actually sent.
-  if (!res.ok && !data.error) {
+  // The older OAuth2 shape sends `error` as a plain string code.
+  if (!res.ok && (!data.error || typeof data.error === 'string')) {
     data.error = {
       code: data.error_code || (typeof data.error === 'string' ? data.error : null),
       message: data.msg || data.error_description || 'Request failed',
@@ -9875,9 +9876,9 @@ async function submitPasswordReset() {
     showAuth('authSignIn');
     showToast('Password updated — sign in with your new password', 'success');
   } catch(e) {
-    errEl.textContent = 'Network error — please try again.';
+    errEl.textContent = 'Couldn\'t reach SAYON. Check your signal and try again.';
   } finally {
-    btn.disabled = false; btn.textContent = 'Update Password';
+    btn.disabled = false; btn.textContent = 'Update password';
   }
 }
 
@@ -9939,7 +9940,8 @@ async function signUp() {
   const btn      = document.getElementById('suBtn');
 
   errEl.textContent = '';
-  if (!name || !business || !email || !password) { errEl.textContent = 'Please fill in all fields.'; return; }
+  const missing = [!name && 'your name', !business && 'your business name', !email && 'your email', !password && 'a password'].filter(Boolean);
+  if (missing.length) { errEl.textContent = `Add ${joinWithAnd(missing)}.`; return; }
   // Receipts and password resets go to this address, so a typo locks the
   // account out of both.
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { errEl.textContent = 'That email address doesn\'t look right. Check it: your receipts and password resets go there.'; return; }
@@ -9959,7 +9961,7 @@ async function signUp() {
         errEl.innerHTML = 'There\'s already a SAYON account for this email. <button type="button" class="auth-inline-link" onclick="signInAs(document.getElementById(\'suEmail\').value)">Sign in</button> or <button type="button" class="auth-inline-link" onclick="showAuth(\'authForgot\')">reset the password</button>.';
         return;
       }
-      errEl.textContent = data.error.code === 'weak_password' ? 'That password is too easy to guess. Try a longer one.' : (data.error.message || 'Sign up failed.');
+      errEl.textContent = data.error.code === 'weak_password' ? 'That password is too easy to guess. Try a longer one.' : (data.error.message || 'Couldn\'t create the account. Try again.');
       return;
     }
 
@@ -9985,9 +9987,9 @@ async function signUp() {
     document.getElementById('authConfirmEmail').textContent = email;
     showAuth('authConfirm');
   } catch(e) {
-    errEl.textContent = 'Network error — please try again.';
+    errEl.textContent = 'Couldn\'t reach SAYON. Check your signal and try again.';
   } finally {
-    btn.disabled = false; btn.textContent = 'Create Account';
+    btn.disabled = false; btn.textContent = 'Create account';
   }
 }
 
@@ -10006,7 +10008,7 @@ async function signIn() {
   const btn      = document.getElementById('siBtn');
 
   errEl.textContent = '';
-  if (!email || !password) { errEl.textContent = 'Please enter your email and password.'; return; }
+  if (!email || !password) { errEl.textContent = !email && !password ? 'Enter your email and password.' : !email ? 'Enter your email.' : 'Enter your password.'; return; }
 
   btn.disabled = true; btn.textContent = 'Signing in…';
   try {
@@ -10015,7 +10017,7 @@ async function signIn() {
       // Branch on the stable error code, not the message text, which Supabase
       // can reword between API versions (see supabaseAuth()'s normalization).
       errEl.textContent = data.error.code === 'invalid_credentials' || data.error.message === 'Invalid login credentials'
-        ? 'Incorrect email or password.' : (data.error.message || 'Sign in failed.');
+        ? 'That email and password don\'t match. Check them, or tap Forgot password.' : (data.error.message || 'Couldn\'t sign in. Try again.');
       return;
     }
     authSession = data;
@@ -10038,9 +10040,9 @@ async function signIn() {
     startAuthAutoRefresh();
     enterApp();
   } catch(e) {
-    errEl.textContent = 'Network error — please try again.';
+    errEl.textContent = 'Couldn\'t reach SAYON. Check your signal and try again.';
   } finally {
-    btn.disabled = false; btn.textContent = 'Sign In';
+    btn.disabled = false; btn.textContent = 'Sign in';
   }
 }
 
@@ -10052,7 +10054,7 @@ async function forgotPassword() {
 
   errEl.textContent = '';
   errEl.style.color = '';
-  if (!email) { errEl.textContent = 'Enter your email address.'; return; }
+  if (!email) { errEl.textContent = 'Enter the email you signed up with.'; return; }
 
   btn.disabled = true; btn.textContent = 'Sending…';
   try {
@@ -10072,11 +10074,11 @@ async function forgotPassword() {
       return;
     }
     errEl.style.color = 'var(--green)';
-    errEl.textContent = 'Reset link sent — check your email.';
+    errEl.textContent = 'Reset link sent. Check your email, including junk.';
   } catch(e) {
-    errEl.textContent = 'Network error — please try again.';
+    errEl.textContent = 'Couldn\'t reach SAYON. Check your signal and try again.';
   } finally {
-    btn.disabled = false; btn.textContent = 'Send Reset Link';
+    btn.disabled = false; btn.textContent = 'Send reset link';
   }
 }
 
@@ -12997,7 +12999,7 @@ function openSendReview() {
 
   const gaps = reportPrepGaps();
   const companyGaps = companyDetailGaps();
-  if (companyGaps.length) gaps.push({ text: `Your ${joinWithAnd(companyGaps)} ${companyGaps.length === 1 ? 'is' : 'are'} missing from ${canEditBusiness() ? 'Your business (tap your initials, top right)' : 'the details your business owner set'}, so the PDFs won't show ${companyGaps.length === 1 ? 'it' : 'them'}`, fix: '' });
+  if (companyGaps.length) gaps.push({ text: `Your ${joinWithAnd(companyGaps)} ${companyGaps.length === 1 ? 'is' : 'are'} missing from ${canEditBusiness() ? 'Menu › Your business' : 'the details your business owner set'}, so the PDFs won't show ${companyGaps.length === 1 ? 'it' : 'them'}`, fix: '' });
   const gapsWrap = document.getElementById('sendReviewGaps');
   gapsWrap.style.display = gaps.length ? '' : 'none';
   gapsWrap.innerHTML = `<div class="send-review-label">Worth checking first</div><ul class="send-review-list">${gaps.map(g =>

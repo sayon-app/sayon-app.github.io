@@ -57,7 +57,7 @@
         <div class="auth-pass"><input class="auth-input" id="siPassword" type="password" placeholder="Your password" autocomplete="current-password"><button type="button" class="auth-reveal" onclick="toggleAuthReveal(this)" aria-label="Show password" aria-pressed="false">Show</button></div>
       </div>
       <div class="auth-error" id="siError"></div>
-      <button class="auth-btn" id="siBtn" onclick="signIn()">Sign In</button>
+      <button class="auth-btn" id="siBtn" onclick="signIn()">Sign in</button>
       <div class="auth-links">
         <button class="auth-link" onclick="showAuth('authForgot')">Forgot password?</button>
         <button class="auth-link" onclick="showAuth('authSignUp')">Create account →</button>
@@ -85,7 +85,7 @@
         <div class="auth-pass"><input class="auth-input" id="suPassword" type="password" placeholder="Min. 8 characters" autocomplete="new-password"><button type="button" class="auth-reveal" onclick="toggleAuthReveal(this)" aria-label="Show password" aria-pressed="false">Show</button></div>
       </div>
       <div class="auth-error" id="suError"></div>
-      <button class="auth-btn" id="suBtn" onclick="signUp()">Create Account</button>
+      <button class="auth-btn" id="suBtn" onclick="signUp()">Create account</button>
       <div class="auth-links">
         <button class="auth-link" onclick="showAuth('authSignIn')">← Back to sign in</button>
       </div>
@@ -100,7 +100,7 @@
         <input class="auth-input" id="fpEmail" type="email" placeholder="you@company.com">
       </div>
       <div class="auth-error" id="fpError"></div>
-      <button class="auth-btn" id="fpBtn" onclick="forgotPassword()">Send Reset Link</button>
+      <button class="auth-btn" id="fpBtn" onclick="forgotPassword()">Send reset link</button>
       <div class="auth-links">
         <button class="auth-link" onclick="showAuth('authSignIn')">← Back to sign in</button>
       </div>
@@ -119,7 +119,7 @@
         <div class="auth-pass"><input class="auth-input" id="rpPasswordConfirm" type="password" placeholder="Re-enter password" autocomplete="new-password"><button type="button" class="auth-reveal" onclick="toggleAuthReveal(this)" aria-label="Show password" aria-pressed="false">Show</button></div>
       </div>
       <div class="auth-error" id="rpError"></div>
-      <button class="auth-btn" id="rpBtn" onclick="submitPasswordReset()">Update Password</button>
+      <button class="auth-btn" id="rpBtn" onclick="submitPasswordReset()">Update password</button>
     </div>
 
     <!-- Email confirmation message -->
@@ -155,17 +155,18 @@
     <div class="auth-card ob-panel" id="ob-panel-0">
       <div class="auth-badge" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/><path d="M9 10h.01M15 10h.01"/></svg></div>
       <h2 class="auth-title" id="obBusinessTitle">Set up your business</h2>
-      <p class="auth-subtitle">This appears on every report, quote and certificate you send to clients. Only the name is needed now; the rest can be added later from your initials, top right.</p>
+      <p class="auth-subtitle ob-setup-only">This appears on every report, quote and certificate you send to clients. Only the name is needed now; add the rest later from Menu › Your business.</p>
+      <p class="auth-subtitle ob-edit-only">Every report, quote and certificate you send prints these details. Changes show on the next PDF you make.</p>
       <div class="auth-field">
         <label class="auth-label" for="ob-companyName">Business Name</label>
         <input class="auth-input" id="ob-companyName" placeholder="e.g. ABC Pest Control">
       </div>
       <div class="auth-field">
-        <label class="auth-label" for="ob-licence">Pest Licence No. <span class="auth-label-optional">(can wait)</span></label>
+        <label class="auth-label" for="ob-licence">Pest Licence No. <span class="auth-label-optional ob-setup-only">(can wait)</span></label>
         <input class="auth-input" id="ob-licence" placeholder="e.g. PL12345">
       </div>
       <div class="auth-field">
-        <label class="auth-label" for="ob-phone">Business Phone <span class="auth-label-optional">(can wait)</span></label>
+        <label class="auth-label" for="ob-phone">Business Phone <span class="auth-label-optional ob-setup-only">(can wait)</span></label>
         <input class="auth-input" id="ob-phone" type="tel" onchange="tidyPhoneInput(this)" placeholder="e.g. 0400 000 000">
       </div>
       <div class="auth-field">
@@ -183,7 +184,7 @@
             <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.5-3.5a2 2 0 0 0-2.8 0L5 21"/></svg>
           </div>
           <div class="logo-upload-actions">
-            <button type="button" class="logo-upload-btn" onclick="document.getElementById('companyLogoInput').click()">Upload Logo</button>
+            <button type="button" class="logo-upload-btn" onclick="document.getElementById('companyLogoInput').click()">Upload logo</button>
             <button type="button" class="logo-remove-btn" id="companyLogoRemoveBtn" onclick="removeCompanyLogo()" style="display:none">Remove</button>
           </div>
           <input type="file" id="companyLogoInput" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="handleCompanyLogoUpload(this)">
@@ -276,7 +277,7 @@
       </div>
 
       <div class="quote-empty" id="quoteEmpty" style="display:none">
-        No inspection reports yet. Complete an inspection in SAYON and its findings and recommendations will appear here as quote line items.
+        No reports yet. Start an inspection, and its findings and advice fill in the quote's lines for you.
         <button class="quote-btn primary" onclick="closeQuote(); openApp('inspect');">Start an inspection</button>
       </div>
 
@@ -457,7 +458,7 @@
     <div class="page-sheet-body">
       <div class="job-row">
         <div class="job-field">
-          <div class="job-field-label">Client Name</div>
+          <div class="job-field-label">Client name</div>
           <input class="job-input" id="qaBy" oninput="updateQuoteAnswerBtn()">
         </div>
         <div class="job-field">
@@ -571,7 +572,7 @@
           <input class="job-input" id="trTech">
         </div>
         <div class="job-field">
-          <div class="job-field-label">Licence No.</div>
+          <div class="job-field-label">Licence no.</div>
           <input class="job-input" id="trLicence">
         </div>
       </div>
@@ -737,7 +738,7 @@
 
             <!-- Property address -->
             <div class="job-field">
-              <div class="job-field-label">Street Address</div>
+              <div class="job-field-label">Street address</div>
               <div class="addr-wrap">
                 <input class="job-input" id="jobAddress" placeholder="Start typing the address" autocomplete="off"
                   oninput="updateJob(); onAddressTyped(this.value)" onblur="setTimeout(hideAddressSuggestions, 200)">
@@ -766,16 +767,16 @@
             <!-- Client -->
             <div class="job-row">
               <div class="job-field">
-                <div class="job-field-label">Client Name</div>
-                <input class="job-input" id="jobClient" placeholder="Client name..." oninput="updateJob()">
+                <div class="job-field-label">Client name</div>
+                <input class="job-input" id="jobClient" placeholder="Client name" oninput="updateJob()">
               </div>
               <div class="job-field">
-                <div class="job-field-label">Client Phone</div>
+                <div class="job-field-label">Client phone</div>
                 <input class="job-input" id="jobClientPhone" type="tel" inputmode="tel" onchange="tidyPhoneInput(this)" placeholder="0400 000 000" oninput="saveJobInfo()">
               </div>
             </div>
             <div class="job-field">
-              <div class="job-field-label">Client Email</div>
+              <div class="job-field-label">Client email</div>
               <input class="job-input" id="jobClientEmail" placeholder="client@email.com" type="email" oninput="saveJobInfo()">
             </div>
 
@@ -794,7 +795,7 @@
               </div>
             </div>
             <div class="job-field">
-              <div class="job-field-label">Inspection Type</div>
+              <div class="job-field-label">Inspection type</div>
               <select class="job-input job-select" id="jobInspectionType" onchange="onInspectionTypeChange()">
                 <option value="">Select…</option>
                 <option>Annual — Existing Building</option>
@@ -809,16 +810,16 @@
             </div>
             <div class="job-row">
               <div class="job-field">
-                <div class="job-field-label">Inspection Date</div>
+                <div class="job-field-label">Inspection date</div>
                 <input class="job-input" id="jobInspectionDate" type="date" oninput="saveJobInfo()">
               </div>
               <div class="job-field">
-                <div class="job-field-label">Inspection Time</div>
+                <div class="job-field-label">Inspection time</div>
                 <input class="job-input" id="jobInspectionTime" type="time" oninput="saveJobInfo()">
               </div>
             </div>
             <div class="job-field">
-              <div class="job-field-label">Internal Notes</div>
+              <div class="job-field-label">Internal notes</div>
               <textarea class="job-input" id="jobNotes" placeholder="Gate codes, access instructions, agent contact, special requirements…" rows="3" style="resize:none;line-height:1.5" oninput="saveJobInfo()"></textarea>
             </div>
 
@@ -955,7 +956,7 @@
           <div class="settings-group-title">Display</div>
           <div class="settings-row">
             <div class="settings-row-text">
-              <div class="settings-row-title">Text Size</div>
+              <div class="settings-row-title">Text size</div>
               <div class="settings-row-desc">Increases text size across the whole app.</div>
             </div>
             <div class="text-size-control" id="textSizeControl">
@@ -966,28 +967,28 @@
           </div>
           <div class="settings-row">
             <div class="settings-row-text">
-              <div class="settings-row-title">High Contrast</div>
+              <div class="settings-row-title">High contrast</div>
               <div class="settings-row-desc">Stronger borders and colour contrast, for bright outdoor light.</div>
             </div>
             <button type="button" class="toggle-switch" id="toggleHighContrast" onclick="toggleA11y('high-contrast','toggleHighContrast','korva_a11y_contrast')" aria-label="Toggle high contrast"></button>
           </div>
           <div class="settings-row">
             <div class="settings-row-text">
-              <div class="settings-row-title">Larger Touch Targets</div>
+              <div class="settings-row-title">Larger touch targets</div>
               <div class="settings-row-desc">Bigger buttons and fields, easier to tap one-handed or with gloves on.</div>
             </div>
             <button type="button" class="toggle-switch" id="toggleLargeTouch" onclick="toggleA11y('large-touch','toggleLargeTouch','korva_a11y_touch')" aria-label="Toggle larger touch targets"></button>
           </div>
           <div class="settings-row">
             <div class="settings-row-text">
-              <div class="settings-row-title">Reduce Motion</div>
+              <div class="settings-row-title">Reduce motion</div>
               <div class="settings-row-desc">Turns off non-essential animations and transitions.</div>
             </div>
             <button type="button" class="toggle-switch" id="toggleReduceMotion" onclick="toggleA11y('reduce-motion','toggleReduceMotion','korva_a11y_motion')" aria-label="Toggle reduce motion"></button>
           </div>
           <div class="settings-row">
             <div class="settings-row-text">
-              <div class="settings-row-title">Colour Vision Mode</div>
+              <div class="settings-row-title">Colour vision mode</div>
               <div class="settings-row-desc">Adjusts the app's accent colours for colour vision deficiency.</div>
             </div>
             <select class="job-input job-select" id="colourVisionSelect" onchange="setColourVisionMode(this.value)" style="max-width:150px" aria-label="Colour vision mode">
@@ -1046,7 +1047,7 @@
           </div>
           <div class="settings-row">
             <div class="settings-row-text">
-              <div class="settings-row-title">Delete My Account</div>
+              <div class="settings-row-title">Delete my account</div>
               <div class="settings-row-desc">Permanently deletes your account, every report and photo stored online, and everything on this phone.</div>
             </div>
             <button class="job-action-btn settings-danger-btn" onclick="deleteMyAccount()">Delete</button>
@@ -2007,7 +2008,7 @@
           <!-- The type decides the standard and the wording of clause 1, so it
                is chosen before the client signs (see onAgreementTypeChange). -->
           <div class="job-field">
-            <div class="job-field-label">Inspection Type</div>
+            <div class="job-field-label">Inspection type</div>
             <select class="job-input job-select" id="agreementInspectionType" onchange="onAgreementTypeChange()">
               <option value="">Select…</option>
               <option>Annual — Existing Building</option>
@@ -2022,7 +2023,7 @@
           </div>
           <div class="job-row">
             <div class="job-field">
-              <div class="job-field-label">Inspection Date</div>
+              <div class="job-field-label">Inspection date</div>
               <input class="job-input" id="agreementDate" type="date" onchange="refreshAgreementPreview()">
             </div>
             <div class="job-field">
@@ -2049,7 +2050,7 @@
           <span class="agr-step-dot" aria-hidden="true"><b>3</b></span>
           <h3 class="agr-step-title">Client signs</h3>
           <div class="job-field">
-            <div class="job-field-label">Client Name</div>
+            <div class="job-field-label">Client name</div>
             <input class="job-input" id="agreementSignerName" placeholder="Full name of the person signing" oninput="refreshAgreementPreview()">
           </div>
           <div class="signature-pad-wrap agreement-sig-wrap">

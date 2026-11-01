@@ -1,28 +1,25 @@
 <!DOCTYPE html>
-<html lang="en-AU">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-180.png">
 <title>Terms of Service — SAYON</title>
-<meta name="description" content="The terms for using SAYON, the voice-to-report app for Australian timber pest inspectors: plans, cancelling, your data and your responsibilities.">
 <style>
   :root {
-    --bg:       #F3F7F8;
-    --surface:  #FFFFFF;
-    --surface2: #E8F8F5;
-    --accent:   #0F766E;
-    --accent2:  #0F766E;
-    --yellow:   #B45309;
-    --text:     #0B1F2A;
-    --text2:    #3D4F5C;
-    --text3:    #6B7B87;
-    --border:   #D5E2E6;
+    --bg:       #0a0b0d;
+    --surface:  #14161a;
+    --surface2: #1c1f24;
+    --accent:   #ff6b4a;
+    --accent2:  #ff8c6e;
+    --yellow:   #ffb648;
+    --text:     #f2f3f5;
+    --text2:    #9aa0aa;
+    --text3:    #5c6168;
+    --border:   #2a2e35;
   }
   * { margin:0; padding:0; box-sizing:border-box; }
   body {
-    background: var(--bg);
+    background: radial-gradient(ellipse 100% 60% at 50% -10%, #1a1d22 0%, var(--bg) 55%), var(--bg);
     color: var(--text);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     line-height: 1.65;
@@ -48,6 +45,16 @@
     color: var(--accent2);
   }
   .brand-name { font-size: 15px; font-weight: 700; letter-spacing: 0.5px; }
+  .draft-note {
+    background: rgba(255,182,72,0.08);
+    border: 1px solid rgba(255,182,72,0.25);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 36px;
+  }
+  .draft-note strong { color: var(--yellow); }
   h1 {
     font-size: 26px;
     font-weight: 700;
@@ -102,11 +109,14 @@
 
   <div class="brand">
     <div class="brand-icon">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="4" r="2" fill="currentColor"/></svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
     </div>
     <div class="brand-name">SAYON</div>
   </div>
 
+  <div class="draft-note">
+    <strong>Draft — not yet legally reviewed.</strong> These terms have not been reviewed by a qualified solicitor and should be treated as provisional pending that review.
+  </div>
 
   <h1>Terms of Service</h1>
   <div class="updated">Last updated: 7 October 2026 · Version 2</div>
@@ -181,7 +191,7 @@
   <a class="back-link" href="privacy.html">Privacy Policy →</a>
 
   <footer>
-    SAYON is operated from New South Wales, Australia. Questions about these terms: use the email above.
+    These terms are marked as a draft pending legal review.
   </footer>
 
 </div>

@@ -7,9 +7,10 @@ calls:
 
 | Route | Called by | What it does |
 | --- | --- | --- |
-| `GET /stripe/subscription-status` | Settings › Billing | Returns the business's plan, status, trial end, AI calls used and limit |
-| `POST /stripe/create-checkout-session` | Upgrade buttons | Returns a Stripe Checkout link for `starter`, `pro` or `business` |
-| `POST /stripe/create-portal-session` | Manage button | Returns a Stripe Billing Portal link (change plan, card, cancel) |
+| `GET /stripe/subscription-status` | Settings › Billing | Returns the business's plan, status, trial end, AI calls used and limit, and how many inspectors it pays for |
+| `POST /stripe/create-checkout-session` | Upgrade buttons | Returns a Stripe Checkout link for `starter` (Solo), `pro` (Team, 2 to 9 inspectors) or `business` (10 to 200), with `seats` as the quantity for the last two. A business already paying is switched in place instead |
+| `POST /stripe/update-seats` | Billing › Change to N | Changes how many inspectors a Team or Business plan pays for; never fewer than are on the team or invited |
+| `POST /stripe/create-portal-session` | Manage button | Returns a Stripe Billing Portal link (card, invoices, cancel) |
 | `POST /stripe/webhook` | Stripe | Updates the `subscriptions` row when someone pays, changes plan or cancels |
 | `POST /send-email` | Send, Email to client, Email certificate | Emails the PDFs to the client from the business through Resend, with a copy to the business; answers 501 until Resend is set up, and the app then uses the phone's mail app |
 | `GET /maps-key` | Street Address box | Returns the Google Maps browser key from the `GOOGLE_MAPS_KEY` secret, so address suggestions work; answers 501 until it's set, and the box stays plain text |
@@ -91,8 +92,10 @@ repeat with live keys when you're ready to charge real cards.
      `customer.subscription.updated`, `customer.subscription.deleted`
    - After saving, reveal the **Signing secret** (starts with `whsec_`).
 4. **Turn on the Billing Portal.** Settings › Billing › Customer portal ›
-   Activate. Allow customers to update payment methods, cancel, and switch
-   plans between the three products above.
+   Activate. Allow customers to update payment methods and cancel (at the
+   end of the period). Leave "switch plans" and "change quantity" off: the
+   app switches plans and changes the number of inspectors itself, so it
+   can check them against the team.
 
 ## Add the secrets to the Worker
 
@@ -104,8 +107,8 @@ Secrets › Add. Add each as type **Secret**:
 | `STRIPE_SECRET_KEY` | `sk_test_…` (later `sk_live_…`) |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` from step 3 |
 | `STRIPE_PRICE_STARTER` | Starter's `price_…` |
-| `STRIPE_PRICE_PRO` | Pro's `price_…` |
-| `STRIPE_PRICE_BUSINESS` | Business's `price_…` |
+| `STRIPE_PRICE_PRO` | Team's per-inspector monthly `price_…` ($79) |
+| `STRIPE_PRICE_BUSINESS` | Business's per-inspector yearly `price_…` ($828) |
 
 `ANTHROPIC_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are already set and stay
 as they are.

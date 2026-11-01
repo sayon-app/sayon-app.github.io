@@ -17,7 +17,7 @@ For an AI model taking over this repo with no context. Last checked 2026-10-05: 
   3. Quote
   4. The client's answer (signed on the phone, or recorded as by email, by phone or on paper), printed on the quote PDF
   5. Treatment record and a one-page certificate
-- **Deliberately cut:** invoices, dashboard follow-ups, office job assigning and schedule, treatment booking, the label calculator, the Your prices list (each quote line starts at the rate last quoted for it), and the Company details menu page and Team (business details are entered at sign-up and edited under account menu › Your business). Don't rebuild them: field-service and accounting apps do them better.
+- **Deliberately cut:** invoices, dashboard follow-ups, office job assigning and schedule, treatment booking, the label calculator, the Your prices list (each quote line starts at the rate last quoted for it), and the Company details menu page (business details are entered at sign-up and edited under account menu › Your business). Don't rebuild them: field-service and accounting apps do them better. **Team came back** in a small form for the per-inspector Team and Business plans: account menu › Your team, where the owner invites by email (supabase/team-seats.sql, tests/team-seats).
 - **Later, not now:** one generic job-in, report-out format so SAYON works alongside field-service apps, with no per-vendor links. Don't start it.
 
 ## 2. Working with baz

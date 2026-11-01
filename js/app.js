@@ -3134,7 +3134,7 @@ let waveLevel = 0, waveFrame = 0;
 function pulseWave() { waveLevel = Math.min(1, waveLevel + 0.55); }
 function driveWave(on) {
   cancelAnimationFrame(waveFrame);
-  const bars = [...document.querySelectorAll('#waveform .wave-bar')];
+  const bars = [...document.querySelectorAll('#waveform .wave-bar, #micFab .wave-bar')];
   if (!on) { waveLevel = 0; bars.forEach(b => { b.style.height = ''; }); return; }
   const tick = t => {
     waveLevel *= 0.95;
@@ -3528,6 +3528,30 @@ function updateVoiceHud() {
   else if (document.body.classList.contains('ai-busy')) state = 'thinking';
   if (state) document.body.dataset.voice = state;
   else delete document.body.dataset.voice;
+  syncDockTalk(state);
+}
+
+// Talk in the bottom dock follows the voice state: the time while it
+// listens (and Stop to tap). Which word shows (Talk, Close, Filling,
+// Stop) is css, read off the same state.
+let dockTalkTimer = 0, dockTalkStart = 0;
+function syncDockTalk(state) {
+  const fab = document.getElementById('micFab');
+  const time = document.getElementById('micFabTime');
+  if (!fab) return;
+  const listening = state === 'listening';
+  fab.classList.toggle('recording', listening);
+  clearInterval(dockTalkTimer);
+  if (listening) {
+    if (!dockTalkStart) dockTalkStart = Date.now();
+    const tick = () => {
+      const sec = Math.floor((Date.now() - dockTalkStart) / 1000);
+      if (time) time.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+    };
+    tick();
+    dockTalkTimer = setInterval(tick, 1000);
+  } else dockTalkStart = 0;
+  fab.setAttribute('aria-label', listening ? 'Stop recording' : fab.classList.contains('open') ? 'Close the voice panel' : 'Talk');
 }
 
 let pendingSpeciesMatch = null; // holds the confirmed species match to apply
@@ -7128,6 +7152,9 @@ function updateProgress() {
     const label = document.getElementById('progressRingLabel');
     if (label) label.style.display = locked ? '' : 'none';
   }
+  syncDockReport(pct, locked);
+  syncDockJobs();
+  renderDocStrips();
   syncNothingFoundButtons();
 }
 
@@ -8769,7 +8796,7 @@ function showMenuPage(panelId) {
   sidebar.classList.toggle('on-page', !!panel);
   const title = panel && panel.querySelector('.panel-title');
   document.getElementById('drawerTitle').textContent = title ? title.textContent : 'Menu';
-  document.getElementById('drawerBack').hidden = !panel;
+  document.getElementById('drawerBack').setAttribute('aria-label', panel ? 'Back to the menu' : 'Back to Jobs');
   sidebar.querySelector('.drawer-scroll').scrollTop = 0;
   // The plan can change in Stripe or with a different sign-in, so Billing
   // always shows it fresh.
@@ -8780,17 +8807,22 @@ function showMenuPage(panelId) {
 }
 
 
-// ── BOTTOM TABS ──────────────────────────────────────────────────────────
-// Dashboard, Report, the mic, Quote and Menu along the bottom, in the order
-// a job runs. Each tab closes whatever is over the report, then opens its
-// place. Which tab is lit is css, read off the screens that are open.
+// ── BOTTOM DOCK ──────────────────────────────────────────────────────────
+// Jobs, the mic and This job. Jobs is every job (the account and settings
+// open from its top corner); This job is the open job's page, and each of
+// its documents (agreement, report, quote, treatment) opens a layer below
+// it. Each tab closes whatever is open, then opens its place. Which tab is
+// lit is css, read off the screens that are open. 'report', 'quote' and
+// 'menu' still work as places for the code that sends people there.
 function tabGo(to) {
   const isOpen = id => document.getElementById(id).classList.contains('open');
-  if (to !== 'report' && isOpen('voicePopover')) toggleVoicePopover();
+  syncDockJobs();
+  if (isOpen('voicePopover') && !isRecording) toggleVoicePopover();
   if (to === 'quote') {
     if (isOpen('quoteScreen')) return;
     if (isOpen('sidebarPanel')) toggleDrawer();
     if (isOpen('dashboardOverlay')) closeDashboard();
+    closeJobPage();
     openQuoteFromReport();
     return;
   }
@@ -8799,22 +8831,209 @@ function tabGo(to) {
     // A quote opened from the start menu goes back there; the tabs go to the app.
     if (document.getElementById('app').style.display !== 'flex') openApp('inspect');
   }
-  if (to === 'menu') {
-    if (isOpen('dashboardOverlay')) closeDashboard();
-    if (isOpen('sidebarPanel')) showMenuPage(null); else toggleDrawer();
-    return;
-  }
+  if (to === 'menu') { openAccountMenu(); return; }
   if (isOpen('sidebarPanel')) toggleDrawer();
   if (to === 'dashboard') {
+    closeJobPage();
     if (isOpen('dashboardOverlay')) closeDashboardDetail(); else openDashboard();
-  } else if (isOpen('dashboardOverlay')) closeDashboard();
+    return;
+  }
+  if (isOpen('dashboardOverlay')) closeDashboard();
+  if (to === 'job') openJobPage(); else closeJobPage();
+}
+
+// The account and settings, from the Jobs page's top corner. Back from the
+// menu's list returns to Jobs.
+function openAccountMenu() {
+  const isOpen = id => document.getElementById(id).classList.contains('open');
+  if (isOpen('quoteScreen')) { closeQuote(); if (document.getElementById('app').style.display !== 'flex') openApp('inspect'); }
+  if (isOpen('dashboardOverlay')) closeDashboard();
+  closeJobPage();
+  if (!isOpen('sidebarPanel')) toggleDrawer(); else showMenuPage(null);
+}
+function drawerBackTap() {
+  if (document.getElementById('sidebarPanel').classList.contains('on-page')) { showMenuPage(null); return; }
+  toggleDrawer();
+  openDashboard();
+}
+
+// ── THIS JOB ─────────────────────────────────────────────────────────────
+// The open job's page: where it's up to and the next step, then every
+// stage in the order a job runs, each opening its document, then the job's
+// details. Built from the same reading of a job as the dashboard's list.
+function currentJobSummary() {
+  saveOpenReportNow();
+  const quotes = getSavedQuotes();
+  const saved = currentReportId && getSavedReports().find(r => r.id === currentReportId);
+  // A job not saved yet (no address) still has a page, read off the open report.
+  const r = saved || { id: currentReportId || 'draft', address: getFullAddress(), client: (document.getElementById('jobClient') || {}).value || '',
+    completion: calculateCompletion(), reportData, quote: currentJobQuote() };
+  return dashboardJob(r, quotes);
+}
+
+function openJobPage() {
+  const overlay = document.getElementById('jobOverlay');
+  if (!overlay) return;
+  renderJobPage();
+  overlay.classList.add('open');
+  document.getElementById('jobPageBody').scrollTop = 0;
+  track('screen_viewed', { screen: 'job' });
+}
+
+function closeJobPage() {
+  const overlay = document.getElementById('jobOverlay');
+  if (!overlay || !overlay.classList.contains('open')) return;
+  overlay.classList.remove('open');
+  parkJobPanel();
+}
+
+function jobAgreementStep() {
+  const a = reportData.agreement;
+  if (!a) return { label: 'Agreement', to: 'agreement', state: 'now', text: 'Not signed yet. Get it signed before you start' };
+  const how = a.method === 'onsite' ? 'Signed on site' : a.method === 'email' ? 'Signed by email' : a.method === 'paper' ? 'Signed on paper' : 'Signed';
+  return { label: 'Agreement', to: 'agreement', state: 'done', text: `${how}${a.signerName ? ' by ' + a.signerName : ''}` };
+}
+
+function renderJobPage() {
+  const body = document.getElementById('jobPageBody');
+  if (!body) return;
+  parkJobPanel();
+  const j = currentJobSummary();
+  const addr = (j.r.address || '').trim();
+  const steps = [jobAgreementStep(), ...j.steps];
+  // Before the agreement is signed, that is the next step.
+  const next = !reportData.agreement && addr ? { status: 'Get the agreement signed', hint: 'The client signs it before the inspection starts.', next: { label: 'Open the agreement', to: 'agreement' } }
+    : !addr ? { status: 'Start the job', hint: 'Type the address and the client\'s name below, get the agreement signed, then tap the mic and talk through the inspection.', next: null }
+    : { status: j.status, hint: j.hint, next: j.next };
+  if (reportData.agreement && j.steps.some(st => st.state === 'now')) steps[0].state = 'done';
+  else if (!reportData.agreement) steps.slice(1).forEach(st => { if (st.state === 'now') st.state = 'todo'; });
+  const icon = d => `<svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const dot = (st, i) => st.state === 'done' ? icon('<path d="M20 6 9 17l-5-5"/>')
+    : st.state === 'bad' ? icon('<path d="M18 6 6 18"/><path d="M6 6l12 12"/>') : st.state === 'skip' ? '–' : i + 1;
+  const pct = calculateCompletion();
+  const detail = (st) => st.to === 'report' && st.state !== 'done' && st.state !== 'skip' ? `${pct}% filled in`
+    : st.to === 'quote' && j.total ? `${formatAUD(j.total).replace(/\.00$/, '')}${j.q && j.q.sentAt ? ', sent' : ', not sent yet'}` : st.text;
+  const chev = '<svg class="icon dash-timeline-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
+  const group = (DASHBOARD_TABS.find(([k]) => k === j.group) || [, ''])[1];
+  body.innerHTML = `
+    <div class="job-hero">
+      ${addr ? `<span class="dash-detail-chip ${j.group}">${group}</span>` : ''}
+      <h3 class="job-hero-addr">${escapeHtml(addr || 'New job')}</h3>
+      ${j.r.client ? `<p class="job-hero-sub">${escapeHtml(j.r.client)}</p>` : ''}
+    </div>
+    <section class="dash-next job-next ${j.group}">
+      <div class="dash-next-label">${next.next ? 'Next step' : addr ? 'Where it\'s at' : 'Next step'}</div>
+      <div class="dash-next-title">${escapeHtml(next.status)}</div>
+      ${next.hint ? `<p class="dash-next-hint">${escapeHtml(next.hint)}</p>` : ''}
+      ${next.next ? `<button type="button" class="dash-detail-primary" onclick="jobGo('${next.next.to}')">${next.next.label}</button>` : ''}
+    </section>
+    <div class="job-section-head">The job, step by step</div>
+    <ol class="dash-timeline job-steps">
+      ${steps.map((st, i) => `
+        <li class="${st.state}">
+          <span class="dash-timeline-dot" aria-hidden="true">${dot(st, i)}</span>
+          <button type="button" class="dash-timeline-btn" onclick="jobGo('${st.to}')">
+            <span class="dash-timeline-label">${st.label}</span>
+            <span class="dash-timeline-text">${escapeHtml(detail(st))}</span>
+            ${chev}
+          </button>
+        </li>`).join('')}
+    </ol>
+    <div class="job-section-head" id="jobDetailsHead">Job details</div>
+    <div id="jobPageSlot"></div>`;
+  const panel = document.getElementById('jobPanel');
+  if (panel) document.getElementById('jobPageSlot').appendChild(panel);
+}
+
+// Opens one of the open job's documents from its page (or from the strip
+// at the top of a document).
+function jobGo(to) {
+  closeJobPage();
+  if (document.getElementById('quoteScreen').classList.contains('open') && to !== 'quote' && to !== 'answer' && to !== 'treatment' && to !== 'certificate') {
+    closeQuote();
+    if (document.getElementById('app').style.display !== 'flex') openApp('inspect');
+  }
+  if (to === 'job') { openJobPage(); return; }
+  if (to === 'details') { openJobPage(); document.getElementById('jobDetailsHead')?.scrollIntoView({ block: 'start' }); return; }
+  if (to === 'agreement') { openAgreementSheet(); return; }
+  if (to === 'report') return;
+  if (!document.getElementById('quoteScreen').classList.contains('open')) openQuoteFromReport();
+  if (to === 'treatment') openTreatmentRecord();
+  if (to === 'answer' || to === 'certificate') {
+    const step = document.getElementById('qgStep3');
+    if (step) step.scrollIntoView({ block: 'center' });
+  }
+  // The certificate's Email button, lit so it's the obvious next tap.
+  if (to === 'certificate') {
+    ensureJsPDFLoaded().catch(() => {});
+    const btn = document.querySelector('#quoteAnswer .qp-cert-email');
+    if (btn) { btn.scrollIntoView({ block: 'center' }); btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 2400); }
+  }
+}
+
+// The strip at the top of the report and the quote: back to the job's page,
+// then its documents, the one on show lit. Treatment joins once the client
+// has accepted.
+function renderDocStrips() {
+  if (typeof quoteHasItems !== 'function') return; // js/quote.js not loaded yet
+  const q = currentJobQuote();
+  const accepted = quoteHasItems(q) && (quoteAnswerState(q) || {}).status === 'accepted';
+  const docs = [['agreement', 'Agreement', !!reportData.agreement], ['report', 'Report'], ['quote', 'Quote', quoteHasItems(q)]];
+  if (accepted) docs.push(['treatment', 'Treatment', !!q.treatment]);
+  document.querySelectorAll('.doc-strip').forEach(strip => {
+    const here = strip.dataset.doc;
+    strip.innerHTML = `<button type="button" class="doc-chip doc-chip-job" onclick="jobGo('job')"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Job</button>`
+      + docs.map(([to, label, done]) => `<button type="button" class="doc-chip${to === here ? ' here' : ''}${done ? ' done' : ''}" ${to === here ? 'aria-current="page"' : `onclick="jobGo('${to}')"`}>${label}</button>`).join('');
+  });
+}
+
+// What the dock's tabs show about the job. This job: a ring that fills with
+// the report's required answers, a tick once it's done.
+function syncDockReport(pct, locked) {
+  const ring = document.getElementById('tabReportRing');
+  if (!ring) return;
+  const done = locked || pct >= 100;
+  ring.style.setProperty('--ring', pct);
+  ring.classList.toggle('done', done);
+  ring.classList.toggle('empty', !done && !pct);
+  ring.closest('.tab').setAttribute('aria-label', done ? 'This job, report done' : `This job, report ${pct}% filled in`);
+}
+
+// Dashboard: how many jobs need the inspector. Quote: a dot in the colour of
+// where this job's quote is up to. Read from storage, so it waits for a
+// quiet moment instead of running on every keystroke.
+let dockJobsTimer = 0;
+function syncDockJobs() {
+  clearTimeout(dockJobsTimer);
+  dockJobsTimer = setTimeout(() => {
+    try {
+      const quotes = getSavedQuotes();
+      const need = getSavedReports().map(r => dashboardJob(r, quotes)).filter(j => j.group === 'todo').length;
+      const count = document.getElementById('tabJobsCount');
+      if (count) {
+        count.textContent = need > 9 ? '9+' : String(need);
+        count.hidden = !need;
+        count.closest('.tab').setAttribute('aria-label', need ? `Dashboard, ${need} job${need === 1 ? '' : 's'} need you` : 'Dashboard');
+      }
+      const dot = document.getElementById('tabQuoteDot');
+      if (dot) {
+        const q = currentJobQuote();
+        const [label, tone] = quoteHasItems(q) ? quoteStatusPill(q) : [];
+        dot.hidden = !label;
+        dot.className = 'tab-dot-badge' + (tone === 'wait' || tone === 'good' || tone === 'bad' ? ' ' + tone : '');
+        dot.closest('.tab').setAttribute('aria-label', label ? `Quote, ${label}` : 'Quote');
+      }
+    } catch (e) { /* the dock's hints are extras; never let them break a save */ }
+  }, 400);
 }
 
 // The mic is for the report: from anywhere else it goes to the report and
 // opens the voice panel there.
 function tabMic() {
+  // While it listens, Talk reads Stop: a tap stops the recording.
+  if (isRecording) { toggleRecording(); return; }
   const onReport = document.getElementById('app').style.display === 'flex'
-    && !['quoteScreen', 'sidebarPanel', 'dashboardOverlay'].some(id => document.getElementById(id).classList.contains('open'));
+    && !['quoteScreen', 'sidebarPanel', 'dashboardOverlay', 'jobOverlay'].some(id => document.getElementById(id).classList.contains('open'));
   if (!onReport) {
     tabGo('report');
     if (!document.getElementById('voicePopover').classList.contains('open')) toggleVoicePopover();
@@ -8829,6 +9048,7 @@ function toggleVoicePopover() {
   const fab = document.getElementById('micFab');
   const isOpen = popover.classList.toggle('open');
   fab.classList.toggle('open', isOpen);
+  updateVoiceHud();
   showTestModeBadge();
   if (isOpen) updateTalkPhotoButton();
 
@@ -8904,8 +9124,9 @@ function updateJob() {
     summary.textContent = parts.length ? parts.join(' · ') : 'No job set';
   }
 
-  const newHint = document.querySelector('.dash-current-new');
-  if (newHint) newHint.textContent = dashNewJobHint();
+  // The job's page shows the address as it's typed into its details.
+  const heroAddr = document.querySelector('#jobOverlay.open .job-hero-addr');
+  if (heroAddr) heroAddr.textContent = addr || 'New job';
 
   syncAllSelectCards();
   renderLastVisitBanner();
@@ -10970,6 +11191,8 @@ function renderProfileMenu() {
   const initials = name.trim().split(/\s+/).slice(0,2).map(w => w[0]).join('').toUpperCase() || '?';
   const initialsEl = document.getElementById('profileInitials');
   if (initialsEl) initialsEl.textContent = initials;
+  const topInitials = document.getElementById('topbarInitials');
+  if (topInitials) topInitials.textContent = initials;
   const nameEl = document.getElementById('profileName');
   if (nameEl) nameEl.textContent = name;
   const emailEl = document.getElementById('profileEmail');
@@ -12244,21 +12467,17 @@ function openDashboard() {
   const search = document.getElementById('dashboardSearch');
   if (search) search.value = '';
   renderDashboard();
-  if (!dashboardJobs.some(j => j.group === 'todo')) setDashboardTab('current');
+  // Nothing to do: open on the list that has jobs in it.
+  if (!dashboardJobs.some(j => j.group === 'todo')) {
+    const fallback = ['waiting', 'done'].find(g => dashboardJobs.some(j => j.group === g));
+    if (fallback) setDashboardTab(fallback);
+  }
 }
 
-// Opens the dashboard on the open job's details.
+// Opens the open job's details, on its page.
 function openJobDetails() {
-  if (!document.getElementById('dashboardOverlay').classList.contains('open')) openDashboard();
-  closeDashboardDetail();
-  setDashboardTab('current');
-}
-
-// The line above Job details for a job not saved yet. Once an address is
-// typed it stops asking for one.
-function dashNewJobHint() {
-  const addr = getFullAddress();
-  return addr ? `${addr}: a draft until you save the report or send it.` : 'A new job. Fill in the address and client to start its report.';
+  if (document.getElementById('dashboardOverlay').classList.contains('open')) closeDashboard();
+  jobGo('details');
 }
 
 function refreshDashboardIfOpen() {
@@ -12270,14 +12489,15 @@ function closeDashboard() {
   document.getElementById('dashboardOverlay').classList.remove('open');
 }
 
-// Which tab the dashboard shows: 'current' (the open job's details) or a
-// list, 'todo' | 'waiting' | 'done'. Search looks through every job.
+// Which list the dashboard shows: 'todo' | 'waiting' | 'done'. Search
+// looks through every job. The open job's details live on its own page
+// (THIS JOB).
 let dashboardTab = 'todo';
 let dashboardJobs = [];
-const DASHBOARD_TABS = [['current', 'This job'], ['todo', 'To do'], ['waiting', 'Waiting'], ['done', 'Done']];
+const DASHBOARD_TABS = [['todo', 'To do'], ['waiting', 'Waiting'], ['done', 'Done']];
 
-// Job details sit on the Current report tab. Before the dashboard redraws,
-// the panel goes back to its holder, so its fields survive the redraw.
+// Job details sit on the job's page. Before a page redraws, the panel goes
+// back to its holder, so its fields survive the redraw.
 function parkJobPanel() {
   const panel = document.getElementById('jobPanel');
   const home = document.getElementById('jobPanelHome');
@@ -12409,8 +12629,7 @@ function renderDashboard() {
   body.innerHTML = `
     <div class="dash-hero">
       <span class="dash-hero-date">${today}</span>
-      <h2 class="dash-hero-title" id="dashboardTitle">Dashboard</h2>
-      <p class="dash-hero-lead">${lead}</p>
+      <p class="dash-hero-title">${lead}</p>
     </div>
     <div class="dash-tabs" id="dashboardTabs" role="tablist">
       ${DASHBOARD_TABS.map(([key, label]) => `<button type="button" role="tab" class="dash-tab" data-tab="${key}" onclick="setDashboardTab('${key}')">${label} <span></span></button>`).join('')}
@@ -12458,29 +12677,6 @@ function renderDashboardJobs(fade) {
       if (lit.scrollIntoView && tabs.scrollWidth > tabs.clientWidth) tabs.scrollTo({ left: lit.offsetLeft - 16, behavior: fade ? 'smooth' : 'auto' });
     }
   }
-  const searchWrap = document.getElementById('dashboardSearchWrap');
-  if (searchWrap) searchWrap.hidden = dashboardTab === 'current' && !query;
-
-  if (dashboardTab === 'current' && !query) {
-    const j = dashboardJobs.find(x => x.r.id === currentReportId);
-    wrap.innerHTML = `<div class="dash-current${fade ? ' fade-in' : ''}">
-      ${j ? `<button type="button" class="dash-row dash-current-job ${j.group}" onclick="openDashboardDetail('${j.r.id}')">
-          ${dashboardRing(j.steps, j.group)}
-          <span class="dash-row-text">
-            <span class="dash-row-addr">${escapeHtml(j.r.address || 'No address')}</span>
-            <span class="dash-row-sub"><span class="dash-row-status">${escapeHtml(j.status)}</span>${j.r.client ? ' · ' + escapeHtml(j.r.client) : ''}</span>
-          </span>
-          <svg class="icon dash-row-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
-        </button>`
-        : `<p class="dash-current-new">${escapeHtml(dashNewJobHint())}</p>`}
-      <div class="dash-current-head">Job details</div>
-      <div id="dashCurrentSlot"></div>
-    </div>`;
-    const panel = document.getElementById('jobPanel');
-    if (panel) document.getElementById('dashCurrentSlot').appendChild(panel);
-    return;
-  }
-
   const empty = query ? `No jobs match "${escapeHtml(searchEl.value.trim())}".`
     : !dashboardJobs.length ? 'Your jobs will show up here once you save a report.'
     : { todo: 'Nothing to do right now.', waiting: 'Nothing is waiting on a client.', done: 'No finished jobs yet.' }[dashboardTab];
@@ -12661,19 +12857,7 @@ function closeDashboardDetail() {
 function openDashboardJob(id, to) {
   closeDashboard();
   loadReport(id);
-  if (to === 'report') return;
-  openQuote('app', id);
-  if (to === 'treatment') openTreatmentRecord();
-  if (to === 'answer' || to === 'certificate') {
-    const step = document.getElementById('qgStep3');
-    if (step) step.scrollIntoView({ block: 'center' });
-  }
-  // The certificate's Email button, lit so it's the obvious next tap.
-  if (to === 'certificate') {
-    ensureJsPDFLoaded().catch(() => {});
-    const btn = document.querySelector('#quoteAnswer .qp-cert-email');
-    if (btn) { btn.scrollIntoView({ block: 'center' }); btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 2400); }
-  }
+  jobGo(to);
 }
 
 const SAVED_EMPTY_HTML = `<div class="empty-state">

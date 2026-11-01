@@ -261,13 +261,11 @@
 
 <!-- QUOTE SCREEN — builds a treatment quote from an inspection report -->
 <div id="quoteScreen">
-  <div class="quote-topbar">
-    <button class="quote-back" onclick="closeQuote()" aria-label="Back">
-      <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Back
-    </button>
-    <div class="quote-topbar-title">Quote</div>
+  <div class="quote-topbar page-topbar">
+    <div class="quote-topbar-title page-topbar-title">Quote</div>
     <div class="quote-save-state" id="quoteSaveState"></div>
   </div>
+  <div class="doc-strip doc-strip-bar" data-doc="quote" aria-label="This job's documents"></div>
   <div class="quote-scroll">
     <div class="quote-shell">
       <!-- Which report the quote is for. Quotes open from a job, so this
@@ -418,34 +416,28 @@
   </div>
 </div>
 
-<!-- BOTTOM TABS: the app's main places in the order a job runs (the
-     dashboard, the report, the mic for it, the quote, then the menu), along
-     the bottom where a thumb reaches. Shown with the report and the quote.
-     The tab for the screen on show is lit by css (see .tabbar). -->
+<!-- BOTTOM DOCK: three things that never change, however much the app
+     grows: Jobs (every job, and the account behind its top corner), the mic,
+     and This job (the open job's page, with each of its documents a layer
+     below). New documents join the job page, never this bar. Shown with the
+     report and the quote. The place on show is lit by css (see .tabbar).
+     While it listens the mic turns red with a Stop mark and the time above. -->
 <nav class="tabbar" id="tabBar" aria-label="Main">
   <div class="tabbar-inner">
     <button class="tab" data-tab="dashboard" onclick="tabGo('dashboard')">
-      <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span class="tabbar-label">Dashboard</span>
-    </button>
-    <button class="tab" data-tab="report" onclick="tabGo('report')">
-      <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6a1 1 0 0 1 1 1v2H8V4a1 1 0 0 1 1-1z"/><path d="M16 5h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/><path d="M8 12h8"/><path d="M8 16h5"/></svg><span class="tabbar-label">Report</span>
+      <span class="tab-icon"><svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span class="tab-count" id="tabJobsCount" hidden></span></span><span class="tabbar-label">Jobs</span>
     </button>
     <div class="mic-dock" id="micDock">
-      <button class="mic-fab" id="micFab" onclick="tabMic()" aria-label="Speak">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:relative; z-index:1;">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-          <line x1="12" y1="19" x2="12" y2="23"/>
-          <line x1="8" y1="23" x2="16" y2="23"/>
-        </svg>
+      <span class="mic-fab-time" id="micFabTime" aria-hidden="true">0:00</span>
+      <button class="mic-fab" id="micFab" onclick="tabMic()" aria-label="Talk">
+        <svg class="mic-fab-mic" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v4"/><path d="M8 23h8"/></svg>
+        <svg class="mic-fab-close" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        <svg class="mic-fab-stop" width="22" height="22" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="3" fill="currentColor"/></svg>
       </button>
       <span class="mic-badge" id="pendingNotesBadge" style="display:none" title="Notes waiting to be filled in"></span>
     </div>
-    <button class="tab" data-tab="quote" onclick="tabGo('quote')">
-      <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/></svg><span class="tabbar-label">Quote</span>
-    </button>
-    <button class="tab" data-tab="menu" onclick="tabGo('menu')">
-      <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg><span class="tabbar-label">Menu</span>
+    <button class="tab" data-tab="job" onclick="tabGo('job')">
+      <span class="tab-icon"><svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg><svg class="tab-ring" id="tabReportRing" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8"/><circle class="tab-ring-fill" cx="10" cy="10" r="8" pathLength="100"/><path class="tab-ring-tick" d="m6.5 10.2 2.3 2.3 4.7-4.9"/></svg></span><span class="tabbar-label">This job</span>
     </button>
   </div>
 </nav>
@@ -714,11 +706,26 @@
 
   <!-- DASHBOARD OVERLAY — placed at #app level, not inside .body, so it
        is never clipped by .body/.main-panel's overflow:hidden -->
+  <!-- THIS JOB: the open job's page. Where it's up to, the next step, every
+       stage in the order a job runs (agreement, report, quote, the client's
+       answer, treatment and certificate), each opening its document, then
+       the job's details. -->
+  <div class="job-overlay" id="jobOverlay">
+    <div class="job-page" role="dialog" aria-modal="true" aria-labelledby="jobPageTitle">
+      <div class="page-topbar">
+        <h2 class="page-topbar-title" id="jobPageTitle">This job</h2>
+      </div>
+      <div class="job-page-body" id="jobPageBody"></div>
+    </div>
+  </div>
+
   <div class="dashboard-overlay" id="dashboardOverlay">
     <div class="dashboard-panel" role="dialog" aria-modal="true" aria-labelledby="dashboardTitle">
-      <div class="dashboard-panel-header">
-        <button type="button" class="dash-back" onclick="closeDashboard()">
-          <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Report
+      <div class="dashboard-panel-header page-topbar">
+        <h2 class="page-topbar-title" id="dashboardTitle">Jobs</h2>
+        <button type="button" class="topbar-account" onclick="openAccountMenu()" aria-label="Account and settings">
+          <span class="topbar-account-initials" id="topbarInitials">?</span>
+          <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
       </div>
       <div class="dashboard-panel-body" id="dashboardBody"></div>
@@ -855,10 +862,9 @@
     <!-- DRAWER (slide-out) -->
     <div class="sidebar" id="sidebarPanel">
 
-      <div class="drawer-header">
-        <button class="drawer-back" id="drawerBack" onclick="showMenuPage(null)" aria-label="Back to menu" hidden><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
-        <span class="drawer-title" id="drawerTitle">Menu</span>
-        <button class="drawer-close" onclick="toggleDrawer()"><svg class="icon " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+      <div class="drawer-header page-topbar">
+        <button class="drawer-back" id="drawerBack" onclick="drawerBackTap()" aria-label="Back to Jobs"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+        <span class="drawer-title page-topbar-title" id="drawerTitle">Menu</span>
       </div>
 
       <div class="drawer-scroll">
@@ -1123,12 +1129,6 @@
 
       </div><!-- /drawer-scroll -->
 
-      <div class="drawer-footer">
-        <button class="share-btn" id="shareBtn" onclick="openSendReview()" disabled title="Check the report, then email it (and the quote) to the client">
-          <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>Send
-        </button>
-      </div>
-
     </div><!-- /sidebarPanel -->
 
     <!-- MAIN PANEL -->
@@ -1139,6 +1139,7 @@
           <h2>Inspection Report</h2>
           <p id="reportSubtitle">Enter job details and speak to populate fields</p>
         </div>
+        <div class="doc-strip" data-doc="report" aria-label="This job's documents"></div>
       </div>
 
       <div class="progress-wrap">
@@ -1867,9 +1868,22 @@
             </div>
           </div>
           <div class="warn-note note-good"><svg class="icon " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> Signatures are saved with this report, synced to your account when you're signed in, and printed in the PDF.</div>
-          <div class="signoff-pdf">
-            <button class="generate-btn" id="generateBtn" onclick="generateReport()" disabled>
-              <svg class="icon " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Generate PDF
+          <!-- What happens once the report is done: the quote, then both go
+               to the client. The PDF on its own is the quiet last option. -->
+          <div class="finish-next">
+            <div class="finish-next-label">Next</div>
+            <button class="finish-next-btn" onclick="tabGo('quote')">
+              <span class="finish-next-icon"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/></svg></span>
+              <span class="finish-next-text"><b>Write the quote</b><small>Starts from what the report found</small></span>
+              <svg class="icon finish-next-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+            <button class="finish-next-btn primary" id="shareBtn" onclick="openSendReview()" disabled>
+              <span class="finish-next-icon"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg></span>
+              <span class="finish-next-text"><b>Send to client</b><small>Check the report, then email it with the quote</small></span>
+              <svg class="icon finish-next-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+            <button class="finish-next-pdf" id="generateBtn" onclick="generateReport()" disabled>
+              <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Just the report PDF
             </button>
           </div>
         </div>

@@ -65,7 +65,7 @@ let shotN = 0;
     await tap(p.getByRole('button', { name: /Start inspecting/i }), 'Start Inspecting'); await p.waitForTimeout(1200); await shot('after-onboarding');
   }
 
-  // 2. Job details, typed on the dashboard.
+  // 2. Job details, typed on the job page.
   await p.locator('#jobAddress').fill(sc.job.jobAddress); await p.keyboard.press('Escape');
   await p.locator('#jobSuburb').fill(sc.job.jobSuburb);
   await p.locator('#jobPostcode').fill(sc.job.jobPostcode);
@@ -74,13 +74,13 @@ let shotN = 0;
   await p.locator('#jobClientPhone').fill('0411 111 111');
   await p.locator('#jobClientEmail').fill('sam@example.com');
   await shot('job-filled');
-  const job = await p.evaluate(() => ({ state: document.getElementById('jobState').value, hint: (document.querySelector('#dashboardOverlay, .dashboard-overlay') || document.body).innerText.includes('A new job. Fill in the address') }));
+  const job = await p.evaluate(() => ({ state: document.getElementById('jobState').value, hero: (document.querySelector('#jobOverlay.open .job-hero-addr') || {}).textContent || '' }));
   console.log('job:', JSON.stringify(job));
   check(job.state === 'NSW', 'state button sets NSW');
-  check(!job.hint, 'the dashboard stops asking for an address once one is typed');
+  check(/Banksia/.test(job.hero), 'the job page shows the address as it is typed');
 
-  // 3. The report tab and the agreement.
-  await tap(p.locator('.tab[data-tab="report"]'), 'Report tab'); await p.waitForTimeout(800); await shot('report');
+  // 3. The report, opened from the job page's steps, and the agreement.
+  await tap(p.locator('#jobOverlay .dash-timeline-btn', { hasText: 'Report' }), 'Report step on the job page'); await p.waitForTimeout(800); await shot('report');
   await tap(p.locator('#agreementBannerBtn'), 'Get it signed'); await p.waitForTimeout(800); await shot('agreement-open');
   const agFields = await p.evaluate(() => [...document.querySelectorAll('#agreementOverlay input, #agreementOverlay textarea, #agreementOverlay select')].filter(e => e.offsetParent).map(e => `${e.id}=${e.value}`));
   console.log('agreement fields:', agFields.join(' | '));
@@ -132,15 +132,14 @@ let shotN = 0;
   let dl = downloads.length;
   await tap(p.locator('#generateBtn'), 'Generate report'); await p.waitForTimeout(5000); await shot('generated');
   console.log('after generate: downloads', downloads.slice(dl), 'toasts', await toasts());
-  await tap(p.locator('.tab[data-tab="menu"]'), 'Menu tab'); await p.waitForTimeout(700); await shot('menu');
-  await tap(p.locator('#shareBtn'), 'Send (drawer)'); await p.waitForTimeout(1500); await shot('send-review');
+  await tap(p.locator('#shareBtn'), 'Send to client (Finish step)'); await p.waitForTimeout(1500); await shot('send-review');
   console.log('send review:', (await p.evaluate(() => document.querySelector('#sendReviewOverlay .page-sheet').innerText)).slice(0, 600));
   let em = emails.length;
   await tap(p.locator('#sendReviewBtn'), 'Send review confirm'); await p.waitForTimeout(6000); await shot('report-sent');
   console.log('after send: emails', emails.slice(em).map(e => e.subject + ' -> ' + e.to + ' [' + (e.attachments || []).map(a => a.filename) + ']'), 'downloads', downloads.slice(dl), 'toasts', await toasts());
 
   // 7. The quote.
-  await tap(p.locator('.tab[data-tab="quote"]'), 'Quote tab'); await p.waitForTimeout(1200); await shot('quote');
+  await tap(p.locator('#mainPanel .doc-chip', { hasText: 'Quote' }), 'Quote in the document strip'); await p.waitForTimeout(1200); await shot('quote');
   const q = await p.evaluate(() => ({ items: (quoteState.items || []).map(i => i.desc || i.description || JSON.stringify(i)).slice(0, 6), total: document.getElementById('qTotal').textContent, client: document.getElementById('qClient').value, email: document.getElementById('qClientEmail').value, addr: document.getElementById('qAddress').value }));
   console.log('quote:', JSON.stringify(q));
   check(q.client === 'Sam Taylor' && q.email === 'sam@example.com' && /Banksia/.test(q.addr), 'quote carries the client and address');
@@ -202,7 +201,6 @@ let shotN = 0;
   check(names.length >= 4 && names.every(n => /^[\w-]+\.pdf$/.test(n) && /Epping_NSW_2121/.test(n)), 'PDF file names keep the whole address with no commas: ' + names.join(', '));
 
   // 11. Back on the dashboard, the job shows as done.
-  await tap(p.locator('.quote-back'), 'Quote back'); await p.waitForTimeout(800);
   await tap(p.locator('.tab[data-tab="dashboard"]'), 'Dashboard tab'); await p.waitForTimeout(1200); await shot('dashboard-end');
   check(/Treated/.test(await p.evaluate(() => document.getElementById('dashboardOverlay').innerText)), 'the dashboard shows the job as treated');
 

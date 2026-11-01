@@ -4,7 +4,15 @@
  * The API keys are stored as Cloudflare secrets and never exposed to the
  * browser or public repo. See worker/README.md for setup and deploy steps.
  *
- * CHANGES FROM v9.6 -> v9.7:
+ * CHANGES FROM v9.7 -> v9.8:
+ * - A daily scheduled run deletes the report and quote PDFs behind client
+ *   links 30 days after the link's 14 days end (the privacy policy promises
+ *   this), then empties the link's file list so the page stops offering
+ *   them. Needs a Cron Trigger on the Worker (Settings > Triggers > Cron:
+ *   "0 17 * * *", about 3 or 4am in NSW). Without one nothing runs and
+ *   nothing else changes.
+ *
+ * CHANGES FROM v9.6 -> v9.7 (also in this version):
  * - Team (plan key `pro`) and Business (plan key `business`) are charged
  *   per inspector. Checkout takes `seats` for them (Team 2 to 9, Business
  *   10 to 200) and charges that quantity of the plan's per-inspector price.
@@ -386,7 +394,50 @@ export default {
     if (!response.ok) await releaseAiCall(gate.reservation, env);
     return response;
   },
+
+  // Cron Trigger (daily): clear client-link PDFs that are past keeping.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(cleanUpClientDocs(env).catch(err =>
+      console.error('client-docs clean-up failed: ' + (err && err.message ? err.message : String(err)))));
+  },
 };
+
+// Client-link PDFs live in the public client-docs bucket under
+// <user id>/<random folder>/. They're kept for 30 days after the link's 14
+// days end, then deleted, and the link's doc.files is emptied so the
+// client's page no longer offers them. A row is only emptied once its
+// files are gone, so a failed run is simply tried again the next day.
+const CLIENT_DOCS_BUCKET = 'client-docs';
+const CLIENT_DOCS_KEEP_DAYS = 30;
+const CLIENT_DOCS_BATCH = 100;
+
+async function cleanUpClientDocs(env) {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) return;
+  const cutoff = new Date(Date.now() - CLIENT_DOCS_KEEP_DAYS * 86400000).toISOString();
+  const marker = `${SUPABASE_URL}/storage/v1/object/public/${CLIENT_DOCS_BUCKET}/`;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/sign_requests?select=id,doc&expires_at=lt.${encodeURIComponent(cutoff)}`
+    + `&or=(doc->files->>report.not.is.null,doc->files->>quote.not.is.null)&order=expires_at.asc&limit=${CLIENT_DOCS_BATCH}`, { headers: serviceHeadersFor(env) });
+  if (!res.ok) throw new Error('list sign_requests ' + res.status);
+  const rows = await res.json();
+  let cleared = 0;
+  for (const row of rows) {
+    const files = (row.doc && row.doc.files) || {};
+    const paths = Object.values(files).filter(u => typeof u === 'string' && u.startsWith(marker)).map(u => decodeURIComponent(u.slice(marker.length)));
+    if (paths.length) {
+      const del = await fetch(`${SUPABASE_URL}/storage/v1/object/${CLIENT_DOCS_BUCKET}`, {
+        method: 'DELETE', headers: serviceHeadersFor(env), body: JSON.stringify({ prefixes: paths }),
+      });
+      if (!del.ok) { console.error(`client-docs: delete for ${row.id} failed ${del.status}`); continue; }
+    }
+    const doc = Object.assign({}, row.doc, { files: {} });
+    const upd = await fetch(`${SUPABASE_URL}/rest/v1/sign_requests?id=eq.${encodeURIComponent(row.id)}`, {
+      method: 'PATCH', headers: Object.assign(serviceHeadersFor(env), { 'Prefer': 'return=minimal' }), body: JSON.stringify({ doc }),
+    });
+    if (!upd.ok) { console.error(`client-docs: clearing files on ${row.id} failed ${upd.status}`); continue; }
+    cleared++;
+  }
+  if (rows.length) console.log(`client-docs: cleared ${cleared} of ${rows.length} expired links`);
+}
 
 // The weather at a property right now, from Google's Weather API, cut down
 // to what the report records. The key is a server key, so it never leaves

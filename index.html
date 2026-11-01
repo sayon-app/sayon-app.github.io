@@ -8,9 +8,9 @@
 <!-- PWA: manifest + icons + theme -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#D6E4EF">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=2">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=2">
-<link rel="apple-touch-icon" href="icon-180.png?v=2">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=3">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=3">
+<link rel="apple-touch-icon" href="icon-180.png?v=3">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="stylesheet" href="css/app.css">
@@ -22,7 +22,7 @@
 <!-- SPLASH SCREEN -->
 <div id="splash">
   <div class="splash-logo">
-    <div class="splash-icon"><svg class="icon " width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="4" r="2" fill="currentColor"/></svg></div>
+    <div class="splash-icon"><svg class="icon " width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle class="logo-dot" cx="12" cy="4" r="2" fill="currentColor"/></svg></div>
     <div class="splash-name">SAYON</div>
     <div class="splash-tagline"><span>Every inspection.</span> <span>Every detail.</span> <span>Done right.</span></div>
     <div class="splash-loading">
@@ -38,7 +38,7 @@
 <div id="authScreen" style="display:none">
   <div class="auth-wrap">
     <div class="auth-logo">
-      <div class="auth-logo-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="4" r="2" fill="currentColor"/></svg></div>
+      <div class="auth-logo-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle class="logo-dot" cx="12" cy="4" r="2" fill="currentColor"/></svg></div>
       <div class="auth-logo-name">SAYON</div>
     </div>
     <p class="auth-tagline">Timber pest reports, quotes and certificates, finished on site.</p>
@@ -140,7 +140,7 @@
 <div id="onboardScreen" style="display:none">
   <div class="auth-wrap">
     <div class="auth-logo">
-      <div class="auth-logo-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="4" r="2" fill="currentColor"/></svg></div>
+      <div class="auth-logo-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle class="logo-dot" cx="12" cy="4" r="2" fill="currentColor"/></svg></div>
       <div class="auth-logo-name">SAYON</div>
     </div>
 
@@ -232,7 +232,7 @@
   <div class="menu-shell">
     <div class="menu-header">
       <div class="menu-logo">
-        <div class="menu-logo-icon"><svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="4" r="2" fill="currentColor"/></svg></div>
+        <div class="menu-logo-icon"><svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle class="logo-dot" cx="12" cy="4" r="2" fill="currentColor"/></svg></div>
         <div class="menu-logo-text">SAYON</div>
       </div>
       <div class="menu-tagline">Voice-to-report timber pest inspections</div>
@@ -542,13 +542,21 @@
       <span class="page-sheet-title" id="treatmentTitle">Record the treatment</span>
       <button class="voice-popover-close" onclick="closeTreatmentRecord()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
     </div>
-    <div class="page-sheet-body">
-      <p class="quote-hint" style="margin:0">Fill this in once the treatment is done. It goes on the client's treatment certificate, and the boxes are ticked from the quote so you only change what was different.</p>
+    <div class="page-sheet-body sheet-secs">
+      <div class="sheet-intro">
+        <div class="agr-kicker">After the treatment</div>
+        <p class="agr-lede">Fill this in once the treatment is done. It goes on the client's treatment certificate.</p>
+      </div>
       <div class="sheet-voice" id="trVoice" data-state="idle">
         <button type="button" class="sheet-voice-btn" onclick="toggleSheetVoice('treatment')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg><span class="sheet-voice-label">Say it instead</span></button>
         <p class="sheet-voice-hint">e.g. "Done today, 8 till 11:30, fine and 22 degrees. Trenched and rodded the perimeter, 48 metres of Termidor at the label rate, foam at the porch post. Didn't do under the rear deck, no access. New notice in the meter box."</p>
         <p class="sheet-voice-text" hidden></p>
       </div>
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <span class="sheet-sec-num" aria-hidden="true">1</span>
+          <div><h3 class="sheet-sec-title">When and who</h3></div>
+        </div>
       <div class="job-row">
         <div class="job-field">
           <div class="job-field-label">Date treated</div>
@@ -562,21 +570,11 @@
       <div class="job-row">
         <div class="job-field">
           <div class="job-field-label">Technician</div>
-          <input class="job-input" id="trTech">
+          <input class="job-input" id="trTech" oninput="updateTreatmentSaveBtn()">
         </div>
         <div class="job-field">
           <div class="job-field-label">Licence no.</div>
           <input class="job-input" id="trLicence">
-        </div>
-      </div>
-      <div class="job-row">
-        <div class="job-field">
-          <div class="job-field-label">Supervisor</div>
-          <input class="job-input" id="trSupervisor" placeholder="If a trainee did it">
-        </div>
-        <div class="job-field">
-          <div class="job-field-label">Supervisor licence</div>
-          <input class="job-input" id="trSupervisorLicence">
         </div>
       </div>
       <div class="job-row">
@@ -589,6 +587,25 @@
           <input class="job-input" id="trFinish" type="time">
         </div>
       </div>
+      <details class="sheet-more" id="trSupervisorMore">
+        <summary>Done by a trainee? Add the supervisor</summary>
+        <div class="job-row">
+          <div class="job-field">
+            <div class="job-field-label">Supervisor</div>
+            <input class="job-input" id="trSupervisor" placeholder="If a trainee did it">
+          </div>
+          <div class="job-field">
+            <div class="job-field-label">Supervisor licence</div>
+            <input class="job-input" id="trSupervisorLicence">
+          </div>
+        </div>
+      </details>
+      </section>
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <span class="sheet-sec-num" aria-hidden="true">2</span>
+          <div><h3 class="sheet-sec-title">The treatment</h3><p class="sheet-sec-sub">Ticked from the quote. Change only what was different.</p></div>
+        </div>
       <div class="job-field">
         <div class="job-field-label">Pest treated</div>
         <input class="job-input" id="trPest" placeholder="e.g. Subterranean termites (Coptotermes)">
@@ -613,6 +630,12 @@
         <datalist id="trProductList"><option value="Termidor"><option value="Termidor Foam"><option value="Premise"><option value="Premise Foam"><option value="Altriset"><option value="Biflex"><option value="Exterra"><option value="Sentricon"><option value="Trelona"><option value="Kordon"></datalist>
         <button class="quote-link-btn treat-add-product" onclick="addTreatmentProduct()">Add another product</button>
       </div>
+      </section>
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <span class="sheet-sec-num" aria-hidden="true">3</span>
+          <div><h3 class="sheet-sec-title">Where</h3></div>
+        </div>
       <div class="job-field">
         <div class="job-field-label">Areas treated</div>
         <textarea class="job-input" id="trAreas" rows="2" placeholder="e.g. Laundry east wall; perimeter of the building"></textarea>
@@ -632,6 +655,12 @@
           <button class="signature-clear-btn" onclick="treatmentSketch.clear()">Clear plan</button>
         </div>
       </div>
+      </section>
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <span class="sheet-sec-num" aria-hidden="true">4</span>
+          <div><h3 class="sheet-sec-title">Notice and paperwork</h3><p class="sheet-sec-sub">What prints on the certificate for the client.</p></div>
+        </div>
       <div class="job-row">
         <div class="job-field">
           <div class="job-field-label">Durable notice</div>
@@ -646,10 +675,10 @@
           <input class="job-input" id="trNoticeWhere" placeholder="e.g. Meter box">
         </div>
       </div>
-      <p class="quote-hint" id="trNoticeHint" style="margin:-4px 0 0">The certificate prints the notice wording: system, date, product life and future inspections.</p>
+      <p class="quote-hint sheet-hint" id="trNoticeHint">The certificate prints the notice wording: system, date, product life and future inspections.</p>
       <div class="job-field">
         <div class="job-field-label">Safety and re-entry (from the label)</div>
-        <textarea class="job-input" id="trCautions" rows="2"></textarea>
+        <textarea class="job-input" id="trCautions" rows="3"></textarea>
       </div>
       <div class="job-field">
         <div class="job-field-label">Warranty or service terms</div>
@@ -659,18 +688,25 @@
         <div class="job-field-label">Notes for the client</div>
         <textarea class="job-input" id="trNotes" rows="2"></textarea>
       </div>
+      </section>
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <span class="sheet-sec-num" aria-hidden="true">5</span>
+          <div><h3 class="sheet-sec-title">Sign off</h3></div>
+        </div>
       <div class="job-field">
-        <div class="job-field-label">Technician signature</div>
         <div class="signature-pad-wrap agreement-sig-wrap">
           <canvas class="signature-canvas" id="trSigCanvas" width="640" height="220"></canvas>
           <div class="signature-placeholder" id="trSigPlaceholder">Sign here</div>
         </div>
         <div class="agreement-sig-actions">
-          <button class="signature-clear-btn" onclick="treatmentPad.clear();updateTreatmentSaveBtn()">Clear signature</button>
+          <span class="agr-sig-by" id="trSigBy">the technician</span>
+          <button class="agr-sig-clear" onclick="treatmentPad.clear();updateTreatmentSaveBtn()">Clear</button>
         </div>
       </div>
       <button class="extract-btn" id="trSaveBtn" onclick="saveTreatmentRecord()">Save treatment record</button>
       <button class="link-btn send-review-cancel" onclick="closeTreatmentRecord()">Cancel</button>
+      </section>
     </div>
   </div>
 </div>
@@ -682,13 +718,21 @@
       <span class="page-sheet-title" id="baitTitle">Bait station visit</span>
       <button class="voice-popover-close" onclick="closeBaitVisit()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
     </div>
-    <div class="page-sheet-body">
-      <p class="quote-hint" style="margin:0">Mark what you found at each station. It goes on the client's visit report, and the next visit's date follows what you found.</p>
+    <div class="page-sheet-body sheet-secs">
+      <div class="sheet-intro">
+        <div class="agr-kicker">Bait station check</div>
+        <p class="agr-lede">Mark what you found at each station. It goes on the client's visit report, and the next visit's date follows what you found.</p>
+      </div>
       <div class="sheet-voice" id="bvVoice" data-state="idle">
         <button type="button" class="sheet-voice-btn" onclick="toggleSheetVoice('bait')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg><span class="sheet-voice-label">Say it instead</span></button>
         <p class="sheet-voice-hint">e.g. "1 to 5 clear. 6 active, added two cartridges. 7's lid was off, replaced it. Rest are clear. Exterra, batch 4471. Back in 4 weeks."</p>
         <p class="sheet-voice-text" hidden></p>
       </div>
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <span class="sheet-sec-num" aria-hidden="true">1</span>
+          <div><h3 class="sheet-sec-title">The visit</h3></div>
+        </div>
       <div class="job-row">
         <div class="job-field">
           <div class="job-field-label">Visit date</div>
@@ -696,15 +740,20 @@
         </div>
         <div class="job-field">
           <div class="job-field-label">Technician</div>
-          <input class="job-input" id="bvTech">
+          <input class="job-input" id="bvTech" oninput="updateBaitSaveBtn()">
         </div>
       </div>
       <div class="job-field">
         <div class="job-field-label">Licence no.</div>
         <input class="job-input" id="bvLicence">
       </div>
+      </section>
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <span class="sheet-sec-num" aria-hidden="true">2</span>
+          <div><h3 class="sheet-sec-title">The stations</h3><p class="sheet-sec-sub">Tap what you found at each one. Rest are clear marks every station you haven't marked yet.</p></div>
+        </div>
       <div class="job-field">
-        <div class="job-field-label">The stations</div>
         <div class="job-row" id="bvCountRow" hidden>
           <div class="job-field">
             <div class="job-field-label">How many are in the ground?</div>
@@ -722,6 +771,12 @@
           <button type="button" class="quote-link-btn" id="bvRemoveStation" onclick="removeLastBaitStation()">Remove the last station</button>
         </div>
       </div>
+      </section>
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <span class="sheet-sec-num" aria-hidden="true">3</span>
+          <div><h3 class="sheet-sec-title">Bait and the next visit</h3></div>
+        </div>
       <div class="job-field">
         <div class="job-field-label">Bait used</div>
         <div class="job-row">
@@ -742,25 +797,32 @@
       <div class="job-field" id="bvNextWrap">
         <div class="job-field-label">Next visit</div>
         <input class="job-input" id="bvNext" type="date" oninput="onBaitNextInput()" onchange="onBaitNextInput()">
-        <p class="quote-hint" style="margin:6px 0 0">Starts at 4 weeks while termites are feeding and 3 months once every station is quiet. Set it to the bait's label.</p>
+        <p class="quote-hint sheet-hint" style="margin:6px 0 0">Starts at 4 weeks while termites are feeding and 3 months once every station is quiet. Set it to the bait's label.</p>
       </div>
       <div class="job-field">
         <div class="job-field-label">Notes for the client</div>
         <textarea class="job-input" id="bvNotes" rows="2" placeholder="Optional, e.g. keep the mulch clear of station 4"></textarea>
       </div>
+      </section>
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <span class="sheet-sec-num" aria-hidden="true">4</span>
+          <div><h3 class="sheet-sec-title">Sign off</h3></div>
+        </div>
       <div class="job-field">
-        <div class="job-field-label">Technician signature</div>
         <div class="signature-pad-wrap agreement-sig-wrap">
           <canvas class="signature-canvas" id="bvSigCanvas" width="640" height="220"></canvas>
           <div class="signature-placeholder" id="bvSigPlaceholder">Sign here</div>
         </div>
         <div class="agreement-sig-actions">
-          <button class="signature-clear-btn" onclick="baitPad.clear();updateBaitSaveBtn()">Clear signature</button>
+          <span class="agr-sig-by" id="bvSigBy">the technician</span>
+          <button class="agr-sig-clear" onclick="baitPad.clear();updateBaitSaveBtn()">Clear</button>
         </div>
       </div>
       <p class="bait-need" id="bvNeed" hidden></p>
       <button class="extract-btn" id="bvSaveBtn" onclick="saveBaitVisit()">Save visit</button>
       <button class="link-btn send-review-cancel" onclick="closeBaitVisit()">Cancel</button>
+      </section>
     </div>
   </div>
 </div>
@@ -771,7 +833,7 @@
   <header>
     <div class="header-left">
       <div class="app-logo">
-        <div class="app-logo-icon"><svg class="icon " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="4" r="2" fill="currentColor"/></svg></div>
+        <div class="app-logo-icon"><svg class="icon " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle class="logo-dot" cx="12" cy="4" r="2" fill="currentColor"/></svg></div>
         <div class="app-logo-name">SAYON</div>
       </div>
       <div class="header-divider"></div>
@@ -2168,6 +2230,8 @@
     <div class="page-sheet-header">
       <span class="page-sheet-title" id="agreementTitle">Pre-Inspection Agreement</span>
       <button class="voice-popover-close" onclick="closeAgreementSheet()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+      <!-- How far through: the job, read it, signed. See updateAgreementSignButton. -->
+      <div class="agr-progress" id="agreementProgress" aria-hidden="true"><i></i><i></i><i></i></div>
     </div>
 
     <!-- Not signed yet: the job, the wording, the signature, as three
@@ -2195,8 +2259,10 @@
       </div>
       <ol class="agr-steps">
         <li class="agr-step" id="agreementStepJob">
-          <span class="agr-step-dot" aria-hidden="true"><b>1</b></span>
-          <h3 class="agr-step-title">The job</h3>
+          <div class="agr-step-head">
+            <span class="agr-step-dot" aria-hidden="true"><b>1</b></span>
+            <div><div class="agr-step-of">Step 1 of 3</div><h3 class="agr-step-title">The job</h3></div>
+          </div>
           <!-- The type decides the standard and the wording of clause 1, so it
                is chosen before the client signs (see onAgreementTypeChange). -->
           <div class="job-field">
@@ -2230,8 +2296,10 @@
           </div>
         </li>
         <li class="agr-step" id="agreementStepRead">
-          <span class="agr-step-dot" aria-hidden="true"><b>2</b></span>
-          <h3 class="agr-step-title">Read it together</h3>
+          <div class="agr-step-head">
+            <span class="agr-step-dot" aria-hidden="true"><b>2</b></span>
+            <div><div class="agr-step-of">Step 2 of 3</div><h3 class="agr-step-title">Read it together</h3></div>
+          </div>
           <article class="agr-doc" id="agreementText"></article>
           <label class="agreement-check">
             <input type="checkbox" id="agreementAgree" onchange="updateAgreementSignButton()">
@@ -2239,8 +2307,10 @@
           </label>
         </li>
         <li class="agr-step" id="agreementStepSign">
-          <span class="agr-step-dot" aria-hidden="true"><b>3</b></span>
-          <h3 class="agr-step-title">Client signs</h3>
+          <div class="agr-step-head">
+            <span class="agr-step-dot" aria-hidden="true"><b>3</b></span>
+            <div><div class="agr-step-of">Step 3 of 3</div><h3 class="agr-step-title">Client signs</h3></div>
+          </div>
           <div class="job-field">
             <div class="job-field-label">Client name</div>
             <input class="job-input" id="agreementSignerName" placeholder="Full name of the person signing" oninput="refreshAgreementPreview()">
@@ -2250,16 +2320,20 @@
             <div class="signature-placeholder" id="agreementSigPlaceholder">Client signs here</div>
           </div>
           <div class="agreement-sig-actions">
-            <button class="signature-clear-btn" onclick="agreementSignaturePad.clear();updateAgreementSignButton()">Clear signature</button>
+            <span class="agr-sig-by" id="agreementSigBy"></span>
+            <button class="agr-sig-clear" onclick="agreementSignaturePad.clear();updateAgreementSignButton()">Clear</button>
           </div>
           <button class="extract-btn" id="agreementSignBtn" onclick="signAgreement('onsite')" disabled>Sign agreement</button>
           <p class="agr-hint agr-sign-need" id="agreementSignNeed"></p>
-          <button class="link-btn agreement-other-toggle" onclick="toggleAgreementOther()">Signed on paper or by email instead?</button>
-          <div class="agreement-other" id="agreementOtherWrap" style="display:none">
-            <input class="job-input" id="agreementOtherNote" placeholder="e.g. Signed on paper, agreed by email">
-            <button class="agreement-banner-btn" onclick="signAgreement('other')">Record it</button>
+          <div class="agr-alt">
+            <div class="agr-alt-label">Other ways to sign</div>
+            <button class="agr-alt-btn" id="agreementLinkBtn" onclick="sendAgreementLink()">Client not here? Send them a link to sign<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+            <button class="agr-alt-btn" onclick="toggleAgreementOther()">Signed on paper or by email instead?<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+            <div class="agreement-other" id="agreementOtherWrap" style="display:none">
+              <input class="job-input" id="agreementOtherNote" placeholder="e.g. Signed on paper, agreed by email">
+              <button class="agreement-banner-btn" onclick="signAgreement('other')">Record it</button>
+            </div>
           </div>
-          <button class="link-btn agreement-other-toggle" id="agreementLinkBtn" onclick="sendAgreementLink()">Client not here? Send them a link to sign</button>
         </li>
       </ol>
     </div>

@@ -274,7 +274,7 @@ body.large-touch .saved-item-delete { width: 44px; height: 44px; }
    the pale top. */
 #splash .splash-icon {
   background: linear-gradient(180deg, #F4F7FA 0%, var(--accent-pale) 40%, var(--accent-hi) 78%, var(--accent) 100%);
-  color: #0B3B36;
+  color: var(--accent-ink);
   box-shadow: 0 0 60px rgba(var(--accent-hi-rgb),0.35), 0 10px 30px rgba(var(--accent-rgb),0.25), inset 0 1px 1px rgba(255,255,255,0.6), inset 0 -2px 4px rgba(var(--accent-deep-rgb),0.35);
 }
 @keyframes splashNameIn {
@@ -337,7 +337,7 @@ body.large-touch .saved-item-delete { width: 44px; height: 44px; }
 .splash-progress-fill {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, var(--accent), var(--green));
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent-hi) 70%, var(--pink));
   border-radius: 99px;
   animation: splashProgress 1.6s cubic-bezier(0.4, 0, 0.2, 1) 0.7s forwards;
 }
@@ -4694,7 +4694,7 @@ body:not(.dark-screen) .app-logo-icon,
 body:not(.dark-screen) .auth-logo-icon,
 body:not(.dark-screen) .menu-logo-icon {
   background: linear-gradient(180deg, #F4F7FA 0%, var(--accent-pale) 40%, var(--accent-hi) 78%, var(--accent) 100%);
-  color: #0B3B36;
+  color: var(--accent-ink);
   box-shadow: 0 0 14px rgba(var(--glow-hi),0.4), inset 0 1px 1px rgba(255,255,255,0.6), inset 0 -2px 3px rgba(var(--accent-deep-rgb),0.35);
 }
 body:not(.dark-screen) .menu-logo-icon {

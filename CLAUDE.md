@@ -13,6 +13,7 @@ Read only the files your task needs. `js/app.js` is about 9,200 lines, so jump t
 | `index.html` | Every screen and overlay: splash, sign-in, platform menu, report (sections 1–7 + sign-off), drawer menu pages, quote screen and sheets |
 | `js/app.js` | The report app and everything shared (see sections below) |
 | `js/quote.js` | Quote builder, the client's answer and the quote PDF |
+| `js/photo-markup.js` | Mark up a report photo (circle, arrow, draw, label) from the photo viewer |
 | `js/treatment.js` | Treatment record and the one-page certificate PDF |
 | `js/business-sync.js` | Syncs company details and quote prices to Supabase `businesses.settings` |
 | `css/app.css`, `css/quote.css` | Styles |

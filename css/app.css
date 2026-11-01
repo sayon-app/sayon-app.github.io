@@ -4864,6 +4864,70 @@ body:not(.dark-screen) .choice-card { transition: background-color 0.3s, border-
 }
 .photo-viewer-hint { text-align: center; font-size: 12px; color: rgba(232,240,246,0.55); padding: 8px 14px calc(12px + env(safe-area-inset-bottom, 0px)); }
 .photo-viewer.zoomed .photo-viewer-hint { visibility: hidden; }
+.photo-viewer-markup {
+  height: 44px; flex-shrink: 0; padding: 0 16px; border-radius: 22px;
+  border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.12); color: #fff;
+  display: flex; align-items: center; gap: 7px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.photo-viewer-markup[hidden] { display: none; }
+
+/* ── PHOTO MARKUP ── circle, arrow, draw or label on a photo (js/photo-markup.js). */
+.photo-markup {
+  position: fixed; inset: 0; z-index: 401;
+  display: flex; flex-direction: column;
+  background: #05090D; color: #F4F8FB;
+}
+.photo-markup[hidden] { display: none; }
+.photo-markup-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 10px 8px;
+}
+.photo-markup-title { flex: 1; text-align: center; font-size: 16px; font-weight: 700; }
+.photo-markup-text-btn {
+  min-height: 44px; padding: 0 16px; border-radius: 22px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.08); color: #fff;
+  font: inherit; font-size: 15px; font-weight: 600;
+}
+.photo-markup-text-btn.primary { background: var(--accent, #2F9E6E); border-color: transparent; color: #fff; }
+.photo-markup-text-btn:disabled { opacity: 0.4; cursor: default; }
+.photo-markup-stage {
+  flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center;
+  padding: 4px 8px; overflow: hidden;
+}
+.photo-markup-stage canvas {
+  max-width: 100%; max-height: 100%; touch-action: none; cursor: crosshair;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.photo-markup-note { margin: 4px 14px 0; font-size: 12.5px; color: #FFD60A; text-align: center; }
+.photo-markup-note[hidden] { display: none; }
+.photo-markup-label { display: flex; gap: 8px; padding: 8px 12px 0; }
+.photo-markup-label[hidden] { display: none; }
+.photo-markup-label input {
+  flex: 1; min-width: 0; min-height: 44px; padding: 0 14px; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: #fff; font: inherit; font-size: 16px;
+}
+.photo-markup-hint { text-align: center; font-size: 13px; color: rgba(232,240,246,0.7); padding: 8px 14px 4px; min-height: 1.4em; }
+.photo-markup-tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 4px 12px; }
+.photo-markup-tools button {
+  min-height: 56px; border-radius: 14px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); color: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  font: inherit; font-size: 13px; font-weight: 600;
+}
+.photo-markup-tools button.on { background: #fff; color: #05090D; border-color: #fff; }
+.photo-markup-actions {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+}
+.photo-markup-colours { display: flex; gap: 10px; flex: 1; }
+.photo-markup-colours button {
+  width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+  border: 3px solid rgba(255,255,255,0.25);
+}
+.photo-markup-colours button.on { border-color: #fff; box-shadow: 0 0 0 2px #05090D inset; }
+.photo-markup-colours [data-markup-colour="red"] { background: #FF3B30; }
+.photo-markup-colours [data-markup-colour="yellow"] { background: #FFD60A; }
+.photo-markup-colours [data-markup-colour="white"] { background: #FFFFFF; }
 /* Photos in the report open the viewer when tapped. */
 img[data-photo-id][src] { cursor: zoom-in; }
 .finding-photos .spot-photos { margin-top: 0; }

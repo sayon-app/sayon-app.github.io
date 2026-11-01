@@ -7290,7 +7290,8 @@ function restoreSignaturePads() {
 // reached), and a short AI call fills the sheet's boxes from it. Every box
 // stays editable, and a box the note doesn't mention is left as it was.
 // SHEET_VOICE[kind] = { box, prompt(), apply(fields) }; the prompts live
-// with their sheets (agreement below, treatment in js/treatment.js).
+// with their sheets (agreement below, treatment in js/treatment.js, bait
+// station visits in js/bait.js).
 const SHEET_VOICE_MAX_MS = 180000;
 let sheetVoice = null;   // { kind, recorder, stream, chunks, recognition, text, timer }
 
@@ -7298,6 +7299,7 @@ function sheetVoiceKinds() {
   return {
     agreement: { box: 'agreementVoice', prompt: agreementVoicePrompt, apply: applyAgreementVoice },
     treatment: { box: 'trVoice', prompt: typeof treatmentVoicePrompt === 'function' ? treatmentVoicePrompt : null, apply: typeof applyTreatmentVoice === 'function' ? applyTreatmentVoice : null },
+    bait: { box: 'bvVoice', prompt: typeof baitVoicePrompt === 'function' ? baitVoicePrompt : null, apply: typeof applyBaitVoice === 'function' ? applyBaitVoice : null },
   };
 }
 
@@ -8949,7 +8951,7 @@ function renderJobPage() {
 // at the top of a document).
 function jobGo(to) {
   closeJobPage();
-  if (document.getElementById('quoteScreen').classList.contains('open') && to !== 'quote' && to !== 'answer' && to !== 'treatment' && to !== 'certificate') {
+  if (document.getElementById('quoteScreen').classList.contains('open') && to !== 'quote' && to !== 'answer' && to !== 'treatment' && to !== 'certificate' && to !== 'bait') {
     closeQuote();
     if (document.getElementById('app').style.display !== 'flex') openApp('inspect');
   }
@@ -8959,6 +8961,13 @@ function jobGo(to) {
   if (to === 'report') return;
   if (!document.getElementById('quoteScreen').classList.contains('open')) openQuoteFromReport();
   if (to === 'treatment') openTreatmentRecord();
+  if (to === 'bait') {
+    const card = document.getElementById('qpBait');
+    if (card) card.scrollIntoView({ block: 'center' });
+    // Nothing recorded, or a check due: straight onto the sheet.
+    const b = typeof baitProgram === 'function' ? baitProgram(quoteState) : null;
+    if (b && !b.finished && !(b.last && !b.last.sentAt) && b.dueNow) openBaitVisit();
+  }
   if (to === 'answer' || to === 'certificate') {
     const step = document.getElementById('qgStep3');
     if (step) step.scrollIntoView({ block: 'center' });
@@ -8980,6 +8989,7 @@ function renderDocStrips() {
   const accepted = quoteHasItems(q) && (quoteAnswerState(q) || {}).status === 'accepted';
   const docs = [['agreement', 'Agreement', !!reportData.agreement], ['report', 'Report'], ['quote', 'Quote', quoteHasItems(q)]];
   if (accepted) docs.push(['treatment', 'Treatment', !!q.treatment]);
+  if (accepted && typeof baitInstalled === 'function' && baitInstalled(q)) docs.push(['bait', 'Bait visits', !!(baitProgram(q) || {}).finished]);
   document.querySelectorAll('.doc-strip').forEach(strip => {
     const here = strip.dataset.doc;
     strip.innerHTML = `<button type="button" class="doc-chip doc-chip-job" onclick="jobGo('job')"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Job</button>`
@@ -12568,6 +12578,29 @@ function dashboardJob(r, quotes) {
     hint = 'Finished. ' + who.charAt(0).toUpperCase() + who.slice(1) + ' has their treatment certificate.';
   }
 
+  // A baiting system keeps the job going: back to To do when a station
+  // check is due or a visit report hasn't gone, Waiting between visits.
+  const bait = typeof baitProgram === 'function' ? baitProgram(q) : null;
+  if (bait && !bait.finished && group === 'done') {
+    const unsent = bait.last && !bait.last.sentAt;
+    if (unsent) {
+      group = 'todo'; status = 'Email the visit report';
+      hint = 'The bait station visit is recorded. Email ' + who + ' the visit report.';
+      next = { label: 'Email the visit report', to: 'bait' };
+    } else if (bait.dueNow) {
+      group = 'todo'; status = bait.visits.length ? 'Bait station visit due' : 'First bait station check due';
+      hint = (bait.overdue ? 'Was due ' : 'Due ') + dashDay(bait.due) + '. Check the stations and record what you found.';
+      next = { label: 'Record the visit', to: 'bait' };
+    } else {
+      group = 'waiting'; status = `Bait check due ${dashDay(bait.due)}`;
+      hint = 'The stations are in. Come back on ' + dashDay(bait.due) + ' to check them and record the visit.';
+      next = { label: 'Record a visit', to: 'bait' };
+    }
+  } else if (bait && bait.finished && group === 'done') {
+    status = 'Treated, baiting finished';
+    hint = 'Finished. ' + who.charAt(0).toUpperCase() + who.slice(1) + ' has their treatment certificate and visit reports.';
+  }
+
   const answered = a && !a.stale;
   const sentOn = d.issue ? d.issue.completedAt : d.sent ? d.sent.at : null;
   const steps = [
@@ -12591,19 +12624,25 @@ function dashboardJob(r, quotes) {
   steps.forEach(s => { if (s.state === 'done' || s.state === 'todo') s.text = s.state === 'done' ? 'Completed' : 'Not completed'; });
   // Recorded but the certificate hasn't gone: the treatment isn't finished.
   if (q && q.treatment && !certificateGiven(q) && steps[3].state === 'done') Object.assign(steps[3], { state: 'now', text: 'Certificate not emailed yet' });
+  // Bait station visits, as a fifth stage once a baiting system is in.
+  if (bait) {
+    const st = baitJobStep(bait);
+    if (bait.last && !bait.last.sentAt) Object.assign(st, { state: 'now', text: 'Visit report not emailed yet' });
+    steps.push(st);
+  }
   if (group !== 'done' && !steps.some(s => s.state === 'now')) { const s = steps.find(s => s.state === 'todo'); if (s) s.state = 'now'; }
   return { r, q, group, status, hint, next, steps, total, time: dashboardJobTime(r) };
 }
 
 // A ring of four arcs, one per step, filled as the job moves along.
 function dashboardRing(steps, group) {
-  const C = 2 * Math.PI * 15, seg = C / 4, gap = 3.2;
+  const C = 2 * Math.PI * 15, seg = C / steps.length, gap = 3.2;
   const arcs = steps.map((s, i) => `<circle cx="18" cy="18" r="15" class="${s.state}" stroke-dasharray="${(seg - gap).toFixed(2)} ${(C - seg + gap).toFixed(2)}" stroke-dashoffset="${(-(i * seg) - gap / 2).toFixed(2)}"/>`).join('');
   // A step the job didn't need counts as done, so a job with no quote still fills.
   const done = steps.filter(s => s.state === 'done' || s.state === 'skip').length;
   const mid = group === 'done'
     ? '<path d="m12.5 18.5 3.5 3.5 7-8" class="tick"/>'
-    : `<text x="18" y="18" dy="0.35em" text-anchor="middle">${done}/4</text>`;
+    : `<text x="18" y="18" dy="0.35em" text-anchor="middle">${done}/${steps.length}</text>`;
   return `<svg class="dash-ring" width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><g transform="rotate(-90 18 18)">${arcs}</g>${mid}</svg>`;
 }
 
@@ -12734,7 +12773,7 @@ function openDashboardDetail(id) {
       ${j.next ? `<button type="button" class="dash-detail-primary" onclick="openDashboardJob('${j.r.id}', '${j.next.to}')">${j.next.label}</button>` : ''}
     </section>
     <div class="dash-detail-section">
-      <span>Progress</span><span>${done} of 4 done</span>
+      <span>Progress</span><span>${done} of ${j.steps.length} done</span>
     </div>
     <ol class="dash-timeline">
       ${j.steps.map((s, i) => `
@@ -12760,8 +12799,8 @@ function openDashboardDetail(id) {
 // A step opens as a small preview over the dashboard: what that section
 // holds, read-only, with a button to open it full screen. On a wide screen
 // the sheet sits at the side, so the job list stays in view.
-const DASH_PEEK_TITLES = { report: 'Report', quote: 'Quote', answer: 'Client\'s answer', treatment: 'Treatment' };
-const DASH_PEEK_OPEN = { report: 'Open the report', quote: 'Open the quote', answer: 'Open the quote', treatment: 'Open the treatment record' };
+const DASH_PEEK_TITLES = { report: 'Report', quote: 'Quote', answer: 'Client\'s answer', treatment: 'Treatment', bait: 'Bait station visits' };
+const DASH_PEEK_OPEN = { report: 'Open the report', quote: 'Open the quote', answer: 'Open the quote', treatment: 'Open the treatment record', bait: 'Open the visits' };
 
 function openDashboardPeek(id, to) {
   const j = dashboardJobs.find(x => x.r.id === id);
@@ -12831,6 +12870,16 @@ function dashboardPeekBody(j, to) {
       ['Note', a.note],
     ]) + (isSignatureImage(a.signature) ? `<img class="dash-peek-sig" src="${a.signature}" alt="Client signature">` : '')
       + (a.stale ? '<p class="dash-peek-warn">The quote changed after they answered.</p>' : '');
+  }
+  if (to === 'bait') {
+    const b = typeof baitProgram === 'function' ? baitProgram(q) : null;
+    if (!b) return none('No baiting system on this job.');
+    const rows = b.visits.slice().reverse().slice(0, 6).map((v, i) => [`${formatAnswerDate(v.date)}`, `${baitVisitShort(v)}${v.sentAt ? '' : ' · report not sent'}`]);
+    return dashPeekRows([
+      ['Stations', String(parseInt(q.treatment.methods.bait, 10) || (b.last ? (b.last.stations || []).length : '') || '')],
+      ['Next visit', b.finished ? 'None, baiting finished' : b.due ? `${formatAnswerDate(b.due)}${b.overdue ? ' (overdue)' : ''}` : ''],
+      ...rows,
+    ]) || none('No visits recorded yet.');
   }
   const t = q.treatment;
   if (!t) return none('No treatment recorded yet.');

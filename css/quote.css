@@ -202,6 +202,38 @@ select.quote-input { cursor: pointer; }
 .treat-method-qty { width: 92px; flex-shrink: 0; }
 .treat-product { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; }
 .treat-product .quote-link-btn, .treat-add-product { align-self: flex-start; }
+
+/* Bait station visits (js/bait.js): a card under the certificate, and the
+   visit sheet's station list, one row per station with its finding as chips. */
+.bait-card { margin-top: 10px; }
+.bait-visits { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.bait-visit-row { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface2); font-size: 13px; color: var(--text2); }
+.bait-visit-main { color: var(--text); }
+.bait-visit-sent { margin-top: 2px; font-size: 12.5px; color: var(--yellow-text); font-weight: 600; }
+.bait-visit-sent.sent { color: var(--text3); font-weight: 500; }
+.bait-visit-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 8px; }
+.bait-visit-actions .quote-btn { min-height: 40px; padding: 8px 14px; font-size: 13.5px; }
+.bait-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 10px; }
+.bait-rest-btn { width: auto; flex: none; min-height: 40px; padding: 8px 14px; font-size: 13.5px; }
+.bait-count-btn { width: auto; flex: none; align-self: flex-end; min-height: 48px; }
+.bait-summary { font-size: 12.5px; color: var(--text3); }
+.bait-stations { display: flex; flex-direction: column; gap: 8px; }
+.bait-station { padding: 10px; border: 1px solid var(--border); border-left: 4px solid var(--border2); border-radius: 10px; background: var(--surface); }
+.bait-station.clear { border-left-color: var(--green); }
+.bait-station.active, .bait-station.eaten { border-left-color: var(--risk); }
+.bait-station.damaged, .bait-station.missing, .bait-station.noaccess { border-left-color: var(--yellow); }
+.bait-station-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.bait-station-no { flex: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--surface3); color: var(--text); font-size: 13px; font-weight: 800; }
+.bait-station-where { flex: 1; min-height: 40px; padding: 8px 10px; font-size: 14px; }
+.bait-chips { gap: 5px; }
+.bait-chip { min-height: 34px; padding: 5px 10px; font-size: 12.5px; }
+.bait-chip.active.on, .bait-chip.eaten.on { background: rgba(192,57,43,0.1); border-color: rgba(192,57,43,0.5); color: var(--risk); }
+.bait-chip.damaged.on, .bait-chip.missing.on, .bait-chip.noaccess.on { background: rgba(212,146,10,0.12); border-color: rgba(212,146,10,0.55); color: var(--yellow-text); }
+.bait-station-extra { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 12.5px; color: var(--text3); }
+.bait-station-extra span { flex: none; width: 76px; }
+.bait-station-extra .job-input { flex: 1; min-height: 40px; padding: 8px 10px; font-size: 14px; }
+.bait-finished { margin: 2px 0; }
+.bait-need { margin: 0; font-size: 13px; color: var(--yellow-text); font-weight: 600; }
 .treat-batch { display: flex; gap: 8px; align-items: center; }
 .treat-batch .job-input { flex: 1; min-width: 0; }
 .treat-batch .treat-label-btn { align-self: center; white-space: nowrap; cursor: pointer; }

@@ -1490,7 +1490,7 @@ function quoteContentHash(q) {
   const content = Object.assign({}, q);
   // 'booking' and 'invoice' are left over from features that were removed;
   // older quotes may still carry them, and they never counted as content.
-  ['updatedAt', 'createdAt', 'sentAt', 'sentHash', 'certificateSentAt', 'certificateHandedAt', 'reportKey', 'answer', 'booking', 'treatment', 'invoice',
+  ['updatedAt', 'createdAt', 'sentAt', 'sentHash', 'certificateSentAt', 'certificateHandedAt', 'reportKey', 'answer', 'booking', 'treatment', 'baitVisits', 'invoice',
     'sourceAddress', 'issuedAt', 'issuedHash', 'linkRequest'].forEach(k => delete content[k]);
   return sha256Hex(stableJson(content));
 }

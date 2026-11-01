@@ -45,6 +45,10 @@ const TREATMENT_PRODUCTS = {
   'Kordon': 'physical barrier with deltamethrin',
 };
 
+// The termite baits among them (and their actives), which have no chemical
+// life on the durable notice and are what a bait station visit tops up.
+const BAIT_PRODUCT_RE = /exterra|sentricon|trelona|chlorfluazuron|noviflumuron|novaluron|bistrifluron|hexaflumuron/i;
+
 const TREATMENT_NOTICE = {
   new: 'New durable notice placed',
   updated: 'Existing durable notice updated',
@@ -219,7 +223,7 @@ function renderTreatmentBlock(q) {
         ${many ? '<button class="quote-link-btn" onclick="downloadTreatmentCertificate(true)">Installation certificate PDF</button>' : ''}
         <button class="quote-link-btn" onclick="openTreatmentRecord()">Edit treatment</button>
       </div>
-    </div>`;
+    </div>${typeof renderBaitBlock === 'function' ? renderBaitBlock(q) : ''}`;
 }
 
 // ── THE RECORD SHEET ──
@@ -733,9 +737,8 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   const methodNames = Object.keys(t.methods || {}).filter(k => !install || systems.includes(k)).map(k => TREATMENT_METHODS[k] && TREATMENT_METHODS[k].label).filter(Boolean);
   // Chemical life only when a chemical was applied, not on a baiting-only
   // job, and only for the chemicals (not the baits).
-  const BAITS = /exterra|sentricon|trelona|chlorfluazuron|noviflumuron|novaluron|bistrifluron|hexaflumuron/i;
   const chemicalApplied = Object.keys(t.methods || {}).some(k => k !== 'bait');
-  const productLife = !chemicalApplied ? [] : products.filter(p => !BAITS.test(`${p.name || ''} ${p.active || ''}`)).map(p => `${p.name || p.active}${p.name && p.active ? ` (${p.active})` : ''}: ${p.life || 'see label'}`);
+  const productLife = !chemicalApplied ? [] : products.filter(p => !BAIT_PRODUCT_RE.test(`${p.name || ''} ${p.active || ''}`)).map(p => `${p.name || p.active}${p.name && p.active ? ` (${p.active})` : ''}: ${p.life || 'see label'}`);
   const every = ongoingInspectionMonths(treatmentReportFor(q));
   const everyText = `at least every ${every} month${every === 1 ? '' : 's'}`;
   const installer = [company.name, [t.technician, t.licence ? `licence ${t.licence}` : ''].filter(Boolean).join(', ')].filter(Boolean).join('. ');

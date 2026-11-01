@@ -14,8 +14,13 @@
  * - The daily email limit on Team and Business is 200 per seat.
  * - POST /stripe/update-seats {seats}: the owner changes how many inspectors
  *   they pay for. Never fewer than are on the team or invited. Adding seats
- *   is charged straight away for the rest of the period; removing them
- *   takes effect at the next bill, with no refund for the current one.
+ *   charges the rest of the period straight away and only happens if that
+ *   payment goes through; removing them takes the unused part off the next
+ *   bill. Neither is allowed to add seats while a payment is overdue.
+ * - Every plan bought or switched to must fit the people already on the
+ *   team or invited (409 otherwise).
+ * - The subscription webhook reads the subscription back from Stripe, so a
+ *   late or repeated event can't undo a newer change.
  * - Choosing another plan while already paying switches the Stripe
  *   subscription in place (new price and seat count, the difference
  *   charged now) instead of opening the Billing Portal, so a team can't be
@@ -823,19 +828,25 @@ async function handleStripeRoute(pathname, request, user, env, origin) {
       // to the Billing Portal (which could put a team on one seat).
       if (alreadyPaying && sub.stripe_subscription_id && sub.status !== 'canceled') {
         if (plan === sub.plan) return reply(400, { message: 'You are already on this plan' });
-        const cap = SEAT_RANGE[plan] ? quantity : 1;
-        const taken = await seatsTaken(businessId, env);
-        if (taken === null) return reply(500, { message: 'Could not count your team' });
-        if (taken > cap) {
-          return reply(409, { message: `You have ${taken} people on your team or invited. Remove someone first`, taken });
-        }
+        if (sub.status === 'past_due') return reply(402, { message: PAST_DUE_MESSAGE });
+        const tooBig = await teamTooBig(businessId, SEAT_RANGE[plan] ? quantity : 1, env);
+        if (tooBig) return reply(tooBig.status, tooBig.payload);
         const stripeSub = await stripeRequest(env, 'GET', `/subscriptions/${encodeURIComponent(sub.stripe_subscription_id)}`);
         const item = stripeSub.items && stripeSub.items.data && stripeSub.items.data[0];
         if (!item) return reply(502, { message: 'Billing request failed' });
-        const updated = await stripeRequest(env, 'POST', `/subscriptions/${encodeURIComponent(sub.stripe_subscription_id)}`, {
-          items: [{ id: item.id, price: priceId, quantity }],
-          proration_behavior: 'always_invoice',
-        });
+        // The switch only happens if the payment for it goes through: a
+        // declined card leaves the plan as it was.
+        let updated;
+        try {
+          updated = await stripeRequest(env, 'POST', `/subscriptions/${encodeURIComponent(sub.stripe_subscription_id)}`, {
+            items: [{ id: item.id, price: priceId, quantity }],
+            proration_behavior: 'always_invoice',
+            payment_behavior: 'error_if_incomplete',
+          });
+        } catch (err) {
+          if (err.status === 402) return reply(402, { message: DECLINED_MESSAGE });
+          throw err;
+        }
         await syncSubscription(updated, env, businessId);
         return reply(200, { switched: true, plan });
       }
@@ -846,6 +857,11 @@ async function handleStripeRoute(pathname, request, user, env, origin) {
         });
         return reply(200, { url: portal.url });
       }
+
+      // A new plan has to fit the team that's already there (a trial of
+      // three can't buy Solo, a cancelled team of nine can't come back on two).
+      const tooBig = await teamTooBig(businessId, quantity, env);
+      if (tooBig) return reply(tooBig.status, tooBig.payload);
 
       const customerId = sub.stripe_customer_id || await createStripeCustomer(businessId, user, env);
 
@@ -872,23 +888,27 @@ async function handleStripeRoute(pathname, request, user, env, origin) {
       if (!Number.isFinite(seats) || seats < range.min || seats > range.max) {
         return reply(400, { message: `Choose between ${range.min} and ${range.max} inspectors` });
       }
-      const taken = await seatsTaken(businessId, env);
-      if (taken === null) return reply(500, { message: 'Could not count your team' });
-      if (seats < taken) {
-        return reply(409, { message: `You have ${taken} people on your team or invited. Remove someone first`, taken });
-      }
       const current = seatCount(sub);
       if (seats === current) return reply(200, { seats });
+      if (seats > current && sub.status === 'past_due') return reply(402, { message: PAST_DUE_MESSAGE });
+      const tooBig = await teamTooBig(businessId, seats, env);
+      if (tooBig) return reply(tooBig.status, tooBig.payload);
 
       const stripeSub = await stripeRequest(env, 'GET', `/subscriptions/${encodeURIComponent(sub.stripe_subscription_id)}`);
       const item = stripeSub.items && stripeSub.items.data && stripeSub.items.data[0];
       if (!item) return reply(502, { message: 'Billing request failed' });
-      // More seats: charge the rest of this period now. Fewer: no refund,
-      // the lower number is billed from the next renewal.
-      const updated = await stripeRequest(env, 'POST', `/subscriptions/${encodeURIComponent(sub.stripe_subscription_id)}`, {
-        items: [{ id: item.id, quantity: seats }],
-        proration_behavior: seats > current ? 'always_invoice' : 'none',
-      });
+      // More seats: the rest of this period is charged now, and the change
+      // only happens if that payment goes through. Fewer: the unused part
+      // comes off the next bill (so adding them back later isn't charged twice).
+      let updated;
+      try {
+        updated = await stripeRequest(env, 'POST', `/subscriptions/${encodeURIComponent(sub.stripe_subscription_id)}`, seats > current
+          ? { items: [{ id: item.id, quantity: seats }], proration_behavior: 'always_invoice', payment_behavior: 'error_if_incomplete' }
+          : { items: [{ id: item.id, quantity: seats }], proration_behavior: 'create_prorations' });
+      } catch (err) {
+        if (err.status === 402) return reply(402, { message: DECLINED_MESSAGE });
+        throw err;
+      }
       // The webhook writes this too; writing it now means the app shows the
       // new number straight away.
       await syncSubscription(updated, env, businessId);
@@ -909,6 +929,20 @@ async function handleStripeRoute(pathname, request, user, env, origin) {
     console.error(`stripe route ${pathname} failed: ` + (err && err.message ? err.message : String(err)));
     return reply(502, { message: 'Billing request failed' });
   }
+}
+
+const PAST_DUE_MESSAGE = 'Your last payment didn\'t go through. Update your card in Manage first';
+const DECLINED_MESSAGE = 'The payment didn\'t go through, so nothing changed. Check your card in Manage and try again';
+
+// A reply refusing a plan for `cap` inspectors when more people than that
+// are on the team or invited, or null when the team fits.
+async function teamTooBig(businessId, cap, env) {
+  const taken = await seatsTaken(businessId, env);
+  if (taken === null) return { status: 500, payload: { message: 'Could not count your team' } };
+  if (taken > cap) {
+    return { status: 409, payload: { message: `You have ${taken} people on your team or invited. Take some off in Your team first`, taken } };
+  }
+  return null;
 }
 
 // People on the team plus invites still waiting: each holds a seat.
@@ -991,9 +1025,15 @@ async function handleStripeWebhook(request, env) {
         break;
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
-      case 'customer.subscription.deleted':
-        await syncSubscription(obj, env);
+      case 'customer.subscription.deleted': {
+        // Events can arrive late or twice, so the subscription is read from
+        // Stripe as it is now rather than as the event saw it.
+        let current = obj;
+        try { current = await stripeRequest(env, 'GET', `/subscriptions/${encodeURIComponent(obj.id)}`); }
+        catch (err) { if (err.status !== 404) throw err; }
+        await syncSubscription(current, env);
         break;
+      }
       default:
         // Not an event we act on - acknowledge so Stripe doesn't retry it.
         break;
@@ -1039,12 +1079,12 @@ async function syncSubscription(stripeSub, env, fallbackBusinessId) {
     stripe_subscription_id: stripeSub.id,
   };
   if (plan) patch.plan = plan;
+  else console.error(`stripe webhook: price ${priceId} doesn't match any STRIPE_PRICE_* secret - plan left unchanged`);
   // How many inspectors are paid for. Only written when the seats column
   // exists (supabase/team-seats.sql), so the patch still lands before then.
   const quantity = stripeSub.items && stripeSub.items.data && stripeSub.items.data[0] && stripeSub.items.data[0].quantity;
   const paidPlan = plan || existing.plan;
   if ('seats' in existing) patch.seats = SEAT_RANGE[paidPlan] && quantity > 0 ? quantity : 1;
-  else console.error(`stripe webhook: price ${priceId} doesn't match any STRIPE_PRICE_* secret - plan left unchanged`);
 
   // A brand-new paid subscription starts a fresh allowance rather than
   // carrying over what was used during the trial.
@@ -1114,7 +1154,9 @@ async function stripeRequest(env, method, path, params) {
   const res = await fetch(`${STRIPE_API}${path}`, init);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(`Stripe ${method} ${path} failed (HTTP ${res.status}): ${data.error && data.error.message || 'unknown error'}`);
+    const err = new Error(`Stripe ${method} ${path} failed (HTTP ${res.status}): ${data.error && data.error.message || 'unknown error'}`);
+    err.status = res.status; // 402: the card was declined
+    throw err;
   }
   return data;
 }

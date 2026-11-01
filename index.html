@@ -78,7 +78,7 @@
       </div>
       <div class="auth-field">
         <label class="auth-label" for="suEmail">Email</label>
-        <input class="auth-input" id="suEmail" type="email" placeholder="you@company.com" autocomplete="email">
+        <input class="auth-input" id="suEmail" type="email" placeholder="you@company.com" autocomplete="email" oninput="onSignUpEmailInput()">
       </div>
       <div class="auth-field">
         <label class="auth-label" for="suPassword">Password</label>
@@ -967,7 +967,7 @@
           <div class="settings-row">
             <div class="settings-row-text">
               <div class="settings-row-desc" id="billingTermsText">Prices are monthly in Australian dollars, no GST. Cancel any time in Manage, and your plan runs to the end of the month you've paid for. The free trial is 14 days with 50 AI fills (about 3 to 5 inspections), and no card is needed. Paying opens in your browser; come back to SAYON afterwards and your plan shows here.</div>
-              <div class="settings-row-desc" id="billingSeatTerms" hidden>Business is billed yearly. On Team and Business everyone on your team takes an inspector place, you included. Adding places is charged straight away for the rest of what you've paid for; fewer places start at your next bill.</div>
+              <div class="settings-row-desc" id="billingSeatTerms" hidden>Business is billed yearly. On Team and Business everyone on your team takes an inspector place, you included. Adding places is charged straight away for the rest of what you've paid for, and only happens if the payment goes through. For fewer places, the unused part comes off your next bill.</div>
               <div class="settings-row-desc" id="seatPlansSoon">Team and Business plans, priced per inspector, are coming soon.</div>
             </div>
           </div>

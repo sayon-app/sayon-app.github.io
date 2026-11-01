@@ -1,9 +1,11 @@
 // Team and Business, charged per inspector: Billing offers them only once
 // the Worker says it can (seat_plans), works out the price for the number
 // of inspectors, sends that number to checkout and changes it on the
-// current plan. Your team invites by email, counts places, and an invited
-// inspector's sign-up link joins the owner's business with nothing to set
-// up. A technician sees no plans to buy. node e2e.js <outDir> (server on :8765)
+// current plan. Your team invites by email, counts places and makes a
+// sign-up link with a secret; that link names the business on the sign-up
+// card and joins it with nothing to set up. A wrong email, a dead link or
+// no free place never joins anyone. A technician sees no plans to buy.
+// node e2e.js <outDir> (server on :8765)
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2] || '/tmp/team-seats'; fs.mkdirSync(OUT, { recursive: true });
 const PORT = '8765', SP = process.env.JSPDF_DIR || '/tmp/jspdf';
@@ -11,6 +13,7 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
 const OWNER = { id: 'u-owner', email: 'boss@acme.test', user_metadata: { name: 'Bo Boss', business_name: 'Acme Pest' } };
 const TECH = { id: 'u-tech', email: 'tech@acme.test', user_metadata: { name: 'Tia Tech' } };
 const BIZ_ID = 'b0000000-0000-4000-8000-00000000ac3e';
+const TOKEN = 'a'.repeat(64), TOKEN2 = 'b'.repeat(64);
 const BIZ = { id: BIZ_ID, name: 'Acme Pest', owner_id: 'u-owner', settings: { company: { name: 'Acme Pest', updatedAt: 1 } } };
 
 async function setup(b, { user, sub, members, invites }) {
@@ -20,7 +23,7 @@ async function setup(b, { user, sub, members, invites }) {
   else await ctx.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ status: 200, body: '' }));
   await ctx.route(/cdnjs\.cloudflare\.com\/ajax\/libs\/jspdf/, r => fs.existsSync(SP + '/package/dist/jspdf.umd.min.js') ? r.fulfill({ body: fs.readFileSync(SP + '/package/dist/jspdf.umd.min.js'), contentType: 'application/javascript' }) : r.fulfill({ body: '' }));
   await ctx.route(/sentry|posthog|maps\.googleapis/, r => r.fulfill({ status: 200, body: '' }));
-  const st = { sub, members: members || [{ user_id: 'u-owner', role: 'owner', name: 'Bo Boss', email: 'boss@acme.test' }], invites: invites || [], calls: [], user, acceptReturns: null };
+  const st = { sub, members: members || [{ user_id: 'u-owner', role: 'owner', name: 'Bo Boss', email: 'boss@acme.test' }], invites: invites || [], calls: [], user, acceptReturns: null, invite: null };
   await ctx.route(/workers\.dev/, async r => {
     const req = r.request(); const path = req.url().replace(/^https:\/\/[^/]+/, '');
     const body = req.postData() ? JSON.parse(req.postData()) : null; st.calls.push({ path, body });
@@ -35,11 +38,16 @@ async function setup(b, { user, sub, members, invites }) {
     st.calls.push({ path: u.replace(/^https:\/\/[^/]+/, ''), method: m, body });
     if (u.includes('/auth/v1/signup')) { st.user = Object.assign({}, TECH, { email: body.email }); return r.fulfill({ json: { access_token: 'a.b.c', refresh_token: 'r', expires_at: Math.floor(Date.now() / 1000) + 3600, user: st.user } }); }
     if (u.includes('/auth/v1/')) return r.fulfill({ json: {} });
-    if (u.includes('/rpc/accept_invite')) return r.fulfill({ json: st.acceptReturns });
+    if (u.includes('/rpc/accept_invite')) {
+      if (st.acceptReturns === 'NO_SEATS') return r.fulfill({ status: 400, json: { code: 'P0001', message: 'NO_SEATS' } });
+      return r.fulfill({ json: body && body.p_token === TOKEN ? st.acceptReturns : null });
+    }
+    if (u.includes('/rpc/get_invite')) return r.fulfill({ json: body && body.p_token === TOKEN ? st.invite : null });
+    if (u.includes('/rpc/invite_link')) return r.fulfill({ json: TOKEN2 });
     if (u.includes('/rpc/invite_member')) {
       const cap = st.sub.plan === 'trial' ? 3 : st.sub.seats;
-      if (st.members.length + st.invites.length >= cap) return r.fulfill({ json: 'no_seats' });
-      st.invites.push({ id: 'i-' + st.invites.length, email: body.p_email }); return r.fulfill({ json: 'invited' });
+      if (st.members.length + st.invites.length >= cap) return r.fulfill({ json: { status: 'no_seats' } });
+      st.invites.push({ id: 'i-' + st.invites.length, email: body.p_email }); return r.fulfill({ json: { status: 'invited', token: TOKEN } });
     }
     if (u.includes('/rest/v1/team_members')) {
       if (m === 'DELETE') { const id = decodeURIComponent((u.match(/user_id=eq\.([^&]+)/) || [])[1]); st.members = st.members.filter(x => x.user_id !== id); return r.fulfill({ status: 204, body: '' }); }
@@ -121,7 +129,7 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     const clip = await p.evaluate(() => navigator.clipboard.readText());
     const link = (clip.match(/https?:\S+/) || [''])[0];
     const lp = new URL(link || 'http://x/').searchParams;
-    check(lp.get('signup') === '1' && lp.get('email') === 'tech@acme.test' && lp.get('join') === 'Acme Pest', 'the sign-up link is copied with their email and the business: ' + link);
+    check(lp.get('signup') === '1' && lp.get('invite') === TOKEN && !lp.get('email') && /Sign up with tech@acme\.test/.test(clip), 'the sign-up link carries only the secret, and the message names their email: ' + link);
     const list = await p.evaluate(() => [...document.querySelectorAll('#teamList .team-row')].map(r => r.innerText.replace(/\s+/g, ' ').trim()));
     check(list.length === 2 && /Bo Boss \(you\)/.test(list[0]) && /tech@acme\.test Invited/.test(list[1]), 'the list shows you and the pending invite: ' + JSON.stringify(list));
     check(/2 of 3 places used/.test(await p.textContent('#teamPlacesText')), 'the invite holds a place');
@@ -129,6 +137,9 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     const full = await p.evaluate(() => ({ btn: document.getElementById('teamInviteBtn').disabled, more: !document.getElementById('teamMorePlaces').hidden, text: document.getElementById('teamPlacesText').textContent }));
     check(full.btn && full.more && /3 of 3/.test(full.text), 'with every place taken, Invite is off and More places shows');
     await p.screenshot({ path: `${OUT}/2c-team-full.png` });
+    await p.evaluate(() => navigator.clipboard.writeText(''));
+    await p.evaluate(() => shareTeamInvite('i-0')); await p.waitForTimeout(600);
+    check(st.calls.some(c => c.path.includes('/rpc/invite_link') && c.body.p_invite_id === 'i-0') && (await p.evaluate(() => navigator.clipboard.readText())).includes('invite=' + 'b'.repeat(64)), 'Send link makes a fresh link');
     await p.evaluate(() => cancelTeamInvite('i-1')); await p.waitForTimeout(800);
     check(st.calls.some(c => c.method === 'DELETE' && c.path.includes('/rest/v1/invites?id=eq.i-1')) && /2 of 3/.test(await p.textContent('#teamPlacesText')), 'cancelling an invite frees its place');
     check(!errs.length, 'no page errors ' + errs.join('; '));
@@ -175,16 +186,48 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
   // 5. The invite link: sign-up names the business, then joins it with nothing to set up.
   {
     const { ctx, p, st, errs } = await setup(b, { user: null, sub: { plan: 'pro', status: 'active', limit: 3200, ai_calls_used_this_period: 0, seats: 4, per_seat: true, seat_plans: true, subscribed: true } });
-    st.acceptReturns = BIZ_ID;
-    await p.goto(`http://localhost:${PORT}/?signup=1&email=tech%40acme.test&join=Acme%20Pest`); await p.waitForTimeout(3200); await p.hookToasts();
-    const card = await p.evaluate(() => ({ title: document.getElementById('suTitle').textContent, email: document.getElementById('suEmail').value, bizHidden: document.getElementById('suBusinessField').hidden, bizShown: getComputedStyle(document.getElementById('suBusinessField')).display }));
-    check(card.title === 'Join Acme Pest on SAYON' && card.email === 'tech@acme.test' && card.bizHidden && card.bizShown === 'none', 'the invite link fills in the sign-up card: ' + JSON.stringify(card));
+    st.acceptReturns = BIZ_ID; st.invite = { business: 'Acme Pest', email: 'tech@acme.test' };
+    await p.goto(`http://localhost:${PORT}/?signup=1&invite=${TOKEN}`); await p.waitForTimeout(3400); await p.hookToasts();
+    const card = await p.evaluate(() => ({ title: document.getElementById('suTitle').textContent, email: document.getElementById('suEmail').value, bizShown: getComputedStyle(document.getElementById('suBusinessField')).display, url: location.search, kept: localStorage.getItem('korva_pending_invite') }));
+    check(card.title === 'Join Acme Pest on SAYON' && card.email === 'tech@acme.test' && card.bizShown === 'none', 'the invite link fills in the sign-up card from the database: ' + JSON.stringify(card));
+    check(!/invite=/.test(card.url) && card.kept === TOKEN, 'the secret leaves the address bar and is kept for sign-in');
     await p.screenshot({ path: `${OUT}/5-invite-signup.png` });
+    // A different email can't use the invite: the business box comes back.
+    await p.fill('#suEmail', 'other@x.test');
+    check(await p.evaluate(() => !document.getElementById('suBusinessField').hidden && /wasn't invited/.test(document.getElementById('suSubtitle').textContent)), 'changing the email brings back the business box and says why');
+    await p.fill('#suEmail', 'tech@acme.test');
+    check(await p.evaluate(() => document.getElementById('suBusinessField').hidden), 'putting the invited email back hides it again');
     await p.fill('#suName', 'Tia Tech'); await p.fill('#suPassword', 'longenough1'); await p.click('#suBtn'); await p.waitForTimeout(2800);
-    const joined = await p.evaluate(() => ({ biz: authBusiness && authBusiness.id, ob: document.getElementById('onboardScreen').style.display, panel0: document.getElementById('ob-panel-0').style.display, panel1: document.getElementById('ob-panel-1').style.display, toasts: window.__toasts.slice() }));
-    check(joined.biz === BIZ_ID && !st.madeBusiness, 'the new inspector joins Acme and no business of their own is made');
+    const su = st.calls.find(c => c.path.includes('/auth/v1/signup'));
+    check(su && !su.body.data.business_name, 'the sign-up doesn\'t name a business of their own');
+    const acc = st.calls.find(c => c.path.includes('/rpc/accept_invite'));
+    check(acc && acc.body.p_token === TOKEN, 'sign-in sends the secret to accept_invite');
+    const joined = await p.evaluate(() => ({ biz: authBusiness && authBusiness.id, ob: document.getElementById('onboardScreen').style.display, panel1: document.getElementById('ob-panel-1').style.display, kept: localStorage.getItem('korva_pending_invite'), toasts: window.__toasts.slice() }));
+    check(joined.biz === BIZ_ID && !st.madeBusiness && !joined.kept, 'the new inspector joins Acme, no business of their own is made, the secret is used up');
     check(joined.toasts.some(t => /joined Acme Pest/.test(t)), 'they are told they joined: ' + joined.toasts.join(' | '));
-    check(joined.ob !== 'flex' || (joined.panel0 === 'none' && joined.panel1 === 'flex'), 'they skip the business set-up: ' + JSON.stringify(joined));
+    check(joined.ob !== 'flex' || joined.panel1 === 'flex', 'they skip the business set-up');
+    check(!errs.length, 'no page errors ' + errs.join('; '));
+    await ctx.close();
+  }
+
+  // 5b. A dead link: a plain sign-up card that says so, and no secret kept.
+  {
+    const { ctx, p, errs } = await setup(b, { user: null, sub: trial({ seat_plans: true }) });
+    await p.goto(`http://localhost:${PORT}/?signup=1&invite=${'c'.repeat(64)}`); await p.waitForTimeout(3400);
+    const dead = await p.evaluate(() => ({ title: document.getElementById('suTitle').textContent, sub: document.getElementById('suSubtitle').textContent, biz: !document.getElementById('suBusinessField').hidden, kept: localStorage.getItem('korva_pending_invite') }));
+    check(dead.title === 'Create your account' && /expired or been replaced/.test(dead.sub) && dead.biz && !dead.kept, 'a dead invite link says so and leaves a normal sign-up: ' + JSON.stringify(dead));
+    check(!errs.length, 'no page errors ' + errs.join('; '));
+    await ctx.close();
+  }
+
+  // 5c. No free place: no business of their own is made, and the secret is kept for next time.
+  {
+    const { ctx, p, st, errs } = await setup(b, { user: null, sub: trial({ seat_plans: true }) });
+    st.acceptReturns = 'NO_SEATS'; st.invite = { business: 'Acme Pest', email: 'tech@acme.test' };
+    await p.goto(`http://localhost:${PORT}/?signup=1&invite=${TOKEN}`); await p.waitForTimeout(3400); await p.hookToasts();
+    await p.fill('#suName', 'Tia Tech'); await p.fill('#suPassword', 'longenough1'); await p.click('#suBtn'); await p.waitForTimeout(2800);
+    const ns = await p.evaluate(() => ({ biz: authBusiness, kept: localStorage.getItem('korva_pending_invite'), toasts: window.__toasts.slice() }));
+    check(!ns.biz && !st.madeBusiness && ns.kept === 'a'.repeat(64) && ns.toasts.some(t => /no free inspector place/.test(t)), 'no free place: nothing is made, they are told, and the next sign-in tries again');
     check(!errs.length, 'no page errors ' + errs.join('; '));
     await ctx.close();
   }
@@ -195,7 +238,7 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     await p.goto(`http://localhost:${PORT}/?signup=1`); await p.waitForTimeout(3200);
     check(await p.evaluate(() => document.getElementById('suTitle').textContent === 'Create your account' && !document.getElementById('suBusinessField').hidden), 'a plain sign-up card is unchanged');
     await p.fill('#suName', 'Sol Owner'); await p.fill('#suBusiness', 'Sol Pest'); await p.fill('#suEmail', 'sol@x.test'); await p.fill('#suPassword', 'longenough1'); await p.click('#suBtn'); await p.waitForTimeout(2800);
-    check(st.calls.some(c => c.path.includes('/rpc/accept_invite')) && st.madeBusiness, 'no invite: accept_invite is asked, then their own business is made');
+    check(!st.calls.some(c => c.path.includes('/rpc/accept_invite')) && st.madeBusiness, 'no invite link: no invite is looked for, and their own business is made');
     check(!errs.length, 'no page errors ' + errs.join('; '));
     await ctx.close();
   }

@@ -12409,8 +12409,7 @@ function renderDashboard() {
   body.innerHTML = `
     <div class="dash-hero">
       <span class="dash-hero-date">${today}</span>
-      <h2 class="dash-hero-title" id="dashboardTitle">Dashboard</h2>
-      <p class="dash-hero-lead">${lead}</p>
+      <p class="dash-hero-title">${lead}</p>
     </div>
     <div class="dash-tabs" id="dashboardTabs" role="tablist">
       ${DASHBOARD_TABS.map(([key, label]) => `<button type="button" role="tab" class="dash-tab" data-tab="${key}" onclick="setDashboardTab('${key}')">${label} <span></span></button>`).join('')}

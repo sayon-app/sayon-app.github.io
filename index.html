@@ -261,11 +261,8 @@
 
 <!-- QUOTE SCREEN — builds a treatment quote from an inspection report -->
 <div id="quoteScreen">
-  <div class="quote-topbar">
-    <button class="quote-back" onclick="closeQuote()" aria-label="Back">
-      <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Back
-    </button>
-    <div class="quote-topbar-title">Quote</div>
+  <div class="quote-topbar page-topbar">
+    <div class="quote-topbar-title page-topbar-title">Quote</div>
     <div class="quote-save-state" id="quoteSaveState"></div>
   </div>
   <div class="quote-scroll">
@@ -431,14 +428,16 @@
       <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6a1 1 0 0 1 1 1v2H8V4a1 1 0 0 1 1-1z"/><path d="M16 5h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/><path d="M8 12h8"/><path d="M8 16h5"/></svg><span class="tabbar-label">Report</span>
     </button>
     <div class="mic-dock" id="micDock">
-      <button class="mic-fab" id="micFab" onclick="tabMic()" aria-label="Speak">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:relative; z-index:1;">
+      <button class="mic-fab" id="micFab" onclick="tabMic()" aria-label="Talk">
+        <svg class="mic-fab-close" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="position:relative; z-index:1;"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
+        <svg class="mic-fab-mic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:relative; z-index:1;">
           <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
           <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
           <line x1="12" y1="19" x2="12" y2="23"/>
           <line x1="8" y1="23" x2="16" y2="23"/>
         </svg>
       </button>
+      <span class="mic-label" aria-hidden="true">Talk</span>
       <span class="mic-badge" id="pendingNotesBadge" style="display:none" title="Notes waiting to be filled in"></span>
     </div>
     <button class="tab" data-tab="quote" onclick="tabGo('quote')">
@@ -716,10 +715,8 @@
        is never clipped by .body/.main-panel's overflow:hidden -->
   <div class="dashboard-overlay" id="dashboardOverlay">
     <div class="dashboard-panel" role="dialog" aria-modal="true" aria-labelledby="dashboardTitle">
-      <div class="dashboard-panel-header">
-        <button type="button" class="dash-back" onclick="closeDashboard()">
-          <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Report
-        </button>
+      <div class="dashboard-panel-header page-topbar">
+        <h2 class="page-topbar-title" id="dashboardTitle">Dashboard</h2>
       </div>
       <div class="dashboard-panel-body" id="dashboardBody"></div>
     </div>
@@ -855,10 +852,9 @@
     <!-- DRAWER (slide-out) -->
     <div class="sidebar" id="sidebarPanel">
 
-      <div class="drawer-header">
+      <div class="drawer-header page-topbar">
         <button class="drawer-back" id="drawerBack" onclick="showMenuPage(null)" aria-label="Back to menu" hidden><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
-        <span class="drawer-title" id="drawerTitle">Menu</span>
-        <button class="drawer-close" onclick="toggleDrawer()"><svg class="icon " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+        <span class="drawer-title page-topbar-title" id="drawerTitle">Menu</span>
       </div>
 
       <div class="drawer-scroll">
@@ -1122,12 +1118,6 @@
       <div class="drawer-legal"><a href="terms.html" target="_blank" rel="noopener">Terms of Service</a> · <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a></div>
 
       </div><!-- /drawer-scroll -->
-
-      <div class="drawer-footer">
-        <button class="share-btn" id="shareBtn" onclick="openSendReview()" disabled title="Check the report, then email it (and the quote) to the client">
-          <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>Send
-        </button>
-      </div>
 
     </div><!-- /sidebarPanel -->
 
@@ -1867,9 +1857,22 @@
             </div>
           </div>
           <div class="warn-note note-good"><svg class="icon " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> Signatures are saved with this report, synced to your account when you're signed in, and printed in the PDF.</div>
-          <div class="signoff-pdf">
-            <button class="generate-btn" id="generateBtn" onclick="generateReport()" disabled>
-              <svg class="icon " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Generate PDF
+          <!-- What happens once the report is done: the quote, then both go
+               to the client. The PDF on its own is the quiet last option. -->
+          <div class="finish-next">
+            <div class="finish-next-label">Next</div>
+            <button class="finish-next-btn" onclick="tabGo('quote')">
+              <span class="finish-next-icon"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/></svg></span>
+              <span class="finish-next-text"><b>Write the quote</b><small>Starts from what the report found</small></span>
+              <svg class="icon finish-next-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+            <button class="finish-next-btn primary" id="shareBtn" onclick="openSendReview()" disabled>
+              <span class="finish-next-icon"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg></span>
+              <span class="finish-next-text"><b>Send to client</b><small>Check the report, then email it with the quote</small></span>
+              <svg class="icon finish-next-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+            <button class="finish-next-pdf" id="generateBtn" onclick="generateReport()" disabled>
+              <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Just the report PDF
             </button>
           </div>
         </div>

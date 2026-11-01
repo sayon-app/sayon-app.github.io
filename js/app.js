@@ -9603,8 +9603,12 @@ function resetBillingDisplay() {
   billingStatusCache = null;
 }
 
-// "12 of 150 AI fills used this month, about 20 inspections left. They come
-// back on 1 Nov." The Worker starts a new count each calendar month (UTC).
+// A real job takes 8 to 20 fills (the pricing doc's measurement); plans are
+// sized at 20 so a busy job never comes up short.
+const FILLS_PER_INSPECTION = 20;
+
+// "12 of 800 AI fills used this month, about 39 inspections left. They come
+// back on 1 Dec." The Worker starts a new count each calendar month (UTC).
 // A trial ends before its count matters, so it doesn't say when they come back.
 function billingUsageText(sub, trial) {
   const used = sub.ai_calls_used_this_period ?? 0;
@@ -9615,7 +9619,7 @@ function billingUsageText(sub, trial) {
   const now = new Date();
   const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const when = next.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
-  const inspections = Math.floor(left / 7);
+  const inspections = Math.floor(left / FILLS_PER_INSPECTION);
   const leftText = left === 0 ? 'none left' : `about ${inspections} inspection${inspections === 1 ? '' : 's'} left`;
   return `${used} of ${limit} AI fills used${period}, ${leftText}.` + (trial ? '' : ` They come back on ${when}.`);
 }

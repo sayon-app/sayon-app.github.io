@@ -2778,6 +2778,43 @@ body.report-locked #micDock { opacity: 0.4; }
 .agr-section-label { color: var(--text3); margin-bottom: 12px; }
 #agreementView .agr-doc + .extract-btn { margin-top: 22px; }
 #agreementView .link-btn { align-self: center; margin-top: 6px; }
+/* Long form sheets (the treatment record): numbered sections with a short
+   head, a hairline between them, the same look as the agreement's steps. */
+.sheet-secs { gap: 0; padding: 22px 20px calc(32px + env(safe-area-inset-bottom, 0px)); }
+.sheet-intro { padding: 0 0 14px; }
+.sheet-intro .agr-lede { margin-top: 8px; }
+.sheet-secs > .sheet-voice { margin: 0 0 4px; }
+.sheet-sec { display: flex; flex-direction: column; gap: 12px; padding: 24px 0 0; }
+.sheet-sec + .sheet-sec { margin-top: 24px; border-top: 1px solid var(--border); }
+.sheet-sec .job-field, .sheet-sec .job-row { margin: 0; }
+.sheet-sec-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 2px; }
+.sheet-sec-num {
+  flex: none; width: 30px; height: 30px; border-radius: 99px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(var(--accent-rgb), 0.12); color: var(--accent2);
+  font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.sheet-sec-title {
+  margin: 3px 0 0; font-family: 'Space Grotesk', sans-serif; font-size: 19px; line-height: 24px;
+  font-weight: 700; letter-spacing: -0.02em; color: var(--text);
+}
+.sheet-sec-sub { margin: 3px 0 0; font-size: 13px; line-height: 1.45; color: var(--text3); }
+.sheet-hint { margin: -4px 0 0; }
+.sheet-sec .extract-btn { margin-top: 6px; }
+/* A fold for fields most jobs don't need. */
+.sheet-more { border: 1px solid var(--border); border-radius: 12px; }
+.sheet-more > summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; padding: 0 14px;
+  list-style: none; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text2);
+}
+.sheet-more > summary::-webkit-details-marker { display: none; }
+.sheet-more > summary::after {
+  content: ''; width: 7px; height: 7px; margin-top: -3px; border: solid var(--text3); border-width: 0 2px 2px 0;
+  transform: rotate(45deg); transition: transform 0.2s;
+}
+.sheet-more[open] > summary::after { transform: rotate(-135deg); margin-top: 3px; }
+.sheet-more > .job-row { padding: 0 14px 14px; }
+
 /* Check before sending */
 .send-review-label {
   margin-top: 6px;

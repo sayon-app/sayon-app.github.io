@@ -240,6 +240,7 @@ function openTreatmentRecord() {
   document.getElementById('trLicence').value = t.licence || '';
   document.getElementById('trSupervisor').value = t.supervisor || '';
   document.getElementById('trSupervisorLicence').value = t.supervisorLicence || '';
+  document.getElementById('trSupervisorMore').open = !!(t.supervisor || t.supervisorLicence);
   document.getElementById('trStart').value = t.start || '';
   document.getElementById('trFinish').value = t.finish || '';
   document.getElementById('trPest').value = t.pest || '';
@@ -348,6 +349,7 @@ function applyTreatmentVoice(f) {
   ['technician:trTech', 'licence:trLicence', 'supervisor:trSupervisor', 'supervisorLicence:trSupervisorLicence', 'pest:trPest', 'weather:trWeather',
     'equipment:trEquipment', 'areas:trAreas', 'notTreated:trNotTreated', 'noticeWhere:trNoticeWhere', 'warranty:trWarranty', 'notes:trNotes']
     .forEach(pair => { const [k, id] = pair.split(':'); n += setSpokenBox(id, f[k]); });
+  if (f.supervisor || f.supervisorLicence) document.getElementById('trSupervisorMore').open = true;
   if (TREATMENT_NOTICE[f.notice]) { n += setSpokenBox('trNotice', f.notice); onTreatmentNoticeChange(); }
   if (/^\d{4}-\d{2}-\d{2}$/.test(f.nextInspectionDate || '')) n += setSpokenBox('trNext', f.nextInspectionDate);
   else if (Number(f.nextInspectionMonths) > 0) n += setSpokenBox('trNext', addMonthsIso(document.getElementById('trDate').value || todayIsoDate(), Number(f.nextInspectionMonths)));
@@ -493,6 +495,8 @@ function onTreatmentProductName(inp) {
 function updateTreatmentSaveBtn() {
   const anyMethod = !!document.querySelector('#trMethods input[type=checkbox]:checked');
   document.getElementById('trSaveBtn').disabled = !anyMethod || !treatmentPad || treatmentPad.empty;
+  const by = document.getElementById('trSigBy');
+  if (by) by.textContent = document.getElementById('trTech').value.trim() || 'the technician';
 }
 
 function saveTreatmentRecord() {

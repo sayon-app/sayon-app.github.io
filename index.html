@@ -542,13 +542,21 @@
       <span class="page-sheet-title" id="treatmentTitle">Record the treatment</span>
       <button class="voice-popover-close" onclick="closeTreatmentRecord()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
     </div>
-    <div class="page-sheet-body">
-      <p class="quote-hint" style="margin:0">Fill this in once the treatment is done. It goes on the client's treatment certificate, and the boxes are ticked from the quote so you only change what was different.</p>
+    <div class="page-sheet-body sheet-secs">
+      <div class="sheet-intro">
+        <div class="agr-kicker">After the treatment</div>
+        <p class="agr-lede">Fill this in once the treatment is done. It goes on the client's treatment certificate.</p>
+      </div>
       <div class="sheet-voice" id="trVoice" data-state="idle">
         <button type="button" class="sheet-voice-btn" onclick="toggleSheetVoice('treatment')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg><span class="sheet-voice-label">Say it instead</span></button>
         <p class="sheet-voice-hint">e.g. "Done today, 8 till 11:30, fine and 22 degrees. Trenched and rodded the perimeter, 48 metres of Termidor at the label rate, foam at the porch post. Didn't do under the rear deck, no access. New notice in the meter box."</p>
         <p class="sheet-voice-text" hidden></p>
       </div>
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <span class="sheet-sec-num" aria-hidden="true">1</span>
+          <div><h3 class="sheet-sec-title">When and who</h3></div>
+        </div>
       <div class="job-row">
         <div class="job-field">
           <div class="job-field-label">Date treated</div>
@@ -562,21 +570,11 @@
       <div class="job-row">
         <div class="job-field">
           <div class="job-field-label">Technician</div>
-          <input class="job-input" id="trTech">
+          <input class="job-input" id="trTech" oninput="updateTreatmentSaveBtn()">
         </div>
         <div class="job-field">
           <div class="job-field-label">Licence no.</div>
           <input class="job-input" id="trLicence">
-        </div>
-      </div>
-      <div class="job-row">
-        <div class="job-field">
-          <div class="job-field-label">Supervisor</div>
-          <input class="job-input" id="trSupervisor" placeholder="If a trainee did it">
-        </div>
-        <div class="job-field">
-          <div class="job-field-label">Supervisor licence</div>
-          <input class="job-input" id="trSupervisorLicence">
         </div>
       </div>
       <div class="job-row">
@@ -589,6 +587,25 @@
           <input class="job-input" id="trFinish" type="time">
         </div>
       </div>
+      <details class="sheet-more" id="trSupervisorMore">
+        <summary>Done by a trainee? Add the supervisor</summary>
+        <div class="job-row">
+          <div class="job-field">
+            <div class="job-field-label">Supervisor</div>
+            <input class="job-input" id="trSupervisor" placeholder="If a trainee did it">
+          </div>
+          <div class="job-field">
+            <div class="job-field-label">Supervisor licence</div>
+            <input class="job-input" id="trSupervisorLicence">
+          </div>
+        </div>
+      </details>
+      </section>
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <span class="sheet-sec-num" aria-hidden="true">2</span>
+          <div><h3 class="sheet-sec-title">The treatment</h3><p class="sheet-sec-sub">Ticked from the quote. Change only what was different.</p></div>
+        </div>
       <div class="job-field">
         <div class="job-field-label">Pest treated</div>
         <input class="job-input" id="trPest" placeholder="e.g. Subterranean termites (Coptotermes)">
@@ -613,6 +630,12 @@
         <datalist id="trProductList"><option value="Termidor"><option value="Termidor Foam"><option value="Premise"><option value="Premise Foam"><option value="Altriset"><option value="Biflex"><option value="Exterra"><option value="Sentricon"><option value="Trelona"><option value="Kordon"></datalist>
         <button class="quote-link-btn treat-add-product" onclick="addTreatmentProduct()">Add another product</button>
       </div>
+      </section>
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <span class="sheet-sec-num" aria-hidden="true">3</span>
+          <div><h3 class="sheet-sec-title">Where</h3></div>
+        </div>
       <div class="job-field">
         <div class="job-field-label">Areas treated</div>
         <textarea class="job-input" id="trAreas" rows="2" placeholder="e.g. Laundry east wall; perimeter of the building"></textarea>
@@ -632,6 +655,12 @@
           <button class="signature-clear-btn" onclick="treatmentSketch.clear()">Clear plan</button>
         </div>
       </div>
+      </section>
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <span class="sheet-sec-num" aria-hidden="true">4</span>
+          <div><h3 class="sheet-sec-title">Notice and paperwork</h3><p class="sheet-sec-sub">What prints on the certificate for the client.</p></div>
+        </div>
       <div class="job-row">
         <div class="job-field">
           <div class="job-field-label">Durable notice</div>
@@ -646,10 +675,10 @@
           <input class="job-input" id="trNoticeWhere" placeholder="e.g. Meter box">
         </div>
       </div>
-      <p class="quote-hint" id="trNoticeHint" style="margin:-4px 0 0">The certificate prints the notice wording: system, date, product life and future inspections.</p>
+      <p class="quote-hint sheet-hint" id="trNoticeHint">The certificate prints the notice wording: system, date, product life and future inspections.</p>
       <div class="job-field">
         <div class="job-field-label">Safety and re-entry (from the label)</div>
-        <textarea class="job-input" id="trCautions" rows="2"></textarea>
+        <textarea class="job-input" id="trCautions" rows="3"></textarea>
       </div>
       <div class="job-field">
         <div class="job-field-label">Warranty or service terms</div>
@@ -659,18 +688,25 @@
         <div class="job-field-label">Notes for the client</div>
         <textarea class="job-input" id="trNotes" rows="2"></textarea>
       </div>
+      </section>
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <span class="sheet-sec-num" aria-hidden="true">5</span>
+          <div><h3 class="sheet-sec-title">Sign off</h3></div>
+        </div>
       <div class="job-field">
-        <div class="job-field-label">Technician signature</div>
         <div class="signature-pad-wrap agreement-sig-wrap">
           <canvas class="signature-canvas" id="trSigCanvas" width="640" height="220"></canvas>
           <div class="signature-placeholder" id="trSigPlaceholder">Sign here</div>
         </div>
         <div class="agreement-sig-actions">
-          <button class="signature-clear-btn" onclick="treatmentPad.clear();updateTreatmentSaveBtn()">Clear signature</button>
+          <span class="agr-sig-by" id="trSigBy">the technician</span>
+          <button class="agr-sig-clear" onclick="treatmentPad.clear();updateTreatmentSaveBtn()">Clear</button>
         </div>
       </div>
       <button class="extract-btn" id="trSaveBtn" onclick="saveTreatmentRecord()">Save treatment record</button>
       <button class="link-btn send-review-cancel" onclick="closeTreatmentRecord()">Cancel</button>
+      </section>
     </div>
   </div>
 </div>

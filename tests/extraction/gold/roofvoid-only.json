@@ -1,0 +1,219 @@
+{
+ "id": "roofvoid-only",
+ "transcript": "transcripts/roofvoid-only.txt",
+ "checks": [
+  {
+   "id": "area-roofvoid",
+   "kind": "equals",
+   "path": "areaStatus.roofvoid",
+   "values": [
+    "PARTIAL"
+   ],
+   "weight": 3,
+   "why": "back half under insulation"
+  },
+  {
+   "id": "no-interior",
+   "kind": "absent",
+   "path": "areaStatus.interior",
+   "weight": 2,
+   "why": "roof void note only"
+  },
+  {
+   "id": "no-exterior",
+   "kind": "absent",
+   "path": "areaStatus.exterior",
+   "weight": 2,
+   "why": "roof void note only"
+  },
+  {
+   "id": "no-subfloor",
+   "kind": "absent",
+   "path": "areaStatus.subfloor",
+   "weight": 2,
+   "why": "roof void note only"
+  },
+  {
+   "id": "restricted-insulation",
+   "kind": "mentions",
+   "path": "restrictedAccess",
+   "all": [
+    [
+     "insulation or sarking"
+    ]
+   ],
+   "weight": 2,
+   "why": "the app's label for batts"
+  },
+  {
+   "id": "hindered-back",
+   "kind": "mentions",
+   "path": "hinderedAreas",
+   "all": [
+    [
+     "back"
+    ]
+   ],
+   "weight": 2,
+   "why": "'the back half'"
+  },
+  {
+   "id": "high-risk-back",
+   "kind": "mentions",
+   "path": "highRiskAreas",
+   "all": [
+    [
+     "back"
+    ]
+   ],
+   "weight": 1,
+   "why": "not seen"
+  },
+  {
+   "id": "no-no-access",
+   "kind": "absent",
+   "path": "noAccessAreas",
+   "weight": 2,
+   "why": "insulation is a temporary obstruction"
+  },
+  {
+   "id": "no-findings",
+   "kind": "count",
+   "path": "findings",
+   "min": 0,
+   "max": 0,
+   "weight": 3,
+   "why": "a clear remark about one area never makes a NONE entry"
+  },
+  {
+   "id": "result-roofvoid",
+   "kind": "equals",
+   "path": "areaResult.roofvoid",
+   "values": [
+    "CLEAR",
+    null
+   ],
+   "weight": 1,
+   "why": "clear where seen"
+  },
+  {
+   "id": "moisture",
+   "kind": "equals",
+   "path": "moistureReadings",
+   "values": [
+    "YES",
+    null
+   ],
+   "weight": 1,
+   "why": "24% with staining, not called high"
+  },
+  {
+   "id": "leak",
+   "kind": "equals",
+   "path": "waterLeaks",
+   "values": [
+    "YES",
+    null
+   ],
+   "weight": 1,
+   "why": "'there might be a leak at the roof vent flashing'"
+  },
+  {
+   "id": "leak-location",
+   "kind": "mentions",
+   "path": "leakLocation",
+   "all": [
+    [
+     "vent",
+     "flashing"
+    ]
+   ],
+   "nullOk": true,
+   "weight": 1,
+   "why": "the roof vent flashing"
+  },
+  {
+   "id": "reading",
+   "kind": "mentions",
+   "path": "moistureMeterReadings",
+   "all": [
+    [
+     "24"
+    ]
+   ],
+   "weight": 1,
+   "why": "'reading on the rafter there was 24%'"
+  },
+  {
+   "id": "borers-none",
+   "kind": "equals",
+   "path": "borerActivity",
+   "values": [
+    "NONE"
+   ],
+   "weight": 1,
+   "why": "'no borers'"
+  },
+  {
+   "id": "decay-no",
+   "kind": "equals",
+   "path": "decayFound",
+   "values": [
+    "NO"
+   ],
+   "weight": 1,
+   "why": "'no rot'"
+  },
+  {
+   "id": "no-mould",
+   "kind": "absent",
+   "path": "mouldSeen",
+   "weight": 1,
+   "why": "water staining is not mould"
+  },
+  {
+   "id": "no-risk",
+   "kind": "absent",
+   "path": "riskLevel",
+   "weight": 3,
+   "why": "one-area note"
+  },
+  {
+   "id": "no-inspection-type",
+   "kind": "absent",
+   "path": "inspectionType",
+   "weight": 1,
+   "why": "not said"
+  },
+  {
+   "id": "no-weep-holes",
+   "kind": "absent",
+   "path": "weepHoles",
+   "weight": 1,
+   "why": "not raised"
+  },
+  {
+   "id": "no-slab-edge",
+   "kind": "absent",
+   "path": "slabEdge",
+   "weight": 1,
+   "why": "not raised"
+  },
+  {
+   "id": "no-treatment",
+   "kind": "absent",
+   "path": "treatmentRecommended",
+   "weight": 2,
+   "why": "not discussed"
+  },
+  {
+   "id": "no-mishearings",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "man hole"
+   ],
+   "weight": 1,
+   "why": "manhole"
+  }
+ ]
+}

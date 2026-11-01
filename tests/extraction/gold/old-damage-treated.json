@@ -185,7 +185,8 @@
             "heavy",
             "live termites",
             "active termites"
-          ]
+          ],
+          "negationOk": true
         }
       ],
       "weight": 3,
@@ -243,7 +244,8 @@
         "currently active"
       ],
       "weight": 3,
-      "why": "'no live termites nothing moving'"
+      "why": "'no live termites nothing moving' (the inspector's own \"no live termites\" is fine)",
+      "negationOk": true
     },
     {
       "id": "no-species",

@@ -1,0 +1,276 @@
+{
+ "id": "subfloor-all-clear",
+ "transcript": "transcripts/subfloor-all-clear.txt",
+ "checks": [
+  {
+   "id": "area-subfloor",
+   "kind": "equals",
+   "path": "areaStatus.subfloor",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 2,
+   "why": "'went right through the whole subfloor good clearance everywhere'"
+  },
+  {
+   "id": "result-subfloor",
+   "kind": "equals",
+   "path": "areaResult.subfloor",
+   "values": [
+    "CLEAR"
+   ],
+   "weight": 2,
+   "why": "'no termite activity under there'"
+  },
+  {
+   "id": "no-interior",
+   "kind": "absent",
+   "path": "areaStatus.interior",
+   "weight": 2,
+   "why": "this note is about the subfloor only"
+  },
+  {
+   "id": "no-exterior",
+   "kind": "absent",
+   "path": "areaStatus.exterior",
+   "weight": 2,
+   "why": "this note is about the subfloor only"
+  },
+  {
+   "id": "no-roofvoid",
+   "kind": "absent",
+   "path": "areaStatus.roofvoid",
+   "weight": 2,
+   "why": "this note is about the subfloor only"
+  },
+  {
+   "id": "no-findings",
+   "kind": "count",
+   "path": "findings",
+   "min": 0,
+   "max": 0,
+   "weight": 3,
+   "why": "a clear remark about one area never makes a NONE entry"
+  },
+  {
+   "id": "ant-capping",
+   "kind": "equals",
+   "path": "antCapping",
+   "values": [
+    "INTACT"
+   ],
+   "weight": 2,
+   "why": "'ant caps on all the peers and they're all intact no gaps'"
+  },
+  {
+   "id": "ant-cap-soldered",
+   "kind": "absent",
+   "path": "antCapSoldered",
+   "weight": 1,
+   "why": "soldering never raised"
+  },
+  {
+   "id": "timber-soil",
+   "kind": "equals",
+   "path": "timberSoil",
+   "values": [
+    "NO"
+   ],
+   "weight": 2,
+   "why": "'no timber lying on the soil'"
+  },
+  {
+   "id": "ventilation",
+   "kind": "equals",
+   "path": "subfloorVentilation",
+   "values": [
+    "ADEQUATE"
+   ],
+   "weight": 2,
+   "why": "'vents are clear and there's plenty of airflow'"
+  },
+  {
+   "id": "subfloor-drainage",
+   "kind": "equals",
+   "path": "subfloorDrainage",
+   "values": [
+    "ADEQUATE",
+    null
+   ],
+   "weight": 1,
+   "why": "'dry soil'"
+  },
+  {
+   "id": "borers-none",
+   "kind": "equals",
+   "path": "borerActivity",
+   "values": [
+    "NONE"
+   ],
+   "weight": 1,
+   "why": "'no borers'"
+  },
+  {
+   "id": "decay-no",
+   "kind": "equals",
+   "path": "decayFound",
+   "values": [
+    "NO"
+   ],
+   "weight": 1,
+   "why": "'no rot'"
+  },
+  {
+   "id": "moisture-no",
+   "kind": "equals",
+   "path": "moistureReadings",
+   "values": [
+    "NO"
+   ],
+   "weight": 2,
+   "why": "'12 to 14% normal'"
+  },
+  {
+   "id": "reading-row",
+   "kind": "count",
+   "path": "moistureMeterReadings",
+   "min": 1,
+   "max": 2,
+   "weight": 1,
+   "why": "readings on the bearers"
+  },
+  {
+   "id": "reading-value",
+   "kind": "mentions",
+   "path": "moistureMeterReadings",
+   "all": [
+    [
+     "12"
+    ],
+    [
+     "14"
+    ]
+   ],
+   "weight": 1,
+   "why": "'all around 12 to 14%'"
+  },
+  {
+   "id": "no-risk",
+   "kind": "absent",
+   "path": "riskLevel",
+   "weight": 3,
+   "why": "a one-area note never sets the risk"
+  },
+  {
+   "id": "no-inspection-type",
+   "kind": "absent",
+   "path": "inspectionType",
+   "weight": 2,
+   "why": "not said"
+  },
+  {
+   "id": "no-address",
+   "kind": "absent",
+   "path": "propertyStreetAddress",
+   "weight": 2,
+   "why": "not said"
+  },
+  {
+   "id": "no-client",
+   "kind": "absent",
+   "path": "clientName",
+   "weight": 2,
+   "why": "not said"
+  },
+  {
+   "id": "no-system",
+   "kind": "absent",
+   "path": "existingSystem",
+   "weight": 2,
+   "why": "not raised; must not overwrite an earlier note"
+  },
+  {
+   "id": "no-slab-edge",
+   "kind": "absent",
+   "path": "slabEdge",
+   "weight": 2,
+   "why": "there is a subfloor, and the slab edge was not raised"
+  },
+  {
+   "id": "no-weep-holes",
+   "kind": "absent",
+   "path": "weepHoles",
+   "weight": 1,
+   "why": "not raised"
+  },
+  {
+   "id": "no-hindered",
+   "kind": "absent",
+   "path": "hinderedAreas",
+   "weight": 2,
+   "why": "nothing in the way"
+  },
+  {
+   "id": "no-obstructions",
+   "kind": "absent",
+   "path": "obstructions",
+   "weight": 2,
+   "why": "nothing in the way"
+  },
+  {
+   "id": "no-restricted",
+   "kind": "absent",
+   "path": "restrictedAccess",
+   "weight": 2,
+   "why": "nothing in the way"
+  },
+  {
+   "id": "no-high-risk",
+   "kind": "absent",
+   "path": "highRiskAreas",
+   "weight": 2,
+   "why": "nothing unreached"
+  },
+  {
+   "id": "no-frequency",
+   "kind": "absent",
+   "path": "inspectionFrequency",
+   "weight": 2,
+   "why": "not said"
+  },
+  {
+   "id": "no-treatment",
+   "kind": "absent",
+   "path": "treatmentRecommended",
+   "weight": 2,
+   "why": "not discussed"
+  },
+  {
+   "id": "no-other-recs",
+   "kind": "absent",
+   "path": "otherRecommendations",
+   "weight": 1,
+   "why": "no advice given"
+  },
+  {
+   "id": "floor-not-slab",
+   "kind": "mentions",
+   "path": "floorType",
+   "none": [
+    "slab"
+   ],
+   "nullOk": true,
+   "weight": 2,
+   "why": "there is a subfloor with piers and stumps"
+  },
+  {
+   "id": "no-mishearings",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "peers"
+   ],
+   "weight": 2,
+   "why": "'peers' is piers"
+  }
+ ]
+}

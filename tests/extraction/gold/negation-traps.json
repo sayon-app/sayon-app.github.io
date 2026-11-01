@@ -1,0 +1,380 @@
+{
+ "id": "negation-traps",
+ "transcript": "transcripts/negation-traps.txt",
+ "checks": [
+  {
+   "id": "inspection-type",
+   "kind": "equals",
+   "path": "inspectionType",
+   "values": [
+    "Annual — Existing Building"
+   ],
+   "weight": 2,
+   "why": "'annual inspection'"
+  },
+  {
+   "id": "client-name",
+   "kind": "mentions",
+   "path": "clientName",
+   "all": [
+    [
+     "graham"
+    ],
+    [
+     "pell"
+    ]
+   ],
+   "weight": 1,
+   "why": "'Graham Pell'"
+  },
+  {
+   "id": "suburb",
+   "kind": "mentions",
+   "path": "propertySuburb",
+   "all": [
+    [
+     "toowoomba"
+    ]
+   ],
+   "weight": 1,
+   "why": "'Toowoomba'"
+  },
+  {
+   "id": "walls",
+   "kind": "equals",
+   "path": "wallConstruction",
+   "values": [
+    "Weatherboard"
+   ],
+   "weight": 1,
+   "why": "'weatherboard'"
+  },
+  {
+   "id": "floor",
+   "kind": "equals",
+   "path": "floorType",
+   "values": [
+    "Elevated timber (stumps)"
+   ],
+   "weight": 2,
+   "why": "'on stumps'"
+  },
+  {
+   "id": "no-findings",
+   "kind": "count",
+   "path": "findings",
+   "min": 0,
+   "max": 1,
+   "weight": 3,
+   "why": "the verandah is a suspicion only: no termites, mud or damage were seen"
+  },
+  {
+   "id": "no-active-or-inactive",
+   "kind": "every",
+   "path": "findings",
+   "checks": [
+    {
+     "kind": "equals",
+     "path": "termiteActivity",
+     "values": [
+      "NONE"
+     ]
+    }
+   ],
+   "weight": 3,
+   "why": "nothing found"
+  },
+  {
+   "id": "invasive-yes",
+   "kind": "equals",
+   "path": "invasiveInspection",
+   "values": [
+    "YES"
+   ],
+   "weight": 3,
+   "why": "'I'd want that opened up to check'"
+  },
+  {
+   "id": "invasive-details",
+   "kind": "mentions",
+   "path": "invasiveInspectionDetails",
+   "all": [
+    [
+     "verandah",
+     "veranda"
+    ]
+   ],
+   "weight": 2,
+   "why": "the verandah floorboards near the steps"
+  },
+  {
+   "id": "area-roofvoid",
+   "kind": "equals",
+   "path": "areaStatus.roofvoid",
+   "values": [
+    "NOT"
+   ],
+   "weight": 3,
+   "why": "'roof void not inspected the man hole is screwed shut'"
+  },
+  {
+   "id": "restricted-roof",
+   "kind": "mentions",
+   "path": "restrictedAccess",
+   "all": [
+    [
+     "roof void: restricted access"
+    ]
+   ],
+   "weight": 2,
+   "why": "a screwed-shut manhole is 'Restricted access'"
+  },
+  {
+   "id": "no-access-roof",
+   "kind": "mentions",
+   "path": "noAccessAreas",
+   "all": [
+    [
+     "roof"
+    ]
+   ],
+   "weight": 2,
+   "why": "a permanent restriction"
+  },
+  {
+   "id": "high-risk-roof",
+   "kind": "mentions",
+   "path": "highRiskAreas",
+   "all": [
+    [
+     "roof"
+    ]
+   ],
+   "weight": 2,
+   "why": "every noAccessAreas place is also high risk"
+  },
+  {
+   "id": "area-interior",
+   "kind": "equals",
+   "path": "areaStatus.interior",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'interior inspected'"
+  },
+  {
+   "id": "area-exterior",
+   "kind": "equals",
+   "path": "areaStatus.exterior",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'exterior inspected'"
+  },
+  {
+   "id": "area-subfloor",
+   "kind": "equals",
+   "path": "areaStatus.subfloor",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'subfloor inspected all the stumps'"
+  },
+  {
+   "id": "result-interior",
+   "kind": "equals",
+   "path": "areaResult.interior",
+   "values": [
+    "FOUND"
+   ],
+   "weight": 2,
+   "why": "old borer holes in the back bedroom floorboards"
+  },
+  {
+   "id": "result-subfloor",
+   "kind": "equals",
+   "path": "areaResult.subfloor",
+   "values": [
+    "CLEAR"
+   ],
+   "weight": 1,
+   "why": "'no mud no activity'"
+  },
+  {
+   "id": "borers-inactive",
+   "kind": "equals",
+   "path": "borerActivity",
+   "values": [
+    "INACTIVE"
+   ],
+   "weight": 3,
+   "why": "'old borer holes... dark holes no frass nothing fresh'"
+  },
+  {
+   "id": "borer-findings",
+   "kind": "count",
+   "path": "borerFindings",
+   "min": 1,
+   "max": 1,
+   "weight": 2,
+   "why": "one place"
+  },
+  {
+   "id": "borer-location",
+   "kind": "mentions",
+   "path": "borerFindings",
+   "all": [
+    [
+     "back bedroom"
+    ]
+   ],
+   "weight": 1,
+   "why": "'in the back bedroom'"
+  },
+  {
+   "id": "previous-treatment",
+   "kind": "equals",
+   "path": "previousTreatment",
+   "values": [
+    "YES"
+   ],
+   "weight": 3,
+   "why": "plugged drill holes along the back patio, whatever the owner says"
+  },
+  {
+   "id": "previous-treatment-details",
+   "kind": "mentions",
+   "path": "previousTreatmentDetails",
+   "all": [
+    [
+     "drill"
+    ]
+   ],
+   "weight": 1,
+   "why": "'drill holes plugged with cement'"
+  },
+  {
+   "id": "previous-treatment-where",
+   "kind": "mentions",
+   "path": "previousTreatmentWhere",
+   "all": [
+    [
+     "patio"
+    ]
+   ],
+   "weight": 1,
+   "why": "'along the back patio'"
+  },
+  {
+   "id": "termite-history",
+   "kind": "mentions",
+   "path": "termiteHistory",
+   "none": [
+    "treated before",
+    "reported before"
+   ],
+   "nullOk": true,
+   "weight": 2,
+   "why": "the owner said it was never treated"
+  },
+  {
+   "id": "durable-notice",
+   "kind": "equals",
+   "path": "durableNoticePresent",
+   "values": [
+    "NO"
+   ],
+   "weight": 2,
+   "why": "'no durable notice'"
+  },
+  {
+   "id": "existing-system",
+   "kind": "equals",
+   "path": "existingSystem",
+   "values": [
+    "No System Found"
+   ],
+   "weight": 2,
+   "why": "'no system that I could find'"
+  },
+  {
+   "id": "ant-capping",
+   "kind": "equals",
+   "path": "antCapping",
+   "values": [
+    "INTACT"
+   ],
+   "weight": 1,
+   "why": "'ant caps intact'"
+  },
+  {
+   "id": "treatment-no",
+   "kind": "equals",
+   "path": "treatmentRecommended",
+   "values": [
+    "NO"
+   ],
+   "weight": 3,
+   "why": "'no treatment needed at this stage'"
+  },
+  {
+   "id": "treatment-type-empty",
+   "kind": "absent",
+   "path": "treatmentType",
+   "weight": 3,
+   "why": "no treatment"
+  },
+  {
+   "id": "risk-not-high",
+   "kind": "equals",
+   "path": "riskLevel",
+   "values": [
+    "LOW",
+    "MEDIUM",
+    null
+   ],
+   "weight": 3,
+   "why": "no termites or evidence found"
+  },
+  {
+   "id": "frequency",
+   "kind": "mentions",
+   "path": "inspectionFrequency",
+   "all": [
+    [
+     "12 month",
+     "twelve month",
+     "annual",
+     "every year"
+    ]
+   ],
+   "weight": 1,
+   "why": "'reinspect in 12 months'"
+  },
+  {
+   "id": "no-live-termites",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "live termites",
+    "active termites",
+    "termite activity found"
+   ],
+   "weight": 3,
+   "why": "none seen",
+   "negationOk": true
+  },
+  {
+   "id": "no-mishearings",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "frash",
+    "man hole"
+   ],
+   "weight": 1,
+   "why": "frass, manhole"
+  }
+ ]
+}

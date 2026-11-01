@@ -2168,6 +2168,8 @@
     <div class="page-sheet-header">
       <span class="page-sheet-title" id="agreementTitle">Pre-Inspection Agreement</span>
       <button class="voice-popover-close" onclick="closeAgreementSheet()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+      <!-- How far through: the job, read it, signed. See updateAgreementSignButton. -->
+      <div class="agr-progress" id="agreementProgress" aria-hidden="true"><i></i><i></i><i></i></div>
     </div>
 
     <!-- Not signed yet: the job, the wording, the signature, as three
@@ -2195,8 +2197,10 @@
       </div>
       <ol class="agr-steps">
         <li class="agr-step" id="agreementStepJob">
-          <span class="agr-step-dot" aria-hidden="true"><b>1</b></span>
-          <h3 class="agr-step-title">The job</h3>
+          <div class="agr-step-head">
+            <span class="agr-step-dot" aria-hidden="true"><b>1</b></span>
+            <div><div class="agr-step-of">Step 1 of 3</div><h3 class="agr-step-title">The job</h3></div>
+          </div>
           <!-- The type decides the standard and the wording of clause 1, so it
                is chosen before the client signs (see onAgreementTypeChange). -->
           <div class="job-field">
@@ -2230,8 +2234,10 @@
           </div>
         </li>
         <li class="agr-step" id="agreementStepRead">
-          <span class="agr-step-dot" aria-hidden="true"><b>2</b></span>
-          <h3 class="agr-step-title">Read it together</h3>
+          <div class="agr-step-head">
+            <span class="agr-step-dot" aria-hidden="true"><b>2</b></span>
+            <div><div class="agr-step-of">Step 2 of 3</div><h3 class="agr-step-title">Read it together</h3></div>
+          </div>
           <article class="agr-doc" id="agreementText"></article>
           <label class="agreement-check">
             <input type="checkbox" id="agreementAgree" onchange="updateAgreementSignButton()">
@@ -2239,8 +2245,10 @@
           </label>
         </li>
         <li class="agr-step" id="agreementStepSign">
-          <span class="agr-step-dot" aria-hidden="true"><b>3</b></span>
-          <h3 class="agr-step-title">Client signs</h3>
+          <div class="agr-step-head">
+            <span class="agr-step-dot" aria-hidden="true"><b>3</b></span>
+            <div><div class="agr-step-of">Step 3 of 3</div><h3 class="agr-step-title">Client signs</h3></div>
+          </div>
           <div class="job-field">
             <div class="job-field-label">Client name</div>
             <input class="job-input" id="agreementSignerName" placeholder="Full name of the person signing" oninput="refreshAgreementPreview()">
@@ -2250,16 +2258,20 @@
             <div class="signature-placeholder" id="agreementSigPlaceholder">Client signs here</div>
           </div>
           <div class="agreement-sig-actions">
-            <button class="signature-clear-btn" onclick="agreementSignaturePad.clear();updateAgreementSignButton()">Clear signature</button>
+            <span class="agr-sig-by" id="agreementSigBy"></span>
+            <button class="agr-sig-clear" onclick="agreementSignaturePad.clear();updateAgreementSignButton()">Clear</button>
           </div>
           <button class="extract-btn" id="agreementSignBtn" onclick="signAgreement('onsite')" disabled>Sign agreement</button>
           <p class="agr-hint agr-sign-need" id="agreementSignNeed"></p>
-          <button class="link-btn agreement-other-toggle" onclick="toggleAgreementOther()">Signed on paper or by email instead?</button>
-          <div class="agreement-other" id="agreementOtherWrap" style="display:none">
-            <input class="job-input" id="agreementOtherNote" placeholder="e.g. Signed on paper, agreed by email">
-            <button class="agreement-banner-btn" onclick="signAgreement('other')">Record it</button>
+          <div class="agr-alt">
+            <div class="agr-alt-label">Other ways to sign</div>
+            <button class="agr-alt-btn" id="agreementLinkBtn" onclick="sendAgreementLink()">Client not here? Send them a link to sign<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+            <button class="agr-alt-btn" onclick="toggleAgreementOther()">Signed on paper or by email instead?<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+            <div class="agreement-other" id="agreementOtherWrap" style="display:none">
+              <input class="job-input" id="agreementOtherNote" placeholder="e.g. Signed on paper, agreed by email">
+              <button class="agreement-banner-btn" onclick="signAgreement('other')">Record it</button>
+            </div>
           </div>
-          <button class="link-btn agreement-other-toggle" id="agreementLinkBtn" onclick="sendAgreementLink()">Client not here? Send them a link to sign</button>
         </li>
       </ol>
     </div>

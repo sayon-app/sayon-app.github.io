@@ -52,7 +52,8 @@ const probe = () => {
       await snap('1-' + st);
     }
     const tries = [
-      ['20-drawer', 'toggleDrawer()', 'toggleDrawer()'],
+      ['20-drawer', 'openAccountMenu()', 'toggleDrawer()'],
+      ['20b-job', "tabGo('job')", "tabGo('report')"],
       ['21-job-panel', "toggleDrawer(); openMenuPage('jobPanel')", "showMenuPage(null); toggleDrawer()"],
       ['22-saved', "toggleDrawer(); openMenuPage('savedPanel')", "showMenuPage(null); toggleDrawer()"],
       ['23-settings', "toggleDrawer(); openMenuPage('settingsPanel')", "showMenuPage(null); toggleDrawer()"],

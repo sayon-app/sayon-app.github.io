@@ -971,7 +971,8 @@ function renderQuoteSystemChoice() {
   const src = currentQuoteSource();
   const rec = src && src.reportData ? (src.reportData.treatmentType || '') : '';
   el.style.display = '';
-  el.innerHTML = `<div class="quote-system-q">The report recommends more than one system${rec ? ` (${escapeHtml(rec)})` : ''}. Which do you want to quote?</div>
+  el.innerHTML = `<div class="quote-system-q">The report's advice names more than one system. Which do you want to quote?</div>${rec ? `
+    <div class="quote-system-rec">${escapeHtml(rec)}</div>` : ''}
     <div class="quote-answer-btns">${c.options.map(k =>
       `<button class="quote-btn" onclick="pickQuoteSystem('${k}')">${escapeHtml(QUOTE_SYSTEM_LABELS[k] || k)}</button>`).join('')}</div>`;
 }

@@ -339,6 +339,8 @@ function updateBaitSaveBtn() {
   const el = document.getElementById('bvNeed');
   el.textContent = need;
   el.hidden = !need;
+  const by = document.getElementById('bvSigBy');
+  if (by) by.textContent = document.getElementById('bvTech').value.trim() || 'the technician';
 }
 
 function saveBaitVisit() {

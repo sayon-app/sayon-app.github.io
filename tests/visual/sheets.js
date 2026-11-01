@@ -62,6 +62,23 @@ const sc = require('./scenarios.js').find(s => s.name === 'standard');
         const sh = b.closest('.page-sheet'); sh.style.position = 'relative'; sh.style.inset = 'auto'; sh.closest('.page-sheet-overlay').style.position = 'absolute'; sh.closest('.page-sheet-overlay').style.overflow = 'visible'; }, sel);
       await p.screenshot({ path: `${OUT}/${tag}-6-treatment-full.png`, fullPage: true });
     }
+    // Bait station visit, after a baiting system went in.
+    await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(2000);
+    await p.evaluate(async (sc) => {
+      storeCompanyDetails(sc.company); openApp('inspect'); resetReportState();
+      const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+      for (const [k, v] of Object.entries(sc.job)) set(k, v); updateJob();
+      reportData.sent = { at: Date.now(), to: 'sam@example.com' }; saveCurrentReport(true);
+      openQuoteFromReport();
+      quoteState.items = [newQuoteItem('bait_install', { qty: 6 }), newQuoteItem('bait_monitor')];
+      quoteState.answer = { status: 'accepted', by: 'Sam Taylor', date: todayIsoDate(), method: 'signed', note: '', at: Date.now(), hash: quoteContentHash(quoteState) };
+      quoteState.treatment = { date: todayIsoDate(), technician: 'Alex Example', licence: 'NSW 000000', methods: { bait: '6' }, products: [{ name: 'Exterra', active: 'chlorfluazuron', batch: 'B-0003' }], notice: 'new', signature: '', at: Date.now() };
+      persistQuote(); openBaitVisit();
+    }, sc);
+    await p.waitForTimeout(600);
+    await p.evaluate(sel => { const b = document.querySelector(sel); b.style.overflow = 'visible'; b.style.flex = 'none';
+      const sh = b.closest('.page-sheet'); sh.style.position = 'relative'; sh.style.inset = 'auto'; sh.closest('.page-sheet-overlay').style.position = 'absolute'; sh.closest('.page-sheet-overlay').style.overflow = 'visible'; }, '#baitOverlay .page-sheet-body');
+    await p.screenshot({ path: `${OUT}/${tag}-7-bait-full.png`, fullPage: true });
     await ctx.close();
   }
   await b.close();

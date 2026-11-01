@@ -675,6 +675,96 @@
   </div>
 </div>
 
+<!-- BAIT STATION VISIT (js/bait.js): checking the stations after a baiting system went in -->
+<div class="page-sheet-overlay" id="baitOverlay">
+  <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="baitTitle">
+    <div class="page-sheet-header">
+      <span class="page-sheet-title" id="baitTitle">Bait station visit</span>
+      <button class="voice-popover-close" onclick="closeBaitVisit()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+    </div>
+    <div class="page-sheet-body">
+      <p class="quote-hint" style="margin:0">Mark what you found at each station. It goes on the client's visit report, and the next visit's date follows what you found.</p>
+      <div class="sheet-voice" id="bvVoice" data-state="idle">
+        <button type="button" class="sheet-voice-btn" onclick="toggleSheetVoice('bait')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg><span class="sheet-voice-label">Say it instead</span></button>
+        <p class="sheet-voice-hint">e.g. "1 to 5 clear. 6 active, added two cartridges. 7's lid was off, replaced it. Rest are clear. Exterra, batch 4471. Back in 4 weeks."</p>
+        <p class="sheet-voice-text" hidden></p>
+      </div>
+      <div class="job-row">
+        <div class="job-field">
+          <div class="job-field-label">Visit date</div>
+          <input class="job-input" id="bvDate" type="date" onchange="onBaitDateChange()">
+        </div>
+        <div class="job-field">
+          <div class="job-field-label">Technician</div>
+          <input class="job-input" id="bvTech">
+        </div>
+      </div>
+      <div class="job-field">
+        <div class="job-field-label">Licence no.</div>
+        <input class="job-input" id="bvLicence">
+      </div>
+      <div class="job-field">
+        <div class="job-field-label">The stations</div>
+        <div class="job-row" id="bvCountRow" hidden>
+          <div class="job-field">
+            <div class="job-field-label">How many are in the ground?</div>
+            <input class="job-input" id="bvCount" type="number" min="1" max="99" inputmode="numeric" placeholder="e.g. 12">
+          </div>
+          <button type="button" class="quote-btn bait-count-btn" onclick="setBaitStationCount()">List them</button>
+        </div>
+        <div class="bait-tools" id="bvStationTools" hidden>
+          <button type="button" class="quote-btn bait-rest-btn" onclick="markRestBaitClear()">Rest are clear</button>
+          <span class="bait-summary" id="bvSummary" aria-live="polite"></span>
+        </div>
+        <div class="bait-stations" id="bvStations"></div>
+        <div class="bait-tools">
+          <button type="button" class="quote-link-btn" onclick="addBaitStation()">Add a station</button>
+          <button type="button" class="quote-link-btn" id="bvRemoveStation" onclick="removeLastBaitStation()">Remove the last station</button>
+        </div>
+      </div>
+      <div class="job-field">
+        <div class="job-field-label">Bait used</div>
+        <div class="job-row">
+          <div class="job-field">
+            <input class="job-input" id="bvProduct" list="bvProductList" placeholder="e.g. Exterra" aria-label="Bait product" oninput="onBaitProductName(this)">
+            <datalist id="bvProductList"><option value="Exterra"><option value="Sentricon"><option value="Trelona"></datalist>
+          </div>
+          <div class="job-field">
+            <input class="job-input" id="bvActive" placeholder="Active constituent" aria-label="Active constituent">
+          </div>
+        </div>
+        <input class="job-input" id="bvBatch" placeholder="Batch no." aria-label="Batch number" style="margin-top:8px">
+      </div>
+      <label class="treat-method bait-finished">
+        <input type="checkbox" id="bvFinished" onchange="onBaitFinishedChange()">
+        <span>Baiting finished: no more visits needed</span>
+      </label>
+      <div class="job-field" id="bvNextWrap">
+        <div class="job-field-label">Next visit</div>
+        <input class="job-input" id="bvNext" type="date" oninput="onBaitNextInput()" onchange="onBaitNextInput()">
+        <p class="quote-hint" style="margin:6px 0 0">Starts at 4 weeks while termites are feeding and 3 months once every station is quiet. Set it to the bait's label.</p>
+      </div>
+      <div class="job-field">
+        <div class="job-field-label">Notes for the client</div>
+        <textarea class="job-input" id="bvNotes" rows="2" placeholder="Optional, e.g. keep the mulch clear of station 4"></textarea>
+      </div>
+      <div class="job-field">
+        <div class="job-field-label">Technician signature</div>
+        <div class="signature-pad-wrap agreement-sig-wrap">
+          <canvas class="signature-canvas" id="bvSigCanvas" width="640" height="220"></canvas>
+          <div class="signature-placeholder" id="bvSigPlaceholder">Sign here</div>
+        </div>
+        <div class="agreement-sig-actions">
+          <button class="signature-clear-btn" onclick="baitPad.clear();updateBaitSaveBtn()">Clear signature</button>
+        </div>
+      </div>
+      <p class="bait-need" id="bvNeed" hidden></p>
+      <button class="extract-btn" id="bvSaveBtn" onclick="saveBaitVisit()">Save visit</button>
+      <button class="link-btn send-review-cancel" onclick="closeBaitVisit()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- MAIN APP -->
 <div id="app">
 
@@ -2265,6 +2355,7 @@
 <!-- Quote builder: uses js/app.js globals (reportData, getSavedReports, jsPDF…) -->
 <script src="js/quote.js"></script>
 <script src="js/treatment.js"></script>
+<script src="js/bait.js"></script>
 <script src="js/business-sync.js"></script>
 </body>
 </html>

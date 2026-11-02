@@ -920,7 +920,6 @@ function onQuoteSourceChange() {
   const c = quoteState.systemChoice;
   document.getElementById('quoteWorkFold').open = !quoteState.items.length || !!(c && !c.picked && c.options && c.options.length);
   editor.querySelectorAll('.quote-item-desc, .quote-item-detail, .quote-textarea').forEach(fitQuoteText);
-  maybeAutoTreatmentPlan();
 }
 
 function renderQuoteEditor() {

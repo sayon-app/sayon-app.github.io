@@ -255,7 +255,7 @@ function renderForm(doc) {
 // ── The quote ─────────────────────────────────────────────────────────────
 // doc = { kind:'quote', company, client, address, number, date, validUntil,
 //   inspector, gst, items:[{desc, detail, qty, unit, price, total}],
-//   subtotal, gstAmount, total, problem, plan:{time, service, inspections,
+//   subtotal, gstAmount, total, problem, plan:{why, time, service, inspections,
 //   we:[], owner:[]}, exclusions:[], notes:[], paymentTerms, files:{report,
 //   quote}, acceptText }. Everything the quote PDF says, laid out for a phone.
 function renderQuote(doc) {
@@ -293,8 +293,9 @@ function renderQuote(doc) {
 
   const plan = doc.plan || {};
   const facts = [['Time on site', plan.time], ['Free service period', plan.service], ['Inspections after', plan.inspections]].filter(([, v]) => v);
-  if (facts.length || (plan.we || []).length || (plan.owner || []).length) {
+  if (facts.length || (plan.we || []).length || (plan.owner || []).length || plan.why) {
     const c = card('Treatment plan');
+    if (plan.why) c.appendChild(el('p', 'purpose', plan.why));
     if (facts.length) {
       const grid = el('div', 'facts');
       facts.forEach(([k, v]) => { const f = el('div', 'fact'); f.append(el('small', null, k), el('b', null, v)); grid.appendChild(f); });

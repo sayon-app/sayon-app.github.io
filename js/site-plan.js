@@ -556,8 +556,11 @@ function drawSitePlan(P, plan, opts = {}) {
         let best = 1;
         lp.forEach((q, i) => { if (i && Math.hypot(q[0] - lp[i - 1][0], q[1] - lp[i - 1][1]) > Math.hypot(lp[best][0] - lp[best - 1][0], lp[best][1] - lp[best - 1][1])) best = i; });
         const a = lp[best - 1], b = lp[best];
-        // A third of the way along, as stations often sit mid-wall.
-        P.text(a[0] + (b[0] - a[0]) * 0.33, a[1] + (b[1] - a[1]) * 0.33 - 20, words, { size: 18, color: it.k === 'barrier' ? PLAN_INK.blueDark : PLAN_INK.muted, bold: it.k === 'barrier', halo: true });
+        // A third of the way along, as stations often sit mid-wall: above a
+        // stretch that runs across, beside one that runs up and down.
+        const x = a[0] + (b[0] - a[0]) * 0.33, y = a[1] + (b[1] - a[1]) * 0.33;
+        const across = Math.abs(b[0] - a[0]) >= Math.abs(b[1] - a[1]), right = x < PLAN_W * 0.85;
+        P.text(across ? x : x + (right ? 22 : -22), across ? y - 20 : y, words, { size: 18, color: it.k === 'barrier' ? PLAN_INK.blueDark : PLAN_INK.muted, bold: it.k === 'barrier', halo: true, align: across ? undefined : right ? 'left' : 'right' });
       }
     } else {
       drawPlanSymbol(P, it.k, it.x, it.y, it, opts.statuses && it.n != null ? opts.statuses[it.n] : null);

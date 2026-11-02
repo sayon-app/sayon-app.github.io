@@ -98,6 +98,17 @@ function adoptDraftQuote(id, address) {
   delete all.draft;
   all[id] = Object.assign({}, q, { reportKey: id, sourceAddress: address || '' });
   try { localStorage.setItem(quotesStorageKey(), JSON.stringify(all)); } catch (e) {}
+  // The quote open on screen moves with it, or its later edits would be
+  // saved under 'draft', which nothing reads once the report has an id.
+  if (quoteState && quoteState.reportKey === 'draft') {
+    quoteState.reportKey = id;
+    quoteState.sourceAddress = address || '';
+    const src = quoteSources.find(s => s.key === 'draft');
+    if (src) src.key = id;
+    const opt = document.querySelector('#quoteSource option[value="draft"]');
+    if (opt) opt.value = id;
+  }
+  if (typeof moveTreatmentPlanKey === 'function') moveTreatmentPlanKey('draft', id);
 }
 
 // The unsaved report was thrown away, so its draft quote goes with it.
@@ -680,7 +691,9 @@ function renderQuotePlan() {
   }
   // The two lists of steps read as bullets, and the timing as a side line
   // from the day of the job to the inspections after it.
-  body.innerHTML = `
+  body.innerHTML = `${p.why ? `
+    <div class="fsub">Why this plan</div>
+    <textarea class="quote-input quote-textarea" id="qPlanWhy" rows="2" aria-label="Why this plan suits the property" oninput="fitQuoteText(this); onQuotePlanInput()">${escapeHtml(p.why)}</textarea>` : ''}
     <div class="fsub">What we'll do<button type="button" class="link-btn fsub-action" onclick="editQuoteList('qPlanWe')">Edit</button></div>
     <textarea class="quote-input quote-textarea" id="qPlanWe" rows="3" data-qlist="No steps yet. Tap to add one." aria-label="What we'll do, one step per line" oninput="fitQuoteText(this); onQuotePlanInput()">${escapeHtml(p.we || '')}</textarea>
     <div class="fsub">What the owner does<button type="button" class="link-btn fsub-action" onclick="editQuoteList('qPlanOwner')">Edit</button></div>
@@ -755,6 +768,8 @@ function rebuildQuotePlan() {
 function onQuotePlanInput() {
   const p = quoteState && quoteState.plan;
   if (!p) return;
+  const why = document.getElementById('qPlanWhy');
+  if (why) p.why = why.value;
   p.we = document.getElementById('qPlanWe').value;
   p.owner = document.getElementById('qPlanOwner').value;
   p.inspections = document.getElementById('qPlanInspections').value;
@@ -905,6 +920,7 @@ function onQuoteSourceChange() {
   const c = quoteState.systemChoice;
   document.getElementById('quoteWorkFold').open = !quoteState.items.length || !!(c && !c.picked && c.options && c.options.length);
   editor.querySelectorAll('.quote-item-desc, .quote-item-detail, .quote-textarea').forEach(fitQuoteText);
+  maybeAutoTreatmentPlan();
 }
 
 function renderQuoteEditor() {
@@ -924,6 +940,7 @@ function renderQuoteEditor() {
   renderQuoteCompanyGaps();
   renderQuoteFolds();
   renderQuotePlan();
+  renderTreatmentPlanCard();
   renderQuoteAnswer();
   syncQuoteLists();
   ['qProblem', 'qPaymentTerms', 'qExclusions', 'qNotes'].forEach(id => fitQuoteText(document.getElementById(id)));
@@ -1562,7 +1579,7 @@ function quoteContentHash(q) {
   // 'booking' and 'invoice' are left over from features that were removed;
   // older quotes may still carry them, and they never counted as content.
   ['updatedAt', 'createdAt', 'sentAt', 'sentHash', 'certificateSentAt', 'certificateHandedAt', 'reportKey', 'answer', 'booking', 'treatment', 'baitVisits', 'invoice',
-    'sourceAddress', 'issuedAt', 'issuedHash', 'linkRequest'].forEach(k => delete content[k]);
+    'sourceAddress', 'issuedAt', 'issuedHash', 'linkRequest', 'aiPlan'].forEach(k => delete content[k]);
   return sha256Hex(stableJson(content));
 }
 // The day this version of the quote was first given to the client. The PDF
@@ -1717,7 +1734,7 @@ function quoteLinkDoc(q, files) {
       price: parseFloat(it.price) || 0, total: lineTotal(it) })),
     subtotal: totals.subtotal, gstAmount: totals.gst, total: totals.total,
     problem: quoteProblem(q).trim(),
-    plan: { time: (plan.time || '').trim(), service: (plan.service || '').trim(), inspections: repairPlanInspections(plan.inspections),
+    plan: { why: (plan.why || '').trim(), time: (plan.time || '').trim(), service: (plan.service || '').trim(), inspections: repairPlanInspections(plan.inspections),
       we: lines(plan.we), owner: lines(plan.owner) },
     exclusions: lines(q.exclusions), notes: lines(q.notes), paymentTerms: (q.paymentTerms || '').trim(),
     files: files || {},
@@ -2085,12 +2102,21 @@ function buildQuotePDF(q) {
   const we = planLines(plan.we), owner = planLines(plan.owner);
   const facts = [['TIME ON SITE', plan.time], ['FREE SERVICE PERIOD', plan.service], ['INSPECTIONS AFTER', repairPlanInspections(plan.inspections)]]
     .map(([k, v]) => [k, (v || '').trim()]).filter(([, v]) => v);
-  if (we.length || owner.length || facts.length) {
+  const why = (plan.why || '').trim();
+  if (we.length || owner.length || facts.length || why) {
     const gap = 4, fw = facts.length ? (CW - gap * (facts.length - 1)) / facts.length : CW;
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
     const wrapped = facts.map(([, v]) => doc.splitTextToSize(v, fw - 8));
     const fh = facts.length ? 10 + Math.max(...wrapped.map(l => l.length)) * 4.4 : 0;
     sectionTitle('TREATMENT PLAN', sectionNum++, facts.length ? fh + 6 : 18);
+    // Why this plan suits the property, in a sentence or two, above the steps.
+    if (why) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+      const lines = doc.splitTextToSize(why, CW);
+      ensure(lines.length * 4.2 + 4);
+      doc.setTextColor(...C.ink); doc.text(lines, M, y);
+      y += lines.length * 4.2 + 3;
+    }
     if (facts.length) {
       ensure(fh + 6);
       facts.forEach(([k], i) => {

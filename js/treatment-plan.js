@@ -1,0 +1,566 @@
+// ══════════════════════════════════════════════════════════════════════════
+// SAYON'S TREATMENT PLAN
+// Reads the whole report (and the notes the inspector dictated) and works out
+// the plan of attack an experienced technician would choose for THIS
+// property: how to knock out live termites, which long-term system suits the
+// site and why it beats the others here, what needs fixing, when to come
+// back, and what isn't known yet. One AI call per plan, through the Worker,
+// with the same request shape as extraction (no Worker change).
+//
+// The plan is a suggestion for the inspector. It's shown on the quote, and
+// nothing reaches the client until the inspector taps "Use this plan", which
+// fills the quote's treatment plan and work lines (they stay editable, and
+// Undo puts the quote back). The plan and its reasoning live on the quote
+// as q.aiPlan, which quoteContentHash() leaves out, so it is never part of
+// what the client signs.
+//
+// Loaded after js/quote.js and uses its globals (quoteState, newQuoteItem,
+// QUOTE_CATALOGUE, QUOTE_SYSTEM_LABELS, QUOTE_PLAN_TIMES, QUOTE_PLAN_SERVICE,
+// renderQuotePlan, renderQuoteItems, scheduleQuoteSave, quotePlanReport,
+// currentQuoteSource, isQuoteLocked) and js/app.js's (workerFetch,
+// escapeHtml, showToast, sha256Hex, stableJson, track, authSession).
+// ══════════════════════════════════════════════════════════════════════════
+
+const TREATMENT_PLAN_TIMEOUT_MS = 120000;
+
+const TREATMENT_PLAN_PROMPT = `You are SAYON's treatment planner. SAYON is an app for licensed Australian timber pest inspectors. The user message is one inspection: the report fields the app filled from the inspector's dictation (JSON), the notes the inspector actually said, and sometimes extra words from the inspector. Work out the plan of attack a highly experienced Australian termite technician would choose for THIS property, and explain it so the inspector can check your reasoning in ten seconds and the client can understand what they are paying for.
+
+The inspector is the licensed professional and makes the final call. Your job is to save them the thinking-through, not to replace their judgement. A generic answer ("install a termite management system") is useless to them. Every choice must be tied to the facts of this property, and every reason must name the fact it rests on.
+
+Return ONLY a valid JSON object, no markdown and no commentary, in exactly this shape:
+{"summary":string,
+"system":"bait"|"barrier"|"retic"|"physical"|"system"|"none",
+"knockdown":{"needed":boolean,"method":string,"where":[string],"why":string},
+"systemWhy":[string],
+"notChosen":[{"system":"bait"|"barrier"|"retic"|"physical"|"system"|"none","why":string}],
+"fixes":[{"what":string,"who":"us"|"owner"|"plumber"|"builder"|"arborist"|"electrician","why":string}],
+"followUp":string,
+"unknowns":[string],
+"client":{"why":string,"we":[string],"owner":[string],"time":string,"service":string,"inspections":string},
+"lines":[{"key":string,"qty":number or null,"detail":string,"why":string}]}
+
+WHAT EACH FIELD IS
+- summary: one line for the inspector, the plan in short ("Dust the live workings in the kitchen window frame, treat the nest in the stump, then an in-ground baiting system because paving covers most of the perimeter").
+- system: the long-term termite management system you recommend. bait = in-ground baiting and monitoring system; barrier = chemical soil treatment (a treated zone); retic = reticulation system charged with termiticide; physical = physical barrier; system = service, top up or recharge the system already on the property; none = no new system (no termites and nothing calling for one, an existing system that is still working, or the inspector said no system).
+- knockdown: what to do about LIVE termites now, separate from the long-term system. needed is false when no live termites were found. method names the method and its sequence ("Above-ground bait stations fixed over the live workings, checked every 2 to 3 weeks until feeding stops"). where lists each place, in the inspector's words. why ties it to what was found (how many places, nest found or not, what the timber is, whether termites can be reached).
+- systemWhy: 2 to 4 reasons this system suits this property better than the others, each naming the fact behind it ("Paving and the driveway cover the slab edge along most of the perimeter, so a soil treatment would mean drilling through concrete every 150 to 300 mm; stations can go in the garden beds and lawn").
+- notChosen: each of the other realistic options and the property-specific reason it lost here. Skip options that were never realistic (a physical barrier on an existing house is rarely realistic; say so once only if the inspector or owner raised it).
+- fixes: conditions that invite or hide termites, each with who does it and why it matters for the plan (a leak keeps the soil and timber wet, which draws termites in and breaks down a soil treatment's working life; a garden bed over the slab edge hides any entry and bridges the treated zone).
+- followUp: the visits after the job, for the inspector: when to check knockdown stations or treated workings, when to confirm activity has stopped, station servicing, and the next full inspection.
+- unknowns: what the plan depends on that the report does not say, each as a short question the inspector can answer on site ("Perimeter length? Needed to price stations or metres.", "Is the slab edge exposed on the left side? Not said."). Put the most decisive ones first. Never fill these gaps with assumptions elsewhere in the plan.
+- client: the plan as the client reads it on the quote, in plain Australian English and short sentences, no trade jargon. why: 2 or 3 sentences on why this plan suits their home, naming the property facts in everyday words. we: the steps we will do, in order, one action each. owner: what the owner must do to keep the treatment working (no repairs by trades: those go on the quote as exclusions). time: time on site for the treatment visit, as one of "1 to 2 hours", "Half a day", "1 day", "2 days", or your own short words. service: free service period, "None" or "12 months" (most businesses offer 12 months after a full treatment; use "None" when there is no treatment). inspections: when the next inspections are ("In 3 months, then every 12 months").
+- lines: the work lines for the quote, using ONLY these keys: direct (direct treatment of live termite workings, unit area, one per place), nest (locate and treat the nest), barrier_lm (chemical soil treatment per linear metre), barrier_job (chemical soil treatment, whole job, only when the length is unknown), bait_install (supply and install in-ground bait stations, per station), bait_monitor (bait station monitoring and servicing, 12 months), retic_lm (reticulation system, per metre), physical_lm (physical barrier, per metre), system_topup (top up or recharge the existing system), borer (treat timbers with live borers), timber_soil (remove timber-to-soil contact), weep_holes (clear bridged weep holes), slab_edge (expose a concealed slab edge), followup (follow-up timber pest inspection), invasive (invasive inspection). qty is the number of units: a length or station count only from a figure in the report or notes (a perimeter said as "about 48 metres" gives 48 lm, or about 16 stations at roughly 3 m apart), the number of places for direct, 1 for a job or visit. When you cannot get a quantity from what was said, qty is null and the matching question goes in unknowns. detail: the client-facing place or scope ("Kitchen window frame", "Full perimeter, including drilling the rear patio"), or "". why: a few words for the inspector. Never give prices: the app prices each line at the business's own rates.
+
+HOW AN EXPERIENCED TECHNICIAN DECIDES
+
+1. Live termites come first.
+- Never break open, spray or disturb live workings before treating: disturbed termites retreat and the chance to reach the colony is lost. Tell the owner not to touch or spray them (put that in client.owner).
+- Nest found (tree, stump, pole, mound, wall or slab cavity): treat the nest directly, drilling into it and applying a non-repellent dust, foam or liquid as the label directs. It is the most direct way to destroy the colony. A dead stump should then be removed or ground out (owner or arborist); a living tree's health is for an arborist.
+- Nest not found, plenty of live termites in timber you can reach: either non-repellent dust puffed into the workings through small holes (quick, works by termites carrying it back to the colony, needs good numbers of termites present), or above-ground bait stations fixed over the workings (slower, often weeks to months, aims to eliminate the colony, needs follow-up visits every few weeks while they feed). Choose dust when speed matters or the timber is being eaten out; choose above-ground baits when the colony is large or spread, the nest can't be found, or several places are active from what looks like one colony. Many technicians do both: above-ground stations where termites are feeding hard, dust where only a few can be reached.
+- Termites in wall cavities, door jambs, architraves or hollow framing you can't reach: non-repellent foam into the voids.
+- Never use a repellent spray on live termites; it scatters them.
+- Live termites in a fence, landscaping timber, stump or tree away from the house still mean a colony is foraging near the building: treat them there and say so in client.why.
+- Live termites inside the house with no nest found: the colony is usually outside, in trees, stumps, root crowns, under paving or a slab, or on a neighbouring property, within roughly 50 to 100 m. A nest search line is worth quoting when there are trees or stumps on site.
+- After the knockdown, confirm activity has stopped (follow-up visit) before relying on the long-term system alone.
+
+2. Choosing the long-term system. Weigh these facts from the report, in roughly this order:
+- Whether a system is already there. existingSystem, durableNoticePresent, previousTreatment and termiteHistory tell you. A reticulation system in place: recharge it (system), unless it's failed or incomplete. Bait stations in place: service them and add above-ground stations on any activity (system). An older chemical zone: re-treat as a soil treatment (barrier) or top up (system) depending on its age and the label; say what you need to know about its date in unknowns. A system installed by another company and still under its warranty or service contract (the inspector or durable notice says so): the plan is for that installer to service it; don't quote replacing or servicing it yourself, and say so in client.we as advice ("Contact the installer to service and rebait the active stations under your warranty"). A chemical zone still inside its working life by the label, with no activity found: no new system (system "none"); keep the zone intact and fix whatever bridges it. Live termites inside despite a system means a breach (garden bed or paving over the zone, render, an extension, concealed slab edge, expired zone): find and fix the breach as part of the plan.
+- Construction. Slab on ground: concealed entry through slab joints, pipe penetrations, infill slabs (patios, garages, extensions), and slab edges hidden by paving, garden beds, render or cladding. Suspended floor with a subfloor: treat soil around piers, stumps and internal walls as well as the outside perimeter, needs safe access and clearance (under about 400 mm limits it); ant caps matter. High-set or Queenslander stumps: treat around each stump and the perimeter; timber stumps in the ground are an entry point.
+- What lies against the walls. Mostly open soil and garden beds with the slab edge exposed favour a chemical soil treatment (trench and treat). Paving, concrete paths, driveways and patios against the walls mean drilling and injecting through the concrete at close spacing, which is more work and can be impossible inside under floor coverings; this pushes towards baiting, or a soil treatment priced for drilling. A concealed slab edge with no way to treat or inspect it favours baiting and a slab_edge line.
+- Water and sensitivity. Ponds, creeks, dams, wells, bores, aquaculture, a high water table, or soil that floods: liquid termiticides carry strict label limits near water, so baiting is usually preferred. Food gardens against the walls, a household that wants as little chemical as possible, or pets or children who dig in the garden beds also favour baiting.
+- Activity level. Live termites with no nest found favour baiting, which aims to eliminate the colony rather than only block it; a soil treatment can follow once activity is controlled if the owner wants a treated zone. Inactive evidence only, with no system: a system is still advisable to prevent a return; it is not urgent knockdown work.
+- The owner's commitment. Baiting needs ongoing servicing (often every 4 to 8 weeks in warmer months, less in cooler months, as the system's label says) and an ongoing yearly cost; if the owner said they don't want ongoing visits, a soil treatment or reticulation suits better. Reticulation costs more up front but lets the zone be recharged without trenching or drilling again; it suits new paving or landscaping planned along the walls, or an owner who wants a renewable zone.
+- Physical barriers are installed during construction or with an extension (AS 3660.1). On an existing house they are rarely the right answer; recommend one only for planned building work.
+- Climate and region (propertyState, postcode) shape season and servicing intervals; in the tropical north the giant northern termite (Mastotermes) occurs and baiting is commonly used against it. Species otherwise informs where to look for the nest and how to reach it (Coptotermes often nests in trees, stumps and root crowns or under slabs; Schedorhinotermes often has several linked nests, so expect more than one knockdown point). Species is never a reason the property is at higher risk, and never say so.
+- If the inspector named a method in the recommendation (treatmentType) or in their notes, plan around their method. If the facts strongly argue against it, keep their method as "system" and put your concern first in unknowns, as a question, with the reason.
+- If the inspector offered a choice ("chemical barrier or baiting"), choose one for this property and explain in systemWhy and notChosen.
+- No termites, no evidence, no system needed: system "none", knockdown not needed, plan built around fixes and regular inspections.
+
+3. Fix what invites termites. Leaks and high moisture readings (find and fix the source; termites follow moisture and a wet zone breaks down a soil treatment sooner), timber on the soil, bridged weep holes and slab edges, garden beds or paving over the inspection zone, poor drainage, poor subfloor ventilation, non-durable timber in the ground, gaps in ant capping, stored timber and firewood against the walls. Include each one the report raises, with who does it. Use the timber_soil, weep_holes and slab_edge lines only for work the pest business itself would do.
+
+4. Borers and decay. Active borers in timber you can treat: a borer line, treated as the label directs. Old borer damage or decay: no treatment line; the owner's builder repairs it and fixes the moisture causing decay.
+
+5. Coming back. AS 3660.2 recommends a timber pest inspection at least every 12 months, more often where the risk is higher. After a knockdown: check stations or treated workings every 2 to 3 weeks until activity stops, then confirm. After a full treatment, a first inspection at about 3 months is common, then every 12 months. Use the inspector's own interval (inspectionFrequency) when they gave one.
+
+RULES THAT MUST NEVER BE BROKEN
+- Never invent a fact. Every reason, place and quantity comes from the report fields or the notes. When the report is silent on something the plan depends on, say so in unknowns and choose what the known facts support. A field that is null or missing means "not said", not "no".
+- Never give a structural verdict. Damage goes to a builder or structural engineer to assess ("have a builder check the window frame"), never "the frame is safe" or "structurally sound" or "compromised".
+- Never rate the risk by termite species.
+- No severity adjectives (minor, moderate, severe, extensive, significant, extreme) about damage. Say what was seen and where.
+- Never promise an outcome. Say what the treatment aims to do ("aims to destroy the colony"), never "will eliminate", "guaranteed" or "permanent".
+- Never name a product or brand in client text unless the inspector named it; say "non-repellent termiticide", "bait stations". The inspector picks the product and applies it as its label directs.
+- Australian terms and spelling: metres, colour, licence (noun), paving, garden beds, meter box, durable notice.
+- Keep it tight: the inspector reads it on a phone. Client sentences under about 25 words.`;
+
+// What the planner reads: every report field that bears on the plan, as
+// the app holds it, plus what the inspector said. No client name, phone,
+// email or street address, which the plan has no use for.
+const TREATMENT_PLAN_FIELDS = [
+  'inspectionType', 'propertySuburb', 'propertyState', 'propertyPostcode',
+  'structureType', 'height', 'wallConstruction', 'roofType', 'floorType', 'constructionEra', 'occupancyStatus',
+  'siteSurroundings', 'siteSlope', 'termiteHistory', 'accessNotes', 'recentWeather', 'rainLast24h',
+  'existingSystem', 'existingSystemOther', 'durableNoticePresent', 'hardLandscaping', 'zone25mmVisible', 'softLandscaping', 'zone75mmVisible',
+  'antCapping', 'antCappingDetails', 'antCapSoldered',
+  'areaStatus', 'areaResult', 'obstructions', 'restrictedAccess', 'noAccessAreas', 'highRiskAreas', 'hinderedAreas', 'hinderedAreasDetail',
+  'borerActivity', 'decayFound', 'decayDetails', 'decayWhere', 'delignification', 'delignificationDetails',
+  'previousTreatment', 'previousTreatmentDetails', 'previousTreatmentWhere',
+  'moistureReadings', 'moistureMeterReadings', 'waterLeaks', 'leakLocation', 'mouldSeen', 'timberSoil', 'slabEdge', 'weepHoles',
+  'siteDrainage', 'subfloorDrainage', 'subfloorVentilation', 'nonDurableTimber', 'nonDurableTimberDetails', 'nonDurableTimberWhere',
+  'riskLevel', 'treatmentRecommended', 'treatmentType', 'inspectionFrequency', 'invasiveInspection', 'invasiveInspectionDetails', 'otherRecommendations',
+];
+
+// The dictated notes are the richest input (an owner who wants no chemicals,
+// a fish pond, dogs), so they go in whole up to this many characters, the
+// newest kept when there's more. The Worker refuses over 20,000 in all.
+const TREATMENT_PLAN_NOTES_CHARS = 12000;
+
+function treatmentPlanInput(rd, address) {
+  rd = rd || {};
+  const report = {};
+  const blank = v => v == null || v === '' || (Array.isArray(v) && !v.length) || (typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length);
+  TREATMENT_PLAN_FIELDS.forEach(k => { if (!blank(rd[k])) report[k] = rd[k]; });
+  // The state and postcode set the climate and season. They sit on the job,
+  // not the report fields, so they're read off the quote's address.
+  const m = String(address || '').match(/\b(NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\b\s*(\d{4})?/i);
+  if (m && !report.propertyState) report.propertyState = m[1].toUpperCase();
+  if (m && m[2] && !report.propertyPostcode) report.propertyPostcode = m[2];
+  const findings = (Array.isArray(rd.findings) ? rd.findings : []).filter(f => f && f.termiteActivity)
+    .map(f => {
+      const o = {};
+      ['termiteActivity', 'activityLocation', 'species', 'timberAffected', 'damageDescription', 'nestLocated', 'structuralConcern']
+        .forEach(k => { if (!blank(f[k])) o[k] = f[k]; });
+      return o;
+    });
+  if (findings.length) report.findings = findings;
+  const borers = (Array.isArray(rd.borerFindings) ? rd.borerFindings : []).filter(Boolean)
+    .map(b => {
+      const o = {};
+      ['borerActivity', 'borerType', 'location', 'timberAffected', 'description'].forEach(k => { if (!blank(b[k])) o[k] = b[k]; });
+      return o;
+    }).filter(o => Object.keys(o).length);
+  if (borers.length) report.borerFindings = borers;
+  const sq = rd.quoteSpoken;
+  if (sq && Array.isArray(sq.items) && sq.items.length) {
+    report.quoteSaid = sq.items.filter(it => it && it.description).map(it => [it.qty, it.unit, it.description].filter(v => v != null && v !== '').join(' '));
+  }
+  // Newest notes win when they don't all fit.
+  const notes = [];
+  let room = TREATMENT_PLAN_NOTES_CHARS;
+  (Array.isArray(rd.heardNotes) ? rd.heardNotes : []).slice().reverse().forEach(n => {
+    const t = (n && n.text || '').trim();
+    if (!t || room <= 0) return;
+    notes.unshift(t.length > room ? '…' + t.slice(t.length - room) : t);
+    room -= t.length;
+  });
+  return { report, notes };
+}
+
+function treatmentPlanMessage(input, extra) {
+  const parts = ['REPORT FIELDS (JSON):\n' + JSON.stringify(input.report)];
+  parts.push(input.notes.length
+    ? 'WHAT THE INSPECTOR SAID (notes in the order dictated):\n' + input.notes.map((t, i) => `[${i + 1}] ${t}`).join('\n')
+    : 'WHAT THE INSPECTOR SAID: no notes kept for this report; plan from the fields.');
+  if ((extra || '').trim()) parts.push('THE INSPECTOR ADDS:\n' + extra.trim());
+  return parts.join('\n\n');
+}
+
+// A report worth planning for: termites found (live or not), a treatment
+// recommended, or a system on the property.
+function reportNeedsPlan(rd) {
+  rd = rd || {};
+  const findings = Array.isArray(rd.findings) ? rd.findings : [];
+  return findings.some(f => f && (f.termiteActivity === 'ACTIVE' || f.termiteActivity === 'INACTIVE')) ||
+    rd.treatmentRecommended === 'YES' || !!(rd.treatmentType || '').trim();
+}
+
+function treatmentPlanHash(rd, address) {
+  return sha256Hex(stableJson(treatmentPlanInput(rd, address))).slice(0, 16);
+}
+
+// One request in flight per quote, so leaving and reopening the quote
+// doesn't ask twice, and the answer lands on the right quote.
+const treatmentPlanRuns = {};
+// Quotes whose plan is waiting for signal (by report key): worked out when
+// the phone is back online, not shown as an error.
+const treatmentPlanWaiting = {};
+
+async function requestTreatmentPlan(rd, address, extra) {
+  if (!navigator.onLine) throw Object.assign(new Error('No signal'), { noSignal: true });
+  const input = treatmentPlanInput(rd, address);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TREATMENT_PLAN_TIMEOUT_MS);
+  let res, raw;
+  try {
+    res = await workerFetch('', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        // The plan is reasoning, so it thinks before answering; thinking
+        // counts toward max_tokens (see callExtraction).
+        max_tokens: 16000,
+        output_config: { effort: 'medium' },
+        // Same for every plan, so cached for an hour.
+        system: [{ type: 'text', text: TREATMENT_PLAN_PROMPT, cache_control: { type: 'ephemeral', ttl: '1h' } }],
+        messages: [{ role: 'user', content: treatmentPlanMessage(input, extra) }],
+      }),
+      signal: controller.signal,
+    });
+    raw = await res.text();
+  } catch (err) {
+    throw Object.assign(new Error(err && err.name === 'AbortError' ? 'No answer in time' : 'No connection'), { noSignal: true });
+  } finally {
+    clearTimeout(timer);
+  }
+  let data;
+  try { data = JSON.parse(raw); } catch (e) { throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status }); }
+  if (!res.ok || data.error) throw Object.assign(new Error((data.error && (data.error.message || data.error.type)) || `HTTP ${res.status}`), { status: res.status });
+  if (data.stop_reason === 'max_tokens') throw new Error('The answer was cut off');
+  const out = (data.content || []).map(c => c.text || '').join('');
+  let plan;
+  try { plan = JSON.parse(out.replace(/```json|```/g, '').trim()); } catch (e) { throw new Error('The answer was not readable'); }
+  return cleanTreatmentPlan(plan);
+}
+
+// Only what the card and the quote can use, in the shapes they expect.
+function cleanTreatmentPlan(p) {
+  if (!p || typeof p !== 'object') throw new Error('The answer was not readable');
+  const str = v => (typeof v === 'string' ? v.trim() : '');
+  const list = v => (Array.isArray(v) ? v.map(x => (typeof x === 'string' ? x.trim() : '')).filter(Boolean) : []);
+  const systems = Object.keys(QUOTE_SYSTEM_LABELS);
+  const kd = p.knockdown && typeof p.knockdown === 'object' ? p.knockdown : {};
+  const client = p.client && typeof p.client === 'object' ? p.client : {};
+  return {
+    summary: str(p.summary),
+    system: systems.includes(p.system) ? p.system : 'none',
+    knockdown: { needed: kd.needed === true, method: str(kd.method), where: list(kd.where), why: str(kd.why) },
+    systemWhy: list(p.systemWhy),
+    notChosen: (Array.isArray(p.notChosen) ? p.notChosen : []).filter(n => n && systems.includes(n.system) && str(n.why))
+      .map(n => ({ system: n.system, why: str(n.why) })),
+    fixes: (Array.isArray(p.fixes) ? p.fixes : []).filter(f => f && str(f.what)).map(f => ({ what: str(f.what), who: str(f.who), why: str(f.why) })),
+    followUp: str(p.followUp),
+    unknowns: list(p.unknowns),
+    client: { why: str(client.why), we: list(client.we), owner: list(client.owner), time: str(client.time), service: str(client.service), inspections: str(client.inspections) },
+    lines: (Array.isArray(p.lines) ? p.lines : []).filter(l => l && l.key in QUOTE_CATALOGUE && l.key !== 'custom' && l.key !== 'treatment')
+      .map(l => ({ key: l.key, qty: typeof l.qty === 'number' && isFinite(l.qty) && l.qty > 0 ? l.qty : null, detail: str(l.detail), why: str(l.why) })),
+  };
+}
+
+// The lines each long-term system needs on the quote.
+const TP_SYSTEM_LINES = { bait: ['bait_install'], barrier: ['barrier_lm', 'barrier_job'], retic: ['retic_lm'], physical: ['physical_lm'], system: ['system_topup'] };
+
+// SAYON's own checks on the answer, added to "Check before you send" rather
+// than changing the plan: a system named with no line to quote it (which
+// can be right, say another company's system under its warranty), live
+// termites with no line to treat them, or lines for two systems at once.
+function checkTreatmentPlan(plan, rd) {
+  const keys = plan.lines.map(l => l.key);
+  const notes = [];
+  const want = TP_SYSTEM_LINES[plan.system];
+  if (want && !want.some(k => keys.includes(k))) notes.push(`The plan picks ${TP_SYSTEM_LABELS[plan.system].toLowerCase()} but gives no line to quote it. Add one if you're doing that work.`);
+  const live = (Array.isArray(rd && rd.findings) ? rd.findings : []).filter(f => f && f.termiteActivity === 'ACTIVE').length;
+  if (live && !keys.includes('direct') && !keys.includes('nest')) notes.push('Live termites were found but the plan has no line to treat them. Check the knockdown is quoted.');
+  const systems = Object.keys(TP_SYSTEM_LINES).filter(s => TP_SYSTEM_LINES[s].some(k => keys.includes(k)));
+  if (systems.length > 1) notes.push(`The lines quote more than one system (${systems.map(s => TP_SYSTEM_LABELS[s].toLowerCase()).join(' and ')}). Keep both only if you mean to do both.`);
+  if (plan.lines.some(l => l.qty == null)) notes.push('Some lines have no quantity from your notes, so they start at a usual amount. Check them before sending.');
+  plan.checks = notes;
+  return plan;
+}
+
+// A line with no quantity said starts where the report-built quote would
+// (12 stations, 40 metres), marked to check.
+function tpStartQty(key) {
+  if (key === 'bait_install') return 12;
+  if (/_lm$/.test(key)) return 40;
+  return 1;
+}
+
+// A draft quote that moves to its report's new id (adoptDraftQuote) takes
+// a plan being worked out with it.
+const treatmentPlanMoved = {};
+function tpKey(k) { while (treatmentPlanMoved[k]) k = treatmentPlanMoved[k]; return k; }
+function moveTreatmentPlanKey(from, to) {
+  treatmentPlanMoved[from] = to;
+  if (treatmentPlanRuns[from]) { treatmentPlanRuns[to] = true; delete treatmentPlanRuns[from]; }
+  if (from in treatmentPlanWaiting) { treatmentPlanWaiting[to] = treatmentPlanWaiting[from]; delete treatmentPlanWaiting[from]; }
+}
+
+// Stores the plan's state on the quote it belongs to, whether or not that
+// quote is still open.
+function setTreatmentPlanState(reportKey, ai) {
+  reportKey = tpKey(reportKey);
+  if (quoteState && quoteState.reportKey === reportKey) {
+    quoteState.aiPlan = ai;
+    persistQuote();
+    renderTreatmentPlanCard();
+    return;
+  }
+  const all = readJSON(quotesStorageKey(), {});
+  const q = all[reportKey];
+  if (!q) return;
+  q.aiPlan = ai;
+  try { localStorage.setItem(quotesStorageKey(), JSON.stringify(all)); } catch (e) { return; }
+  storeQuoteOnReport(q, false);
+}
+
+async function runTreatmentPlan(extra) {
+  const q = quoteState;
+  const rd = quotePlanReport();
+  if (!q || !rd || treatmentPlanRuns[q.reportKey]) return;
+  const key = q.reportKey;
+  const prev = q.aiPlan || {};
+  const hash = treatmentPlanHash(rd, q.address);
+  const started = Date.now();
+  treatmentPlanRuns[key] = true;
+  delete treatmentPlanWaiting[key];
+  if (q.aiPlan) q.aiPlan.error = '';
+  renderTreatmentPlanCard();
+  try {
+    const plan = checkTreatmentPlan(await requestTreatmentPlan(rd, q.address, extra), rd);
+    track('treatment_plan_made', { seconds: Math.round((Date.now() - started) / 1000), system: plan.system });
+    delete treatmentPlanRuns[tpKey(key)];
+    setTreatmentPlanState(key, { plan, hash, at: Date.now(), extra: extra || '', applied: false, before: null });
+  } catch (err) {
+    if (err.noSignal && !(prev && prev.plan)) {
+      delete treatmentPlanRuns[tpKey(key)];
+      treatmentPlanWaiting[tpKey(key)] = extra || '';
+      if (quoteState && quoteState.reportKey === tpKey(key)) renderTreatmentPlanCard();
+      return;
+    }
+    const why = err.noSignal ? 'No signal. Try again when you\'re back online.'
+      : err.status === 402 ? 'Your plan has ended, so SAYON can\'t work out a plan.'
+      : err.status === 429 ? 'You\'ve used this month\'s AI allowance.'
+      : `SAYON couldn't work out a plan (${err.message}).`;
+    track('treatment_plan_failed', { reason: err.noSignal ? 'no_signal' : err.status ? 'http_' + err.status : 'other' });
+    delete treatmentPlanRuns[tpKey(key)];
+    setTreatmentPlanState(key, Object.assign({}, prev, { error: why }));
+  } finally {
+    delete treatmentPlanRuns[tpKey(key)];
+  }
+}
+
+// When the quote opens: a report with something to plan for gets its plan
+// worked out once, by itself, unless the quote has already gone to the
+// client. After that the inspector asks again when they want.
+function maybeAutoTreatmentPlan() {
+  const q = quoteState;
+  const rd = quotePlanReport();
+  if (!q || !rd || q.aiPlan || q.sentAt || q.answer || isQuoteLocked()) return;
+  if (!reportNeedsPlan(rd) || typeof authSession === 'undefined' || !authSession) return;
+  if (!navigator.onLine) { treatmentPlanWaiting[q.reportKey] = ''; renderTreatmentPlanCard(); return; }
+  runTreatmentPlan('');
+}
+
+window.addEventListener('online', () => {
+  const q = quoteState;
+  if (q && q.reportKey in treatmentPlanWaiting && document.getElementById('quoteScreen').classList.contains('open')) {
+    runTreatmentPlan(treatmentPlanWaiting[q.reportKey]);
+  }
+});
+
+function askTreatmentPlanAgain() {
+  const box = document.getElementById('tpExtra');
+  runTreatmentPlan(box ? box.value : ((quoteState && quoteState.aiPlan && quoteState.aiPlan.extra) || ''));
+}
+
+// From the report's Recommendations: open the quote at the plan, and work
+// it out if there isn't one yet (the inspector asked, so even a report with
+// nothing found gets one).
+function openTreatmentPlanFromReport() {
+  openQuoteFromReport();
+  const q = quoteState;
+  if (q && !q.aiPlan && !treatmentPlanRuns[q.reportKey] && !isQuoteLocked()) {
+    if (navigator.onLine) runTreatmentPlan(''); else { treatmentPlanWaiting[q.reportKey] = ''; renderTreatmentPlanCard(); }
+  } else if (q && q.aiPlan && q.aiPlan.hidden) showTreatmentPlan();
+  const card = document.getElementById('quoteAiPlan');
+  if (card) setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+}
+
+// ── USING THE PLAN ──
+const TP_REPORT_SOURCE = /^(Finding|Recommendation|Conducive condition)/;
+
+function planChoice(value, options) {
+  const v = (value || '').trim();
+  return options.find(o => o.toLowerCase() === v.toLowerCase()) || v;
+}
+
+function useTreatmentPlan() {
+  const q = quoteState;
+  const ai = q && q.aiPlan;
+  if (!ai || !ai.plan || isQuoteLocked()) return;
+  const p = ai.plan;
+  const before = { items: q.items, plan: q.plan || null, systemChoice: q.systemChoice || null };
+  // Lines the inspector dictated with their prices stay as said; lines the
+  // inspector added by hand stay too. Lines guessed from the report make
+  // way for the plan's.
+  const spoken = q.items.some(it => it.source === 'Said in a voice note');
+  if (!spoken && p.lines.length) {
+    const own = q.items.filter(it => !TP_REPORT_SOURCE.test(it.source || '') && !/^SAYON plan/.test(it.source || ''));
+    const fresh = p.lines.map(l => newQuoteItem(l.key, {
+      detail: l.detail,
+      qty: l.qty != null ? l.qty : tpStartQty(l.key),
+      source: 'SAYON plan' + (l.why ? ': ' + l.why : '') + (l.qty == null ? ' (quantity to check)' : ''),
+    }));
+    q.items = fresh.concat(own);
+    q.systemChoice = null;
+  }
+  const c = p.client;
+  const plan = Object.assign({}, q.plan || { we: '', owner: '', time: '', service: '', inspections: '' });
+  if (c.why) plan.why = c.why;
+  if (c.we.length) plan.we = c.we.join('\n');
+  if (c.owner.length) plan.owner = c.owner.join('\n');
+  if (c.time) plan.time = planChoice(c.time, QUOTE_PLAN_TIMES);
+  if (c.service) plan.service = planChoice(c.service, QUOTE_PLAN_SERVICE);
+  if (c.inspections) plan.inspections = c.inspections;
+  q.plan = plan;
+  ai.applied = true;
+  ai.keptLines = spoken;
+  ai.before = before;
+  quoteOpenItems.clear();
+  renderQuoteItems();
+  renderQuotePlan();
+  renderTreatmentPlanCard();
+  scheduleQuoteSave();
+  track('treatment_plan_used', { system: p.system });
+  showToast(spoken ? 'Plan added. Your spoken quote lines are kept as you said them' : 'Plan added to the quote. Check the lines and prices', 'success');
+}
+
+function undoTreatmentPlan() {
+  const q = quoteState;
+  const ai = q && q.aiPlan;
+  if (!ai || !ai.applied || !ai.before || isQuoteLocked()) return;
+  q.items = ai.before.items;
+  q.plan = ai.before.plan || undefined;
+  if (!q.plan) delete q.plan;
+  q.systemChoice = ai.before.systemChoice;
+  ai.applied = false;
+  ai.before = null;
+  quoteOpenItems.clear();
+  renderQuoteItems();
+  renderQuotePlan();
+  renderTreatmentPlanCard();
+  scheduleQuoteSave();
+}
+
+function dismissTreatmentPlan() {
+  const q = quoteState;
+  if (!q || !q.aiPlan) return;
+  q.aiPlan.hidden = true;
+  renderTreatmentPlanCard();
+  scheduleQuoteSave();
+}
+
+function showTreatmentPlan() {
+  const q = quoteState;
+  if (!q) return;
+  if (!q.aiPlan) { runTreatmentPlan(''); return; }
+  q.aiPlan.hidden = false;
+  q.aiPlan.open = true;
+  renderTreatmentPlanCard();
+  scheduleQuoteSave();
+}
+
+function toggleTreatmentPlanReasons() {
+  const ai = quoteState && quoteState.aiPlan;
+  if (!ai) return;
+  ai.open = !ai.open;
+  renderTreatmentPlanCard();
+}
+
+// ── THE CARD ──
+// 'none' on the quote's picker means "termites only"; in a plan it can also
+// mean the system already there is still doing its job.
+const TP_SYSTEM_LABELS = Object.assign({}, QUOTE_SYSTEM_LABELS, { none: 'No new system' });
+const TP_WHO = { us: 'Us', owner: 'Owner', plumber: 'Plumber', builder: 'Builder', arborist: 'Arborist', electrician: 'Electrician' };
+
+function tpList(items, cls) {
+  return items.length ? `<ul class="tp-list${cls ? ' ' + cls : ''}">${items.map(t => `<li>${t}</li>`).join('')}</ul>` : '';
+}
+
+function treatmentPlanBodyHTML(ai) {
+  const p = ai.plan;
+  const e = escapeHtml;
+  const lines = p.lines.map(l => {
+    const cat = QUOTE_CATALOGUE[l.key] || {};
+    const n = l.qty != null ? l.qty : tpStartQty(l.key);
+    const qty = `${n} ${pluralUnit(cat.unit, n)}${l.qty == null ? ', to check' : ''}`;
+    return `<li><span class="tp-line-desc">${e(cat.desc || l.key)}${l.detail ? ` <span class="tp-dim">· ${e(l.detail)}</span>` : ''}</span><span class="tp-line-qty${l.qty == null ? ' warn' : ''}">${e(qty)}</span></li>`;
+  }).join('');
+  const kd = p.knockdown;
+  return `
+    ${p.unknowns.length || (p.checks || []).length ? `<div class="tp-block tp-unknowns"><div class="tp-label">Check before you send</div>${tpList(p.unknowns.map(e).concat((p.checks || []).map(t => `<span class="tp-own-check">${e(t)}</span>`)))}</div>` : ''}
+    ${kd.needed ? `<div class="tp-block"><div class="tp-label">1 · Knock out the live termites</div>
+      <div class="tp-text"><strong>${e(kd.method)}</strong></div>
+      ${kd.where.length ? `<div class="tp-text tp-dim">${e(kd.where.join('; '))}</div>` : ''}
+      ${kd.why ? `<div class="tp-text">${e(kd.why)}</div>` : ''}</div>` : ''}
+    <div class="tp-block"><div class="tp-label">${kd.needed ? '2' : '1'} · Long-term: ${e(TP_SYSTEM_LABELS[p.system] || p.system)}</div>
+      ${tpList(p.systemWhy.map(e))}
+      ${p.notChosen.length ? `<div class="tp-sub">Why not</div>${tpList(p.notChosen.map(n => `<strong>${e(TP_SYSTEM_LABELS[n.system] || n.system)}:</strong> ${e(n.why)}`), 'tp-why-not')}` : ''}</div>
+    ${p.fixes.length ? `<div class="tp-block"><div class="tp-label">${kd.needed ? '3' : '2'} · Fix what draws them in</div>
+      ${tpList(p.fixes.map(f => `${e(f.what)}${f.who ? ` <span class="tp-who">${e(TP_WHO[f.who] || f.who)}</span>` : ''}${f.why ? `<div class="tp-dim">${e(f.why)}</div>` : ''}`))}</div>` : ''}
+    ${p.followUp ? `<div class="tp-block"><div class="tp-label">Coming back</div><div class="tp-text">${e(p.followUp)}</div></div>` : ''}
+    ${lines ? `<div class="tp-block"><div class="tp-label">Lines for the quote</div><ul class="tp-lines">${lines}</ul>
+      <div class="tp-dim tp-small">Priced at your usual rates once you use the plan.</div></div>` : ''}
+    ${p.client.why ? `<div class="tp-block"><div class="tp-label">What the client reads</div><div class="tp-text tp-client">${e(p.client.why)}</div></div>` : ''}`;
+}
+
+function renderTreatmentPlanCard() {
+  const el = document.getElementById('quoteAiPlan');
+  if (!el) return;
+  const q = quoteState;
+  const rd = quotePlanReport();
+  const ai = q && q.aiPlan;
+  const locked = isQuoteLocked();
+  const busy = !!(q && treatmentPlanRuns[q.reportKey]);
+  // Nothing to plan for and nothing planned: no card.
+  if (!q || (!ai && !busy && !(q.reportKey in treatmentPlanWaiting) && (!reportNeedsPlan(rd) || locked))) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+  const head = (sub) => `<div class="tp-head"><span class="tp-mark" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg></span>
+    <span class="tp-head-text"><span class="quote-card-title">SAYON's treatment plan</span>${sub ? `<span class="tp-head-sub">${sub}</span>` : ''}</span></div>`;
+
+  if (!ai && !busy && q.reportKey in treatmentPlanWaiting) {
+    el.className = 'quote-card tp-card';
+    el.innerHTML = `${head('No signal right now. SAYON will work out the plan when you\'re back online, while this quote is open.')}
+      <button class="quote-btn tp-go" onclick="runTreatmentPlan(treatmentPlanWaiting[quoteState.reportKey] || '')">Try now</button>`;
+    return;
+  }
+  if (!ai || (busy && !ai.plan)) {
+    el.className = 'quote-card tp-card';
+    el.innerHTML = busy
+      ? `${head('Reading the report and working out the best plan for this property…')}<div class="tp-busy"><span class="tp-spinner"></span>This takes about half a minute. You can keep working on the quote.</div>`
+      : `${head('How to knock out the termites, which system suits this property and why, what to fix and when to come back.')}
+         <button class="quote-btn primary tp-go" onclick="runTreatmentPlan('')">Work out the plan</button>`;
+    return;
+  }
+  if (!ai.plan) {
+    el.className = 'quote-card tp-card';
+    el.innerHTML = `${head('')}<div class="tp-error">${escapeHtml(ai.error || 'No plan yet.')}</div>
+      <button class="quote-btn tp-go" onclick="runTreatmentPlan('')">Try again</button>`;
+    return;
+  }
+  if (ai.hidden) {
+    el.className = 'quote-card tp-card tp-folded';
+    el.innerHTML = `<button type="button" class="tp-fold-row" onclick="showTreatmentPlan()">${head(escapeHtml(TP_SYSTEM_LABELS[ai.plan.system] || ''))}<span class="link-btn">Show</span></button>`;
+    return;
+  }
+  const p = ai.plan;
+  const stale = rd && ai.hash && treatmentPlanHash(rd, q.address) !== ai.hash;
+  const sub = escapeHtml(p.summary || TP_SYSTEM_LABELS[p.system] || '');
+  const open = ai.open || !ai.applied;
+  el.className = 'quote-card tp-card' + (ai.applied ? ' tp-applied' : '');
+  el.innerHTML = `${head(sub)}
+    ${ai.applied ? `<div class="tp-status">In the quote${ai.keptLines ? ' (your spoken lines kept)' : ''}. Edit it under Treatment plan and the work lines.</div>` : ''}
+    ${stale ? `<div class="tp-stale">The report has changed since this plan was made.</div>` : ''}
+    ${ai.error ? `<div class="tp-error">${escapeHtml(ai.error)}</div>` : ''}
+    <div class="tp-body"${open ? '' : ' hidden'}>${treatmentPlanBodyHTML(ai)}</div>
+    <div class="tp-actions">
+      ${busy ? '<div class="tp-busy"><span class="tp-spinner"></span>Working out a new plan…</div>' : ai.applied
+        ? `<button class="quote-link-btn" onclick="toggleTreatmentPlanReasons()">${open ? 'Hide the reasons' : 'Show the reasons'}</button>
+           ${locked ? '' : '<button class="quote-text-btn" onclick="undoTreatmentPlan()">Undo</button>'}`
+        : locked ? '' : `<button class="quote-btn primary" onclick="useTreatmentPlan()">Use this plan</button>
+           <button class="quote-link-btn" onclick="dismissTreatmentPlan()">Not now</button>`}
+    </div>
+    ${busy || locked || ai.applied ? '' : `<details class="tp-again"${stale ? ' open' : ''}><summary>Ask again${stale ? ' with the changes' : ''}</summary>
+      <textarea class="quote-input quote-textarea" id="tpExtra" rows="2" placeholder="Anything SAYON should know? e.g. owner wants as little chemical as possible, fish pond out the back, about 52 m around">${escapeHtml(ai.extra || '')}</textarea>
+      <button class="quote-btn" onclick="askTreatmentPlanAgain()">Work it out again</button></details>`}`;
+}

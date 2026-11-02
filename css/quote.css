@@ -541,8 +541,12 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 /* The editor */
 #sitePlanOverlay .page-sheet-body.sp-body { gap: 8px; padding-top: 10px; }
 .sp-hint { margin: 0; min-height: 36px; font-size: 13px; line-height: 1.4; color: var(--text2); }
-.sp-canvas { position: relative; border: 1.5px solid var(--border2); border-radius: 12px; overflow: hidden; background: #fff; touch-action: none; user-select: none; -webkit-user-select: none; }
-.sp-canvas svg { border-radius: 0; cursor: crosshair; }
+.sp-canvas { position: relative; border: 1.5px solid var(--border2); border-radius: 12px; overflow: hidden; background: #E3E9F0; touch-action: none; user-select: none; -webkit-user-select: none; }
+.sp-canvas svg { border-radius: 0; cursor: crosshair; background: transparent; }
+.sp-canvas.grab svg { cursor: grab; }
+.sp-canvas.grabbing svg { cursor: grabbing; }
+.sp-grab { display: inline-flex; align-items: center; gap: 6px; }
+.sp-grab.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink, #fff); }
 .sp-canvas-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sp-canvas-tools .quote-link-btn:disabled { opacity: 0.4; }
 .sp-finish { margin-left: auto; min-height: 40px; padding: 8px 16px; }

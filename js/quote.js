@@ -275,6 +275,13 @@ const QUOTE_SYSTEM_LABELS = {
   bait: 'Baiting system', barrier: 'Chemical barrier', retic: 'Reticulation system',
   physical: 'Physical barrier', system: 'Top up existing', none: 'No system, termites only',
 };
+const quoteSystemLabel = k => QUOTE_SYSTEM_LABELS[k] || (k === 'generic' ? 'Termite management treatment' : k);
+
+// The quote lines each system adds, to tell which system a quote holds.
+const QUOTE_SYSTEM_LINE_KIND = {
+  barrier_lm: 'barrier', barrier_job: 'barrier', bait_install: 'bait', bait_monitor: 'bait',
+  retic_lm: 'retic', physical_lm: 'physical', system_topup: 'system', treatment: 'generic',
+};
 
 // A starting price is the catalogue price, shown on a line until this
 // business sets a price for it (typed on any quote, so it is remembered).
@@ -989,24 +996,38 @@ function renderQuoteCompanyGaps() {
 
 // When the recommendation offers more than one system, the inspector picks
 // which one this quote is for. Shown above the line items until picked.
+// The quote's system choice. A recommendation that named one system made
+// no choice; its lines say which system it is, so it can be changed too.
+function quoteSystemChoice(q) {
+  if (!q) return null;
+  if (q.systemChoice) return q.systemChoice;
+  const lines = q.items.filter(it => /^Recommendation: /.test(it.source || '') && QUOTE_SYSTEM_LINE_KIND[it.key]);
+  if (!lines.length) return null;
+  const kind = QUOTE_SYSTEM_LINE_KIND[lines[0].key];
+  q.systemChoice = { options: [kind], picked: kind, added: lines.map(it => ({ id: it.id })) };
+  return q.systemChoice;
+}
+
 function renderQuoteSystemChoice() {
   const el = document.getElementById('quoteSystemChoice');
   if (!el) return;
-  const c = quoteState && quoteState.systemChoice;
+  const c = quoteSystemChoice(quoteState);
   if (!c || !Array.isArray(c.options) || !c.options.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
   el.style.display = '';
   // Picked: one line saying which, to change it.
   if (c.picked) {
     el.classList.add('picked');
-    el.innerHTML = `<div class="quote-system-picked"><span>System: <strong>${escapeHtml(QUOTE_SYSTEM_LABELS[c.picked] || c.picked)}</strong></span>
-      <button class="link-btn" onclick="changeQuoteSystem()">Change</button></div>`;
+    // Changing needs the report to build the new lines from.
+    const canChange = !isQuoteLocked() && !!currentQuoteSource();
+    el.innerHTML = `<div class="quote-system-picked"><span>System: <strong>${escapeHtml(quoteSystemLabel(c.picked))}</strong></span>
+      ${canChange ? '<button class="link-btn" onclick="changeQuoteSystem()">Change</button>' : ''}</div>`;
     return;
   }
   el.classList.remove('picked');
   const src = currentQuoteSource();
   const rec = src && src.reportData ? (src.reportData.treatmentType || '') : '';
   const others = Object.keys(QUOTE_SYSTEM_LABELS).filter(k => !c.options.includes(k));
-  const btn = (k, cls) => `<button class="${cls}" onclick="pickQuoteSystem('${k}')">${escapeHtml(QUOTE_SYSTEM_LABELS[k] || k)}</button>`;
+  const btn = (k, cls) => `<button class="${cls}" onclick="pickQuoteSystem('${k}')">${escapeHtml(quoteSystemLabel(k))}</button>`;
   el.innerHTML = `<div class="quote-system-q">Which system are you quoting?</div>${rec ? `
     <div class="quote-system-rec">The report says: ${escapeHtml(rec)}</div>` : ''}
     <div class="quote-answer-btns">${c.options.map(k => btn(k, 'quote-btn')).join('')}</div>
@@ -1014,17 +1035,17 @@ function renderQuoteSystemChoice() {
     <div class="quote-system-more">${others.map(k => btn(k, 'quote-link-btn')).join('')}</div>`;
 }
 
-// Back to the question: the lines the last pick added go, unless changed since.
+// Back to the question: the lines the last pick added go, edited or not
+// (a typed price is remembered for next time anyway).
 function changeQuoteSystem() {
   const q = quoteState, c = q && q.systemChoice;
-  if (!c || !c.picked) return;
+  if (!c || !c.picked || !currentQuoteSource() || isQuoteLocked()) return;
   const added = c.added || [];
-  q.items = q.items.filter(it => !added.some(a => a.id === it.id && a.sig === quoteItemSig(it)));
+  q.items = q.items.filter(it => !added.some(a => a.id === it.id));
   c.was = c.picked; c.picked = null; c.added = [];
   renderQuoteItems();
   scheduleQuoteSave();
 }
-const quoteItemSig = it => JSON.stringify([it.key, it.desc, it.detail, it.qty, it.unit, it.price]);
 
 function pickQuoteSystem(kind) {
   const src = currentQuoteSource();
@@ -1038,7 +1059,7 @@ function pickQuoteSystem(kind) {
   q.items.splice(at, 0, ...fresh);
   const was = q.systemChoice.was || undefined;
   q.systemChoice.picked = kind;
-  q.systemChoice.added = fresh.map(it => ({ id: it.id, sig: quoteItemSig(it) }));
+  q.systemChoice.added = fresh.map(it => ({ id: it.id }));
   // The plan's steps name the system, so they follow the pick unless edited.
   if (q.plan && q.plan.we === buildPlanWe(rd, was)) {
     q.plan.we = buildPlanWe(rd, kind);

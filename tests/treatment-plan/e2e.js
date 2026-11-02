@@ -160,6 +160,36 @@ async function backend(ctx) {
   const undone = await p.evaluate(() => ({ items: quoteState.items.map(i => i.key), we: quoteState.plan && quoteState.plan.we }));
   check(JSON.stringify(undone.items) === JSON.stringify(before.items) && undone.we === before.we, 'Undo restores the lines and the plan');
 
+  // A thin answer: SAYON's own checks say what's missing, without changing the plan.
+  const thin = await p.evaluate(() => checkTreatmentPlan({ system: 'bait', lines: [{ key: 'bait_monitor', qty: null }, { key: 'barrier_job', qty: 1 }], unknowns: [] },
+    { findings: [{ termiteActivity: 'ACTIVE' }] }).checks);
+  check(thin.length === 3, 'thin answer: no bait line, no knockdown line, two systems flagged');
+  const thinQty = await p.evaluate(() => [tpStartQty('bait_install'), tpStartQty('barrier_lm'), tpStartQty('nest')]);
+  check(JSON.stringify(thinQty) === '[12,40,1]', 'a line with no quantity starts at the usual amount');
+
+  // No signal: the plan waits, then works itself out when signal returns.
+  await p.evaluate(() => { delete quoteState.aiPlan; persistQuote(); closeQuote(); });
+  await ctx.setOffline(true);
+  await p.evaluate(() => openQuoteFromReport());
+  await p.waitForTimeout(500);
+  const waitText = await p.locator('#quoteAiPlan').innerText();
+  check(/No signal right now/.test(waitText) && aiCalls.length === 1, 'offline: the card waits for signal, no call, no error');
+  await ctx.setOffline(false);
+  await p.waitForFunction(() => quoteState && quoteState.aiPlan && quoteState.aiPlan.plan, null, { timeout: 20000 });
+  check(aiCalls.length === 2, 'back online: the plan is worked out by itself');
+
+  // From the report's Recommendations: opens the quote at the plan, no new call.
+  await p.evaluate(() => { closeQuote(); showSection('recommendations'); });
+  await p.waitForTimeout(400);
+  const btn = p.locator('.tp-report-link');
+  if (await btn.isVisible()) {
+    await btn.scrollIntoViewIfNeeded();
+    await p.screenshot({ path: `${OUT}/5-report-link.png` });
+    await btn.click();
+  } else await p.evaluate(() => openTreatmentPlanFromReport());
+  await p.waitForTimeout(800);
+  check(await p.evaluate(() => document.getElementById('quoteScreen').classList.contains('open')) && aiCalls.length === 2, 'report button opens the quote at the existing plan');
+
   check(!errs.length, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await b.close();
   console.log(fails.length ? `\n${fails.length} FAILED` : '\nall passed');

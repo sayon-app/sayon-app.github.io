@@ -751,6 +751,7 @@
       <div class="sp-canvas-tools">
         <button type="button" class="quote-link-btn" id="spUndo" onclick="undoSitePlan()">Undo</button>
         <button type="button" class="quote-link-btn" id="spNorth" onclick="rotateSitePlanNorth()">North: up</button>
+        <button type="button" class="quote-link-btn sp-grab" id="spGrab" onclick="toggleSitePlanGrab()" aria-pressed="false" title="Move the map (or hold the space bar)"><svg class="icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-4 0v0"/><path d="M14 10V4a2 2 0 0 0-4 0v2"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>Grab</button>
         <button type="button" class="quote-link-btn sp-zoom" id="spZoomOut" onclick="zoomSitePlan(-1)" aria-label="Zoom out">−</button>
         <button type="button" class="quote-link-btn sp-zoom" id="spZoomIn" onclick="zoomSitePlan(1)" aria-label="Zoom in">+</button>
         <button type="button" class="quote-btn primary sp-finish" id="spFinishLine" onclick="finishSitePlanLine()" hidden>Finish line</button>

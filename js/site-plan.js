@@ -233,7 +233,11 @@ function pdfPainter(doc, ox, oy, s) {
       if (pts.length < 2 || (!o.fill && !o.stroke)) return;
       const st = apply(o);
       const deltas = pts.slice(1).map((p, i) => [(p[0] - pts[i][0]) * s, (p[1] - pts[i][1]) * s]);
+      // Lines get round ends and corners, as on screen, so joined stretches meet cleanly.
+      const open = o.close === false && doc.setLineJoin;
+      if (open) { doc.setLineJoin('round'); doc.setLineCap('round'); }
       doc.lines(deltas, X(pts[0][0]), Y(pts[0][1]), [1, 1], o.close === false ? 'S' : st, o.close !== false);
+      if (open) { doc.setLineJoin('miter'); doc.setLineCap('butt'); }
       done();
     },
     text(x, y, str, o) {
@@ -571,6 +575,7 @@ function drawPlanSwatch(P, k, x, y) {
 
 function sitePlanSVG(plan, opts = {}) {
   const P = svgPainter();
+  if (opts.grid) P.raw(`<rect x="0" y="0" width="${PLAN_W}" height="${PLAN_H}" fill="#fff"/>`);
   if (plan && plan.bg && opts.layer !== 'sub') P.raw(`<image href="${escapeHtml(plan.bg)}" x="0" y="0" width="${PLAN_W}" height="${PLAN_H}" preserveAspectRatio="none"/>`);
   if (opts.grid) {
     for (let x = 50; x < PLAN_W; x += 50) P.raw(`<line x1="${x}" y1="0" x2="${x}" y2="${PLAN_H}" stroke="${x % 250 ? '#EEF2F7' : '#DCE4EE'}" stroke-width="1.5"/>`);
@@ -680,7 +685,7 @@ function drawSitePlanStationListPdf(doc, plan, { x, y, w, cols = 3 } = {}) {
 // pinch to zoom. Opened from the treatment record; Save hands the plan back
 // through sitePlanEditor.onSave.
 const sitePlanEditor = { plan: null, layer: 'site', tool: null, group: 'build', sel: null, part: null, drawing: null, drag: null, undo: [], onSave: null,
-  zoom: 1, cx: PLAN_W / 2, cy: PLAN_H / 2, upx: 3, ptrs: new Map(), pinch: null, down: null, partBase: null };
+  zoom: 1, cx: PLAN_W / 2, cy: PLAN_H / 2, upx: 3, ptrs: new Map(), pinch: null, down: null, partBase: null, grab: false, space: false };
 const PLAN_MAX_ZOOM = 4;
 
 function newSitePlan() {
@@ -696,7 +701,7 @@ function openSitePlan(plan, onSave) {
   if (E.plan.north == null) E.plan.north = 0;
   E.tool = null; E.sel = null; E.part = null; E.drawing = null; E.drag = null; E.undo = []; E.onSave = onSave;
   E.layer = 'site'; E.group = 'build'; E.zoom = 1; E.cx = PLAN_W / 2; E.cy = PLAN_H / 2;
-  E.ptrs.clear(); E.pinch = null; E.down = null;
+  E.ptrs.clear(); E.pinch = null; E.down = null; E.grab = false; E.space = false;
   track('screen_viewed', { screen: 'site_plan' });
   document.getElementById('sitePlanOverlay').classList.add('open');
   renderSitePlanTray();
@@ -709,7 +714,30 @@ function openSitePlan(plan, onSave) {
     svgWrap.addEventListener('pointerup', onSitePlanUp);
     svgWrap.addEventListener('pointercancel', onSitePlanUp);
     svgWrap.addEventListener('wheel', onSitePlanWheel, { passive: false });
+    // On a computer, holding the space bar grabs the map too.
+    document.addEventListener('keydown', e => {
+      const t = e.target;
+      if (e.code !== 'Space' || !document.getElementById('sitePlanOverlay').classList.contains('open') || (t && /INPUT|TEXTAREA|SELECT|BUTTON/.test(t.tagName))) return;
+      e.preventDefault();
+      if (!sitePlanEditor.space) { sitePlanEditor.space = true; renderSitePlanGrab(); }
+    });
+    document.addEventListener('keyup', e => { if (e.code === 'Space' && sitePlanEditor.space) { sitePlanEditor.space = false; renderSitePlanGrab(); } });
   }
+}
+
+// Grab: the map moves under the finger, and nothing on it can be picked up
+// or drawn, so it's safe to drag around to see where things sit.
+function toggleSitePlanGrab(on) {
+  const E = sitePlanEditor;
+  E.grab = on == null ? !E.grab : !!on;
+  renderSitePlanEditor();
+}
+function renderSitePlanGrab() {
+  const E = sitePlanEditor, on = E.grab || E.space, btn = document.getElementById('spGrab');
+  if (btn) { btn.classList.toggle('on', on); btn.setAttribute('aria-pressed', on); }
+  const wrap = document.getElementById('spCanvas');
+  wrap.classList.toggle('grab', on);
+  wrap.classList.toggle('grabbing', on && !!(E.drag && E.drag.mode === 'pan'));
 }
 
 function closeSitePlan() {
@@ -770,6 +798,7 @@ function setSitePlanLayer(layer) {
 }
 
 function setSitePlanTool(k) {
+  sitePlanEditor.grab = false;
   const E = sitePlanEditor;
   finishSitePlanLine();
   E.tool = E.tool === k ? null : k;
@@ -794,14 +823,15 @@ const sitePlanClosed = it => SITE_PLAN_SYMBOLS[it.k].kind !== 'line';
 
 function sitePlanHint() {
   const E = sitePlanEditor;
+  if (E.grab || E.space) return 'Moving the map: drag it to look around, pinch or + and − to zoom. Tap Grab again to draw.';
   if (E.drawing) {
     const area = SITE_PLAN_SYMBOLS[(E.plan.items.find(x => x.id === E.drawing) || {}).k || 'fence'].kind === 'area';
-    return area ? 'Tap each corner of the building in turn. Tap the first corner again, or Finish shape, to close it.' : 'Tap each corner of the line. Tap Finish line when it\'s done.';
+    return area ? 'Tap each corner of the building in turn. Tap the first corner again, or Finish shape, to close it.' : 'Tap each corner of the line. Tap the end of a matching line to join them, or Finish line when it\'s done.';
   }
   if (E.tool) {
     const s = SITE_PLAN_SYMBOLS[E.tool];
     return s.kind === 'rect' ? `Drag on the plan to draw the ${s.label.toLowerCase()}, or tap to drop one.`
-      : s.kind === 'line' ? `Tap where the ${s.label.toLowerCase()} starts, then each corner.`
+      : s.kind === 'line' ? (sitePlanJoinEnds(E.tool).length ? `Tap where the ${s.label.toLowerCase()} starts, then each corner. Start on a pink ring to carry that one on.` : `Tap where the ${s.label.toLowerCase()} starts, then each corner.`)
       : s.kind === 'area' ? 'Tap each corner of the building in turn, all the way round.'
       : s.kind === 'station' ? `Tap the plan to place each ${s.label.toLowerCase()} station. They number themselves.`
       : `Tap the plan to place it.`;
@@ -816,7 +846,7 @@ function sitePlanHint() {
       : 'Drag a white corner or a pink tab to reshape the line, ↻ to turn it, or the line itself to move it.';
   }
   if (sel) return 'Drag to move it. Name it below, or delete it.';
-  if (E.zoom > 1) return 'Zoomed in: drag an empty spot to look around, pinch to zoom.';
+  if (E.zoom > 1) return 'Zoomed in: drag an empty spot, or tap Grab, to look around. Pinch to zoom.';
   return E.layer === 'sub' ? 'The subfloor, under the house walls (grey). Mark the piers, vents, access and what you found.'
     : 'Pick a symbol below, then tap the plan. Tap something on the plan to move, reshape or name it.';
 }
@@ -905,6 +935,12 @@ function renderSitePlanCanvas() {
   const wrap = document.getElementById('spCanvas');
   E.upx = vb[2] / (wrap.clientWidth || 350);
   wrap.innerHTML = sitePlanSVG(E.plan, { grid: true, layer: E.layer, cls: 'site-plan-svg sp-edit', viewBox: vb.join(' '), after: P => {
+    // Rings on the ends a line can join, while one is drawn or reshaped.
+    const reshaping = E.drag && E.drag.mode === 'corner' && sitePlanIsLine(sel) ? sel : null;
+    const lineK = reshaping ? reshaping.k : E.tool && SITE_PLAN_SYMBOLS[E.tool].kind === 'line' ? E.tool : null;
+    if (lineK && !E.grab && !E.space) sitePlanJoinEnds(lineK, reshaping ? reshaping.id : E.drawing).forEach(q =>
+      P.circle(q[0], q[1], 13 * E.upx, { stroke: PLAN_INK.pink, lw: 2.5 * E.upx, dash: [5 * E.upx, 4 * E.upx] }));
+    if (reshaping && E.drag.join) P.circle(E.drag.join.p[0], E.drag.join.p[1], 15 * E.upx, { stroke: PLAN_INK.pink, lw: 4 * E.upx });
     if (E.drawing) {
       const it = E.plan.items.find(x => x.id === E.drawing);
       if (it) it.pts.forEach((p, i) => P.circle(p[0], p[1], (i ? 6 : 8) * E.upx, { fill: i ? PLAN_INK.paper : PLAN_INK.pink, stroke: PLAN_INK.pink, lw: 2.5 * E.upx }));
@@ -965,7 +1001,8 @@ function renderSitePlanEditor() {
   const E = sitePlanEditor;
   renderSitePlanCanvas();
   renderSitePlanSelBar();
-  document.getElementById('spZoomOut').disabled = E.zoom <= 1;
+  document.getElementById('spZoomOut').disabled = E.zoom <= 1 && E.cx === PLAN_W / 2 && E.cy === PLAN_H / 2;
+  renderSitePlanGrab();
   document.getElementById('spZoomIn').disabled = E.zoom >= PLAN_MAX_ZOOM;
   document.getElementById('spBgRemove').hidden = !E.plan.bg;
   document.querySelector('#sitePlanOverlay .sp-bg').hidden = E.layer === 'sub';
@@ -999,13 +1036,17 @@ function sitePlanBounds(it) {
 // What part of the plan shows: all of it, or a zoomed-in window.
 function sitePlanViewBox() {
   const E = sitePlanEditor, vw = PLAN_W / E.zoom, vh = PLAN_H / E.zoom;
-  E.cx = planClamp(E.cx, vw / 2, PLAN_W - vw / 2); E.cy = planClamp(E.cy, vh / 2, PLAN_H - vh / 2);
+  // The map can be dragged a little past its edges, to get at what sits on them.
+  const mx = vw * 0.2, my = vh * 0.2;
+  E.cx = planClamp(E.cx, vw / 2 - mx, PLAN_W - vw / 2 + mx); E.cy = planClamp(E.cy, vh / 2 - my, PLAN_H - vh / 2 + my);
   return [E.cx - vw / 2, E.cy - vh / 2, vw, vh];
 }
 
 function zoomSitePlan(step) {
   const E = sitePlanEditor;
   E.zoom = step > 0 ? Math.min(PLAN_MAX_ZOOM, Math.floor(E.zoom + 1e-6) + 1) : Math.max(1, Math.ceil(E.zoom - 1e-6) - 1);
+  // All the way out, the whole plan sits square in the frame again.
+  if (E.zoom === 1) { E.cx = PLAN_W / 2; E.cy = PLAN_H / 2; }
   // Zoom in on what's selected.
   const sel = sitePlanSelected();
   if (sel && step > 0) { const b = sitePlanBounds(sel); E.cx = b.x + b.w / 2; E.cy = b.y + b.h / 2; }
@@ -1258,6 +1299,74 @@ function keepSitePlanItemIn(it) {
   else { it.x += dx; it.y += dy; }
 }
 
+// ── JOINING LINES ── A line's corner lands exactly on the end of another
+// line, or on a building's corner, when it's put down close to one. Two
+// lines of the same kind that meet end to end become one line, so a barrier
+// down the west side and one along the north turn the corner as one run,
+// with one length.
+const sitePlanIsLine = it => !!it && SITE_PLAN_SYMBOLS[it.k].kind === 'line';
+const planSame = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 0.5;
+
+// What p can join to: the ends of other lines, then the corners of
+// buildings and shapes. Ends of a line of kind k win over anything else.
+function sitePlanJoinAt(p, exceptId, k) {
+  const E = sitePlanEditor;
+  let best = null, bd = Infinity;
+  planLayerItems(E.plan, E.layer).forEach(it => {
+    if (it.id === exceptId) return;
+    const kind = SITE_PLAN_SYMBOLS[it.k].kind;
+    if (kind !== 'line' && kind !== 'rect' && kind !== 'area') return;
+    const pts = planItemPts(it);
+    const spots = kind === 'line' ? (pts.length > 1 ? [[pts[0], 0], [pts[pts.length - 1], 1]] : []) : pts.map(q => [q, null]);
+    // A matching line's end reaches a finger's width; other ends and wall
+    // corners only reach a little, so a line can still run a grid square off a wall.
+    const reach = (kind === 'line' ? (it.k === k ? 22 : 12) : 8) * E.upx;
+    spots.forEach(([q, end]) => {
+      const d = Math.hypot(p[0] - q[0], p[1] - q[1]);
+      if (d < reach && d - reach < bd) { bd = d - reach; best = { p: q.slice(), it, end }; }
+    });
+  });
+  return best;
+}
+
+// The ends a new or reshaped line of kind k could join, for the rings.
+function sitePlanJoinEnds(k, exceptId) {
+  return planLayerItems(sitePlanEditor.plan, sitePlanEditor.layer)
+    .filter(it => it.k === k && it.id !== exceptId && sitePlanIsLine(it) && (it.pts || []).length > 1)
+    .flatMap(it => [it.pts[0], it.pts[it.pts.length - 1]]);
+}
+
+// Join the line to any line of its kind it now meets end to end. The joined
+// line keeps this one's name (or the other's, if this has none).
+function mergeSitePlanLine(it) {
+  const E = sitePlanEditor;
+  if (!sitePlanIsLine(it) || (it.pts || []).length < 2) return false;
+  let joined = false;
+  for (let guard = 0; guard < 20; guard++) {
+    const first = it.pts[0], last = it.pts[it.pts.length - 1];
+    if (planSame(first, last)) break;
+    const o = E.plan.items.find(x => x !== it && x.k === it.k && (x.layer || 'site') === (it.layer || 'site') && (x.pts || []).length > 1 &&
+      [x.pts[0], x.pts[x.pts.length - 1]].some(q => planSame(q, first) || planSame(q, last)));
+    if (!o) break;
+    const op = o.pts.map(q => q.slice()), oF = op[0], oL = op[op.length - 1];
+    let pts, at;
+    if (planSame(last, oF)) { at = it.pts.length - 1; pts = it.pts.concat(op.slice(1)); }
+    else if (planSame(last, oL)) { at = it.pts.length - 1; pts = it.pts.concat(op.reverse().slice(1)); }
+    else if (planSame(first, oL)) { at = op.length - 1; pts = op.concat(it.pts.slice(1)); }
+    else { at = op.length - 1; pts = op.reverse().concat(it.pts.slice(1)); }
+    // Where two stretches run straight on, the join isn't a corner.
+    const a = pts[at - 1], c = pts[at], b = pts[at + 1];
+    if (a && b && Math.abs((c[0] - a[0]) * (b[1] - c[1]) - (c[1] - a[1]) * (b[0] - c[0])) < 1 && (c[0] - a[0]) * (b[0] - c[0]) + (c[1] - a[1]) * (b[1] - c[1]) > 0) pts.splice(at, 1);
+    it.pts = planRound(pts);
+    if (!it.label && o.label) it.label = o.label;
+    delete it.rot;
+    E.plan.items = E.plan.items.filter(x => x !== o);
+    if (E.sel === o.id) E.sel = it.id;
+    joined = true;
+  }
+  return joined;
+}
+
 function onSitePlanDown(e) {
   const E = sitePlanEditor;
   e.preventDefault();
@@ -1268,14 +1377,31 @@ function onSitePlanDown(e) {
   E.ptrs.set(e.pointerId, [e.clientX, e.clientY]);
   if (E.ptrs.size === 2) { startSitePlanPinch(); return; }
   if (E.ptrs.size > 2 || E.pinch) return;
+  if (E.grab || E.space) {
+    E.down = null;
+    E.drag = { mode: 'pan', sx: e.clientX, sy: e.clientY, cx: E.cx, cy: E.cy };
+    renderSitePlanGrab();
+    return;
+  }
   // How things were, in case a second finger turns this into a pinch.
   E.down = { plan: JSON.stringify(E.plan), undo: E.undo.length, sel: E.sel, part: E.part, drawing: E.drawing, tool: E.tool };
   const p = sitePlanPoint(e);
   const tool = E.tool, sym = tool && SITE_PLAN_SYMBOLS[tool];
   const pt = [planClamp(planSnap(p[0], PLAN_GRID / 2), 10, PLAN_W - 10), planClamp(planSnap(p[1], PLAN_GRID / 2), 10, PLAN_H - 10)];
   if (sym && (sym.kind === 'line' || sym.kind === 'area')) {
-    const gp = [planSnap(p[0]), planSnap(p[1])].map((v, i) => planClamp(v, 0, i ? PLAN_H : PLAN_W));
+    let gp = [planSnap(p[0]), planSnap(p[1])].map((v, i) => planClamp(v, 0, i ? PLAN_H : PLAN_W));
     let it = E.drawing && E.plan.items.find(x => x.id === E.drawing);
+    const join = sym.kind === 'line' && sitePlanJoinAt(p, E.drawing, tool);
+    if (join) gp = join.p;
+    // Starting on the end of a line of the same kind carries that line on.
+    if (!it && join && join.it.k === tool && join.end != null) {
+      pushSitePlanUndo();
+      if (join.end === 0) join.it.pts.reverse();
+      delete join.it.rot;
+      E.drawing = join.it.id; E.sel = null; E.part = null;
+      renderSitePlanEditor();
+      return;
+    }
     if (it) {
       const last = it.pts[it.pts.length - 1];
       // Tapping the last corner again finishes the line; tapping the first
@@ -1283,6 +1409,8 @@ function onSitePlanDown(e) {
       if (Math.hypot(last[0] - gp[0], last[1] - gp[1]) < 20) { finishSitePlanLine(); return; }
       if (sym.kind === 'area' && it.pts.length > 2 && Math.hypot(it.pts[0][0] - gp[0], it.pts[0][1] - gp[1]) < 30) { finishSitePlanLine(); return; }
       pushSitePlanUndo(); it.pts.push(gp);
+      // Reaching the end of another line of its kind joins them, and that's the line done.
+      if (join && join.it.k === tool && join.end != null) { finishSitePlanLine(); return; }
     } else {
       pushSitePlanUndo();
       it = { id: planId(), k: tool, pts: [gp] };
@@ -1383,6 +1511,7 @@ function onSitePlanMove(e) {
     E.cx = d.cx - (e.clientX - d.sx) / r.width * PLAN_W / E.zoom;
     E.cy = d.cy - (e.clientY - d.sy) / r.height * PLAN_H / E.zoom;
     renderSitePlanCanvas();
+    renderSitePlanGrab();
     return;
   }
   const p = sitePlanPoint(e);
@@ -1443,6 +1572,9 @@ function dragSitePlanCorner(it, d, p, g) {
   }
   const pts = d.orig.pts.map(x => x.slice());
   pts[d.i] = planSnapInFrame(q, d.orig.pts[d.i ? 0 : 1], d.orig.rot || 0, g);
+  // A line's corner clicks onto the end of another line, or a wall's corner.
+  d.join = sitePlanIsLine(it) ? sitePlanJoinAt(q, it.id, it.k) : null;
+  if (d.join) pts[d.i] = d.join.p;
   it.pts = planRound(pts);
 }
 
@@ -1471,6 +1603,8 @@ function onSitePlanUp(e) {
     renderSitePlanTray();
   }
   if (it && d.moved && ['corner', 'wall', 'turn'].includes(d.mode)) keepSitePlanItemIn(it);
+  // A line put down end to end with another of its kind joins it.
+  if (it && d.moved && ['corner', 'move'].includes(d.mode) && mergeSitePlanLine(it)) E.part = null;
   // A move only counts for undo once something moved.
   if (d.before && d.moved) { E.undo.push(d.before); if (E.undo.length > 40) E.undo.shift(); }
   renderSitePlanEditor();
@@ -1482,7 +1616,7 @@ function finishSitePlanLine() {
   const it = E.plan.items.find(x => x.id === E.drawing);
   E.drawing = null;
   if (it && it.pts.length < (SITE_PLAN_SYMBOLS[it.k].kind === 'area' ? 3 : 2)) E.plan.items = E.plan.items.filter(x => x !== it);
-  else if (it) { E.sel = it.id; E.part = null; }
+  else if (it) { mergeSitePlanLine(it); E.sel = it.id; E.part = null; }
   E.tool = null;
   renderSitePlanTray();
   renderSitePlanEditor();

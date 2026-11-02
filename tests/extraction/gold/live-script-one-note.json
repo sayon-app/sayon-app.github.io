@@ -1,0 +1,638 @@
+{
+ "id": "live-script-one-note",
+ "transcript": "transcripts/live-script-one-note.txt",
+ "checks": [
+  {
+   "id": "inspection-type",
+   "kind": "equals",
+   "path": "inspectionType",
+   "values": [
+    "Pre-Purchase — Timber Pest"
+   ],
+   "weight": 2,
+   "why": "'pre-purchase timber pest inspection'"
+  },
+  {
+   "id": "client-name",
+   "kind": "mentions",
+   "path": "clientName",
+   "all": [
+    [
+     "alex"
+    ],
+    [
+     "morgan"
+    ]
+   ],
+   "weight": 1,
+   "why": "'Alex Morgan'"
+  },
+  {
+   "id": "address",
+   "kind": "mentions",
+   "path": "propertyStreetAddress",
+   "all": [
+    [
+     "12"
+    ],
+    [
+     "currajong",
+     "kurrajong"
+    ]
+   ],
+   "weight": 1,
+   "why": "'12 Kurrajong Street' (heard as Currajong)"
+  },
+  {
+   "id": "suburb",
+   "kind": "mentions",
+   "path": "propertySuburb",
+   "all": [
+    [
+     "springfield"
+    ]
+   ],
+   "weight": 1,
+   "why": "'Springfield'"
+  },
+  {
+   "id": "state",
+   "kind": "equals",
+   "path": "propertyState",
+   "values": [
+    "QLD"
+   ],
+   "weight": 1,
+   "why": "'Queensland'"
+  },
+  {
+   "id": "postcode",
+   "kind": "equals",
+   "path": "propertyPostcode",
+   "values": [
+    "4300"
+   ],
+   "weight": 2,
+   "why": "'4-3-double-zero'"
+  },
+  {
+   "id": "height",
+   "kind": "equals",
+   "path": "height",
+   "values": [
+    "Single storey"
+   ],
+   "weight": 1,
+   "why": "'single story'"
+  },
+  {
+   "id": "walls",
+   "kind": "equals",
+   "path": "wallConstruction",
+   "values": [
+    "Brick veneer"
+   ],
+   "weight": 1,
+   "why": "'brick veneer'"
+  },
+  {
+   "id": "floor",
+   "kind": "equals",
+   "path": "floorType",
+   "values": [
+    "Timber suspended floor"
+   ],
+   "weight": 2,
+   "why": "'suspended timber floor with brick piers'"
+  },
+  {
+   "id": "roof",
+   "kind": "equals",
+   "path": "roofType",
+   "values": [
+    "Tiled — concrete"
+   ],
+   "weight": 1,
+   "why": "'concrete tiled roof'"
+  },
+  {
+   "id": "era-boundary",
+   "kind": "equals",
+   "path": "constructionEra",
+   "values": [
+    "1965-1985"
+   ],
+   "weight": 2,
+   "why": "'built around 1985': on the line, so the earlier range with the stronger asbestos warning"
+  },
+  {
+   "id": "occupancy",
+   "kind": "equals",
+   "path": "occupancyStatus",
+   "values": [
+    "Vacant"
+   ],
+   "weight": 1,
+   "why": "'vacant'"
+  },
+  {
+   "id": "furnishing",
+   "kind": "equals",
+   "path": "furnishing",
+   "values": [
+    "Unfurnished"
+   ],
+   "weight": 1,
+   "why": "'unfurnished'"
+  },
+  {
+   "id": "people",
+   "kind": "mentions",
+   "path": "peoplePresent",
+   "all": [
+    [
+     "agent"
+    ]
+   ],
+   "weight": 1,
+   "why": "'the agent was here'"
+  },
+  {
+   "id": "weather",
+   "kind": "equals",
+   "path": "weatherConditions",
+   "values": [
+    "Fine and dry"
+   ],
+   "weight": 1,
+   "why": "'fine and dry'"
+  },
+  {
+   "id": "temperature",
+   "kind": "mentions",
+   "path": "temperature",
+   "all": [
+    [
+     "26"
+    ]
+   ],
+   "weight": 1,
+   "why": "'about 26 degrees'"
+  },
+  {
+   "id": "weep-holes",
+   "kind": "equals",
+   "path": "weepHoles",
+   "values": [
+    "BRIDGED"
+   ],
+   "weight": 3,
+   "why": "'the garden bed... built up over the weep holes. They're bridged there'"
+  },
+  {
+   "id": "existing-system",
+   "kind": "equals",
+   "path": "existingSystem",
+   "values": [
+    "Physical Barrier"
+   ],
+   "weight": 3,
+   "why": "'Cordon physical barrier'"
+  },
+  {
+   "id": "existing-system-other",
+   "kind": "mentions",
+   "path": "existingSystemOther",
+   "all": [
+    [
+     "kordon"
+    ],
+    [
+     "2015"
+    ]
+   ],
+   "none": [
+    "cordon"
+   ],
+   "weight": 3,
+   "why": "Kordon, installed 2015 ('in store' is installed)"
+  },
+  {
+   "id": "durable-notice",
+   "kind": "equals",
+   "path": "durableNoticePresent",
+   "values": [
+    "YES"
+   ],
+   "weight": 2,
+   "why": "'the meter box has a durable notice'"
+  },
+  {
+   "id": "leak",
+   "kind": "equals",
+   "path": "waterLeaks",
+   "values": [
+    "YES"
+   ],
+   "weight": 2,
+   "why": "downpipe dumping water against the wall"
+  },
+  {
+   "id": "leak-location",
+   "kind": "mentions",
+   "path": "leakLocation",
+   "all": [
+    [
+     "downpipe",
+     "down pipe"
+    ]
+   ],
+   "weight": 2,
+   "why": "the disconnected downpipe"
+  },
+  {
+   "id": "area-exterior",
+   "kind": "equals",
+   "path": "areaStatus.exterior",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 2,
+   "why": "walked all the way round; the garden bed is a conducive condition"
+  },
+  {
+   "id": "area-subfloor",
+   "kind": "equals",
+   "path": "areaStatus.subfloor",
+   "values": [
+    "PARTIAL"
+   ],
+   "weight": 3,
+   "why": "back section under the laundry not reached"
+  },
+  {
+   "id": "area-interior",
+   "kind": "equals",
+   "path": "areaStatus.interior",
+   "values": [
+    "INSPECTED"
+   ],
+   "weight": 1,
+   "why": "'inspected every room'"
+  },
+  {
+   "id": "area-roofvoid",
+   "kind": "equals",
+   "path": "areaStatus.roofvoid",
+   "values": [
+    "PARTIAL"
+   ],
+   "weight": 3,
+   "why": "back half under batts"
+  },
+  {
+   "id": "restricted",
+   "kind": "mentions",
+   "path": "restrictedAccess",
+   "all": [
+    [
+     "subfloor: low clearance"
+    ],
+    [
+     "insulation or sarking"
+    ]
+   ],
+   "none": [
+    "restricted access"
+   ],
+   "weight": 2,
+   "why": "the app's labels"
+  },
+  {
+   "id": "no-no-access",
+   "kind": "absent",
+   "path": "noAccessAreas",
+   "weight": 2,
+   "why": "nothing locked or permanently closed"
+  },
+  {
+   "id": "high-risk",
+   "kind": "mentions",
+   "path": "highRiskAreas",
+   "all": [
+    [
+     "subfloor"
+    ],
+    [
+     "roof"
+    ]
+   ],
+   "weight": 2,
+   "why": "both unreached parts"
+  },
+  {
+   "id": "ant-capping",
+   "kind": "equals",
+   "path": "antCapping",
+   "values": [
+    "INTACT"
+   ],
+   "weight": 1,
+   "why": "'ant caps on all the piers, all intact'"
+  },
+  {
+   "id": "ventilation",
+   "kind": "equals",
+   "path": "subfloorVentilation",
+   "values": [
+    "ADEQUATE"
+   ],
+   "weight": 1,
+   "why": "'vents are clear and there's plenty of airflow'"
+  },
+  {
+   "id": "two-findings",
+   "kind": "count",
+   "path": "findings",
+   "min": 2,
+   "max": 2,
+   "weight": 3,
+   "why": "kitchen bearer (inactive) and bedroom two skirting (active)"
+  },
+  {
+   "id": "kitchen-finding",
+   "kind": "findingMatch",
+   "checks": [
+    {
+     "kind": "equals",
+     "path": "termiteActivity",
+     "values": [
+      "INACTIVE"
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "activityLocation",
+     "all": [
+      [
+       "kitchen"
+      ]
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "damageDescription",
+     "all": [
+      [
+       "workings"
+      ]
+     ]
+    },
+    {
+     "kind": "absent",
+     "path": "species"
+    }
+   ],
+   "weight": 3,
+   "why": "'termite workings... dry, nothing alive, so inactive, no damage visible'"
+  },
+  {
+   "id": "bedroom-finding",
+   "kind": "findingMatch",
+   "checks": [
+    {
+     "kind": "equals",
+     "path": "termiteActivity",
+     "values": [
+      "ACTIVE"
+     ]
+    },
+    {
+     "kind": "mentions",
+     "path": "activityLocation",
+     "all": [
+      [
+       "bedroom two",
+       "bedroom 2"
+      ]
+     ]
+    },
+    {
+     "kind": "equals",
+     "path": "species",
+     "values": [
+      "Coptotermes acinaciformis",
+      "Coptotermes spp."
+     ]
+    },
+    {
+     "kind": "equals",
+     "path": "structuralConcern",
+     "values": [
+      "YES"
+     ]
+    }
+   ],
+   "weight": 3,
+   "why": "live termites in bedroom two's skirting, 'look like' Coptotermes acinaciformis, builder referral"
+  },
+  {
+   "id": "no-severity",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "minor",
+    "moderate",
+    "severe",
+    "extensive",
+    "significant",
+    "extreme",
+    "major",
+    "heavy",
+    "massive"
+   ],
+   "weight": 3,
+   "why": "'severe damage' is dropped"
+  },
+  {
+   "id": "no-verdict",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "compromised",
+    "structurally"
+   ],
+   "weight": 3,
+   "why": "'it's structurally compromised' is dropped"
+  },
+  {
+   "id": "one-reading",
+   "kind": "count",
+   "path": "moistureMeterReadings",
+   "min": 1,
+   "max": 1,
+   "weight": 1,
+   "why": "one reading"
+  },
+  {
+   "id": "reading-corrected",
+   "kind": "mentions",
+   "path": "moistureMeterReadings",
+   "all": [
+    [
+     "22"
+    ]
+   ],
+   "none": [
+    "32"
+   ],
+   "weight": 3,
+   "why": "'32%, no, sorry, 22%'"
+  },
+  {
+   "id": "borers",
+   "kind": "equals",
+   "path": "borerActivity",
+   "values": [
+    "INACTIVE"
+   ],
+   "weight": 2,
+   "why": "'old borer holes... dark holes, nothing fresh'"
+  },
+  {
+   "id": "borer-type-not-invented",
+   "kind": "every",
+   "path": "borerFindings",
+   "checks": [
+    {
+     "kind": "absent",
+     "path": "borerType"
+    }
+   ],
+   "weight": 1,
+   "why": "no beetle named and never said 'not identified'"
+  },
+  {
+   "id": "result-interior",
+   "kind": "equals",
+   "path": "areaResult.interior",
+   "values": [
+    "FOUND"
+   ],
+   "weight": 2,
+   "why": "live termites and old borers"
+  },
+  {
+   "id": "result-subfloor",
+   "kind": "equals",
+   "path": "areaResult.subfloor",
+   "values": [
+    "FOUND"
+   ],
+   "weight": 2,
+   "why": "workings on the kitchen bearer"
+  },
+  {
+   "id": "risk",
+   "kind": "equals",
+   "path": "riskLevel",
+   "values": [
+    "HIGH"
+   ],
+   "weight": 3,
+   "why": "'overall risk is high'"
+  },
+  {
+   "id": "treatment",
+   "kind": "equals",
+   "path": "treatmentRecommended",
+   "values": [
+    "YES"
+   ],
+   "weight": 2,
+   "why": "'treat the live termites'"
+  },
+  {
+   "id": "treatment-type",
+   "kind": "mentions",
+   "path": "treatmentType",
+   "all": [
+    [
+     "bedroom"
+    ],
+    [
+     "chemical barrier"
+    ],
+    [
+     "bait"
+    ]
+   ],
+   "none": [
+    "reticulation",
+    "termidor",
+    "physical"
+   ],
+   "weight": 2,
+   "why": "the methods he said, and no others"
+  },
+  {
+   "id": "frequency",
+   "kind": "mentions",
+   "path": "inspectionFrequency",
+   "all": [
+    [
+     "12 month",
+     "twelve month"
+    ]
+   ],
+   "none": [
+    "week"
+   ],
+   "weight": 3,
+   "why": "the routine interval; the two-week return visit is not it"
+  },
+  {
+   "id": "return-visit",
+   "kind": "mentions",
+   "path": "otherRecommendations",
+   "all": [
+    [
+     "two weeks",
+     "2 weeks"
+    ]
+   ],
+   "weight": 2,
+   "why": "'come back... say in two weeks'"
+  },
+  {
+   "id": "other-recs",
+   "kind": "mentions",
+   "path": "otherRecommendations",
+   "all": [
+    [
+     "downpipe",
+     "down pipe"
+    ],
+    [
+     "garden bed"
+    ],
+    [
+     "builder"
+    ]
+   ],
+   "weight": 2,
+   "why": "downpipe, garden bed, builder"
+  },
+  {
+   "id": "no-mishearings",
+   "kind": "forbidAnywhere",
+   "terms": [
+    "cordon",
+    "bats laid",
+    "bedroom to",
+    "in store",
+    "asinaceiformes"
+   ],
+   "weight": 2,
+   "why": "dictation slips corrected"
+  }
+ ]
+}

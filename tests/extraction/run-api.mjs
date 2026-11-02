@@ -18,7 +18,7 @@ const repo = join(here, '..', '..');
 // Keep in step with requestExtraction() in js/app.js.
 const MODEL = 'claude-sonnet-5';
 const MAX_TOKENS = 16000;
-const EFFORT = 'medium';
+const EFFORT = process.env.SAYON_EFFORT || 'medium'; // override only to compare settings
 
 // The text of a `const NAME = \`...\`` template literal in a source file.
 function readTemplate(file, name) {
@@ -51,6 +51,7 @@ mkdirSync(outDir, { recursive: true });
 const base = process.env.SAYON_API_BASE || 'https://api.anthropic.com';
 
 for (let k = 1; k <= runs; k++) {
+  const started = Date.now();
   const res = await fetch(`${base}/v1/messages`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
@@ -61,5 +62,5 @@ for (let k = 1; k <= runs; k++) {
   const text = (data.content || []).map(b => b.text || '').join('');
   const file = join(outDir, `${id}-run${k}.json`);
   writeFileSync(file, text);
-  console.log(`run ${k}: ${data.stop_reason}, ${data.usage?.input_tokens} in / ${data.usage?.output_tokens} out -> ${file}`);
+  console.log(`run ${k}: ${data.stop_reason}, ${data.usage?.input_tokens} in / ${data.usage?.output_tokens} out, ${((Date.now() - started) / 1000).toFixed(1)} s (effort ${EFFORT}) -> ${file}`);
 }

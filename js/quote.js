@@ -98,6 +98,17 @@ function adoptDraftQuote(id, address) {
   delete all.draft;
   all[id] = Object.assign({}, q, { reportKey: id, sourceAddress: address || '' });
   try { localStorage.setItem(quotesStorageKey(), JSON.stringify(all)); } catch (e) {}
+  // The quote open on screen moves with it, or its later edits would be
+  // saved under 'draft', which nothing reads once the report has an id.
+  if (quoteState && quoteState.reportKey === 'draft') {
+    quoteState.reportKey = id;
+    quoteState.sourceAddress = address || '';
+    const src = quoteSources.find(s => s.key === 'draft');
+    if (src) src.key = id;
+    const opt = document.querySelector('#quoteSource option[value="draft"]');
+    if (opt) opt.value = id;
+  }
+  if (typeof moveTreatmentPlanKey === 'function') moveTreatmentPlanKey('draft', id);
 }
 
 // The unsaved report was thrown away, so its draft quote goes with it.

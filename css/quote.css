@@ -658,3 +658,9 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 .tp-again .quote-textarea { margin: 6px 0 8px; }
 .tp-folded { padding: 10px 14px; }
 .tp-fold-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; background: none; border: 0; padding: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.tp-own-check { color: var(--text2); font-style: italic; }
+.tp-report-link { display: flex; align-items: center; gap: 12px; width: calc(100% - 28px); margin: 4px 14px 14px; padding: 12px 14px; min-height: 44px; text-align: left; border-radius: 12px; border: 1px solid rgba(var(--accent-rgb),0.35); background: rgba(var(--accent-rgb),0.06); color: var(--text); font: inherit; cursor: pointer; }
+.tp-report-link .icon { flex-shrink: 0; color: var(--accent); }
+.tp-report-link span { display: flex; flex-direction: column; gap: 2px; }
+.tp-report-link strong { font-size: 14px; }
+.tp-report-link small { font-size: 12px; color: var(--text2); line-height: 1.4; }

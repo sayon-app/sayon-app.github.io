@@ -180,6 +180,9 @@ function treatmentPlanHash(rd, address) {
 // One request in flight per quote, so leaving and reopening the quote
 // doesn't ask twice, and the answer lands on the right quote.
 const treatmentPlanRuns = {};
+// Quotes whose plan is waiting for signal (by report key): worked out when
+// the phone is back online, not shown as an error.
+const treatmentPlanWaiting = {};
 
 async function requestTreatmentPlan(rd, address, extra) {
   if (!navigator.onLine) throw Object.assign(new Error('No signal'), { noSignal: true });
@@ -243,9 +246,49 @@ function cleanTreatmentPlan(p) {
   };
 }
 
+// The lines each long-term system needs on the quote.
+const TP_SYSTEM_LINES = { bait: ['bait_install'], barrier: ['barrier_lm', 'barrier_job'], retic: ['retic_lm'], physical: ['physical_lm'], system: ['system_topup'] };
+
+// SAYON's own checks on the answer, added to "Check before you send" rather
+// than changing the plan: a system named with no line to quote it (which
+// can be right, say another company's system under its warranty), live
+// termites with no line to treat them, or lines for two systems at once.
+function checkTreatmentPlan(plan, rd) {
+  const keys = plan.lines.map(l => l.key);
+  const notes = [];
+  const want = TP_SYSTEM_LINES[plan.system];
+  if (want && !want.some(k => keys.includes(k))) notes.push(`The plan picks ${TP_SYSTEM_LABELS[plan.system].toLowerCase()} but gives no line to quote it. Add one if you're doing that work.`);
+  const live = (Array.isArray(rd && rd.findings) ? rd.findings : []).filter(f => f && f.termiteActivity === 'ACTIVE').length;
+  if (live && !keys.includes('direct') && !keys.includes('nest')) notes.push('Live termites were found but the plan has no line to treat them. Check the knockdown is quoted.');
+  const systems = Object.keys(TP_SYSTEM_LINES).filter(s => TP_SYSTEM_LINES[s].some(k => keys.includes(k)));
+  if (systems.length > 1) notes.push(`The lines quote more than one system (${systems.map(s => TP_SYSTEM_LABELS[s].toLowerCase()).join(' and ')}). Keep both only if you mean to do both.`);
+  if (plan.lines.some(l => l.qty == null)) notes.push('Some lines have no quantity from your notes, so they start at a usual amount. Check them before sending.');
+  plan.checks = notes;
+  return plan;
+}
+
+// A line with no quantity said starts where the report-built quote would
+// (12 stations, 40 metres), marked to check.
+function tpStartQty(key) {
+  if (key === 'bait_install') return 12;
+  if (/_lm$/.test(key)) return 40;
+  return 1;
+}
+
+// A draft quote that moves to its report's new id (adoptDraftQuote) takes
+// a plan being worked out with it.
+const treatmentPlanMoved = {};
+function tpKey(k) { while (treatmentPlanMoved[k]) k = treatmentPlanMoved[k]; return k; }
+function moveTreatmentPlanKey(from, to) {
+  treatmentPlanMoved[from] = to;
+  if (treatmentPlanRuns[from]) { treatmentPlanRuns[to] = true; delete treatmentPlanRuns[from]; }
+  if (from in treatmentPlanWaiting) { treatmentPlanWaiting[to] = treatmentPlanWaiting[from]; delete treatmentPlanWaiting[from]; }
+}
+
 // Stores the plan's state on the quote it belongs to, whether or not that
 // quote is still open.
 function setTreatmentPlanState(reportKey, ai) {
+  reportKey = tpKey(reportKey);
   if (quoteState && quoteState.reportKey === reportKey) {
     quoteState.aiPlan = ai;
     persistQuote();
@@ -269,23 +312,30 @@ async function runTreatmentPlan(extra) {
   const hash = treatmentPlanHash(rd, q.address);
   const started = Date.now();
   treatmentPlanRuns[key] = true;
+  delete treatmentPlanWaiting[key];
   if (q.aiPlan) q.aiPlan.error = '';
   renderTreatmentPlanCard();
   try {
-    const plan = await requestTreatmentPlan(rd, q.address, extra);
+    const plan = checkTreatmentPlan(await requestTreatmentPlan(rd, q.address, extra), rd);
     track('treatment_plan_made', { seconds: Math.round((Date.now() - started) / 1000), system: plan.system });
-    delete treatmentPlanRuns[key];
+    delete treatmentPlanRuns[tpKey(key)];
     setTreatmentPlanState(key, { plan, hash, at: Date.now(), extra: extra || '', applied: false, before: null });
   } catch (err) {
+    if (err.noSignal && !(prev && prev.plan)) {
+      delete treatmentPlanRuns[tpKey(key)];
+      treatmentPlanWaiting[tpKey(key)] = extra || '';
+      if (quoteState && quoteState.reportKey === tpKey(key)) renderTreatmentPlanCard();
+      return;
+    }
     const why = err.noSignal ? 'No signal. Try again when you\'re back online.'
       : err.status === 402 ? 'Your plan has ended, so SAYON can\'t work out a plan.'
       : err.status === 429 ? 'You\'ve used this month\'s AI allowance.'
       : `SAYON couldn't work out a plan (${err.message}).`;
     track('treatment_plan_failed', { reason: err.noSignal ? 'no_signal' : err.status ? 'http_' + err.status : 'other' });
-    delete treatmentPlanRuns[key];
+    delete treatmentPlanRuns[tpKey(key)];
     setTreatmentPlanState(key, Object.assign({}, prev, { error: why }));
   } finally {
-    delete treatmentPlanRuns[key];
+    delete treatmentPlanRuns[tpKey(key)];
   }
 }
 
@@ -296,13 +346,34 @@ function maybeAutoTreatmentPlan() {
   const q = quoteState;
   const rd = quotePlanReport();
   if (!q || !rd || q.aiPlan || q.sentAt || q.answer || isQuoteLocked()) return;
-  if (!reportNeedsPlan(rd) || !navigator.onLine || typeof authSession === 'undefined' || !authSession) return;
+  if (!reportNeedsPlan(rd) || typeof authSession === 'undefined' || !authSession) return;
+  if (!navigator.onLine) { treatmentPlanWaiting[q.reportKey] = ''; renderTreatmentPlanCard(); return; }
   runTreatmentPlan('');
 }
+
+window.addEventListener('online', () => {
+  const q = quoteState;
+  if (q && q.reportKey in treatmentPlanWaiting && document.getElementById('quoteScreen').classList.contains('open')) {
+    runTreatmentPlan(treatmentPlanWaiting[q.reportKey]);
+  }
+});
 
 function askTreatmentPlanAgain() {
   const box = document.getElementById('tpExtra');
   runTreatmentPlan(box ? box.value : ((quoteState && quoteState.aiPlan && quoteState.aiPlan.extra) || ''));
+}
+
+// From the report's Recommendations: open the quote at the plan, and work
+// it out if there isn't one yet (the inspector asked, so even a report with
+// nothing found gets one).
+function openTreatmentPlanFromReport() {
+  openQuoteFromReport();
+  const q = quoteState;
+  if (q && !q.aiPlan && !treatmentPlanRuns[q.reportKey] && !isQuoteLocked()) {
+    if (navigator.onLine) runTreatmentPlan(''); else { treatmentPlanWaiting[q.reportKey] = ''; renderTreatmentPlanCard(); }
+  } else if (q && q.aiPlan && q.aiPlan.hidden) showTreatmentPlan();
+  const card = document.getElementById('quoteAiPlan');
+  if (card) setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
 }
 
 // ── USING THE PLAN ──
@@ -325,9 +396,11 @@ function useTreatmentPlan() {
   const spoken = q.items.some(it => it.source === 'Said in a voice note');
   if (!spoken && p.lines.length) {
     const own = q.items.filter(it => !TP_REPORT_SOURCE.test(it.source || '') && !/^SAYON plan/.test(it.source || ''));
-    const fresh = p.lines.map(l => newQuoteItem(l.key, Object.assign(
-      { detail: l.detail, source: 'SAYON plan' + (l.why ? ': ' + l.why : '') },
-      l.qty != null ? { qty: l.qty } : {})));
+    const fresh = p.lines.map(l => newQuoteItem(l.key, {
+      detail: l.detail,
+      qty: l.qty != null ? l.qty : tpStartQty(l.key),
+      source: 'SAYON plan' + (l.why ? ': ' + l.why : '') + (l.qty == null ? ' (quantity to check)' : ''),
+    }));
     q.items = fresh.concat(own);
     q.systemChoice = null;
   }
@@ -409,12 +482,13 @@ function treatmentPlanBodyHTML(ai) {
   const e = escapeHtml;
   const lines = p.lines.map(l => {
     const cat = QUOTE_CATALOGUE[l.key] || {};
-    const qty = l.qty != null ? `${l.qty} ${pluralUnit(cat.unit, l.qty)}` : 'qty to check';
+    const n = l.qty != null ? l.qty : tpStartQty(l.key);
+    const qty = `${n} ${pluralUnit(cat.unit, n)}${l.qty == null ? ', to check' : ''}`;
     return `<li><span class="tp-line-desc">${e(cat.desc || l.key)}${l.detail ? ` <span class="tp-dim">· ${e(l.detail)}</span>` : ''}</span><span class="tp-line-qty${l.qty == null ? ' warn' : ''}">${e(qty)}</span></li>`;
   }).join('');
   const kd = p.knockdown;
   return `
-    ${p.unknowns.length ? `<div class="tp-block tp-unknowns"><div class="tp-label">Check before you send</div>${tpList(p.unknowns.map(e))}</div>` : ''}
+    ${p.unknowns.length || (p.checks || []).length ? `<div class="tp-block tp-unknowns"><div class="tp-label">Check before you send</div>${tpList(p.unknowns.map(e).concat((p.checks || []).map(t => `<span class="tp-own-check">${e(t)}</span>`)))}</div>` : ''}
     ${kd.needed ? `<div class="tp-block"><div class="tp-label">1 · Knock out the live termites</div>
       <div class="tp-text"><strong>${e(kd.method)}</strong></div>
       ${kd.where.length ? `<div class="tp-text tp-dim">${e(kd.where.join('; '))}</div>` : ''}
@@ -439,11 +513,17 @@ function renderTreatmentPlanCard() {
   const locked = isQuoteLocked();
   const busy = !!(q && treatmentPlanRuns[q.reportKey]);
   // Nothing to plan for and nothing planned: no card.
-  if (!q || (!ai && !busy && (!reportNeedsPlan(rd) || locked))) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  if (!q || (!ai && !busy && !(q.reportKey in treatmentPlanWaiting) && (!reportNeedsPlan(rd) || locked))) { el.style.display = 'none'; el.innerHTML = ''; return; }
   el.style.display = '';
   const head = (sub) => `<div class="tp-head"><span class="tp-mark" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg></span>
     <span class="tp-head-text"><span class="quote-card-title">SAYON's treatment plan</span>${sub ? `<span class="tp-head-sub">${sub}</span>` : ''}</span></div>`;
 
+  if (!ai && !busy && q.reportKey in treatmentPlanWaiting) {
+    el.className = 'quote-card tp-card';
+    el.innerHTML = `${head('No signal right now. SAYON will work out the plan when you\'re back online, while this quote is open.')}
+      <button class="quote-btn tp-go" onclick="runTreatmentPlan(treatmentPlanWaiting[quoteState.reportKey] || '')">Try now</button>`;
+    return;
+  }
   if (!ai || (busy && !ai.plan)) {
     el.className = 'quote-card tp-card';
     el.innerHTML = busy

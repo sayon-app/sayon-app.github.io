@@ -7,8 +7,10 @@
 // back, and what isn't known yet. One AI call per plan, through the Worker,
 // with the same request shape as extraction (no Worker change).
 //
-// The plan is a suggestion for the inspector. It's shown on the quote, and
-// nothing reaches the client until the inspector taps "Use this plan", which
+// It's a second opinion the inspector asks for (Ask SAYON on the quote, or
+// the button under the report's Recommendations), usually after working out
+// their own plan; it never runs by itself. Shown on the quote in folded
+// sections, and nothing reaches the client until "Add to my quote", which
 // fills the quote's treatment plan and work lines (they stay editable, and
 // Undo puts the quote back). The plan and its reasoning live on the quote
 // as q.aiPlan, which quoteContentHash() leaves out, so it is never part of
@@ -25,12 +27,13 @@ const TREATMENT_PLAN_TIMEOUT_MS = 120000;
 
 const TREATMENT_PLAN_PROMPT = `You are SAYON's treatment planner. SAYON is an app for licensed Australian timber pest inspectors. The user message is one inspection: the report fields the app filled from the inspector's dictation (JSON), the notes the inspector actually said, and sometimes extra words from the inspector. Work out the plan of attack a highly experienced Australian termite technician would choose for THIS property, and explain it so the inspector can check your reasoning in ten seconds and the client can understand what they are paying for.
 
-The inspector is the licensed professional and makes the final call. Your job is to save them the thinking-through, not to replace their judgement. A generic answer ("install a termite management system") is useless to them. Every choice must be tied to the facts of this property, and every reason must name the fact it rests on.
+The inspector is the licensed professional and makes the final call. You are a second opinion: most inspectors have already formed their own plan and ask you to check it against yours. Give your honest best plan, and where the inspector has said what they intend, say plainly where you agree and where you would do something different and why. A generic answer ("install a termite management system") is useless to them. Every choice must be tied to the facts of this property, and every reason must name the fact it rests on.
 
 Return ONLY a valid JSON object, no markdown and no commentary, in exactly this shape:
 {"summary":string,
+"versusInspector":string,
 "system":"bait"|"barrier"|"retic"|"physical"|"system"|"none",
-"knockdown":{"needed":boolean,"method":string,"where":[string],"why":string},
+"knockdown":{"needed":boolean,"short":string,"method":string,"where":[string],"why":string},
 "systemWhy":[string],
 "notChosen":[{"system":"bait"|"barrier"|"retic"|"physical"|"system"|"none","why":string}],
 "fixes":[{"what":string,"who":"us"|"owner"|"plumber"|"builder"|"arborist"|"electrician","why":string}],
@@ -40,9 +43,10 @@ Return ONLY a valid JSON object, no markdown and no commentary, in exactly this 
 "lines":[{"key":string,"qty":number or null,"detail":string,"why":string}]}
 
 WHAT EACH FIELD IS
-- summary: one line for the inspector, the plan in short ("Dust the live workings in the kitchen window frame, treat the nest in the stump, then an in-ground baiting system because paving covers most of the perimeter").
+- summary: one line for the inspector, the plan in short, at most 20 words ("Treat the nest in the stump, then in-ground baits: paving covers most of the perimeter").
+- versusInspector: only when the inspector said what they intend (treatmentType or the notes name a method): at most 25 words on where you agree and where you differ ("Agrees with baiting; adds a nest search at the gum tree, and a soil treatment won't suit the pond"). "" when they named no method.
 - system: the long-term termite management system you recommend. bait = in-ground baiting and monitoring system; barrier = chemical soil treatment (a treated zone); retic = reticulation system charged with termiticide; physical = physical barrier; system = service, top up or recharge the system already on the property; none = no new system (no termites and nothing calling for one, an existing system that is still working, or the inspector said no system).
-- knockdown: what to do about LIVE termites now, separate from the long-term system. needed is false when no live termites were found. method names the method and its sequence ("Above-ground bait stations fixed over the live workings, checked every 2 to 3 weeks until feeding stops"). where lists each place, in the inspector's words. why ties it to what was found (how many places, nest found or not, what the timber is, whether termites can be reached).
+- knockdown: what to do about LIVE termites now, separate from the long-term system. needed is false when no live termites were found. short: the method in at most 8 words ("Dust the workings, AG baits on the frame"). method names the method and its sequence ("Above-ground bait stations fixed over the live workings, checked every 2 to 3 weeks until feeding stops"). where lists each place, in the inspector's words. why ties it to what was found (how many places, nest found or not, what the timber is, whether termites can be reached).
 - systemWhy: 2 to 4 reasons this system suits this property better than the others, each naming the fact behind it ("Paving and the driveway cover the slab edge along most of the perimeter, so a soil treatment would mean drilling through concrete every 150 to 300 mm; stations can go in the garden beds and lawn").
 - notChosen: each of the other realistic options and the property-specific reason it lost here. Skip options that were never realistic (a physical barrier on an existing house is rarely realistic; say so once only if the inspector or owner raised it).
 - fixes: conditions that invite or hide termites, each with who does it and why it matters for the plan (a leak keeps the soil and timber wet, which draws termites in and breaks down a soil treatment's working life; a garden bed over the slab edge hides any entry and bridges the treated zone).
@@ -90,7 +94,14 @@ RULES THAT MUST NEVER BE BROKEN
 - Never promise an outcome. Say what the treatment aims to do ("aims to destroy the colony"), never "will eliminate", "guaranteed" or "permanent".
 - Never name a product or brand in client text unless the inspector named it; say "non-repellent termiticide", "bait stations". The inspector picks the product and applies it as its label directs.
 - Australian terms and spelling: metres, colour, licence (noun), paving, garden beds, meter box, durable notice.
-- Keep it tight: the inspector reads it on a phone. Client sentences under about 25 words.`;
+
+KEEP IT SHORT (the inspector reads it on a phone, at a glance; every extra word is noise)
+- summary at most 20 words; knockdown.method at most 20 words; knockdown.why at most 25 words.
+- systemWhy: at most 3 reasons, each at most 20 words. notChosen: at most 3, each at most 15 words.
+- fixes: at most 5; what at most 10 words; why at most 12 words.
+- followUp at most 25 words. unknowns: at most 4, each a short question of at most 15 words, most decisive first.
+- client.why: at most 2 sentences, 40 words in all. client.we: at most 6 steps; client.owner: at most 4; each step at most 15 words.
+- No filler ("It is important to note", "In order to"), no repeating a fact in two places.`;
 
 // What the planner reads: every report field that bears on the plan, as
 // the app holds it, plus what the inspector said. No client name, phone,
@@ -233,7 +244,8 @@ function cleanTreatmentPlan(p) {
   return {
     summary: str(p.summary),
     system: systems.includes(p.system) ? p.system : 'none',
-    knockdown: { needed: kd.needed === true, method: str(kd.method), where: list(kd.where), why: str(kd.why) },
+    versusInspector: str(p.versusInspector),
+    knockdown: { needed: kd.needed === true, short: str(kd.short), method: str(kd.method), where: list(kd.where), why: str(kd.why) },
     systemWhy: list(p.systemWhy),
     notChosen: (Array.isArray(p.notChosen) ? p.notChosen : []).filter(n => n && systems.includes(n.system) && str(n.why))
       .map(n => ({ system: n.system, why: str(n.why) })),
@@ -339,18 +351,6 @@ async function runTreatmentPlan(extra) {
   }
 }
 
-// When the quote opens: a report with something to plan for gets its plan
-// worked out once, by itself, unless the quote has already gone to the
-// client. After that the inspector asks again when they want.
-function maybeAutoTreatmentPlan() {
-  const q = quoteState;
-  const rd = quotePlanReport();
-  if (!q || !rd || q.aiPlan || q.sentAt || q.answer || isQuoteLocked()) return;
-  if (!reportNeedsPlan(rd) || typeof authSession === 'undefined' || !authSession) return;
-  if (!navigator.onLine) { treatmentPlanWaiting[q.reportKey] = ''; renderTreatmentPlanCard(); return; }
-  runTreatmentPlan('');
-}
-
 window.addEventListener('online', () => {
   const q = quoteState;
   if (q && q.reportKey in treatmentPlanWaiting && document.getElementById('quoteScreen').classList.contains('open')) {
@@ -422,7 +422,7 @@ function useTreatmentPlan() {
   renderTreatmentPlanCard();
   scheduleQuoteSave();
   track('treatment_plan_used', { system: p.system });
-  showToast(spoken ? 'Plan added. Your spoken quote lines are kept as you said them' : 'Plan added to the quote. Check the lines and prices', 'success');
+  showToast(spoken ? 'Added to the quote. Your spoken quote lines are kept as you said them' : 'Added to the quote. Check the lines and prices', 'success');
 }
 
 function undoTreatmentPlan() {
@@ -455,17 +455,10 @@ function showTreatmentPlan() {
   if (!q) return;
   if (!q.aiPlan) { runTreatmentPlan(''); return; }
   q.aiPlan.hidden = false;
-  q.aiPlan.open = true;
   renderTreatmentPlanCard();
   scheduleQuoteSave();
 }
 
-function toggleTreatmentPlanReasons() {
-  const ai = quoteState && quoteState.aiPlan;
-  if (!ai) return;
-  ai.open = !ai.open;
-  renderTreatmentPlanCard();
-}
 
 // ── THE CARD ──
 // 'none' on the quote's picker means "termites only"; in a plan it can also
@@ -477,32 +470,54 @@ function tpList(items, cls) {
   return items.length ? `<ul class="tp-list${cls ? ' ' + cls : ''}">${items.map(t => `<li>${t}</li>`).join('')}</ul>` : '';
 }
 
+// The suggestion in folded sections, each with a one-line heading, so it
+// reads at a glance and opens where the inspector wants detail. Which
+// sections are open is kept while the card is redrawn.
+const tpOpenSections = new Set();
+function tpToggleSection(el) {
+  if (el.open) tpOpenSections.add(el.dataset.sec); else tpOpenSections.delete(el.dataset.sec);
+}
+
+function tpSection(key, mark, title, sub, body, cls) {
+  if (!body) return '';
+  return `<details class="tp-sec${cls ? ' ' + cls : ''}" data-sec="${key}"${tpOpenSections.has(key) ? ' open' : ''} ontoggle="tpToggleSection(this)">
+    <summary><span class="tp-sec-mark">${mark}</span><span class="tp-sec-text"><span class="tp-sec-title">${title}</span>${sub ? `<span class="tp-sec-sub">${sub}</span>` : ''}</span>
+      <svg class="icon tp-sec-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+    <div class="tp-sec-body">${body}</div></details>`;
+}
+
 function treatmentPlanBodyHTML(ai) {
   const p = ai.plan;
   const e = escapeHtml;
+  const kd = p.knockdown;
+  const checks = p.unknowns.map(e).concat((p.checks || []).map(t => `<span class="tp-own-check">${e(t)}</span>`));
   const lines = p.lines.map(l => {
     const cat = QUOTE_CATALOGUE[l.key] || {};
     const n = l.qty != null ? l.qty : tpStartQty(l.key);
     const qty = `${n} ${pluralUnit(cat.unit, n)}${l.qty == null ? ', to check' : ''}`;
     return `<li><span class="tp-line-desc">${e(cat.desc || l.key)}${l.detail ? ` <span class="tp-dim">· ${e(l.detail)}</span>` : ''}</span><span class="tp-line-qty${l.qty == null ? ' warn' : ''}">${e(qty)}</span></li>`;
   }).join('');
-  const kd = p.knockdown;
-  return `
-    ${p.unknowns.length || (p.checks || []).length ? `<div class="tp-block tp-unknowns"><div class="tp-label">Check before you send</div>${tpList(p.unknowns.map(e).concat((p.checks || []).map(t => `<span class="tp-own-check">${e(t)}</span>`)))}</div>` : ''}
-    ${kd.needed ? `<div class="tp-block"><div class="tp-label">1 · Knock out the live termites</div>
-      <div class="tp-text"><strong>${e(kd.method)}</strong></div>
-      ${kd.where.length ? `<div class="tp-text tp-dim">${e(kd.where.join('; '))}</div>` : ''}
-      ${kd.why ? `<div class="tp-text">${e(kd.why)}</div>` : ''}</div>` : ''}
-    <div class="tp-block"><div class="tp-label">${kd.needed ? '2' : '1'} · Long-term: ${e(TP_SYSTEM_LABELS[p.system] || p.system)}</div>
-      ${tpList(p.systemWhy.map(e))}
-      ${p.notChosen.length ? `<div class="tp-sub">Why not</div>${tpList(p.notChosen.map(n => `<strong>${e(TP_SYSTEM_LABELS[n.system] || n.system)}:</strong> ${e(n.why)}`), 'tp-why-not')}` : ''}</div>
-    ${p.fixes.length ? `<div class="tp-block"><div class="tp-label">${kd.needed ? '3' : '2'} · Fix what draws them in</div>
-      ${tpList(p.fixes.map(f => `${e(f.what)}${f.who ? ` <span class="tp-who">${e(TP_WHO[f.who] || f.who)}</span>` : ''}${f.why ? `<div class="tp-dim">${e(f.why)}</div>` : ''}`))}</div>` : ''}
-    ${p.followUp ? `<div class="tp-block"><div class="tp-label">Coming back</div><div class="tp-text">${e(p.followUp)}</div></div>` : ''}
-    ${lines ? `<div class="tp-block"><div class="tp-label">Lines for the quote</div><ul class="tp-lines">${lines}</ul>
-      <div class="tp-dim tp-small">Priced at your usual rates once you use the plan.</div></div>` : ''}
-    ${p.client.why ? `<div class="tp-block"><div class="tp-label">What the client reads</div><div class="tp-text tp-client">${e(p.client.why)}</div></div>` : ''}`;
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  let n = 0;
+  return `<div class="tp-secs">
+    ${tpSection('check', '!', 'Check first', plural(checks.length, 'thing to confirm', 'things to confirm'), tpList(checks), 'tp-sec-warn')}
+    ${kd.needed ? tpSection('kill', ++n, 'Live termites', e(kd.short || kd.method),
+      `<div class="tp-text"><strong>${e(kd.method)}</strong></div>
+       ${kd.where.length ? `<div class="tp-dim">${e(kd.where.join('; '))}</div>` : ''}
+       ${kd.why ? `<div class="tp-text">${e(kd.why)}</div>` : ''}`) : ''}
+    ${tpSection('system', ++n, 'Long-term system', e(TP_SYSTEM_LABELS[p.system] || p.system),
+      `${tpList(p.systemWhy.map(e))}
+       ${p.notChosen.length ? `<div class="tp-sub">Not chosen here</div>${tpList(p.notChosen.map(x => `<strong>${e(TP_SYSTEM_LABELS[x.system] || x.system)}:</strong> ${e(x.why)}`), 'tp-why-not')}` : ''}`)}
+    ${p.fixes.length ? tpSection('fix', ++n, 'Fix', e(p.fixes.map(f => f.what).join(' · ')),
+      tpList(p.fixes.map(f => `${e(f.what)}${f.who ? ` <span class="tp-who">${e(TP_WHO[f.who] || f.who)}</span>` : ''}${f.why ? `<div class="tp-dim">${e(f.why)}</div>` : ''}`))) : ''}
+    ${p.followUp ? tpSection('back', ++n, 'Coming back', e(p.followUp), `<div class="tp-text">${e(p.followUp)}</div>`) : ''}
+    ${lines || p.client.why ? tpSection('quote', '$', 'For the quote', lines ? plural(p.lines.length, 'line', 'lines') + ' at your rates' : 'What the client reads',
+      `${lines ? `<ul class="tp-lines">${lines}</ul>` : ''}
+       ${p.client.why ? `<div class="tp-sub">What the client reads</div><div class="tp-text tp-client">${e(p.client.why)}</div>` : ''}`) : ''}
+  </div>`;
 }
+
+const TP_SPARK = '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>';
 
 function renderTreatmentPlanCard() {
   const el = document.getElementById('quoteAiPlan');
@@ -512,55 +527,56 @@ function renderTreatmentPlanCard() {
   const ai = q && q.aiPlan;
   const locked = isQuoteLocked();
   const busy = !!(q && treatmentPlanRuns[q.reportKey]);
-  // Nothing to plan for and nothing planned: no card.
-  if (!q || (!ai && !busy && !(q.reportKey in treatmentPlanWaiting) && (!reportNeedsPlan(rd) || locked))) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  const waiting = !!(q && q.reportKey in treatmentPlanWaiting);
+  // Nothing to plan for and nothing asked: no card.
+  if (!q || (!ai && !busy && !waiting && (!reportNeedsPlan(rd) || locked))) { el.style.display = 'none'; el.innerHTML = ''; return; }
   el.style.display = '';
-  const head = (sub) => `<div class="tp-head"><span class="tp-mark" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg></span>
-    <span class="tp-head-text"><span class="quote-card-title">SAYON's treatment plan</span>${sub ? `<span class="tp-head-sub">${sub}</span>` : ''}</span></div>`;
+  const head = (title, sub, tag) => `<div class="tp-head"><span class="tp-mark" aria-hidden="true">${TP_SPARK}</span>
+    <span class="tp-head-text"><span class="tp-title-row"><span class="tp-title">${title}</span>${tag ? `<span class="tp-tag">${tag}</span>` : ''}</span>${sub ? `<span class="tp-head-sub">${sub}</span>` : ''}</span></div>`;
+  el.className = 'quote-card tp-card';
 
-  if (!ai && !busy && q.reportKey in treatmentPlanWaiting) {
-    el.className = 'quote-card tp-card';
-    el.innerHTML = `${head('No signal right now. SAYON will work out the plan when you\'re back online, while this quote is open.')}
-      <button class="quote-btn tp-go" onclick="runTreatmentPlan(treatmentPlanWaiting[quoteState.reportKey] || '')">Try now</button>`;
+  // Not asked yet: the inspector works out their own plan, then asks.
+  if (!ai && !busy && !waiting) {
+    el.classList.add('tp-idle');
+    el.innerHTML = `<div class="tp-idle-row">${head('Second opinion', 'Worked out your treatment? See what SAYON would do here.')}
+      <button class="quote-link-btn tp-ask" onclick="runTreatmentPlan('')">Ask SAYON</button></div>`;
+    return;
+  }
+  if (!ai && waiting && !busy) {
+    el.innerHTML = `${head('Second opinion', 'No signal right now. SAYON will look at it when you\'re back online, while this quote is open.')}
+      <button class="quote-link-btn tp-ask" onclick="runTreatmentPlan(treatmentPlanWaiting[quoteState.reportKey] || '')">Try now</button>`;
     return;
   }
   if (!ai || (busy && !ai.plan)) {
-    el.className = 'quote-card tp-card';
-    el.innerHTML = busy
-      ? `${head('Reading the report and working out the best plan for this property…')}<div class="tp-busy"><span class="tp-spinner"></span>This takes about half a minute. You can keep working on the quote.</div>`
-      : `${head('How to knock out the termites, which system suits this property and why, what to fix and when to come back.')}
-         <button class="quote-btn primary tp-go" onclick="runTreatmentPlan('')">Work out the plan</button>`;
+    el.innerHTML = `${head('Second opinion', '')}<div class="tp-busy"><span class="tp-spinner"></span>SAYON is reading the report. About half a minute; you can keep working on the quote.</div>`;
     return;
   }
   if (!ai.plan) {
-    el.className = 'quote-card tp-card';
-    el.innerHTML = `${head('')}<div class="tp-error">${escapeHtml(ai.error || 'No plan yet.')}</div>
-      <button class="quote-btn tp-go" onclick="runTreatmentPlan('')">Try again</button>`;
+    el.innerHTML = `${head('Second opinion', '')}<div class="tp-error">${escapeHtml(ai.error || 'No suggestion yet.')}</div>
+      <button class="quote-link-btn tp-ask" onclick="runTreatmentPlan('')">Try again</button>`;
     return;
   }
   if (ai.hidden) {
     el.className = 'quote-card tp-card tp-folded';
-    el.innerHTML = `<button type="button" class="tp-fold-row" onclick="showTreatmentPlan()">${head(escapeHtml(TP_SYSTEM_LABELS[ai.plan.system] || ''))}<span class="link-btn">Show</span></button>`;
+    el.innerHTML = `<button type="button" class="tp-fold-row" onclick="showTreatmentPlan()">${head("SAYON's suggestion", escapeHtml(TP_SYSTEM_LABELS[ai.plan.system] || ''))}<span class="link-btn">Show</span></button>`;
     return;
   }
   const p = ai.plan;
   const stale = rd && ai.hash && treatmentPlanHash(rd, q.address) !== ai.hash;
-  const sub = escapeHtml(p.summary || TP_SYSTEM_LABELS[p.system] || '');
-  const open = ai.open || !ai.applied;
-  el.className = 'quote-card tp-card' + (ai.applied ? ' tp-applied' : '');
-  el.innerHTML = `${head(sub)}
-    ${ai.applied ? `<div class="tp-status">In the quote${ai.keptLines ? ' (your spoken lines kept)' : ''}. Edit it under Treatment plan and the work lines.</div>` : ''}
-    ${stale ? `<div class="tp-stale">The report has changed since this plan was made.</div>` : ''}
+  if (ai.applied) el.classList.add('tp-applied');
+  el.innerHTML = `${head("SAYON's suggestion", escapeHtml(p.summary || TP_SYSTEM_LABELS[p.system] || ''), ai.applied ? 'In the quote' : 'Guide only')}
+    ${p.versusInspector ? `<div class="tp-versus"><span class="tp-versus-label">Your plan vs SAYON</span>${escapeHtml(p.versusInspector)}</div>` : ''}
+    ${stale ? '<div class="tp-stale">The report has changed since SAYON looked at it.</div>' : ''}
     ${ai.error ? `<div class="tp-error">${escapeHtml(ai.error)}</div>` : ''}
-    <div class="tp-body"${open ? '' : ' hidden'}>${treatmentPlanBodyHTML(ai)}</div>
+    ${treatmentPlanBodyHTML(ai)}
     <div class="tp-actions">
-      ${busy ? '<div class="tp-busy"><span class="tp-spinner"></span>Working out a new plan…</div>' : ai.applied
-        ? `<button class="quote-link-btn" onclick="toggleTreatmentPlanReasons()">${open ? 'Hide the reasons' : 'Show the reasons'}</button>
-           ${locked ? '' : '<button class="quote-text-btn" onclick="undoTreatmentPlan()">Undo</button>'}`
-        : locked ? '' : `<button class="quote-btn primary" onclick="useTreatmentPlan()">Use this plan</button>
-           <button class="quote-link-btn" onclick="dismissTreatmentPlan()">Not now</button>`}
+      ${busy ? '<div class="tp-busy"><span class="tp-spinner"></span>Looking at it again…</div>' : ai.applied
+        ? (locked ? '' : '<span class="tp-status">Edit it under Treatment plan and the work lines.</span><button class="quote-text-btn" onclick="undoTreatmentPlan()">Undo</button>')
+        : locked ? '' : `<button class="quote-btn tp-use" onclick="useTreatmentPlan()">Add to my quote</button>
+           <button class="quote-link-btn" onclick="dismissTreatmentPlan()">Hide</button>`}
     </div>
     ${busy || locked || ai.applied ? '' : `<details class="tp-again"${stale ? ' open' : ''}><summary>Ask again${stale ? ' with the changes' : ''}</summary>
-      <textarea class="quote-input quote-textarea" id="tpExtra" rows="2" placeholder="Anything SAYON should know? e.g. owner wants as little chemical as possible, fish pond out the back, about 52 m around">${escapeHtml(ai.extra || '')}</textarea>
-      <button class="quote-btn" onclick="askTreatmentPlanAgain()">Work it out again</button></details>`}`;
+      <textarea class="quote-input quote-textarea" id="tpExtra" rows="2" placeholder="Anything SAYON should know? e.g. owner wants as little chemical as possible, about 52 m around">${escapeHtml(ai.extra || '')}</textarea>
+      <button class="quote-btn" onclick="askTreatmentPlanAgain()">Ask again</button></details>`}
+    <div class="tp-foot">A guide worked out from your report. You make the call.</div>`;
 }

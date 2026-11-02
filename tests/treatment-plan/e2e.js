@@ -24,9 +24,10 @@ const NOTE = 'owner has two dogs that dig in the garden beds and a fish pond nea
 
 // The answer the planner would give for the standard scenario.
 const PLAN = {
-  summary: 'Treat the nest in the gum tree, then an in-ground baiting system: the fish pond and the owner\'s wish for less chemical rule out a soil treatment.',
+  summary: 'Treat the nest in the gum tree, then in-ground baits: the pond and less chemical rule out a soil treatment.',
+  versusInspector: 'Agrees a system is needed; of your two options, baiting suits the pond and the dogs better than a chemical barrier.',
   system: 'bait',
-  knockdown: { needed: true, method: 'Drill into the nest in the gum tree and treat it with a non-repellent dust or foam as the label directs', where: ['Gum tree in the backyard, about 15 m from the house'], why: 'The nest was found, so treating it directly is the quickest way to reach the colony. The subfloor workings are inactive, so there is nothing live to treat inside.' },
+  knockdown: { needed: true, short: 'Treat the nest in the gum tree', method: 'Drill into the nest in the gum tree and treat it with a non-repellent dust or foam as the label directs', where: ['Gum tree in the backyard, about 15 m from the house'], why: 'The nest was found, so treating it directly is the quickest way to reach the colony. The subfloor workings are inactive, so there is nothing live to treat inside.' },
   systemWhy: ['A fish pond near the back fence: liquid termiticides carry strict limits near water.', 'The owner would rather avoid chemicals, and two dogs dig in the garden beds where a treated zone would be.', 'The house is about 54 m around, so about 18 stations at roughly 3 m apart.'],
   notChosen: [{ system: 'barrier', why: 'The pond, the dogs digging the beds and the owner\'s wish for less chemical.' }, { system: 'retic', why: 'The same chemical concerns, at a higher cost.' }],
   fixes: [{ what: 'Remove the timber touching the soil', who: 'us', why: 'It is a hidden way in and food for termites near the house.' }, { what: 'Find why the back room reads 28% moisture', who: 'plumber', why: 'Damp timber draws termites in.' }],
@@ -92,8 +93,14 @@ async function backend(ctx) {
   const heard = await p.evaluate(() => reportData.heardNotes);
   check(Array.isArray(heard) && heard.length === 1 && heard[0].text.includes('fish pond'), 'the dictated note is kept once on the report');
 
-  // 2. Opening the quote works out the plan by itself.
+  // 2. Opening the quote asks nothing by itself: the inspector asks for a second opinion.
   await p.evaluate(() => { saveDraft(); openQuoteFromReport(); });
+  await p.waitForTimeout(1200);
+  check(aiCalls.length === 0, 'opening the quote makes no AI call by itself');
+  await p.evaluate(() => document.getElementById('quoteAiPlan').scrollIntoView({ block: 'start' }));
+  await p.screenshot({ path: `${OUT}/0-ask.png` });
+  check(/Second opinion/.test(await p.locator('#quoteAiPlan').innerText()), 'the card offers a second opinion');
+  await p.click('#quoteAiPlan .tp-ask');
   await p.waitForTimeout(400);
   await p.screenshot({ path: `${OUT}/1-working.png` });
   check(await p.evaluate(() => document.querySelector('#quoteAiPlan .tp-busy') !== null), 'the card says it is working while the plan is made');
@@ -113,10 +120,16 @@ async function backend(ctx) {
   await p.evaluate(() => document.getElementById('quoteAiPlan').scrollIntoView({ block: 'start' }));
   await p.screenshot({ path: `${OUT}/2-plan-card.png` });
   await p.setViewportSize({ width: 390, height: 2400 });
-  await p.locator('#quoteAiPlan').screenshot({ path: `${OUT}/2b-plan-card-full.png` });
-  await p.setViewportSize({ width: 390, height: 844 });
+  await p.locator('#quoteAiPlan').screenshot({ path: `${OUT}/2a-sections-folded.png` });
   const text = await p.locator('#quoteAiPlan').innerText();
-  check(/Check before you send/i.test(text) && /Why not/.test(text) && /Knock out the live termites/i.test(text), 'card shows checks, knockdown, and why the others lost');
+  check(/Check first/.test(text) && /Live termites/.test(text) && /Long-term system/.test(text) && /Your plan vs SAYON/i.test(text) && /Guide only/i.test(text), 'card shows the folded sections, the comparison and Guide only');
+  check(!/Not chosen here/.test(text), 'sections start folded');
+  await p.click('#quoteAiPlan .tp-sec[data-sec="system"] > summary');
+  await p.click('#quoteAiPlan .tp-sec[data-sec="check"] > summary');
+  await p.waitForTimeout(200);
+  check(/Not chosen here/.test(await p.locator('#quoteAiPlan').innerText()), 'a section opens to its detail');
+  await p.locator('#quoteAiPlan').screenshot({ path: `${OUT}/2b-sections-open.png` });
+  await p.setViewportSize({ width: 390, height: 844 });
 
   // 3. Reopening the quote doesn't ask again.
   await p.evaluate(() => { closeQuote(); openQuoteFromReport(); });
@@ -125,9 +138,8 @@ async function backend(ctx) {
 
   // 4. Use this plan.
   const hashBefore = await p.evaluate(() => quoteContentHash(quoteState));
-  await p.evaluate(() => { quoteState.aiPlan.open = false; renderTreatmentPlanCard(); });
   check(await p.evaluate(() => quoteContentHash(quoteState)) === hashBefore, 'the AI plan is not part of the quote the client signs');
-  await p.click('#quoteAiPlan .quote-btn.primary');
+  await p.click('#quoteAiPlan .tp-use');
   await p.waitForTimeout(600);
   const after = await p.evaluate(() => ({ items: quoteState.items.map(i => [i.key, i.qty, i.price]), plan: quoteState.plan, choice: quoteState.systemChoice }));
   check(after.items.some(([k, q]) => k === 'bait_install' && q === 18) && after.items.some(([k]) => k === 'nest'), 'lines come from the plan, with its quantities');
@@ -173,7 +185,10 @@ async function backend(ctx) {
   await p.evaluate(() => openQuoteFromReport());
   await p.waitForTimeout(500);
   const waitText = await p.locator('#quoteAiPlan').innerText();
-  check(/No signal right now/.test(waitText) && aiCalls.length === 1, 'offline: the card waits for signal, no call, no error');
+  check(/Ask SAYON/.test(waitText) && aiCalls.length === 1, 'offline: the card still only offers to ask');
+  await p.click('#quoteAiPlan .tp-ask');
+  await p.waitForTimeout(400);
+  check(/No signal right now/.test(await p.locator('#quoteAiPlan').innerText()) && aiCalls.length === 1, 'asked offline: the card waits for signal, no call, no error');
   await ctx.setOffline(false);
   await p.waitForFunction(() => quoteState && quoteState.aiPlan && quoteState.aiPlan.plan, null, { timeout: 20000 });
   check(aiCalls.length === 2, 'back online: the plan is worked out by itself');

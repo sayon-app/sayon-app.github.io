@@ -4504,7 +4504,7 @@ const isBlankValue = v => v === undefined || v === null || v === '' || (typeof v
 function countExtractFilled(before) {
   let n = 0;
   Object.keys(reportData).forEach(k => {
-    if (k === 'findings' || k === 'pendingNotes' || k === 'noteText' || k === 'weatherFilled' || isBlankValue(reportData[k])) return;
+    if (k === 'findings' || k === 'pendingNotes' || k === 'noteText' || k === 'heardNotes' || k === 'weatherFilled' || isBlankValue(reportData[k])) return;
     if (JSON.stringify(reportData[k]) !== before.data[k]) n++;
   });
   (reportData.findings || []).forEach(f => {
@@ -4962,6 +4962,22 @@ function noteTextKey(transcript) {
   return 'n' + h.toString(36);
 }
 
+// What the inspector said, note by note (reportData.heardNotes [{ k, text,
+// at }]), so SAYON's treatment plan (js/treatment-plan.js) can read things
+// no field holds: an owner who wants no chemicals, a fish pond, the dogs.
+// The same note filled again is kept once; the oldest go past about 16,000
+// characters. Never printed: ISSUE_META_KEYS leaves it out of the report.
+const HEARD_NOTES_MAX_CHARS = 16000;
+function keepHeardNote(rd, k, text) {
+  text = String(text || '').trim();
+  if (!rd || !text) return;
+  const notes = (Array.isArray(rd.heardNotes) ? rd.heardNotes : []).filter(n => n && n.k !== k);
+  notes.push({ k, text, at: Date.now() });
+  let total = notes.reduce((n, x) => n + x.text.length, 0);
+  while (notes.length > 1 && total > HEARD_NOTES_MAX_CHARS) total -= notes.shift().text.length;
+  rd.heardNotes = notes;
+}
+
 // The quote, as dictated: reportData.quoteSpoken = { items: [{ description,
 // qty, unit, price }], exclusions: [], paymentTerms, timeframe,
 // servicePeriod, notes, at }. Notes add to it: a line said again (the same
@@ -5019,6 +5035,7 @@ function populateFields(data, transcript) {
   // the meantime, the rest stop rather than land in that job.
   const target = reportData;
   const noteKey = transcript ? noteTextKey(transcript) : null;
+  if (noteKey) keepHeardNote(target, noteKey, transcript);
   // Handle findings array from AI extraction
   if (data.findings && Array.isArray(data.findings) && data.findings.length > 0) {
     let incoming = data.findings.filter(f => f && typeof f === 'object').map(f => ({
@@ -13107,7 +13124,7 @@ else installToastScreenWatch();
 //   reportData.amending      { reason, startedAt } - unlocked for an amendment
 //   reportData.noQuoteNeeded true when the job needs no quote
 // The quote's own sent state lives on the quote (see SENT AND LOCKED in js/quote.js).
-const ISSUE_META_KEYS = ['reportNumber', 'sent', 'issue', 'issueHistory', 'amending', 'pendingNotes', 'noQuoteNeeded', 'noteText', 'weatherFilled'];
+const ISSUE_META_KEYS = ['reportNumber', 'sent', 'issue', 'issueHistory', 'amending', 'pendingNotes', 'noQuoteNeeded', 'noteText', 'heardNotes', 'weatherFilled'];
 const ISSUE_SECTION_NAMES = { job:'Job details', quote:'Quote', property:'Property', obstructions:'Areas inspected', restrictions:'Areas unable to be inspected',
   findings:'Findings', conducive:'Conducive', recommendations:'Recommendations', photos:'Photos', signoff:'Sign-off' };
 

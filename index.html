@@ -285,6 +285,10 @@
         <div class="quote-lock-note" id="quoteLockNote" style="display:none">This job is complete, so the quote is locked. Amend the job from its report to change it.</div>
         <div class="quote-company-gaps" id="quoteCompanyGaps" style="display:none"></div>
 
+        <!-- SAYON's treatment plan: worked out from the report, used only when
+             the inspector taps Use this plan (js/treatment-plan.js). -->
+        <div class="quote-card tp-card" id="quoteAiPlan" style="display:none"></div>
+
         <!-- The quote as a guide: four steps on a side line, each holding
              its part of the job. Writing the quote holds who it's for, the
              work, the plan and the terms; the others fill in as it goes.
@@ -2520,6 +2524,7 @@
 <script src="js/photo-markup.js"></script>
 <!-- Quote builder: uses js/app.js globals (reportData, getSavedReports, jsPDF…) -->
 <script src="js/quote.js"></script>
+<script src="js/treatment-plan.js"></script>
 <script src="js/treatment.js"></script>
 <script src="js/bait.js"></script>
 <script src="js/site-plan.js"></script>

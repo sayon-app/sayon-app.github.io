@@ -25,8 +25,11 @@
 // the quote lines that mean the method was quoted.
 const TREATMENT_METHODS = {
   barrier: { label: 'Chemical soil treatment (termite barrier)', qty: 'linear metres', quoteKeys: ['barrier_lm', 'barrier_job'] },
-  direct:  { label: 'Direct treatment of active termite workings', quoteKeys: ['direct'] },
   bait:    { label: 'Termite baiting system installed', qty: 'stations', quoteKeys: ['bait_install'] },
+  retic:   { label: 'Reticulation system installed and charged', qty: 'linear metres', quoteKeys: ['retic_lm'] },
+  physical: { label: 'Physical termite barrier installed', qty: 'linear metres', quoteKeys: ['physical_lm'] },
+  direct:  { label: 'Direct treatment of active termite workings', quoteKeys: ['direct'] },
+  nest:    { label: 'Termite nest located and treated', quoteKeys: ['nest'] },
   topup:   { label: 'Top-up of existing termite management system', quoteKeys: ['system_topup'] },
   general: { label: 'Termite management treatment', quoteKeys: ['treatment'] },
   borer:   { label: 'Borer treatment of affected timbers', quoteKeys: ['borer'] },
@@ -61,9 +64,10 @@ function treatmentCertNumber(q, prefix = 'TC') {
   return prefix + '-' + String(q.number || '').replace(/^Q-?/i, '');
 }
 
-// A chemical barrier or a baiting system is a termite management system
-// left in place, so the client also gets a certificate of installation.
-const INSTALLED_SYSTEMS = ['barrier', 'bait'];
+// A chemical barrier, baiting system, reticulation system or physical
+// barrier is a termite management system left in place, so the client also
+// gets a certificate of installation.
+const INSTALLED_SYSTEMS = ['barrier', 'bait', 'retic', 'physical'];
 function installedSystems(t) {
   return INSTALLED_SYSTEMS.filter(k => t && t.methods && k in t.methods);
 }
@@ -147,7 +151,7 @@ function draftTreatment(q) {
     .find(p => new RegExp(`\\b${p}\\b`, 'i').test(text));
   const places = (rd.findings || []).filter(f => f && f.termiteActivity === 'ACTIVE' && f.activityLocation)
     .map(f => f.activityLocation);
-  if (methods.barrier !== undefined) places.push('Perimeter of the building');
+  if (['barrier', 'retic', 'physical'].some(k => methods[k] !== undefined)) places.push('Perimeter of the building');
   return {
     date,
     technician: signedIn || q.inspector || me.name || '',
@@ -266,7 +270,9 @@ function openTreatmentRecord() {
   document.getElementById('trEquipment').value = t.equipment || '';
   document.getElementById('trCautions').value = t.cautions != null ? t.cautions : TREATMENT_DEFAULT_CAUTIONS;
   document.getElementById('trWarranty').value = t.warranty || '';
-  document.getElementById('trMethods').innerHTML = Object.entries(TREATMENT_METHODS).map(([key, m]) => {
+  // What was quoted shows ticked; every other kind of treatment waits under
+  // "Something else", so the list stays short.
+  const method = ([key, m]) => {
     const on = key in (t.methods || {});
     return `<label class="treat-method">
         <input type="checkbox" data-key="${key}" ${on ? 'checked' : ''} onchange="onTreatmentMethodToggle(this)">
@@ -274,13 +280,18 @@ function openTreatmentRecord() {
         ${m.qty ? `<input class="quote-input treat-method-qty" type="number" min="0" step="any" inputmode="decimal" data-qty="${key}"
           value="${escapeHtml((t.methods || {})[key] || '')}" placeholder="${m.qty}" aria-label="${m.qty}" ${on ? '' : 'hidden'}>` : ''}
       </label>`;
-  }).join('');
+  };
+  const all = Object.entries(TREATMENT_METHODS), ticked = all.filter(([k]) => k in (t.methods || {})), rest = all.filter(([k]) => !(k in (t.methods || {})));
+  document.getElementById('trMethods').innerHTML = !ticked.length ? all.map(method).join('')
+    : ticked.map(method).join('') + (rest.length ? `<details class="sheet-more treat-more" id="trMethodsMore"><summary>Something else done?</summary>${rest.map(method).join('')}</details>` : '');
   renderTreatmentProducts(t.products && t.products.length ? t.products : [{}]);
   const site = t.site || treatmentSiteFromReport(treatmentSourceReport());
   document.getElementById('trSiteBuilding').value = site.building || '';
   document.getElementById('trSiteFloor').value = site.floor || '';
   document.getElementById('trSiteSurrounds').value = site.surrounds || '';
   document.getElementById('trSiteExisting').value = site.existing || '';
+  renderTreatmentSiteSummary();
+  ['trSiteBuilding', 'trSiteFloor', 'trSiteSurrounds', 'trSiteExisting'].forEach(id => { document.getElementById(id).oninput = renderTreatmentSiteSummary; });
   treatmentPlanDraft = sitePlanHasContent(t.plan) ? JSON.parse(JSON.stringify(t.plan)) : null;
   renderTreatmentPlan();
   document.getElementById('trAreas').value = t.areas || '';
@@ -305,6 +316,15 @@ function openTreatmentRecord() {
   updateTreatmentSaveBtn();
 }
 
+// The site, folded away as it comes from the report: its building, or what's
+// missing, beside the heading.
+function renderTreatmentSiteSummary() {
+  const v = id => document.getElementById(id).value.trim();
+  const building = v('trSiteBuilding');
+  document.getElementById('trSiteSummary').textContent = building || (v('trSiteFloor') || v('trSiteSurrounds') ? '' : 'not filled in yet');
+  if (!building && !v('trSiteFloor') && !v('trSiteSurrounds') && !v('trSiteExisting')) document.getElementById('trSiteMore').open = true;
+}
+
 // ── THE SITE PLAN ON THE RECORD ── The drawn plan (js/site-plan.js) is kept
 // here until the record is saved.
 let treatmentPlanDraft = null;
@@ -315,7 +335,7 @@ function renderTreatmentPlan() {
   if (!sitePlanHasContent(plan)) {
     el.innerHTML = `<button type="button" class="treat-plan-empty" onclick="openTreatmentSitePlan()">
         <span class="treat-plan-empty-title">Draw the site plan</span>
-        <span class="treat-plan-empty-text">Place the building, the barrier, each bait and monitoring station, the notice and what you found. It prints on the certificate with a legend.</span>
+        <span class="treat-plan-empty-text">The building, what you treated, any stations and the notice. It prints on the certificate.</span>
       </button>`;
     return;
   }
@@ -404,7 +424,7 @@ function treatmentVoicePrompt() {
   return `You fill in a termite treatment record for SAYON, an app for Australian timber pest technicians. The user message is what the technician said about a treatment they did, and the date today. Return ONLY a JSON object, no markdown, with these keys, each null unless the technician said it:
 {"date":"YYYY-MM-DD","start":"HH:MM","finish":"HH:MM","technician":string,"licence":string,"supervisor":string,"supervisorLicence":string,"pest":string,"weather":string,"equipment":string,"methods":{"<method>":{"qty":number|null}},"products":[{"name":string,"rate":string,"amount":string,"batch":string,"life":string,"where":string}],"areas":string,"notTreated":string,"notice":"new"|"updated"|"none","noticeWhere":string,"nextInspectionMonths":number,"nextInspectionDate":"YYYY-MM-DD","warranty":string,"notes":string}
 - date: the day it was done. "Today" and "yesterday" count from today's date. start and finish in 24-hour time ("8 till half 11" is 08:00 and 11:30).
-- methods: only the methods they did, from: ${methods}. qty is the linear metres of barrier or the number of bait stations, when said.
+- methods: only the methods they did, from: ${methods}. qty is the linear metres of barrier, reticulation or physical barrier, or the number of bait stations, when said.
 - products: each product used, with the mix or application rate, the amount used, the batch number, the life on the label and where it went, as said. Brand names as written on the drum ("termite door" is Termidor).
 - areas: where they treated, in brief. notTreated: anywhere they didn't treat and why ("Under the rear deck, no access").
 - notice: "new" when they put a new durable notice up, "updated" when they updated the existing one, "none" when none was placed. noticeWhere: where it is ("Meter box").
@@ -434,6 +454,7 @@ function applyTreatmentVoice(f) {
     document.querySelectorAll('#trMethods input[type=checkbox]').forEach(box => {
       const on = said.includes(box.dataset.key);
       if (box.checked !== on) { box.checked = on; n++; }
+      if (on && box.closest('#trMethodsMore')) document.getElementById('trMethodsMore').open = true;
       onTreatmentMethodToggle(box);
       const qty = document.querySelector(`#trMethods [data-qty="${box.dataset.key}"]`);
       const q = on && f.methods[box.dataset.key] && Number(f.methods[box.dataset.key].qty);
@@ -469,7 +490,6 @@ function onTreatmentMethodToggle(box) {
 function onTreatmentNoticeChange() {
   const none = document.getElementById('trNotice').value === 'none';
   document.getElementById('trNoticeWhereWrap').style.display = none ? 'none' : '';
-  document.getElementById('trNoticeHint').hidden = none;
 }
 
 function renderTreatmentProducts(products) {
@@ -831,7 +851,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   const methodNames = Object.keys(t.methods || {}).filter(k => !install || systems.includes(k)).map(k => TREATMENT_METHODS[k] && TREATMENT_METHODS[k].label).filter(Boolean);
   // Chemical life only when a chemical was applied, not on a baiting-only
   // job, and only for the chemicals (not the baits).
-  const chemicalApplied = Object.keys(t.methods || {}).some(k => k !== 'bait');
+  const chemicalApplied = Object.keys(t.methods || {}).some(k => k !== 'bait' && k !== 'physical');
   const productLife = !chemicalApplied ? [] : products.filter(p => !BAIT_PRODUCT_RE.test(`${p.name || ''} ${p.active || ''}`)).map(p => `${p.name || p.active}${p.name && p.active ? ` (${p.active})` : ''}: ${p.life || 'see label'}`);
   const every = ongoingInspectionMonths(treatmentReportFor(q));
   const everyText = `at least every ${every} month${every === 1 ? '' : 's'}`;
@@ -877,10 +897,12 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     // What keeps the installed system working.
     if (systems.includes('barrier')) steps.push('The barrier only works while the treated soil stays unbroken. Do not dig, pave, build or garden against the house without asking us first.');
     if (systems.includes('bait')) steps.push('The bait stations need checking as often as the manufacturer directs. Do not move, cover or remove them.');
+    if (systems.includes('retic')) steps.push('The reticulation system needs recharging when the label\'s life runs out. Keep its filling points clear and don\'t cut or dig through the pipes.');
+    if (systems.includes('physical')) steps.push('The physical barrier only works while it stays whole and visible. Do not cover, cut or build over it.');
   } else if (t.cautions) steps.push(`Safety and re-entry: ${t.cautions}`);
   if (t.nextInspection) steps.push(`Book your next timber pest inspection by ${formatLongDate(t.nextInspection)}. AS 3660.2 recommends one at least every 12 months.`);
   // Three short points, so the signature stays on page 1.
-  steps.push((!install && (t.methods || {}).barrier !== undefined ? 'Do not dig or build against the treated soil without asking us. ' : '') +
+  steps.push((!install && ['barrier', 'retic'].some(k => (t.methods || {})[k] !== undefined) ? 'Do not dig or build against the treated soil without asking us. ' : '') +
     'Keep weep holes clear and leaks fixed, and call us if you see termites or mud leads.');
   // The list stays together, so it never starts at the foot of a page.
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);

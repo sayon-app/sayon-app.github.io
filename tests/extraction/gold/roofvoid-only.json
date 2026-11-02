@@ -90,11 +90,10 @@
    "kind": "equals",
    "path": "areaResult.roofvoid",
    "values": [
-    "CLEAR",
-    null
+    "CLEAR"
    ],
    "weight": 1,
-   "why": "clear where seen"
+   "why": "clear in the front half, the back half under batts: CLEAR (the prompt's rule since 2 Nov)"
   },
   {
    "id": "moisture",

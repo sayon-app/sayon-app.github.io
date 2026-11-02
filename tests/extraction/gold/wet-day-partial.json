@@ -358,11 +358,10 @@
       "kind": "equals",
       "path": "areaResult.subfloor",
       "values": [
-        null,
         "CLEAR"
       ],
       "weight": 1,
-      "why": "only the front half was seen clear: null is the prompt's answer, CLEAR is defensible"
+      "why": "nothing in the front half, the rear flooded and not entered: CLEAR (the prompt's rule since 2 Nov)"
     },
     {
       "id": "findings-at-most-one",

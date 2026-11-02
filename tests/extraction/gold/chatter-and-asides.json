@@ -248,11 +248,10 @@
    "kind": "equals",
    "path": "areaResult.subfloor",
    "values": [
-    "CLEAR",
-    null
+    "CLEAR"
    ],
    "weight": 1,
-   "why": "nothing found in the part seen"
+   "why": "nothing found in the part seen, the back too low to enter: CLEAR (the prompt's rule since 2 Nov)"
   },
   {
    "id": "no-risk",

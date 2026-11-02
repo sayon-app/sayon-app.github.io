@@ -154,3 +154,19 @@ The owner read Test A of the voice test script (one house, six areas) as one lon
 **Effort low, to see whether it cuts the wait** (13 runs on 11 cases): long note 35-38 s against 43-52 s at medium, short notes 10-31 s against 22-26 s, so roughly 20-30% faster. It cost accuracy: 3 misses in 13 runs (an activity grade "high" in a `house-test-1` finding, borerActivity null once on `live-script-one-note`, the screwed-shut roof void missing from highRiskAreas on `negation-traps`), against none in 6 medium runs. Not worth switching; the app stays at medium.
 
 Cost: 18 calls, about $1.70.
+
+## 2026-11-02 (later): the client's PDF from the live note
+
+The app's answer to `live-script-one-note` was put through the real report screen and PDF (Playwright, service worker blocked) and read as the client would read it. Two things came from the AI:
+- **Roof void: "Inspected with limits. Result not recorded."** The inspector said "the front half is fine, no termite activity" with the back half under batts. The prompt left a part-area clear remark out of areaResult, so the client saw no result for the roof void (the check sheet would also have asked the inspector).
+- **"once the bats are removed"** in the recommendations, although the same answer wrote "batts" in obstructions.
+
+The other "Not recorded" rows (nest found, invasive inspection, chemical delignification, previous treatment, restricted access) are things the script never says. That is right for the AI; the inspector fills them on the report.
+
+**Prompt changes:** a clear remark about the part that could be inspected makes the area CLEAR when the rest could not be inspected and the note says why; a corrected mishearing is used in every field, and "bats" to be removed is batts. **Code:** `correctKnownMishearings` now fixes "cordon ... barrier" to Kordon and "bats laid / covering / over the joists / are removed" to batts in the transcript itself. The keys for `live-script-one-note` (roof void CLEAR, no "bats" anywhere), `roofvoid-only`, `wet-day-partial` and `chatter-and-asides` (part-area clear is CLEAR) were tightened to match.
+
+**After** (effort medium): `live-script-one-note` 96/96 on both runs, `roofvoid-only`, `wet-day-partial`, `chatter-and-asides` 100%.
+
+**Speed.** On the long note the AI writes about 5,500 tokens, of which the answer is about 1,300 and the empty fields about 250: the rest is thinking. So leaving out empty fields would save about 2 s of 47, and was not tried. Thinking off instead (`SAYON_THINKING=off`, 6 runs on 4 cases): the long note took 14.5-14.8 s against 43-50 s, short notes 11-12 s against 20-26 s, so about three times faster and about 40% cheaper per note. It cost accuracy: 4 misses in 6 runs, against none with thinking on: the postcode "4-3-double-zero" missed on both `live-script-one-note` runs, "treated before" put in termiteHistory on `negation-traps` though the owner said never treated, and "heaps of them" in a damageDescription on `verdict-and-severity` (critical). The app keeps thinking on.
+
+Cost: 10 calls, about $0.60 (Sonnet 5 at $2 / $10 per million tokens).

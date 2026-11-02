@@ -531,6 +531,16 @@
    "why": "workings on the kitchen bearer"
   },
   {
+   "id": "result-roofvoid",
+   "kind": "equals",
+   "path": "areaResult.roofvoid",
+   "values": [
+    "CLEAR"
+   ],
+   "weight": 2,
+   "why": "'front half is fine, no termite activity' with the back half under batts: clear in all that could be seen. Left out on 2 Nov, so the PDF said 'Result not recorded'"
+  },
+  {
    "id": "risk",
    "kind": "equals",
    "path": "riskLevel",
@@ -626,13 +636,13 @@
    "kind": "forbidAnywhere",
    "terms": [
     "cordon",
-    "bats laid",
+    "bats",
     "bedroom to",
     "in store",
     "asinaceiformes"
    ],
    "weight": 2,
-   "why": "dictation slips corrected"
+   "why": "dictation slips corrected, in every field: 'bats' stayed in the recommendations on 2 Nov"
   }
  ]
 }

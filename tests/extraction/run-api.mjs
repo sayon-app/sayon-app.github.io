@@ -19,6 +19,8 @@ const repo = join(here, '..', '..');
 const MODEL = 'claude-sonnet-5';
 const MAX_TOKENS = 16000;
 const EFFORT = process.env.SAYON_EFFORT || 'medium'; // override only to compare settings
+// SAYON_THINKING=off sends thinking disabled, to measure speed against accuracy. The app leaves thinking on.
+const THINKING_OFF = process.env.SAYON_THINKING === 'off';
 
 // The text of a `const NAME = \`...\`` template literal in a source file.
 function readTemplate(file, name) {
@@ -55,12 +57,12 @@ for (let k = 1; k <= runs; k++) {
   const res = await fetch(`${base}/v1/messages`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: MODEL, max_tokens: MAX_TOKENS, output_config: { effort: EFFORT }, system, messages: [{ role: 'user', content: transcript }] }),
+    body: JSON.stringify({ model: MODEL, max_tokens: MAX_TOKENS, output_config: { effort: EFFORT }, ...(THINKING_OFF ? { thinking: { type: 'disabled' } } : {}), system, messages: [{ role: 'user', content: transcript }] }),
   });
   const data = await res.json();
   if (!res.ok) { console.error(`run ${k}: HTTP ${res.status} ${JSON.stringify(data).slice(0, 300)}`); process.exit(1); }
   const text = (data.content || []).map(b => b.text || '').join('');
   const file = join(outDir, `${id}-run${k}.json`);
   writeFileSync(file, text);
-  console.log(`run ${k}: ${data.stop_reason}, ${data.usage?.input_tokens} in / ${data.usage?.output_tokens} out, ${((Date.now() - started) / 1000).toFixed(1)} s (effort ${EFFORT}) -> ${file}`);
+  console.log(`run ${k}: ${data.stop_reason}, ${data.usage?.input_tokens} in / ${data.usage?.output_tokens} out, ${((Date.now() - started) / 1000).toFixed(1)} s (effort ${EFFORT}${THINKING_OFF ? ', thinking off' : ''}) -> ${file}`);
 }

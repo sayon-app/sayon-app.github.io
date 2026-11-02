@@ -122,7 +122,7 @@ function planPathLength(pts, closed) {
 }
 function sitePlanLength(plan, k) {
   if (!plan || !plan.mpu) return 0;
-  return planLayerItems(plan).filter(it => it.k === k).reduce((a, it) => a + planPathLength(it.pts), 0) * plan.mpu;
+  return planLayerItems(plan).filter(it => it.k === k).reduce((a, it) => a + planPathLength(it.pts, it.loop), 0) * plan.mpu;
 }
 function formatPlanMetres(m) {
   return `${m < 10 ? Math.round(m * 10) / 10 : Math.round(m)} m`;
@@ -268,6 +268,10 @@ function planRotatePts(pts, c, deg) {
 
 // The outline of a building, area or shape in plan units: its corners, in
 // order, turned when it's turned. Lines give their points.
+// A line that goes all the way round (it.loop) keeps each corner once; to
+// draw or measure it, it runs back to its first corner.
+const planLinePts = it => it.loop && (it.pts || []).length > 2 ? it.pts.concat([it.pts[0]]) : (it.pts || []);
+
 function planItemPts(it) {
   if (it.pts) return it.pts;
   const pts = rectPts(it.x, it.y, it.w, it.h);
@@ -543,14 +547,15 @@ function drawSitePlan(P, plan, opts = {}) {
       drawPlanShape(P, it.k, planItemPts(it), it.label, mpu && sym.size ? (dims ? { size: `${formatPlanMetres(dims.w * mpu).replace(' m', '')} × ${formatPlanMetres(dims.h * mpu)}` } : { mpu }) : {});
     } else if (sym.kind === 'area') drawPlanShape(P, it.k, it.pts || [], it.label, { mpu: it.k === 'outline' ? mpu : 0 });
     else if (sym.kind === 'line') {
-      drawPlanLine(P, it.k, it.pts || [], plan.mpu);
-      const len = mpu && sym.size && it.pts && it.pts.length > 1 ? formatPlanMetres(planPathLength(it.pts) * mpu) : '';
+      const lp = planLinePts(it);
+      drawPlanLine(P, it.k, lp, plan.mpu);
+      const len = mpu && sym.size && lp.length > 1 ? formatPlanMetres(planPathLength(lp) * mpu) : '';
       const words = [it.label, len].filter(Boolean).join(' · ');
-      if (words && it.pts && it.pts.length > 1) {
+      if (words && lp.length > 1) {
         // On the longest stretch, above the line.
         let best = 1;
-        it.pts.forEach((q, i) => { if (i && Math.hypot(q[0] - it.pts[i - 1][0], q[1] - it.pts[i - 1][1]) > Math.hypot(it.pts[best][0] - it.pts[best - 1][0], it.pts[best][1] - it.pts[best - 1][1])) best = i; });
-        const a = it.pts[best - 1], b = it.pts[best];
+        lp.forEach((q, i) => { if (i && Math.hypot(q[0] - lp[i - 1][0], q[1] - lp[i - 1][1]) > Math.hypot(lp[best][0] - lp[best - 1][0], lp[best][1] - lp[best - 1][1])) best = i; });
+        const a = lp[best - 1], b = lp[best];
         // A third of the way along, as stations often sit mid-wall.
         P.text(a[0] + (b[0] - a[0]) * 0.33, a[1] + (b[1] - a[1]) * 0.33 - 20, words, { size: 18, color: it.k === 'barrier' ? PLAN_INK.blueDark : PLAN_INK.muted, bold: it.k === 'barrier', halo: true });
       }
@@ -836,14 +841,14 @@ function renderSitePlanTray() {
 }
 
 const sitePlanSelected = () => sitePlanEditor.plan.items.find(it => it.id === sitePlanEditor.sel) || null;
-const sitePlanClosed = it => SITE_PLAN_SYMBOLS[it.k].kind !== 'line';
+const sitePlanClosed = it => SITE_PLAN_SYMBOLS[it.k].kind !== 'line' || !!it.loop;
 
 function sitePlanHint() {
   const E = sitePlanEditor;
   if (E.grab || E.space) return 'Moving the map: drag it to look around, pinch or + and − to zoom. Tap Grab again to draw.';
   if (E.drawing) {
     const area = SITE_PLAN_SYMBOLS[(E.plan.items.find(x => x.id === E.drawing) || {}).k || 'fence'].kind === 'area';
-    return area ? 'Tap each corner of the building in turn. Tap the first corner again, or Finish shape, to close it.' : 'Tap each corner of the line. Tap the end of a matching line to join them, or Finish line when it\'s done.';
+    return area ? 'Tap each corner of the building in turn. Tap the first corner again, or Finish shape, to close it.' : 'Tap each corner of the line. Tap its first corner to go all the way round, the end of a matching line to join them, or Finish line.';
   }
   if (E.tool) {
     const s = SITE_PLAN_SYMBOLS[E.tool];
@@ -856,15 +861,18 @@ function sitePlanHint() {
   const sel = sitePlanSelected();
   if (E.drag && E.drag.mode === 'turn' && sel) return `Turned to ${Math.round(sel.rot || 0)}°. It clicks at every 15°.`;
   if (sel && sitePlanHandles(sel)) {
-    const wall = sitePlanClosed(sel) ? 'wall' : 'stretch';
+    const wall = sitePlanClosed(sel) && !sel.loop ? 'wall' : 'stretch';
     if (E.part && E.part.type === 'corner') {
       const n = planItemPts(sel).length, end = E.part.i === 0 || E.part.i === n - 1;
-      return sitePlanClosed(sel) ? 'Drag the corner to reshape it. Below: step it in for an L shape, or remove it.'
+      return sel.loop ? 'Drag the corner to reshape the line. Below: step it in, or remove it.'
+        : sitePlanClosed(sel) ? 'Drag the corner to reshape it. Below: step it in for an L shape, or remove it.'
         : end ? 'Drag the end onto another line\'s end to join them. Below: remove it.'
         : 'Drag the corner to reshape it. Below: split the line here, or remove it.';
     }
-    if (E.part && E.part.type === 'wall') return `Drag the pink tab to push or pull this ${wall}. Below: its real length, or add a corner in it.`;
-    return sitePlanClosed(sel) ? 'Drag a white corner or a wall\'s pink tab to reshape it, ↻ to turn it, or the middle to move it.'
+    if (E.part && E.part.type === 'wall') return sel.loop ? 'Drag the pink tab to push or pull this stretch. Below: its real length, add a corner, or leave it out to open the line.'
+      : `Drag the pink tab to push or pull this ${wall}. Below: its real length, or add a corner in it.`;
+    return sel.loop ? 'All the way round. Drag a white corner or a pink tab to reshape it, ↻ to turn it, or the line itself to move it.'
+      : sitePlanClosed(sel) ? 'Drag a white corner or a wall\'s pink tab to reshape it, ↻ to turn it, or the middle to move it.'
       : 'Drag a white corner or a pink tab to reshape the line, ↻ to turn it, or the line itself to move it.';
   }
   if (sel) return 'Drag to move it. Name it below, or delete it.';
@@ -880,7 +888,7 @@ function sitePlanHint() {
 function sitePlanHandles(it) {
   const kind = SITE_PLAN_SYMBOLS[it.k].kind;
   if (!['rect', 'area', 'line'].includes(kind)) return null;
-  const pts = planItemPts(it), closed = kind !== 'line';
+  const pts = planItemPts(it), closed = sitePlanClosed(it);
   if (pts.length < (closed ? 3 : 2)) return null;
   const u = sitePlanEditor.upx, walls = [];
   for (let i = 0; i < pts.length - (closed ? 0 : 1); i++) {
@@ -1005,7 +1013,7 @@ function renderSitePlanSelBar() {
   const part = h && E.part && (E.part.type === 'corner' ? h.corners[E.part.i] : h.walls[E.part.i]) ? E.part : null;
   document.getElementById('spPart').hidden = !part;
   if (!part) return;
-  const wallWord = h.closed ? 'wall' : 'stretch';
+  const wallWord = h.closed && !sel.loop ? 'wall' : 'stretch';
   document.getElementById('spPartName').textContent = part.type === 'corner' ? `Corner ${part.i + 1} of ${h.corners.length}` : `This ${wallWord}`;
   document.getElementById('spPartLenRow').hidden = part.type !== 'wall';
   if (part.type === 'wall') {
@@ -1017,8 +1025,11 @@ function renderSitePlanSelBar() {
   document.getElementById('spPartAdd').hidden = part.type !== 'wall';
   document.getElementById('spPartStep').hidden = part.type !== 'corner' || !h.closed;
   document.getElementById('spPartRemove').hidden = part.type !== 'corner' || h.corners.length <= (h.closed ? 3 : 2);
-  // A line can be cut in two at any corner but its ends.
-  document.getElementById('spPartSplit').hidden = part.type !== 'corner' || h.closed || part.i === 0 || part.i === h.corners.length - 1;
+  // A line can be cut in two at any corner but its ends; one that goes all
+  // the way round opens up by leaving a stretch out.
+  const split = document.getElementById('spPartSplit');
+  split.textContent = sel.loop ? 'Leave this stretch out' : 'Split the line here';
+  split.hidden = sel.loop ? part.type !== 'wall' : part.type !== 'corner' || h.closed || part.i === 0 || part.i === h.corners.length - 1;
 }
 
 function renderSitePlanEditor() {
@@ -1099,7 +1110,7 @@ function onSitePlanWheel(e) {
 function sitePlanItemUnits(it) {
   const sym = SITE_PLAN_SYMBOLS[it.k];
   if (sym.kind === 'rect') { const d = planRectDims(it); return d ? d.w : planPathLength(it.pts, true); }
-  if (sym.kind === 'line') return (it.pts || []).length > 1 ? planPathLength(it.pts) : 0;
+  if (sym.kind === 'line') return (it.pts || []).length > 1 ? planPathLength(it.pts, it.loop) : 0;
   if (sym.kind === 'area') return (it.pts || []).length > 2 ? planPathLength(it.pts, true) : 0;
   return 0;
 }
@@ -1191,7 +1202,7 @@ function planSnapInFrame(q, o, deg, g) {
 // Is p on the item?
 function sitePlanItemHit(it, p) {
   const kind = SITE_PLAN_SYMBOLS[it.k].kind;
-  if (kind === 'line') return it.pts.some((a, i) => i && planSegDist(p, it.pts[i - 1], a) < 24);
+  if (kind === 'line') { const lp = planLinePts(it); return lp.some((a, i) => i && planSegDist(p, lp[i - 1], a) < 24); }
   if (kind === 'rect' || kind === 'area') {
     // Inside the shape, or on one of its walls.
     const pts = planItemPts(it);
@@ -1341,7 +1352,7 @@ function sitePlanJoinAt(p, exceptId, k) {
     const kind = SITE_PLAN_SYMBOLS[it.k].kind;
     if (kind !== 'line' && kind !== 'rect' && kind !== 'area') return;
     const pts = planItemPts(it);
-    const spots = kind === 'line' ? (pts.length > 1 ? [[pts[0], 0], [pts[pts.length - 1], 1]] : []) : pts.map(q => [q, null]);
+    const spots = kind === 'line' ? (pts.length > 1 && !it.loop ? [[pts[0], 0], [pts[pts.length - 1], 1]] : []) : pts.map(q => [q, null]);
     // A matching line's end reaches a finger's width; other ends and wall
     // corners only reach a little, so a line can still run a grid square off a wall.
     const reach = (kind === 'line' ? (it.k === k ? 22 : 12) : 8) * E.upx;
@@ -1356,7 +1367,7 @@ function sitePlanJoinAt(p, exceptId, k) {
 // The ends a new or reshaped line of kind k could join, for the rings.
 function sitePlanJoinEnds(k, exceptId) {
   return planLayerItems(sitePlanEditor.plan, sitePlanEditor.layer)
-    .filter(it => it.k === k && it.id !== exceptId && sitePlanIsLine(it) && (it.pts || []).length > 1)
+    .filter(it => it.k === k && it.id !== exceptId && sitePlanIsLine(it) && !it.loop && (it.pts || []).length > 1)
     .flatMap(it => [it.pts[0], it.pts[it.pts.length - 1]]);
 }
 
@@ -1366,8 +1377,16 @@ function sitePlanJoinEnds(k, exceptId) {
 // line that was split don't join again when only some other corner moves.
 function mergeSitePlanLine(it, ends = 'both') {
   const E = sitePlanEditor;
-  if (!sitePlanIsLine(it) || (it.pts || []).length < 2) return false;
+  if (!sitePlanIsLine(it) || it.loop || (it.pts || []).length < 2) return false;
   let joined = false, useFirst = ends !== 'last', useLast = ends !== 'first';
+  // A line whose ends meet goes all the way round.
+  const closeUp = () => {
+    const n = it.pts.length;
+    if (n < 4 || !planSame(it.pts[0], it.pts[n - 1])) return false;
+    it.pts.pop(); it.loop = true; delete it.rot;
+    return true;
+  };
+  if (closeUp()) return true;
   while (useFirst || useLast) {
     const first = it.pts[0], last = it.pts[it.pts.length - 1];
     if (planSame(first, last)) break;
@@ -1393,6 +1412,7 @@ function mergeSitePlanLine(it, ends = 'both') {
     E.plan.items = E.plan.items.filter(x => x !== o);
     if (E.sel === o.id) E.sel = it.id;
     joined = true;
+    if (closeUp()) break;
   }
   return joined;
 }
@@ -1438,6 +1458,10 @@ function onSitePlanDown(e) {
       // corner closes a shape.
       if (Math.hypot(last[0] - gp[0], last[1] - gp[1]) < 20) { finishSitePlanLine(); return; }
       if (sym.kind === 'area' && it.pts.length > 2 && Math.hypot(it.pts[0][0] - gp[0], it.pts[0][1] - gp[1]) < 30) { finishSitePlanLine(); return; }
+      // A line back to its first corner goes all the way round.
+      if (sym.kind === 'line' && it.pts.length > 2 && Math.hypot(it.pts[0][0] - p[0], it.pts[0][1] - p[1]) < 22 * E.upx) {
+        pushSitePlanUndo(); it.loop = true; finishSitePlanLine(); return;
+      }
       pushSitePlanUndo(); it.pts.push(gp);
       // Reaching the end of another line of its kind joins them, and that's the line done.
       if (join && join.it.k === tool && join.end != null) { finishSitePlanLine(); return; }
@@ -1757,7 +1781,20 @@ function removeSitePlanCorner() {
 // to move, delete or name apart.
 function splitSitePlanLine() {
   const E = sitePlanEditor, it = sitePlanSelected(), part = E.part;
-  if (!sitePlanIsLine(it) || !part || part.type !== 'corner' || part.i <= 0 || part.i >= it.pts.length - 1) return;
+  if (!sitePlanIsLine(it) || !part) return;
+  if (it.loop) {
+    // All the way round: leaving the picked stretch out opens it there, say
+    // for a driveway or a gate.
+    if (part.type !== 'wall') return;
+    pushSitePlanUndo();
+    const i = part.i;
+    it.pts = it.pts.slice(i + 1).concat(it.pts.slice(0, i + 1));
+    delete it.loop;
+    E.part = null;
+    renderSitePlanEditor();
+    return;
+  }
+  if (part.type !== 'corner' || part.i <= 0 || part.i >= it.pts.length - 1) return;
   pushSitePlanUndo();
   const rest = Object.assign({}, JSON.parse(JSON.stringify(it)), { id: planId(), pts: it.pts.slice(part.i).map(q => q.slice()) });
   it.pts = it.pts.slice(0, part.i + 1);

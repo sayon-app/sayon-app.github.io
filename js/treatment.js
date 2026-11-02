@@ -365,11 +365,14 @@ function openTreatmentSitePlan(layer) {
     const qty = document.querySelector('#trMethods [data-qty="bait"]');
     if (n && box && !box.checked) { box.checked = true; onTreatmentMethodToggle(box); }
     if (n && qty && !qty.value.trim()) qty.value = String(n);
-    // A plan with a scale gives the barrier's linear metres.
-    const lm = Math.round(sitePlanLength(plan, 'barrier'));
-    const bBox = document.querySelector('#trMethods input[data-key="barrier"]');
-    const bQty = document.querySelector('#trMethods [data-qty="barrier"]');
-    if (lm && bBox && bBox.checked && bQty && !bQty.value.trim()) bQty.value = String(lm);
+    // A plan with a scale gives the linear metres of each barrier or
+    // reticulation system ticked.
+    ['barrier', 'retic', 'physical'].forEach(k => {
+      const lm = Math.round(sitePlanLength(plan, k));
+      const lBox = document.querySelector(`#trMethods input[data-key="${k}"]`);
+      const lQty = document.querySelector(`#trMethods [data-qty="${k}"]`);
+      if (lm && lBox && lBox.checked && lQty && !lQty.value.trim()) lQty.value = String(lm);
+    });
   });
   if (layer === 'sub') setSitePlanLayer('sub');
 }

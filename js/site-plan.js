@@ -25,6 +25,7 @@ const PLAN_INK = {
   ink: '#0C121C', muted: '#566A7F', faint: '#C8D5E3', paper: '#FFFFFF',
   building: '#EEF2F7', shed: '#F5F7FA',
   blue: '#2F6BFF', blueDark: '#1D4ED8', bluePale: '#DCE6FF',
+  purple: '#7C3AED',
   pink: '#FF3D8B',
   green: '#15803D', greenFill: '#22C55E',
   red: '#C03026', redDark: '#8E1F18',
@@ -69,6 +70,9 @@ const SITE_PLAN_SYMBOLS = {
   meter:     { kind: 'point', group: 'services', label: 'Meter box', legend: 'Meter box', z: 3, ph: 'e.g. Electricity meter' },
   access:    { kind: 'point', group: 'services', label: 'Access point', legend: 'Subfloor or roof access', z: 3, ph: 'e.g. Subfloor hatch' },
   barrier:   { kind: 'line', group: 'treat', label: 'Chemical barrier', legend: 'Chemical barrier (treated soil)', z: 2, ph: 'e.g. Trenched and rodded', size: true },
+  retic:     { kind: 'line', group: 'treat', label: 'Reticulation', legend: 'Reticulation system', z: 2, ph: 'e.g. Laid in the garden beds', size: true },
+  fillpoint: { kind: 'point', group: 'treat', label: 'Filling point', legend: 'Reticulation filling point', z: 3, ph: 'e.g. Beside the meter box' },
+  physical:  { kind: 'line', group: 'treat', label: 'Physical barrier', legend: 'Physical termite barrier', z: 2, ph: 'e.g. Perimeter sheet at slab edge', size: true },
   treated:   { kind: 'point', group: 'treat', label: 'Treated spot', legend: 'Direct treatment (foam, dust or spray)', z: 3, ph: 'e.g. Foamed wall cavity' },
   untreated: { kind: 'line', group: 'treat', label: 'Not treated', legend: 'Not treated', z: 2, ph: 'e.g. Under paving, no access', size: true },
   noaccess:  { kind: 'rect', group: 'treat', label: 'No access area', legend: 'Area not inspected or treated', z: 1, def: { w: 200, h: 100, label: 'No access' }, ph: 'e.g. Under rear deck' },
@@ -189,6 +193,10 @@ function sitePlanSummary(plan) {
   });
   const barrier = sitePlanLength(plan, 'barrier');
   if (count('barrier')) bits.push(`a chemical barrier${barrier ? ` (about ${formatPlanMetres(barrier)})` : ''}`);
+  const retic = sitePlanLength(plan, 'retic'), physical = sitePlanLength(plan, 'physical');
+  if (count('retic')) bits.push(`a reticulation system${retic ? ` (about ${formatPlanMetres(retic)})` : ''}${count('fillpoint') ? ` with ${count('fillpoint')} filling point${count('fillpoint') === 1 ? '' : 's'}` : ''}`);
+  else if (count('fillpoint')) bits.push(`${count('fillpoint')} reticulation filling point${count('fillpoint') === 1 ? '' : 's'}`);
+  if (count('physical')) bits.push(`a physical barrier${physical ? ` (about ${formatPlanMetres(physical)})` : ''}`);
   if (count('treated')) bits.push(`${count('treated')} direct treatment spot${count('treated') === 1 ? '' : 's'}`);
   if (count('untreated') + count('noaccess')) bits.push('areas not treated');
   if (count('activity')) bits.push(`${count('activity')} place${count('activity') === 1 ? '' : 's'} termite activity or damage was found`);
@@ -334,6 +342,10 @@ function drawPlanSymbol(P, k, x, y, it = {}, status) {
       P.poly([[x - 20, y - 20], [x + 20, y + 20]], { stroke: I.ink, lw: 2.5, close: false });
       P.poly([[x + 20, y - 20], [x - 20, y + 20]], { stroke: I.ink, lw: 2.5, close: false });
       break;
+    case 'fillpoint':
+      P.circle(x, y, 16, { fill: I.paper, stroke: I.blue, lw: 4 });
+      P.text(x, y + 1, 'F', { size: 18, bold: true, color: I.blueDark });
+      break;
     case 'notice':
       P.poly(rectPts(x - 22, y - 16, 44, 32), { fill: I.pink, stroke: '#C2185B', lw: 2 });
       P.text(x, y + 1, 'N', { size: 22, bold: true, color: '#FFFFFF' });
@@ -423,6 +435,8 @@ function planRectStyle(k) {
 function planLineStyle(k) {
   const I = PLAN_INK;
   return k === 'barrier' ? { stroke: I.blue, lw: 9 }
+    : k === 'retic' ? { stroke: I.blue, lw: 9, inner: '#FFFFFF', innerDash: [10, 12] }
+    : k === 'physical' ? { stroke: I.purple, lw: 7, ticks: true, tickSide: 'both' }
     : k === 'untreated' ? { stroke: I.muted, lw: 6, dash: [14, 10] }
     : k === 'retaining' ? { stroke: I.ink, lw: 6, ticks: true }
     : k === 'pierrow' ? { stroke: '#AAB7C4', lw: 2, dash: [6, 8], piers: true }
@@ -465,15 +479,18 @@ function drawPlanLine(P, k, pts, mpu) {
   if (pts.length < 2) return;
   const o = planLineStyle(k);
   P.poly(pts, Object.assign({ close: false }, o));
-  // A brick dwarf wall reads as a double line.
-  if (o.inner) P.poly(pts, { stroke: o.inner, lw: 4, close: false });
+  // A brick dwarf wall reads as a double line; a reticulation pipe as a
+  // dashed core in the treated band.
+  if (o.inner) P.poly(pts, { stroke: o.inner, lw: o.innerDash ? 3 : 4, dash: o.innerDash, close: false });
   if (o.piers) pierRowPoints(pts, mpu).forEach(q => drawPlanSymbol(P, 'pier', q[0], q[1]));
-  // A retaining wall carries ticks on its low side.
+  // A retaining wall carries ticks on its low side; a physical barrier
+  // ticks right across.
   if (o.ticks) pts.forEach((a, i) => {
     if (!i) return;
     const b = pts[i - 1], L = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1;
     const ux = (a[0] - b[0]) / L, uy = (a[1] - b[1]) / L;
-    for (let d = 10; d < L; d += 22) P.poly([[b[0] + ux * d, b[1] + uy * d], [b[0] + ux * d - uy * 12, b[1] + uy * d + ux * 12]], { stroke: o.stroke, lw: 3, close: false });
+    const back = o.tickSide === 'both' ? 12 : 0;
+    for (let d = 10; d < L; d += 22) P.poly([[b[0] + ux * d + uy * back, b[1] + uy * d - ux * back], [b[0] + ux * d - uy * 12, b[1] + uy * d + ux * 12]], { stroke: o.stroke, lw: 3, close: false });
   });
 }
 
@@ -840,7 +857,12 @@ function sitePlanHint() {
   if (E.drag && E.drag.mode === 'turn' && sel) return `Turned to ${Math.round(sel.rot || 0)}°. It clicks at every 15°.`;
   if (sel && sitePlanHandles(sel)) {
     const wall = sitePlanClosed(sel) ? 'wall' : 'stretch';
-    if (E.part && E.part.type === 'corner') return `Drag the corner to reshape it. Below: ${sitePlanClosed(sel) ? 'step it in for an L shape, or ' : ''}remove it.`;
+    if (E.part && E.part.type === 'corner') {
+      const n = planItemPts(sel).length, end = E.part.i === 0 || E.part.i === n - 1;
+      return sitePlanClosed(sel) ? 'Drag the corner to reshape it. Below: step it in for an L shape, or remove it.'
+        : end ? 'Drag the end onto another line\'s end to join them. Below: remove it.'
+        : 'Drag the corner to reshape it. Below: split the line here, or remove it.';
+    }
     if (E.part && E.part.type === 'wall') return `Drag the pink tab to push or pull this ${wall}. Below: its real length, or add a corner in it.`;
     return sitePlanClosed(sel) ? 'Drag a white corner or a wall\'s pink tab to reshape it, ↻ to turn it, or the middle to move it.'
       : 'Drag a white corner or a pink tab to reshape the line, ↻ to turn it, or the line itself to move it.';
@@ -995,6 +1017,8 @@ function renderSitePlanSelBar() {
   document.getElementById('spPartAdd').hidden = part.type !== 'wall';
   document.getElementById('spPartStep').hidden = part.type !== 'corner' || !h.closed;
   document.getElementById('spPartRemove').hidden = part.type !== 'corner' || h.corners.length <= (h.closed ? 3 : 2);
+  // A line can be cut in two at any corner but its ends.
+  document.getElementById('spPartSplit').hidden = part.type !== 'corner' || h.closed || part.i === 0 || part.i === h.corners.length - 1;
 }
 
 function renderSitePlanEditor() {
@@ -1010,7 +1034,7 @@ function renderSitePlanEditor() {
   document.getElementById('spUndo').disabled = !E.undo.length;
   document.getElementById('spNorth').textContent = `North: ${['up', 'up-right', 'right', 'down-right', 'down', 'down-left', 'left', 'up-left'][E.plan.north || 0]}`;
   document.getElementById('spScaleNote').textContent = E.plan.mpu
-    ? 'The plan has a scale. Lengths show on the barrier and walls, and the barrier\'s metres fill the record.'
+    ? 'The plan has a scale. Lengths show on the treatment lines and walls, and fill the record\'s metres.'
     : 'Tip: tap the house, then type its real width, and the plan works out every length from it.';
   document.getElementById('spLegend').innerHTML = sitePlanLegendHTML(E.plan, { layer: E.layer });
   const sum = E.layer === 'sub' ? sitePlanSubSummary(E.plan) : sitePlanSummary(E.plan);
@@ -1337,23 +1361,29 @@ function sitePlanJoinEnds(k, exceptId) {
 }
 
 // Join the line to any line of its kind it now meets end to end. The joined
-// line keeps this one's name (or the other's, if this has none).
-function mergeSitePlanLine(it) {
+// line keeps this one's name (or the other's, if this has none). ends says
+// which of its ends just moved ('first', 'last' or both), so two halves of a
+// line that was split don't join again when only some other corner moves.
+function mergeSitePlanLine(it, ends = 'both') {
   const E = sitePlanEditor;
   if (!sitePlanIsLine(it) || (it.pts || []).length < 2) return false;
-  let joined = false;
-  for (let guard = 0; guard < 20; guard++) {
+  let joined = false, useFirst = ends !== 'last', useLast = ends !== 'first';
+  while (useFirst || useLast) {
     const first = it.pts[0], last = it.pts[it.pts.length - 1];
     if (planSame(first, last)) break;
+    const meets = q => (useFirst && planSame(q, first)) || (useLast && planSame(q, last));
     const o = E.plan.items.find(x => x !== it && x.k === it.k && (x.layer || 'site') === (it.layer || 'site') && (x.pts || []).length > 1 &&
-      [x.pts[0], x.pts[x.pts.length - 1]].some(q => planSame(q, first) || planSame(q, last)));
+      [x.pts[0], x.pts[x.pts.length - 1]].some(meets));
     if (!o) break;
     const op = o.pts.map(q => q.slice()), oF = op[0], oL = op[op.length - 1];
     let pts, at;
-    if (planSame(last, oF)) { at = it.pts.length - 1; pts = it.pts.concat(op.slice(1)); }
-    else if (planSame(last, oL)) { at = it.pts.length - 1; pts = it.pts.concat(op.reverse().slice(1)); }
-    else if (planSame(first, oL)) { at = op.length - 1; pts = op.concat(it.pts.slice(1)); }
-    else { at = op.length - 1; pts = op.reverse().concat(it.pts.slice(1)); }
+    // Which end of this line met, and which end of the other one.
+    const atLast = useLast && (planSame(last, oF) || planSame(last, oL));
+    const otherFirst = atLast ? planSame(last, oF) : planSame(first, oF);
+    if (atLast) { at = it.pts.length - 1; pts = it.pts.concat((otherFirst ? op : op.reverse()).slice(1)); }
+    else { at = op.length - 1; pts = (otherFirst ? op.reverse() : op).concat(it.pts.slice(1)); }
+    // Each end joins once: the other line's far end didn't move.
+    if (atLast) useLast = false; else useFirst = false;
     // Where two stretches run straight on, the join isn't a corner.
     const a = pts[at - 1], c = pts[at], b = pts[at + 1];
     if (a && b && Math.abs((c[0] - a[0]) * (b[1] - c[1]) - (c[1] - a[1]) * (b[0] - c[0])) < 1 && (c[0] - a[0]) * (b[0] - c[0]) + (c[1] - a[1]) * (b[1] - c[1]) > 0) pts.splice(at, 1);
@@ -1604,7 +1634,12 @@ function onSitePlanUp(e) {
   }
   if (it && d.moved && ['corner', 'wall', 'turn'].includes(d.mode)) keepSitePlanItemIn(it);
   // A line put down end to end with another of its kind joins it.
-  if (it && d.moved && ['corner', 'move'].includes(d.mode) && mergeSitePlanLine(it)) E.part = null;
+  if (it && d.moved && sitePlanIsLine(it)) {
+    // Only an end that moved joins: a dragged end corner, or the whole line moved.
+    const n = it.pts.length, shifted = d.orig.pts && !planSame(d.orig.pts[0], it.pts[0]);
+    const ends = d.mode === 'corner' ? (d.i === 0 ? 'first' : d.i === n - 1 ? 'last' : null) : d.mode === 'move' && shifted ? 'both' : null;
+    if (ends && mergeSitePlanLine(it, ends)) E.part = null;
+  }
   // A move only counts for undo once something moved.
   if (d.before && d.moved) { E.undo.push(d.before); if (E.undo.length > 40) E.undo.shift(); }
   renderSitePlanEditor();
@@ -1714,6 +1749,20 @@ function removeSitePlanCorner() {
   pushSitePlanUndo();
   sitePlanToShape(it);
   it.pts.splice(part.i, 1);
+  E.part = null;
+  renderSitePlanEditor();
+}
+
+// Cut a line in two at the picked corner: the far part becomes its own line,
+// to move, delete or name apart.
+function splitSitePlanLine() {
+  const E = sitePlanEditor, it = sitePlanSelected(), part = E.part;
+  if (!sitePlanIsLine(it) || !part || part.type !== 'corner' || part.i <= 0 || part.i >= it.pts.length - 1) return;
+  pushSitePlanUndo();
+  const rest = Object.assign({}, JSON.parse(JSON.stringify(it)), { id: planId(), pts: it.pts.slice(part.i).map(q => q.slice()) });
+  it.pts = it.pts.slice(0, part.i + 1);
+  delete it.rot; delete rest.rot;
+  E.plan.items.splice(E.plan.items.indexOf(it) + 1, 0, rest);
   E.part = null;
   renderSitePlanEditor();
 }

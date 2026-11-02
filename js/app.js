@@ -4996,6 +4996,15 @@ function mergeSpokenQuote(q) {
 //   - the system type doesn't clear a brand a plate scan read unless the
 //     type itself changed
 // Resolves once the staggered field writes are done, so a caller can save.
+// True when a note covers the subfloor and not the outside of the house,
+// and never mentions weep holes (as dictated: "weep", "wee poles", "weep
+// holds"), so a weepHoles answer from it can only be a misread vent remark.
+function weepHolesFromSubfloorNote(values, transcript) {
+  const areas = values.areaStatus && typeof values.areaStatus === 'object' ? Object.keys(values.areaStatus) : [];
+  if (!areas.includes('subfloor') || areas.includes('exterior')) return false;
+  return !/\bwe+p|\bwee ?(?:p|h)oles?\b/i.test(String(transcript || ''));
+}
+
 function populateFields(data, transcript) {
   if (!data || typeof data !== 'object') return Promise.resolve();
   // Each field lands a moment after the last. If another job is opened in
@@ -5134,6 +5143,10 @@ function populateFields(data, transcript) {
     if (String(values.existingSystem).trim().toLowerCase() === NO_SYSTEM_FOUND.toLowerCase() && !hasIdentifiedSystem(reportData.existingSystem || '')) values.existingSystem = NO_SYSTEM_FOUND;
     else delete values.existingSystem;
   }
+  // Weep holes are on the outside walls. A note about the subfloor alone
+  // that never says "weep" sometimes reads "vents are clear" as weep holes
+  // clear, which would wipe "bridged" from an earlier exterior note.
+  if (values.weepHoles && weepHolesFromSubfloorNote(values, transcript)) delete values.weepHoles;
   NIL_TEXT_KEYS.forEach(k => { if (values[k] !== undefined && values[k] !== null && isNilText(values[k])) values[k] = k === 'hinderedAreas' ? '' : null; });
   mergeBorerExtraction(values);
 

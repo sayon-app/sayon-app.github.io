@@ -26,6 +26,9 @@ const QUOTE_CATALOGUE = {
   barrier_job:   { desc: 'Chemical soil treatment (termite barrier)', unit: 'job', price: 2400 },
   bait_install:  { desc: 'Termite baiting system: supply and install stations', unit: 'station', price: 165 },
   bait_monitor:  { desc: 'Bait station monitoring and servicing (12 months)', unit: 'year', price: 480 },
+  retic_lm:      { desc: 'Reticulation system: install and charge with termiticide', unit: 'lm', price: 95 },
+  physical_lm:   { desc: 'Physical termite barrier: supply and install', unit: 'lm', price: 120 },
+  nest:          { desc: 'Locate and treat the termite nest', unit: 'job', price: 450 },
   system_topup:  { desc: 'Top-up / re-treatment of existing termite management system', unit: 'job', price: 1500 },
   treatment:     { desc: 'Termite management treatment', unit: 'job', price: 1800 },
   direct:        { desc: 'Direct treatment of active termite workings', unit: 'area', price: 380 },
@@ -232,22 +235,29 @@ function collectQuoteSources() {
 }
 
 // ── LINE ITEMS FROM A REPORT ────────────────────────────────────────────────
+// The systems a recommendation can name, each with the words that name it.
+// Topping up what's already there wins over the kind of system it is.
+const TREATMENT_KIND_RES = [
+  ['bait', /exterra|sentricon|trelona|bait/],
+  ['system', /existing system|top.?up|re-?charge/],
+  ['retic', /reticulat/],
+  ['physical', /homeguard|kordon|termimesh|granitgard|physical/],
+  ['barrier', /termidor|altriset|phantom|premise|fipronil|chlorantraniliprole|bifenthrin|biflex|talstar|maxxthor|chemical|soil treat|barrier/],
+];
+
 function classifyTreatment(text) {
-  const t = (text || '').toLowerCase();
-  if (/exterra|sentricon|trelona|bait/.test(t)) return 'bait';
-  if (/homeguard|kordon|termimesh|reticulation|physical|existing system|top.?up/.test(t)) return 'system';
-  if (/termidor|altriset|phantom|premise|fipronil|chlorantraniliprole|bifenthrin|biflex|talstar|maxxthor|chemical|barrier|soil treat/.test(t)) return 'barrier';
-  return 'generic';
+  return treatmentKinds(text)[0] || 'generic';
 }
 
-// Every system the recommendation names, in the order classifyTreatment
-// checks them. "chemical barrier or baiting system" gives ['bait', 'barrier'].
+// Every system the recommendation names, in that order. "chemical barrier
+// or baiting system" gives ['bait', 'barrier'].
 function treatmentKinds(text) {
   const t = (text || '').toLowerCase();
-  const kinds = [];
-  if (/exterra|sentricon|trelona|bait/.test(t)) kinds.push('bait');
-  if (/homeguard|kordon|termimesh|reticulation|physical|existing system|top.?up/.test(t)) kinds.push('system');
-  if (/termidor|altriset|phantom|premise|fipronil|chlorantraniliprole|bifenthrin|biflex|talstar|maxxthor|chemical|barrier|soil treat/.test(t)) kinds.push('barrier');
+  const kinds = TREATMENT_KIND_RES.filter(([, re]) => re.test(t)).map(([k]) => k);
+  // "Top up the reticulation system" is a top-up, not a new one.
+  if (kinds.includes('system')) return kinds.filter(k => k !== 'retic' && k !== 'physical');
+  // A physical barrier is a barrier too; "physical barrier" alone isn't chemical.
+  if (kinds.includes('physical') && !/termidor|altriset|phantom|premise|fipronil|chlorantraniliprole|bifenthrin|biflex|talstar|maxxthor|chemical|soil treat/.test(t)) return kinds.filter(k => k !== 'barrier');
   return kinds;
 }
 
@@ -259,7 +269,12 @@ function treatmentChoices(text) {
   return kinds.length > 1 && /\bor\b|\/|\beither\b/i.test(text || '') ? kinds : [];
 }
 
-const QUOTE_SYSTEM_LABELS = { bait: 'Baiting system', barrier: 'Chemical barrier', system: 'Existing system top-up' };
+// The systems the builder can quote, in the order it offers them. 'none'
+// quotes only the live termites (and the rest of the work), no system.
+const QUOTE_SYSTEM_LABELS = {
+  bait: 'Baiting system', barrier: 'Chemical barrier', retic: 'Reticulation system',
+  physical: 'Physical barrier', system: 'Top up existing', none: 'No system, termites only',
+};
 
 // A starting price is the catalogue price, shown on a line until this
 // business sets a price for it (typed on any quote, so it is remembered).
@@ -324,11 +339,16 @@ function buildQuoteItemsFromReport(rd, system) {
     // report's wording (and may name other systems), so it is not copied.
     const detail = '';
     const src = treatmentType ? `Recommendation: ${treatmentType}` : 'Recommendation: treatment';
+    const lm = treatmentType.match(/(\d+(?:\.\d+)?)\s*(?:linear\s*)?(?:lm|m|metres|meters)\b/i);
     if (kind === 'barrier') {
-      const lm = treatmentType.match(/(\d+(?:\.\d+)?)\s*(?:linear\s*)?(?:lm|m|metres|meters)\b/i);
       items.push(lm
         ? newQuoteItem('barrier_lm', { detail, qty: parseFloat(lm[1]), source: src })
         : newQuoteItem('barrier_job', { detail, source: src }));
+    } else if (kind === 'retic' || kind === 'physical') {
+      // Priced by the metre, like bait by the station: a starting length to change.
+      items.push(newQuoteItem(kind + '_lm', { detail, qty: lm ? parseFloat(lm[1]) : 40, source: src }));
+    } else if (kind === 'none') {
+      // Only the live termites, already on their own lines.
     } else if (kind === 'bait') {
       const st = treatmentType.match(/(\d+)\s*(?:bait\s*)?stations?/i);
       items.push(newQuoteItem('bait_install', { detail, qty: st ? parseInt(st[1], 10) : 12, source: src }));
@@ -384,8 +404,11 @@ function spokenItemKey(desc, unit) {
   const d = (desc || '').toLowerCase(), u = (unit || '').toLowerCase();
   if (/monitor|servic/.test(d) && /bait|station/.test(d)) return 'bait_monitor';
   if (/bait|station/.test(d)) return 'bait_install';
-  if (/barrier|soil treatment|perimeter|trench|reticulat/.test(d)) return /^(lm|m|metre|meter|linear)/.test(u) ? 'barrier_lm' : 'barrier_job';
-  if (/top.?up|re-?treat/.test(d)) return 'system_topup';
+  if (/top.?up|re-?treat|re-?charge/.test(d)) return 'system_topup';
+  if (/reticulat/.test(d)) return 'retic_lm';
+  if (/physical|kordon|termimesh|homeguard|granitgard/.test(d)) return 'physical_lm';
+  if (/\bnest\b/.test(d)) return 'nest';
+  if (/barrier|soil treatment|perimeter|trench/.test(d)) return /^(lm|m|metre|meter|linear)/.test(u) ? 'barrier_lm' : 'barrier_job';
   if (/borer/.test(d)) return 'borer';
   if (/invasive/.test(d)) return 'invasive';
   if (/follow.?up|re-?inspect|inspection/.test(d)) return 'followup';
@@ -551,14 +574,16 @@ function buildPlanWe(rd, system) {
   if (wants) {
     if (kind === 'bait') out.push('Install bait stations around the building and check them regularly while termites are feeding, then keep monitoring.');
     else if (kind === 'barrier') out.push('Treat the soil around the building to form a continuous treated zone.');
+    else if (kind === 'retic') out.push('Lay a reticulation system around the building and charge it with termiticide, so the treated zone can be topped up without trenching again.');
+    else if (kind === 'physical') out.push('Install a physical termite barrier around the building.');
     else if (kind === 'system') out.push(`Top up the existing termite management system${rd.existingSystem ? ` (${rd.existingSystem})` : ''}.`);
-    else if (kind) out.push('Install a termite management system.');
+    else if (kind && kind !== 'none') out.push('Install a termite management system.');
   }
   if (rd.borerActivity === 'ACTIVE') out.push('Treat the timbers with live borers.');
   if (rd.timberSoil === 'YES') out.push('Remove the timber touching the soil.');
   if (rd.weepHoles === 'BRIDGED') out.push('Clear the bridged weep holes.');
   if (rd.slabEdge === 'OBSTRUCTED') out.push('Expose the concealed slab edge so it can be inspected.');
-  if (wants && kind) out.push('Fit a durable notice in the meter box showing what was used and when.');
+  if (wants && kind && kind !== 'none') out.push('Fit a durable notice in the meter box showing what was used and when.');
   return out.join('\n');
 }
 
@@ -968,15 +993,38 @@ function renderQuoteSystemChoice() {
   const el = document.getElementById('quoteSystemChoice');
   if (!el) return;
   const c = quoteState && quoteState.systemChoice;
-  if (!c || c.picked || !Array.isArray(c.options) || !c.options.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  if (!c || !Array.isArray(c.options) || !c.options.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+  // Picked: one line saying which, to change it.
+  if (c.picked) {
+    el.classList.add('picked');
+    el.innerHTML = `<div class="quote-system-picked"><span>System: <strong>${escapeHtml(QUOTE_SYSTEM_LABELS[c.picked] || c.picked)}</strong></span>
+      <button class="link-btn" onclick="changeQuoteSystem()">Change</button></div>`;
+    return;
+  }
+  el.classList.remove('picked');
   const src = currentQuoteSource();
   const rec = src && src.reportData ? (src.reportData.treatmentType || '') : '';
-  el.style.display = '';
-  el.innerHTML = `<div class="quote-system-q">The report's advice names more than one system. Which do you want to quote?</div>${rec ? `
-    <div class="quote-system-rec">${escapeHtml(rec)}</div>` : ''}
-    <div class="quote-answer-btns">${c.options.map(k =>
-      `<button class="quote-btn" onclick="pickQuoteSystem('${k}')">${escapeHtml(QUOTE_SYSTEM_LABELS[k] || k)}</button>`).join('')}</div>`;
+  const others = Object.keys(QUOTE_SYSTEM_LABELS).filter(k => !c.options.includes(k));
+  const btn = (k, cls) => `<button class="${cls}" onclick="pickQuoteSystem('${k}')">${escapeHtml(QUOTE_SYSTEM_LABELS[k] || k)}</button>`;
+  el.innerHTML = `<div class="quote-system-q">Which system are you quoting?</div>${rec ? `
+    <div class="quote-system-rec">The report says: ${escapeHtml(rec)}</div>` : ''}
+    <div class="quote-answer-btns">${c.options.map(k => btn(k, 'quote-btn')).join('')}</div>
+    <div class="quote-system-more-label">Or something else</div>
+    <div class="quote-system-more">${others.map(k => btn(k, 'quote-link-btn')).join('')}</div>`;
 }
+
+// Back to the question: the lines the last pick added go, unless changed since.
+function changeQuoteSystem() {
+  const q = quoteState, c = q && q.systemChoice;
+  if (!c || !c.picked) return;
+  const added = c.added || [];
+  q.items = q.items.filter(it => !added.some(a => a.id === it.id && a.sig === quoteItemSig(it)));
+  c.was = c.picked; c.picked = null; c.added = [];
+  renderQuoteItems();
+  scheduleQuoteSave();
+}
+const quoteItemSig = it => JSON.stringify([it.key, it.desc, it.detail, it.qty, it.unit, it.price]);
 
 function pickQuoteSystem(kind) {
   const src = currentQuoteSource();
@@ -988,9 +1036,11 @@ function pickQuoteSystem(kind) {
   let at = 0;
   while (at < q.items.length && q.items[at].key === 'direct') at++;
   q.items.splice(at, 0, ...fresh);
+  const was = q.systemChoice.was || undefined;
   q.systemChoice.picked = kind;
+  q.systemChoice.added = fresh.map(it => ({ id: it.id, sig: quoteItemSig(it) }));
   // The plan's steps name the system, so they follow the pick unless edited.
-  if (q.plan && q.plan.we === buildPlanWe(rd)) {
+  if (q.plan && q.plan.we === buildPlanWe(rd, was)) {
     q.plan.we = buildPlanWe(rd, kind);
     renderQuotePlan();
   }

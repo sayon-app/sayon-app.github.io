@@ -170,3 +170,15 @@ The other "Not recorded" rows (nest found, invasive inspection, chemical deligni
 **Speed.** On the long note the AI writes about 5,500 tokens, of which the answer is about 1,300 and the empty fields about 250: the rest is thinking. So leaving out empty fields would save about 2 s of 47, and was not tried. Thinking off instead (`SAYON_THINKING=off`, 6 runs on 4 cases): the long note took 14.5-14.8 s against 43-50 s, short notes 11-12 s against 20-26 s, so about three times faster and about 40% cheaper per note. It cost accuracy: 4 misses in 6 runs, against none with thinking on: the postcode "4-3-double-zero" missed on both `live-script-one-note` runs, "treated before" put in termiteHistory on `negation-traps` though the owner said never treated, and "heaps of them" in a damageDescription on `verdict-and-severity` (critical). The app keeps thinking on.
 
 Cost: 10 calls, about $0.60 (Sonnet 5 at $2 / $10 per million tokens).
+
+## 2026-11-02 (evening): second live voice test
+
+The owner read Test A again as one long note, on the live site with #303's fixes (korva-v219). The call took 37 s. The phone's transcript was rougher than the morning's ("Courageong Street", "Long-storey brick piers", "The check. Jump top is pre- exterior", "Five termites ... Sorry. Sorry. Live termites", "Coptotermes acid. Now Ciformis", "no rock"), but "Kordon" and "batts" came through, which the new transcript fixes cover.
+
+**The app's answer: 95/96** on the `live-script-one-note` key. The roof void was CLEAR and the recommendations said "batts". The only miss was the street name, misheard by the phone. Slips the key didn't count: "the work came out when I tapped it" became "workings came out when tapped" (it was the workers), and "200 mil clearance" stayed "mil" in the transcript because the fix only knew "clearance ... 200 mil".
+
+**Changes:** the prompt's mishearing list gets "the work came out" = workers, "it's still in 2015" after a barrier = installed 2015, "no rock" = no rot, "scootings" = skirtings. The transcript fix now also turns "200 mil clearance" into "200 mm clearance". New case `live-script-take-two` (the key accepts the phone's street spelling).
+
+**After** (effort medium): `live-script-take-two` 97/97 on both runs (38.8 and 45.2 s), `live-script-one-note` 96/96.
+
+Cost: 3 calls, about $0.25.

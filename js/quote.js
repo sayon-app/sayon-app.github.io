@@ -98,6 +98,17 @@ function adoptDraftQuote(id, address) {
   delete all.draft;
   all[id] = Object.assign({}, q, { reportKey: id, sourceAddress: address || '' });
   try { localStorage.setItem(quotesStorageKey(), JSON.stringify(all)); } catch (e) {}
+  // The quote open on screen moves with it, or its later edits would be
+  // saved under 'draft', which nothing reads once the report has an id.
+  if (quoteState && quoteState.reportKey === 'draft') {
+    quoteState.reportKey = id;
+    quoteState.sourceAddress = address || '';
+    const src = quoteSources.find(s => s.key === 'draft');
+    if (src) src.key = id;
+    const opt = document.querySelector('#quoteSource option[value="draft"]');
+    if (opt) opt.value = id;
+  }
+  if (typeof moveTreatmentPlanKey === 'function') moveTreatmentPlanKey('draft', id);
 }
 
 // The unsaved report was thrown away, so its draft quote goes with it.
@@ -274,6 +285,13 @@ function treatmentChoices(text) {
 const QUOTE_SYSTEM_LABELS = {
   bait: 'Baiting system', barrier: 'Chemical barrier', retic: 'Reticulation system',
   physical: 'Physical barrier', system: 'Top up existing', none: 'No system, termites only',
+};
+const quoteSystemLabel = k => QUOTE_SYSTEM_LABELS[k] || (k === 'generic' ? 'Termite management treatment' : k);
+
+// The quote lines each system adds, to tell which system a quote holds.
+const QUOTE_SYSTEM_LINE_KIND = {
+  barrier_lm: 'barrier', barrier_job: 'barrier', bait_install: 'bait', bait_monitor: 'bait',
+  retic_lm: 'retic', physical_lm: 'physical', system_topup: 'system', treatment: 'generic',
 };
 
 // A starting price is the catalogue price, shown on a line until this
@@ -673,7 +691,9 @@ function renderQuotePlan() {
   }
   // The two lists of steps read as bullets, and the timing as a side line
   // from the day of the job to the inspections after it.
-  body.innerHTML = `
+  body.innerHTML = `${p.why ? `
+    <div class="fsub">Why this plan</div>
+    <textarea class="quote-input quote-textarea" id="qPlanWhy" rows="2" aria-label="Why this plan suits the property" oninput="fitQuoteText(this); onQuotePlanInput()">${escapeHtml(p.why)}</textarea>` : ''}
     <div class="fsub">What we'll do<button type="button" class="link-btn fsub-action" onclick="editQuoteList('qPlanWe')">Edit</button></div>
     <textarea class="quote-input quote-textarea" id="qPlanWe" rows="3" data-qlist="No steps yet. Tap to add one." aria-label="What we'll do, one step per line" oninput="fitQuoteText(this); onQuotePlanInput()">${escapeHtml(p.we || '')}</textarea>
     <div class="fsub">What the owner does<button type="button" class="link-btn fsub-action" onclick="editQuoteList('qPlanOwner')">Edit</button></div>
@@ -748,6 +768,8 @@ function rebuildQuotePlan() {
 function onQuotePlanInput() {
   const p = quoteState && quoteState.plan;
   if (!p) return;
+  const why = document.getElementById('qPlanWhy');
+  if (why) p.why = why.value;
   p.we = document.getElementById('qPlanWe').value;
   p.owner = document.getElementById('qPlanOwner').value;
   p.inspections = document.getElementById('qPlanInspections').value;
@@ -898,6 +920,7 @@ function onQuoteSourceChange() {
   const c = quoteState.systemChoice;
   document.getElementById('quoteWorkFold').open = !quoteState.items.length || !!(c && !c.picked && c.options && c.options.length);
   editor.querySelectorAll('.quote-item-desc, .quote-item-detail, .quote-textarea').forEach(fitQuoteText);
+  maybeAutoTreatmentPlan();
 }
 
 function renderQuoteEditor() {
@@ -917,6 +940,7 @@ function renderQuoteEditor() {
   renderQuoteCompanyGaps();
   renderQuoteFolds();
   renderQuotePlan();
+  renderTreatmentPlanCard();
   renderQuoteAnswer();
   syncQuoteLists();
   ['qProblem', 'qPaymentTerms', 'qExclusions', 'qNotes'].forEach(id => fitQuoteText(document.getElementById(id)));
@@ -989,24 +1013,38 @@ function renderQuoteCompanyGaps() {
 
 // When the recommendation offers more than one system, the inspector picks
 // which one this quote is for. Shown above the line items until picked.
+// The quote's system choice. A recommendation that named one system made
+// no choice; its lines say which system it is, so it can be changed too.
+function quoteSystemChoice(q) {
+  if (!q) return null;
+  if (q.systemChoice) return q.systemChoice;
+  const lines = q.items.filter(it => /^Recommendation: /.test(it.source || '') && QUOTE_SYSTEM_LINE_KIND[it.key]);
+  if (!lines.length) return null;
+  const kind = QUOTE_SYSTEM_LINE_KIND[lines[0].key];
+  q.systemChoice = { options: [kind], picked: kind, added: lines.map(it => ({ id: it.id })) };
+  return q.systemChoice;
+}
+
 function renderQuoteSystemChoice() {
   const el = document.getElementById('quoteSystemChoice');
   if (!el) return;
-  const c = quoteState && quoteState.systemChoice;
+  const c = quoteSystemChoice(quoteState);
   if (!c || !Array.isArray(c.options) || !c.options.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
   el.style.display = '';
   // Picked: one line saying which, to change it.
   if (c.picked) {
     el.classList.add('picked');
-    el.innerHTML = `<div class="quote-system-picked"><span>System: <strong>${escapeHtml(QUOTE_SYSTEM_LABELS[c.picked] || c.picked)}</strong></span>
-      <button class="link-btn" onclick="changeQuoteSystem()">Change</button></div>`;
+    // Changing needs the report to build the new lines from.
+    const canChange = !isQuoteLocked() && !!currentQuoteSource();
+    el.innerHTML = `<div class="quote-system-picked"><span>System: <strong>${escapeHtml(quoteSystemLabel(c.picked))}</strong></span>
+      ${canChange ? '<button class="link-btn" onclick="changeQuoteSystem()">Change</button>' : ''}</div>`;
     return;
   }
   el.classList.remove('picked');
   const src = currentQuoteSource();
   const rec = src && src.reportData ? (src.reportData.treatmentType || '') : '';
   const others = Object.keys(QUOTE_SYSTEM_LABELS).filter(k => !c.options.includes(k));
-  const btn = (k, cls) => `<button class="${cls}" onclick="pickQuoteSystem('${k}')">${escapeHtml(QUOTE_SYSTEM_LABELS[k] || k)}</button>`;
+  const btn = (k, cls) => `<button class="${cls}" onclick="pickQuoteSystem('${k}')">${escapeHtml(quoteSystemLabel(k))}</button>`;
   el.innerHTML = `<div class="quote-system-q">Which system are you quoting?</div>${rec ? `
     <div class="quote-system-rec">The report says: ${escapeHtml(rec)}</div>` : ''}
     <div class="quote-answer-btns">${c.options.map(k => btn(k, 'quote-btn')).join('')}</div>
@@ -1014,17 +1052,17 @@ function renderQuoteSystemChoice() {
     <div class="quote-system-more">${others.map(k => btn(k, 'quote-link-btn')).join('')}</div>`;
 }
 
-// Back to the question: the lines the last pick added go, unless changed since.
+// Back to the question: the lines the last pick added go, edited or not
+// (a typed price is remembered for next time anyway).
 function changeQuoteSystem() {
   const q = quoteState, c = q && q.systemChoice;
-  if (!c || !c.picked) return;
+  if (!c || !c.picked || !currentQuoteSource() || isQuoteLocked()) return;
   const added = c.added || [];
-  q.items = q.items.filter(it => !added.some(a => a.id === it.id && a.sig === quoteItemSig(it)));
+  q.items = q.items.filter(it => !added.some(a => a.id === it.id));
   c.was = c.picked; c.picked = null; c.added = [];
   renderQuoteItems();
   scheduleQuoteSave();
 }
-const quoteItemSig = it => JSON.stringify([it.key, it.desc, it.detail, it.qty, it.unit, it.price]);
 
 function pickQuoteSystem(kind) {
   const src = currentQuoteSource();
@@ -1038,7 +1076,7 @@ function pickQuoteSystem(kind) {
   q.items.splice(at, 0, ...fresh);
   const was = q.systemChoice.was || undefined;
   q.systemChoice.picked = kind;
-  q.systemChoice.added = fresh.map(it => ({ id: it.id, sig: quoteItemSig(it) }));
+  q.systemChoice.added = fresh.map(it => ({ id: it.id }));
   // The plan's steps name the system, so they follow the pick unless edited.
   if (q.plan && q.plan.we === buildPlanWe(rd, was)) {
     q.plan.we = buildPlanWe(rd, kind);
@@ -1541,7 +1579,7 @@ function quoteContentHash(q) {
   // 'booking' and 'invoice' are left over from features that were removed;
   // older quotes may still carry them, and they never counted as content.
   ['updatedAt', 'createdAt', 'sentAt', 'sentHash', 'certificateSentAt', 'certificateHandedAt', 'reportKey', 'answer', 'booking', 'treatment', 'baitVisits', 'invoice',
-    'sourceAddress', 'issuedAt', 'issuedHash', 'linkRequest'].forEach(k => delete content[k]);
+    'sourceAddress', 'issuedAt', 'issuedHash', 'linkRequest', 'aiPlan'].forEach(k => delete content[k]);
   return sha256Hex(stableJson(content));
 }
 // The day this version of the quote was first given to the client. The PDF
@@ -1696,7 +1734,7 @@ function quoteLinkDoc(q, files) {
       price: parseFloat(it.price) || 0, total: lineTotal(it) })),
     subtotal: totals.subtotal, gstAmount: totals.gst, total: totals.total,
     problem: quoteProblem(q).trim(),
-    plan: { time: (plan.time || '').trim(), service: (plan.service || '').trim(), inspections: repairPlanInspections(plan.inspections),
+    plan: { why: (plan.why || '').trim(), time: (plan.time || '').trim(), service: (plan.service || '').trim(), inspections: repairPlanInspections(plan.inspections),
       we: lines(plan.we), owner: lines(plan.owner) },
     exclusions: lines(q.exclusions), notes: lines(q.notes), paymentTerms: (q.paymentTerms || '').trim(),
     files: files || {},
@@ -2064,12 +2102,21 @@ function buildQuotePDF(q) {
   const we = planLines(plan.we), owner = planLines(plan.owner);
   const facts = [['TIME ON SITE', plan.time], ['FREE SERVICE PERIOD', plan.service], ['INSPECTIONS AFTER', repairPlanInspections(plan.inspections)]]
     .map(([k, v]) => [k, (v || '').trim()]).filter(([, v]) => v);
-  if (we.length || owner.length || facts.length) {
+  const why = (plan.why || '').trim();
+  if (we.length || owner.length || facts.length || why) {
     const gap = 4, fw = facts.length ? (CW - gap * (facts.length - 1)) / facts.length : CW;
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
     const wrapped = facts.map(([, v]) => doc.splitTextToSize(v, fw - 8));
     const fh = facts.length ? 10 + Math.max(...wrapped.map(l => l.length)) * 4.4 : 0;
     sectionTitle('TREATMENT PLAN', sectionNum++, facts.length ? fh + 6 : 18);
+    // Why this plan suits the property, in a sentence or two, above the steps.
+    if (why) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+      const lines = doc.splitTextToSize(why, CW);
+      ensure(lines.length * 4.2 + 4);
+      doc.setTextColor(...C.ink); doc.text(lines, M, y);
+      y += lines.length * 4.2 + 3;
+    }
     if (facts.length) {
       ensure(fh + 6);
       facts.forEach(([k], i) => {

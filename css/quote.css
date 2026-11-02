@@ -616,3 +616,51 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 .sheet-more-note { font-weight: 500; color: var(--text2); }
 .sheet-more-note:not(:empty)::before { content: '· '; }
 .sheet-more > .job-field { margin: 0 14px 12px; }
+
+/* ── SAYON's treatment plan (js/treatment-plan.js) ── */
+.tp-card { border-color: rgba(var(--accent-rgb),0.35); background: linear-gradient(180deg, rgba(var(--accent-rgb),0.06), var(--surface) 70px); }
+.tp-card.tp-applied { background: var(--surface); }
+.tp-head { display: flex; align-items: flex-start; gap: 10px; }
+.tp-mark { flex-shrink: 0; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; color: #fff; background: linear-gradient(145deg, var(--accent2), var(--accent)); }
+.tp-head-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.tp-head-sub { font-size: 13.5px; line-height: 1.45; color: var(--text); font-weight: 500; }
+.tp-go { width: 100%; margin-top: 12px; }
+.tp-busy { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 12.5px; color: var(--text2); line-height: 1.4; }
+.tp-spinner { flex-shrink: 0; width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(var(--accent-rgb),0.25); border-top-color: var(--accent); animation: tpSpin 0.9s linear infinite; }
+@keyframes tpSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .tp-spinner { animation-duration: 3s; } }
+.tp-error { margin-top: 10px; font-size: 13px; color: var(--yellow-text); line-height: 1.45; }
+.tp-status { margin-top: 10px; font-size: 12.5px; color: var(--text2); line-height: 1.45; }
+.tp-stale { margin-top: 10px; font-size: 12.5px; color: var(--yellow-text); }
+.tp-body { margin-top: 4px; }
+.tp-block { margin-top: 14px; }
+.tp-label { font-size: 11px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text2); margin-bottom: 6px; }
+.tp-sub { font-size: 12px; font-weight: 700; color: var(--text2); margin: 8px 0 4px; }
+.tp-text { font-size: 13.5px; line-height: 1.5; color: var(--text); margin-top: 3px; }
+.tp-dim { color: var(--text3); font-size: 12.5px; line-height: 1.45; }
+.tp-small { margin-top: 6px; }
+.tp-list { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.5; color: var(--text); }
+.tp-list li + li { margin-top: 5px; }
+.tp-why-not { color: var(--text2); }
+.tp-who { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 99px; background: var(--surface2); color: var(--text2); margin-left: 4px; }
+.tp-unknowns { background: rgba(212,146,10,0.1); border: 1px solid rgba(212,146,10,0.35); border-radius: 10px; padding: 10px 12px; }
+.tp-unknowns .tp-label { color: var(--yellow-text); }
+.tp-lines { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.tp-lines li { display: flex; justify-content: space-between; gap: 10px; padding: 9px 12px; font-size: 13px; line-height: 1.4; color: var(--text); }
+.tp-lines li + li { border-top: 1px solid var(--border); }
+.tp-line-qty { flex-shrink: 0; color: var(--text2); font-weight: 600; white-space: nowrap; }
+.tp-line-qty.warn { color: var(--yellow-text); }
+.tp-client { padding-left: 10px; border-left: 2px solid var(--accent); }
+.tp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.tp-actions .quote-btn.primary { flex: 1 1 auto; }
+.tp-again { margin-top: 12px; }
+.tp-again summary { font-size: 13px; font-weight: 600; color: var(--accent); cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+.tp-again .quote-textarea { margin: 6px 0 8px; }
+.tp-folded { padding: 10px 14px; }
+.tp-fold-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; background: none; border: 0; padding: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.tp-own-check { color: var(--text2); font-style: italic; }
+.tp-report-link { display: flex; align-items: center; gap: 12px; width: calc(100% - 28px); margin: 4px 14px 14px; padding: 12px 14px; min-height: 44px; text-align: left; border-radius: 12px; border: 1px solid rgba(var(--accent-rgb),0.35); background: rgba(var(--accent-rgb),0.06); color: var(--text); font: inherit; cursor: pointer; }
+.tp-report-link .icon { flex-shrink: 0; color: var(--accent); }
+.tp-report-link span { display: flex; flex-direction: column; gap: 2px; }
+.tp-report-link strong { font-size: 14px; }
+.tp-report-link small { font-size: 12px; color: var(--text2); line-height: 1.4; }

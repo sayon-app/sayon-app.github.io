@@ -102,6 +102,12 @@ select.quote-input { cursor: pointer; }
 .quote-system-choice { background: var(--surface2); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
 .quote-system-q { font-size: 13px; margin-bottom: 8px; font-weight: 600; color: var(--text); }
 .quote-system-rec { font-size: 12.5px; line-height: 1.45; color: var(--text2); margin-bottom: 10px; padding-left: 10px; border-left: 2px solid var(--border2); }
+.quote-system-more-label { font-size: 12px; font-weight: 600; color: var(--text2); margin: 12px 0 6px; }
+.quote-system-more { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.quote-system-more .quote-link-btn { min-height: 44px; line-height: 1.25; }
+.quote-system-choice.picked { padding: 8px 12px; }
+.quote-system-picked { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--text2); }
+.quote-system-picked strong { color: var(--text); }
 .quote-item-source { font-size: 12px; color: var(--text3); }
 .quote-items-empty { font-size: 13px; color: var(--text3); padding: 6px 0 10px; }
 
@@ -541,8 +547,12 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 /* The editor */
 #sitePlanOverlay .page-sheet-body.sp-body { gap: 8px; padding-top: 10px; }
 .sp-hint { margin: 0; min-height: 36px; font-size: 13px; line-height: 1.4; color: var(--text2); }
-.sp-canvas { position: relative; border: 1.5px solid var(--border2); border-radius: 12px; overflow: hidden; background: #fff; touch-action: none; user-select: none; -webkit-user-select: none; }
-.sp-canvas svg { border-radius: 0; cursor: crosshair; }
+.sp-canvas { position: relative; border: 1.5px solid var(--border2); border-radius: 12px; overflow: hidden; background: #E3E9F0; touch-action: none; user-select: none; -webkit-user-select: none; }
+.sp-canvas svg { border-radius: 0; cursor: crosshair; background: transparent; }
+.sp-canvas.grab svg { cursor: grab; }
+.sp-canvas.grabbing svg { cursor: grabbing; }
+.sp-grab { display: inline-flex; align-items: center; gap: 6px; }
+.sp-grab.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink, #fff); }
 .sp-canvas-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sp-canvas-tools .quote-link-btn:disabled { opacity: 0.4; }
 .sp-finish { margin-left: auto; min-height: 40px; padding: 8px 16px; }
@@ -597,3 +607,12 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 .treat-plan-sub { margin-top: 14px; }
 .treat-plan-caption { margin: 0 0 6px; font-size: 13px; font-weight: 800; color: var(--text); }
 .sp-bg[hidden] { display: none; }
+
+/* Treatment record: the other kinds of treatment, folded under the ticked ones */
+.treat-more { margin-top: 2px; }
+.treat-more[open] { padding: 0 8px 8px; }
+.treat-more .treat-method + .treat-method { margin-top: 6px; }
+.treat-more > summary + .treat-method { margin-top: 2px; }
+.sheet-more-note { font-weight: 500; color: var(--text2); }
+.sheet-more-note:not(:empty)::before { content: '· '; }
+.sheet-more > .job-field { margin: 0 14px 12px; }

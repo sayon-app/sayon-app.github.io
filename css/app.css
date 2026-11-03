@@ -2826,6 +2826,14 @@ body.report-locked #micDock { opacity: 0.4; }
 .sheet-sec-sub { margin: 3px 0 0; font-size: 13px; line-height: 1.45; color: var(--text3); }
 .sheet-hint { margin: -4px 0 0; }
 .sheet-sec .extract-btn { margin-top: 6px; }
+
+/* The treatment record and bait visit in the quote's style: each part folds
+   to one row with what it holds, amber when something's missing. */
+.sheet-folds { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.sheet-folds + .sheet-sec { margin-top: 12px; padding-top: 20px; }
+.sheet-fold-body { display: flex; flex-direction: column; gap: 12px; }
+.sheet-fold-body .job-field, .sheet-fold-body .job-row { margin: 0; }
+.sheet-fold-hint { margin: 0; font-size: 13px; color: var(--text3); }
 /* A fold for fields most jobs don't need. */
 .sheet-more { border: 1px solid var(--border); border-radius: 12px; }
 .sheet-more > summary {

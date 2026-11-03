@@ -1204,7 +1204,7 @@ function renderQuoteWorkSummary() {
   if (!q || !sub) return;
   const n = q.items.length;
   const starting = q.items.filter(isStartingPrice).length;
-  const per = sitePlanPerimeter(q.sitePlan);
+  const per = quoteHousePerimeter(q);
   sub.textContent = (!n ? 'No lines yet' : `${n} line${n === 1 ? '' : 's'}` + (starting ? `, ${starting} price${starting === 1 ? '' : 's'} to check` : '')) +
     (per ? ` · ${formatPlanMetres(per)} perimeter` : '');
   sub.classList.toggle('warn', !n || starting > 0);
@@ -1263,17 +1263,23 @@ function renderQuoteTotals() {
 
 // ── HOUSE PERIMETER ─────────────────────────────────────────────────────────
 // The house measured while quoting, so lines priced by the metre or the
-// station aren't guessed: its length and width typed in, or the site plan
-// drawn or traced over a map (js/site-plan.js). q.sitePlan holds the plan,
-// and the treatment record starts from it, so it's drawn once.
+// station aren't guessed. The technician walks round the house and types
+// each side as they go, in metres or paces (q.houseSides, q.houseUnit);
+// two sides are a length and a width. Where the sides make a square-cornered
+// shape, the app draws the house from them (sitePlanFromSides), and the
+// treatment record's site plan starts from that drawing. The plan can be
+// drawn or traced instead (q.sitePlan), which then counts.
 // The house's walls all round fill the barrier, reticulation and physical
 // barrier metres, and bait stations at about one every QUOTE_STATION_GAP_M.
 // A barrier or reticulation line drawn on the plan, or stations drawn,
 // count instead. A line is filled only while its quantity is a starting
-// amount (it.qtyGuess) or still what the plan last gave it (it.planQty).
-// A quantity the inspector said or typed stays, with a tap to use the
-// measured one.
+// amount (it.qtyGuess) or still what the measurement last gave it
+// (it.planQty). A quantity the inspector said or typed stays, with a tap to
+// use the measured one.
 const QUOTE_STATION_GAP_M = 3;
+const QUOTE_PACE_M = 0.8;
+const QUOTE_MEASURE_UNIT_KEY = 'korva_measure_unit';
+const QUOTE_MAX_SIDES = 16;
 const QUOTE_MEASURED_LINES = {
   barrier_lm: { from: 'barrier', name: 'Chemical barrier' },
   retic_lm: { from: 'retic', name: 'Reticulation' },
@@ -1281,24 +1287,46 @@ const QUOTE_MEASURED_LINES = {
   bait_install: { from: 'stations', name: 'Bait stations' },
 };
 
-// What the plan measures for a line, or 0.
+// The sides walked, in metres.
+function quoteSides(q) {
+  const f = q && q.houseUnit === 'pace' ? QUOTE_PACE_M : 1;
+  return ((q && q.houseSides) || []).map(v => parseFloat(String(v).replace(',', '.'))).filter(v => v > 0 && v < 1000).map(v => v * f);
+}
+function quoteSidesPerimeter(q) {
+  const s = quoteSides(q);
+  if (s.length === 2) return 2 * (s[0] + s[1]);
+  return s.length > 2 ? s.reduce((a, b) => a + b, 0) : 0;
+}
+// A drawn plan with a scale measures the house; else the sides walked do.
+function quoteHousePerimeter(q) {
+  return (q && sitePlanPerimeter(q.sitePlan)) || quoteSidesPerimeter(q);
+}
+// The plan the house starts from: the one drawn, else the sides' shape.
+function quoteHousePlan(q) {
+  if (!q) return null;
+  if (sitePlanHasContent(q.sitePlan)) return q.sitePlan;
+  return sitePlanFromSides(quoteSides(q));
+}
+
+// What the measurement gives a line, or 0.
 function quoteMeasuredQty(q, key) {
-  const m = QUOTE_MEASURED_LINES[key], plan = q && q.sitePlan;
-  if (!m || !plan || !plan.mpu) return 0;
-  const per = sitePlanPerimeter(plan);
+  const m = QUOTE_MEASURED_LINES[key];
+  if (!m || !q) return 0;
+  const plan = q.sitePlan && q.sitePlan.mpu ? q.sitePlan : null;
+  const per = quoteHousePerimeter(q);
   if (m.from === 'stations') {
-    const drawn = planLayerItems(plan).filter(it => it.k === 'inground').length;
+    const drawn = plan ? planLayerItems(plan).filter(it => it.k === 'inground').length : 0;
     // A hair under a whole number of gaps doesn't add a station.
     return drawn || (per ? Math.ceil(per / QUOTE_STATION_GAP_M - 0.05) : 0);
   }
-  return Math.round(sitePlanLength(plan, m.from) || per);
+  return Math.round((plan && sitePlanLength(plan, m.from)) || per);
 }
 
 // Fills the lines a measurement should. Not once the client has answered
 // or the job is locked: then a tap does it (useQuoteMeasurement). Returns
 // the lines whose quantity changed.
 function fillMeasuredLines(q) {
-  if (!q || !q.sitePlan || isQuoteLocked() || q.answer) return [];
+  if (!q || isQuoteLocked() || q.answer) return [];
   const changed = [];
   q.items.forEach(it => {
     const m = quoteMeasuredQty(q, it.key);
@@ -1339,53 +1367,86 @@ function priceBarrierByMetre(id) {
   scheduleQuoteSave();
 }
 
-// The block above the lines: the house's length and width, or the drawn
-// plan, then what it fills. Typing a size only redraws the parts after
-// the boxes, so the keyboard stays up.
+// Metres or paces: the quote's own, else what this device last used.
+function quoteMeasureUnit(q) {
+  if (q && q.houseUnit) return q.houseUnit;
+  try { return localStorage.getItem(QUOTE_MEASURE_UNIT_KEY) === 'pace' ? 'pace' : 'm'; } catch (e) { return 'm'; }
+}
+
+// The block above the lines: a box for each side walked (one spare at the
+// end), or the drawn plan, then what it fills. Typing a side only redraws
+// the parts after the boxes, so the keyboard stays up.
 function renderQuoteMeasure() {
   const el = document.getElementById('quoteMeasure');
   const q = quoteState;
   if (!el || !q) return;
   const plan = q.sitePlan;
-  if (sitePlanHasContent(plan) && !sitePlanIsSizeOnly(plan)) {
-    const per = sitePlanPerimeter(plan);
+  if (sitePlanHasContent(plan)) {
+    const per = quoteHousePerimeter(q);
     el.innerHTML = `<div class="qm-drawn">
         <button type="button" class="qm-thumb" onclick="openQuoteSitePlan()" aria-label="Edit the site plan">${sitePlanSVG(plan)}</button>
         <div class="qm-drawn-text">
           <div class="qm-per">${per ? `<b>${formatPlanMetres(per)}</b>` : '<b>No scale yet</b>'}</div>
-          <div class="qm-drawn-sub">${per ? 'Perimeter, from the site plan' : 'Tap the house on the plan and type one wall\'s real length.'}</div>
+          <div class="qm-drawn-sub">${sitePlanPerimeter(plan) ? 'Perimeter, from the site plan' : per ? 'Perimeter, from the sides walked' : 'Tap the house on the plan and type one wall\'s real length.'}</div>
           <button type="button" class="quote-link-btn" onclick="openQuoteSitePlan()">Edit the plan</button>
         </div>
       </div>
       <div id="quoteMeasureLines"></div>`;
   } else {
-    const size = sitePlanHouseSize(plan);
-    const box = (id, label, v) => `<label class="qm-field"><span>${label}</span><span class="qm-box"><input class="quote-input" id="${id}" type="number" min="0" step="any" inputmode="decimal" value="${v || ''}" oninput="onQuoteHouseSize()"><span class="qm-unit">m</span></span></label>`;
-    el.innerHTML = `<div class="qm-size">
-        ${box('qmLength', 'Length', size && size.length)}
-        <span class="qm-x" aria-hidden="true">×</span>
-        ${box('qmWidth', 'Width', size && size.width)}
-        <div class="qm-result" id="qmResult" aria-live="polite"></div>
+    const unit = quoteMeasureUnit(q);
+    const sides = (q.houseSides || []).slice();
+    while (sides.length < 2) sides.push('');
+    if (String(sides[sides.length - 1]).trim() && sides.length < QUOTE_MAX_SIDES) sides.push('');
+    el.innerHTML = `<div class="qm-walk-head">
+        <span class="qm-walk-title">Walk round, type each side</span>
+        <select class="quote-input qm-unit-pick" id="qmUnit" aria-label="Measured in" onchange="onQuoteMeasureUnit(this.value)">
+          <option value="m"${unit === 'm' ? ' selected' : ''}>metres</option>
+          <option value="pace"${unit === 'pace' ? ' selected' : ''}>paces</option>
+        </select>
       </div>
+      <div class="qm-sides" id="qmSides">${sides.map((v, i) => quoteSideBox(v, i)).join('')}</div>
+      <div class="qm-walk-foot"><span class="qm-walk-note" id="qmNote"></span><span class="qm-result" id="qmResult" aria-live="polite"></span></div>
       <div id="quoteMeasureLines"></div>
-      <button type="button" class="quote-link-btn qm-draw" onclick="openQuoteSitePlan()">${size ? 'Draw its exact shape' : 'Not square? Draw or trace it'}</button>`;
+      <button type="button" class="quote-link-btn qm-draw" id="qmDraw" onclick="openQuoteSitePlan()"></button>`;
   }
   renderQuoteMeasureLines();
 }
 
-// The perimeter, and each line it fills: done, or a tap to use it.
+function quoteSideBox(v, i) {
+  return `<input class="quote-input qm-side" type="number" min="0" step="any" inputmode="decimal" value="${escapeHtml(String(v))}"
+    aria-label="Side ${i + 1}" placeholder="+" oninput="onQuoteSideInput()" onkeydown="onQuoteSideKey(event, this)">`;
+}
+
+// The perimeter, what the sides make, and each line it fills: done, or a
+// tap to use it.
 function renderQuoteMeasureLines() {
   const q = quoteState;
   const el = document.getElementById('quoteMeasureLines');
   if (!el || !q) return;
-  const per = sitePlanPerimeter(q.sitePlan);
+  const per = quoteHousePerimeter(q);
   const res = document.getElementById('qmResult');
-  if (res) res.innerHTML = per ? `<b>${formatPlanMetres(per)}</b><span>perimeter</span>` : '<span>perimeter</span>';
-  if (!per && !(q.sitePlan && q.sitePlan.mpu)) {
+  if (res) res.innerHTML = per ? `<b>${formatPlanMetres(per)}</b> perimeter` : '';
+  const sides = quoteSides(q), shape = sitePlanFromSides(sides);
+  const note = document.getElementById('qmNote');
+  if (note) {
+    const n = sides.length;
+    note.textContent = !n ? (quoteMeasureUnit(q) === 'pace' ? `A pace counts as ${QUOTE_PACE_M} m.` : 'A wheel, a laser or paces. Rough is fine.')
+      : n === 1 ? 'Then the next side.'
+      : n === 2 ? 'Two sides count as length × width.'
+      : n % 2 ? `${n} sides: square corners come in pairs, so check none was missed.`
+      : shape ? `${n} sides.` : `${n} sides that don't meet up square: the total is used.`;
+  }
+  const draw = document.getElementById('qmDraw');
+  if (draw) {
+    draw.innerHTML = shape ? `<span class="qm-draw-pic">${sitePlanSVG(shape)}</span><span>The house from these sides. Tap to add to it.</span>` : 'Draw or trace it instead';
+    draw.classList.toggle('qm-draw-shape', !!shape);
+  }
+  if (!per) {
     el.innerHTML = `<p class="qm-hint">Fills the barrier metres, and bait stations at about 1 every ${QUOTE_STATION_GAP_M} m.</p>`;
     return;
   }
   const e = escapeHtml;
+  const drawnStations = q.sitePlan && q.sitePlan.mpu && planLayerItems(q.sitePlan).some(x => x.k === 'inground');
   const rows = q.items.map(it => {
     if (it.key === 'barrier_job' && quoteMeasuredQty(q, 'barrier_lm')) {
       const m = quoteMeasuredQty(q, 'barrier_lm');
@@ -1394,28 +1455,53 @@ function renderQuoteMeasureLines() {
     const m = quoteMeasuredQty(q, it.key);
     if (!m) return '';
     const name = QUOTE_MEASURED_LINES[it.key].name, unit = pluralUnit(it.unit, m);
-    const how = it.key === 'bait_install' && !planLayerItems(q.sitePlan).some(x => x.k === 'inground') ? ` <span class="qm-dim">· 1&nbsp;every&nbsp;${QUOTE_STATION_GAP_M}&nbsp;m</span>` : '';
+    const how = it.key === 'bait_install' && !drawnStations ? ` <span class="qm-dim">· 1&nbsp;every&nbsp;${QUOTE_STATION_GAP_M}&nbsp;m</span>` : '';
     if (parseFloat(it.qty) === m) return `<li class="qm-done"><span><b>${name}</b> ${m}&nbsp;${e(unit)}${how}</span><span class="qm-tick" aria-label="Filled from the measurement">✓</span></li>`;
-    return `<li class="qm-offer"><span><b>${name}</b> is ${e(String(it.qty))}&nbsp;${e(pluralUnit(it.unit, it.qty))}</span><button type="button" class="quote-link-btn" onclick="useQuoteMeasurement('${e(it.id)}')">Use ${m}</button></li>`;
+    return `<li class="qm-offer"><span><b>${name}</b> ${e(String(it.qty))}&nbsp;${e(pluralUnit(it.unit, it.qty))} on the quote</span><button type="button" class="quote-link-btn" onclick="useQuoteMeasurement('${e(it.id)}')">Use ${m}</button></li>`;
   }).filter(Boolean);
   el.innerHTML = rows.length ? `<ul class="qm-lines">${rows.join('')}</ul>`
     : '<p class="qm-hint">No lines priced by the metre or station yet. SAYON uses the perimeter when you ask it.</p>';
 }
 
-function onQuoteHouseSize() {
+// A side typed: kept as typed, and a spare box appears once the last one
+// has a number, so the next side can go straight in.
+function onQuoteSideInput() {
   const q = quoteState;
-  if (!q || (sitePlanHasContent(q.sitePlan) && !sitePlanIsSizeOnly(q.sitePlan))) return;
-  const num = id => { const v = parseFloat(String(document.getElementById(id).value).replace(',', '.')); return v > 0 && v < 500 ? v : 0; };
-  const length = num('qmLength'), width = num('qmWidth');
-  q.sitePlan = length && width ? sitePlanFromSize(length, width, q.sitePlan) : null;
+  if (!q) return;
+  const boxes = [...document.querySelectorAll('#qmSides .qm-side')];
+  const vals = boxes.map(b => b.value.trim());
+  while (vals.length && !vals[vals.length - 1]) vals.pop();
+  if (vals.length) q.houseSides = vals; else delete q.houseSides;
+  if (!q.houseUnit && vals.length) q.houseUnit = quoteMeasureUnit(q);
+  const last = boxes[boxes.length - 1];
+  if (last && last.value.trim() && boxes.length < QUOTE_MAX_SIDES) last.insertAdjacentHTML('afterend', quoteSideBox('', boxes.length));
   renderQuoteItems();
   scheduleQuoteSave();
 }
 
+// Enter (Next or Go on a phone keyboard) moves on to the next side.
+function onQuoteSideKey(e, input) {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const next = input.nextElementSibling;
+  if (next) next.focus();
+}
+
+function onQuoteMeasureUnit(unit) {
+  const q = quoteState;
+  if (!q) return;
+  q.houseUnit = unit === 'pace' ? 'pace' : 'm';
+  try { localStorage.setItem(QUOTE_MEASURE_UNIT_KEY, q.houseUnit); } catch (e) { /* this quote keeps it */ }
+  renderQuoteItems();
+  scheduleQuoteSave();
+}
+
+// Opens the site plan editor on the drawn plan, or on the house drawn from
+// the sides walked. What's saved there becomes the quote's plan.
 function openQuoteSitePlan() {
   const q = quoteState;
   if (!q || isQuoteLocked()) return;
-  openSitePlan(q.sitePlan, plan => {
+  openSitePlan(quoteHousePlan(q), plan => {
     // A lone house with no real size measures nothing, so it isn't kept.
     const blank = plan.items.length === 1 && plan.items[0].k === 'house' && !plan.mpu && !plan.bg;
     q.sitePlan = sitePlanHasContent(plan) && !blank ? plan : null;
@@ -1787,10 +1873,10 @@ function quoteContentHash(q) {
   const content = Object.assign({}, q);
   // 'booking' and 'invoice' are left over from features that were removed;
   // older quotes may still carry them, and they never counted as content.
-  // The site plan isn't on the quote the client gets; the quantities it
-  // fills are.
+  // The house's measurement isn't on the quote the client gets; the
+  // quantities it fills are.
   ['updatedAt', 'createdAt', 'sentAt', 'sentHash', 'certificateSentAt', 'certificateHandedAt', 'reportKey', 'answer', 'booking', 'treatment', 'baitVisits', 'invoice',
-    'sourceAddress', 'issuedAt', 'issuedHash', 'linkRequest', 'aiPlan', 'sitePlan'].forEach(k => delete content[k]);
+    'sourceAddress', 'issuedAt', 'issuedHash', 'linkRequest', 'aiPlan', 'sitePlan', 'houseSides', 'houseUnit'].forEach(k => delete content[k]);
   // How a line's quantity was arrived at isn't content either.
   if (Array.isArray(content.items)) content.items = content.items.map(it => { const c = Object.assign({}, it); delete c.qtyGuess; delete c.planQty; return c; });
   return sha256Hex(stableJson(content));

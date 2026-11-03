@@ -138,34 +138,77 @@ function sitePlanPerimeter(plan) {
     .reduce((a, it) => a + planPathLength(planItemPts(it), true), 0) * plan.mpu;
 }
 
-// A plan that is only a house typed in by its size on the quote: one
-// square house, not turned or reshaped, with a scale and nothing else.
-// Its size can be typed again; anything drawn makes it a drawn plan.
-function sitePlanIsSizeOnly(plan) {
-  const items = (plan && plan.items) || [];
-  const it = items[0];
-  return !!(plan && plan.mpu && !plan.bg && items.length === 1 && it.k === 'house' && !it.pts && !it.rot && !it.layer);
+// The house's corners from its sides as the technician walked round it
+// (metres, in order), every corner square: tries each way the corners
+// could turn (clockwise all round, so four more right turns than left)
+// and keeps the shape that meets up best without crossing itself. Two
+// sides are a length and a width. Sides measured on site never quite meet,
+// so up to 3% out is taken up in the last two sides. null when there's no
+// such shape: an odd number of sides, say, or more than 12.
+function planSidesShape(sides) {
+  const n = sides.length;
+  if (n === 2) return planSidesShape([sides[0], sides[1], sides[0], sides[1]]);
+  if (n < 4 || n % 2 || n > 12) return null;
+  const tol = Math.max(0.5, sides.reduce((a, b) => a + b, 0) * 0.03);
+  const step = [[1, 0], [0, 1], [-1, 0], [0, -1]]; // east, south, west, north (y down)
+  let best = null;
+  for (let mask = 0; mask < (1 << (n - 1)); mask++) {
+    let d = 0, x = 0, y = 0, rights = 0;
+    const pts = [[0, 0]];
+    for (let i = 0; i < n; i++) {
+      x += step[d][0] * sides[i]; y += step[d][1] * sides[i];
+      pts.push([x, y]);
+      if (i < n - 1) { const r = (mask >> i) & 1; rights += r; d = (d + (r ? 1 : 3)) % 4; }
+    }
+    // The last side runs north or south; the corner back to the start
+    // turns right from north, left from south.
+    if (d === 3) rights++;
+    if (rights - (n - rights) !== 4) continue;
+    const err = Math.abs(x) + Math.abs(y);
+    if (err > tol || (best && err >= best.err)) continue;
+    pts.pop();
+    pts[n - 1][0] -= x; // the last east–west side takes up the gap across
+    if (planPathCrosses(pts)) continue;
+    best = { err, pts };
+  }
+  return best ? best.pts : null;
 }
 
-// The house's length and width in metres, for a size-only plan.
-function sitePlanHouseSize(plan) {
-  if (!sitePlanIsSizeOnly(plan)) return null;
-  const it = plan.items[0], r = v => Math.round(v * plan.mpu * 10) / 10;
-  return { length: r(it.w), width: r(it.h) };
-}
-
-// A plan holding just the house, drawn to scale from its length and width
-// and centred with room around it for the yard. A size-only plan given
-// keeps its house's id, name and the north arrow.
-function sitePlanFromSize(length, width, base) {
-  const upm = Math.min(500 / length, 375 / width);
-  const w = Math.round(length * upm * 10) / 10, h = Math.round(width * upm * 10) / 10;
-  const old = sitePlanIsSizeOnly(base) ? base.items[0] : null;
-  return {
-    v: 1, north: (base && base.north) || 0, mpu: 1 / upm,
-    items: [{ id: old ? old.id : planId(), k: 'house', x: Math.round((PLAN_W - w) / 2), y: Math.round((PLAN_H - h) / 2), w, h,
-      label: old ? old.label : SITE_PLAN_SYMBOLS.house.def.label }],
+// Whether a closed shape's walls cross or touch other than at the corners
+// they share.
+function planPathCrosses(pts) {
+  const n = pts.length, eps = 1e-6;
+  const cross = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  const on = (a, b, c) => Math.min(a[0], b[0]) - eps <= c[0] && c[0] <= Math.max(a[0], b[0]) + eps && Math.min(a[1], b[1]) - eps <= c[1] && c[1] <= Math.max(a[1], b[1]) + eps;
+  const meet = (a, b, c, d) => {
+    const d1 = cross(c, d, a), d2 = cross(c, d, b), d3 = cross(a, b, c), d4 = cross(a, b, d);
+    if (((d1 > eps && d2 < -eps) || (d1 < -eps && d2 > eps)) && ((d3 > eps && d4 < -eps) || (d3 < -eps && d4 > eps))) return true;
+    return (Math.abs(d1) <= eps && on(c, d, a)) || (Math.abs(d2) <= eps && on(c, d, b)) || (Math.abs(d3) <= eps && on(a, b, c)) || (Math.abs(d4) <= eps && on(a, b, d));
   };
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (j === i + 1 || (i === 0 && j === n - 1)) continue;
+      if (meet(pts[i], pts[(i + 1) % n], pts[j], pts[(j + 1) % n])) return true;
+    }
+  }
+  return false;
+}
+
+// A plan holding just the house, drawn to scale from the sides walked and
+// centred with room around it for the yard: a square house when it's
+// four-sided, else a house of any shape. null when the sides don't make a
+// shape (planSidesShape).
+function sitePlanFromSides(sides) {
+  const pts = planSidesShape(sides);
+  if (!pts) return null;
+  const b = planBoundsOf(pts);
+  const upm = Math.min(500 / b.w, 375 / b.h);
+  const r = v => Math.round(v * 10) / 10;
+  const ox = (PLAN_W - b.w * upm) / 2 - b.x * upm, oy = (PLAN_H - b.h * upm) / 2 - b.y * upm;
+  const house = pts.length === 4
+    ? { k: 'house', x: r(ox + b.x * upm), y: r(oy + b.y * upm), w: r(b.w * upm), h: r(b.h * upm) }
+    : { k: 'outline', pts: pts.map(p => [r(ox + p[0] * upm), r(oy + p[1] * upm)]) };
+  return { v: 1, north: 0, mpu: 1 / upm, items: [Object.assign({ id: planId(), label: 'House' }, house)] };
 }
 
 // The items on one view: the site ('site') or the subfloor ('sub').

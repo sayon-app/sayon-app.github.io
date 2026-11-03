@@ -261,9 +261,12 @@
 
 <!-- QUOTE SCREEN — builds a treatment quote from an inspection report -->
 <div id="quoteScreen">
+  <!-- The top bar and the job's documents fold to one slim row, and the
+       total bar to a slim total, to clear space (toggleQuoteBar). -->
   <div class="quote-topbar page-topbar">
     <div class="quote-topbar-title page-topbar-title">Quote</div>
     <div class="quote-save-state" id="quoteSaveState"></div>
+    <button type="button" class="quote-fold-btn" id="quoteTopFold" onclick="toggleQuoteBar('top')" aria-expanded="true" aria-label="Fold the top bar"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg></button>
   </div>
   <div class="doc-strip doc-strip-bar" data-doc="quote" aria-label="This job's documents"></div>
   <div class="quote-scroll">
@@ -407,10 +410,10 @@
 
   <!-- Always on screen: the total and the two ways out of the quote. -->
   <div class="quote-bar" id="quoteBar" style="display:none">
-    <div class="quote-bar-total">
-      <span class="quote-bar-label" id="quoteBarLabel">Total</span>
+    <button type="button" class="quote-bar-total" id="quoteBottomFold" onclick="toggleQuoteBar('bottom')" aria-expanded="true" title="Fold the total bar">
+      <span class="quote-bar-label" id="quoteBarLabel">Total</span><svg class="icon quote-bar-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
       <span class="quote-bar-amount" id="quoteBarAmount">$0.00</span>
-    </div>
+    </button>
     <button class="quote-btn quote-bar-pdf" id="quotePdfBtn" onclick="exportQuotePDF()" aria-label="Quote PDF" title="Quote PDF">
       <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>PDF
     </button>

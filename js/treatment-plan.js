@@ -9,7 +9,8 @@
 //
 // It's a second opinion the inspector asks for (Ask SAYON on the quote, or
 // the button under the report's Recommendations), usually after working out
-// their own plan; it never runs by itself. Shown on the quote in folded
+// their own plan; it never runs by itself. It reads their quote so far too,
+// and says where it would change, add to or keep their plan. Shown on the quote in folded
 // sections, and nothing reaches the client until "Add to my quote", which
 // fills the quote's treatment plan and work lines (they stay editable, and
 // Undo puts the quote back). The plan and its reasoning live on the quote
@@ -25,13 +26,13 @@
 
 const TREATMENT_PLAN_TIMEOUT_MS = 120000;
 
-const TREATMENT_PLAN_PROMPT = `You are SAYON's treatment planner. SAYON is an app for licensed Australian timber pest inspectors. The user message is one inspection: the report fields the app filled from the inspector's dictation (JSON), the notes the inspector actually said, and sometimes extra words from the inspector. Work out the plan of attack a highly experienced Australian termite technician would choose for THIS property, and explain it so the inspector can check your reasoning in ten seconds and the client can understand what they are paying for.
+const TREATMENT_PLAN_PROMPT = `You are SAYON's treatment planner. SAYON is an app for licensed Australian timber pest inspectors. The user message is one inspection: the report fields the app filled from the inspector's dictation (JSON), the notes the inspector actually said, often the inspector's own quote so far, and sometimes extra words from the inspector. Work out the plan of attack a highly experienced Australian termite technician would choose for THIS property, and explain it so the inspector can check your reasoning in ten seconds and the client can understand what they are paying for.
 
-The inspector is the licensed professional and makes the final call. You are a second opinion: most inspectors have already formed their own plan and ask you to check it against yours. Give your honest best plan, and where the inspector has said what they intend, say plainly where you agree and where you would do something different and why. A generic answer ("install a termite management system") is useless to them. Every choice must be tied to the facts of this property, and every reason must name the fact it rests on.
+The inspector is the licensed professional and makes the final call. You are a second opinion: most inspectors have already formed their own plan and ask you to check it against yours. Give your honest best plan, and where the inspector has said or quoted what they intend, say plainly where you agree, what you would add and what you would do differently, and why. A generic answer ("install a termite management system") is useless to them. Every choice must be tied to the facts of this property, and every reason must name the fact it rests on.
 
 Return ONLY a valid JSON object, no markdown and no commentary, in exactly this shape:
 {"summary":string,
-"versusInspector":string,
+"versus":{"agree":[string],"add":[string],"change":[string]},
 "system":"bait"|"barrier"|"retic"|"physical"|"system"|"none",
 "knockdown":{"needed":boolean,"short":string,"method":string,"where":[string],"why":string},
 "systemWhy":[string],
@@ -44,15 +45,15 @@ Return ONLY a valid JSON object, no markdown and no commentary, in exactly this 
 
 WHAT EACH FIELD IS
 - summary: one line for the inspector, the plan in short, at most 20 words ("Treat the nest in the stump, then in-ground baits: paving covers most of the perimeter").
-- versusInspector: only when the inspector said what they intend (treatmentType or the notes name a method): at most 25 words on where you agree and where you differ ("Agrees with baiting; adds a nest search at the gum tree, and a soil treatment won't suit the pond"). "" when they named no method.
+- versus: your plan against the inspector's own plan: their quote so far (THE INSPECTOR'S QUOTE SO FAR), the method they named (treatmentType or the notes) and the steps they wrote. agree: what in their plan you would also do ("Baiting over a soil treatment"). add: what you would add that their plan leaves out, with the fact behind it ("A nest search at the gum stump by the back fence"). change: what you would do differently, what instead and why ("Dust the window frame instead of AG baits: only a few termites left to carry it"). Name the line or method each time; never repeat an item across the three lists, and never pad agree with small items. All three are empty arrays when the inspector gave no plan, quote or method.
 - system: the long-term termite management system you recommend. bait = in-ground baiting and monitoring system; barrier = chemical soil treatment (a treated zone); retic = reticulation system charged with termiticide; physical = physical barrier; system = service, top up or recharge the system already on the property; none = no new system (no termites and nothing calling for one, an existing system that is still working, or the inspector said no system).
 - knockdown: what to do about LIVE termites now, separate from the long-term system. needed is false when no live termites were found. short: the method in at most 8 words ("Dust the workings, AG baits on the frame"). method names the method and its sequence ("Above-ground bait stations fixed over the live workings, checked every 2 to 3 weeks until feeding stops"). where lists each place, in the inspector's words. why ties it to what was found (how many places, nest found or not, what the timber is, whether termites can be reached).
-- systemWhy: 2 to 4 reasons this system suits this property better than the others, each naming the fact behind it ("Paving and the driveway cover the slab edge along most of the perimeter, so a soil treatment would mean drilling through concrete every 150 to 300 mm; stations can go in the garden beds and lawn").
+- systemWhy: 2 or 3 reasons this system suits this property better than the others, each naming the fact behind it ("Paving and the driveway cover the slab edge along most of the perimeter, so a soil treatment would mean drilling through concrete every 150 to 300 mm; stations can go in the garden beds and lawn").
 - notChosen: each of the other realistic options and the property-specific reason it lost here. Skip options that were never realistic (a physical barrier on an existing house is rarely realistic; say so once only if the inspector or owner raised it).
 - fixes: conditions that invite or hide termites, each with who does it and why it matters for the plan (a leak keeps the soil and timber wet, which draws termites in and breaks down a soil treatment's working life; a garden bed over the slab edge hides any entry and bridges the treated zone).
 - followUp: the visits after the job, for the inspector: when to check knockdown stations or treated workings, when to confirm activity has stopped, station servicing, and the next full inspection.
 - unknowns: what the plan depends on that the report does not say, each as a short question the inspector can answer on site ("Perimeter length? Needed to price stations or metres.", "Is the slab edge exposed on the left side? Not said."). Put the most decisive ones first. Never fill these gaps with assumptions elsewhere in the plan.
-- client: the plan as the client reads it on the quote, in plain Australian English and short sentences, no trade jargon. why: 2 or 3 sentences on why this plan suits their home, naming the property facts in everyday words. we: the steps we will do, in order, one action each. owner: what the owner must do to keep the treatment working (no repairs by trades: those go on the quote as exclusions). time: time on site for the treatment visit, as one of "1 to 2 hours", "Half a day", "1 day", "2 days", or your own short words. service: free service period, "None" or "12 months" (most businesses offer 12 months after a full treatment; use "None" when there is no treatment). inspections: when the next inspections are ("In 3 months, then every 12 months").
+- client: the plan as the client reads it on the quote, in plain Australian English and short sentences, no trade jargon. why: 1 or 2 sentences on why this plan suits their home, naming the property facts in everyday words. we: the steps we will do from the treatment visit on, in order, one action each (never what was done at the inspection). owner: what the owner must do to keep the treatment working (no repairs by trades: those go on the quote as exclusions). time: time on site for the treatment visit, as one of "1 to 2 hours", "Half a day", "1 day", "2 days", or your own short words. service: free service period, "None" or "12 months" (most businesses offer 12 months after a full treatment; use "None" when there is no treatment). inspections: when the next inspections are ("In 3 months, then every 12 months").
 - lines: the work lines for the quote, using ONLY these keys: direct (direct treatment of live termite workings, unit area, one per place), nest (locate and treat the nest), barrier_lm (chemical soil treatment per linear metre), barrier_job (chemical soil treatment, whole job, only when the length is unknown), bait_install (supply and install in-ground bait stations, per station), bait_monitor (bait station monitoring and servicing, 12 months), retic_lm (reticulation system, per metre), physical_lm (physical barrier, per metre), system_topup (top up or recharge the existing system), borer (treat timbers with live borers), timber_soil (remove timber-to-soil contact), weep_holes (clear bridged weep holes), slab_edge (expose a concealed slab edge), followup (follow-up timber pest inspection), invasive (invasive inspection). qty is the number of units: a length or station count only from a figure in the report or notes (a perimeter said as "about 48 metres" gives 48 lm, or about 16 stations at roughly 3 m apart), the number of places for direct, 1 for a job or visit. When you cannot get a quantity from what was said, qty is null and the matching question goes in unknowns. detail: the client-facing place or scope ("Kitchen window frame", "Full perimeter, including drilling the rear patio"), or "". why: a few words for the inspector. Never give prices: the app prices each line at the business's own rates.
 
 HOW AN EXPERIENCED TECHNICIAN DECIDES
@@ -76,7 +77,7 @@ HOW AN EXPERIENCED TECHNICIAN DECIDES
 - The owner's commitment. Baiting needs ongoing servicing (often every 4 to 8 weeks in warmer months, less in cooler months, as the system's label says) and an ongoing yearly cost; if the owner said they don't want ongoing visits, a soil treatment or reticulation suits better. Reticulation costs more up front but lets the zone be recharged without trenching or drilling again; it suits new paving or landscaping planned along the walls, or an owner who wants a renewable zone.
 - Physical barriers are installed during construction or with an extension (AS 3660.1). On an existing house they are rarely the right answer; recommend one only for planned building work.
 - Climate and region (propertyState, postcode) shape season and servicing intervals; in the tropical north the giant northern termite (Mastotermes) occurs and baiting is commonly used against it. Species otherwise informs where to look for the nest and how to reach it (Coptotermes often nests in trees, stumps and root crowns or under slabs; Schedorhinotermes often has several linked nests, so expect more than one knockdown point). Species is never a reason the property is at higher risk, and never say so.
-- If the inspector named a method in the recommendation (treatmentType) or in their notes, plan around their method. If the facts strongly argue against it, keep their method as "system" and put your concern first in unknowns, as a question, with the reason.
+- If the inspector named or quoted a method (treatmentType, their notes or their quote so far), start from it and keep it when the facts support it. When the facts strongly argue against it, recommend what you would do and put the reason first in versus.change, so the inspector weighs it before anything else.
 - If the inspector offered a choice ("chemical barrier or baiting"), choose one for this property and explain in systemWhy and notChosen.
 - No termites, no evidence, no system needed: system "none", knockdown not needed, plan built around fixes and regular inspections.
 
@@ -96,7 +97,8 @@ RULES THAT MUST NEVER BE BROKEN
 - Australian terms and spelling: metres, colour, licence (noun), paving, garden beds, meter box, durable notice.
 
 KEEP IT SHORT (the inspector reads it on a phone, at a glance; every extra word is noise)
-- summary at most 20 words; knockdown.method at most 20 words; knockdown.why at most 25 words.
+- summary at most 20 words; knockdown.short at most 8 words; knockdown.method at most 20 words; knockdown.why at most 25 words.
+- versus: at most 3 items in each list; agree items at most 10 words, add at most 15, change at most 20.
 - systemWhy: at most 3 reasons, each at most 20 words. notChosen: at most 3, each at most 15 words.
 - fixes: at most 5; what at most 10 words; why at most 12 words.
 - followUp at most 25 words. unknowns: at most 4, each a short question of at most 15 words, most decisive first.
@@ -166,11 +168,42 @@ function treatmentPlanInput(rd, address) {
   return { report, notes };
 }
 
-function treatmentPlanMessage(input, extra) {
+// The inspector's own plan as it stands on the quote: the work lines they
+// have (said, typed or built from their recommendation, not SAYON's), and
+// the steps they wrote for the client. SAYON compares its plan with this.
+// No prices: the comparison is about the work, not the money.
+function treatmentPlanTechQuote(q) {
+  if (!q) return null;
+  const lines = (Array.isArray(q.items) ? q.items : [])
+    .filter(it => it && !/^SAYON plan/.test(it.source || '') && (it.desc || '').trim())
+    .map(it => {
+      const n = Number(it.qty) || 0;
+      const qty = n > 0 && it.unit ? `${n} ${pluralUnit(it.unit, n)}: ` : '';
+      return qty + it.desc.trim() + ((it.detail || '').trim() ? ` (${it.detail.trim()})` : '');
+    });
+  // Steps SAYON wrote don't count as theirs.
+  const ownSteps = q.plan && !(q.aiPlan && q.aiPlan.applied) ? String(q.plan.we || '') : '';
+  const steps = ownSteps.split('\n').map(t => t.trim()).filter(Boolean);
+  return lines.length || steps.length ? { lines, steps } : null;
+}
+
+function treatmentPlanQuoteHash(q) {
+  return sha256Hex(stableJson(treatmentPlanTechQuote(q))).slice(0, 16);
+}
+
+function treatmentPlanMessage(input, extra, techQuote) {
   const parts = ['REPORT FIELDS (JSON):\n' + JSON.stringify(input.report)];
   parts.push(input.notes.length
     ? 'WHAT THE INSPECTOR SAID (notes in the order dictated):\n' + input.notes.map((t, i) => `[${i + 1}] ${t}`).join('\n')
     : 'WHAT THE INSPECTOR SAID: no notes kept for this report; plan from the fields.');
+  if (techQuote) {
+    const q = [];
+    if (techQuote.lines.length) q.push('Work lines:\n' + techQuote.lines.map(t => '- ' + t).join('\n'));
+    if (techQuote.steps.length) q.push('Steps they wrote for the client:\n' + techQuote.steps.map(t => '- ' + t).join('\n'));
+    parts.push("THE INSPECTOR'S QUOTE SO FAR (their own plan, before asking you; lines built from their recommendation count as theirs):\n" + q.join('\n'));
+  } else {
+    parts.push("THE INSPECTOR'S QUOTE SO FAR: empty.");
+  }
   if ((extra || '').trim()) parts.push('THE INSPECTOR ADDS:\n' + extra.trim());
   return parts.join('\n\n');
 }
@@ -195,7 +228,7 @@ const treatmentPlanRuns = {};
 // the phone is back online, not shown as an error.
 const treatmentPlanWaiting = {};
 
-async function requestTreatmentPlan(rd, address, extra) {
+async function requestTreatmentPlan(rd, address, extra, techQuote) {
   if (!navigator.onLine) throw Object.assign(new Error('No signal'), { noSignal: true });
   const input = treatmentPlanInput(rd, address);
   const controller = new AbortController();
@@ -213,7 +246,7 @@ async function requestTreatmentPlan(rd, address, extra) {
         output_config: { effort: 'medium' },
         // Same for every plan, so cached for an hour.
         system: [{ type: 'text', text: TREATMENT_PLAN_PROMPT, cache_control: { type: 'ephemeral', ttl: '1h' } }],
-        messages: [{ role: 'user', content: treatmentPlanMessage(input, extra) }],
+        messages: [{ role: 'user', content: treatmentPlanMessage(input, extra, techQuote) }],
       }),
       signal: controller.signal,
     });
@@ -241,9 +274,12 @@ function cleanTreatmentPlan(p) {
   const systems = Object.keys(QUOTE_SYSTEM_LABELS);
   const kd = p.knockdown && typeof p.knockdown === 'object' ? p.knockdown : {};
   const client = p.client && typeof p.client === 'object' ? p.client : {};
+  const vs = p.versus && typeof p.versus === 'object' ? p.versus : {};
   return {
     summary: str(p.summary),
     system: systems.includes(p.system) ? p.system : 'none',
+    versus: { agree: list(vs.agree).slice(0, 3), add: list(vs.add).slice(0, 3), change: list(vs.change).slice(0, 3) },
+    // Plans from before the three lists said it in one line.
     versusInspector: str(p.versusInspector),
     knockdown: { needed: kd.needed === true, short: str(kd.short), method: str(kd.method), where: list(kd.where), why: str(kd.why) },
     systemWhy: list(p.systemWhy),
@@ -322,16 +358,18 @@ async function runTreatmentPlan(extra) {
   const key = q.reportKey;
   const prev = q.aiPlan || {};
   const hash = treatmentPlanHash(rd, q.address);
+  const techQuote = treatmentPlanTechQuote(q);
+  const quoteHash = treatmentPlanQuoteHash(q);
   const started = Date.now();
   treatmentPlanRuns[key] = true;
   delete treatmentPlanWaiting[key];
   if (q.aiPlan) q.aiPlan.error = '';
   renderTreatmentPlanCard();
   try {
-    const plan = checkTreatmentPlan(await requestTreatmentPlan(rd, q.address, extra), rd);
-    track('treatment_plan_made', { seconds: Math.round((Date.now() - started) / 1000), system: plan.system });
+    const plan = checkTreatmentPlan(await requestTreatmentPlan(rd, q.address, extra, techQuote), rd);
+    track('treatment_plan_made', { seconds: Math.round((Date.now() - started) / 1000), system: plan.system, compared: !!techQuote });
     delete treatmentPlanRuns[tpKey(key)];
-    setTreatmentPlanState(key, { plan, hash, at: Date.now(), extra: extra || '', applied: false, before: null });
+    setTreatmentPlanState(key, { plan, hash, quoteHash, compared: !!techQuote, at: Date.now(), extra: extra || '', applied: false, before: null });
   } catch (err) {
     if (err.noSignal && !(prev && prev.plan)) {
       delete treatmentPlanRuns[tpKey(key)];
@@ -517,6 +555,34 @@ function treatmentPlanBodyHTML(ai) {
   </div>`;
 }
 
+// Your plan vs SAYON: what SAYON would do differently first, then what it
+// would add, then where it agrees, one short line each.
+const TP_VS_ICONS = {
+  change: '<path d="M7 7h12l-4-4"/><path d="M17 17H5l4 4"/>',
+  add: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+  agree: '<path d="M20 6 9 17l-5-5"/>',
+};
+const TP_VS_WORDS = { change: 'Change', add: 'Add', agree: 'Same' };
+
+function tpVersusHTML(ai, q) {
+  const p = ai.plan;
+  const e = escapeHtml;
+  const vs = p.versus || { agree: [], add: [], change: [] };
+  const rows = ['change', 'add', 'agree'].flatMap(k => vs[k].map(t => `<li class="tp-vs-${k}"><span class="tp-vs-icon" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${TP_VS_ICONS[k]}</svg></span><span class="tp-vs-text"><span class="tp-vs-word">${TP_VS_WORDS[k]}</span>${e(t)}</span></li>`));
+  if (rows.length) {
+    const tally = !vs.change.length && !vs.add.length ? 'Agrees with your plan'
+      : [vs.change.length && `${vs.change.length} ${vs.change.length === 1 ? 'change' : 'changes'}`, vs.add.length && `${vs.add.length} to add`, vs.agree.length && `${vs.agree.length} same`]
+        .filter(Boolean).join(' · ');
+    return `<div class="tp-vs"><div class="tp-vs-head"><span class="tp-vs-label">Your plan vs SAYON</span><span class="tp-vs-tally">${tally}</span></div><ul class="tp-vs-list">${rows.join('')}</ul></div>`;
+  }
+  if (p.versusInspector) return `<div class="tp-vs"><div class="tp-vs-head"><span class="tp-vs-label">Your plan vs SAYON</span></div><div class="tp-text">${e(p.versusInspector)}</div></div>`;
+  // Asked before there was anything of theirs on the quote.
+  if (ai.compared === false && !ai.applied && !treatmentPlanTechQuote(q)) {
+    return '<div class="tp-vs tp-vs-empty">Nothing of yours to compare yet. Put your own lines in the quote, then ask again to see where SAYON agrees.</div>';
+  }
+  return '';
+}
+
 const TP_SPARK = '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>';
 
 function renderTreatmentPlanCard() {
@@ -562,11 +628,15 @@ function renderTreatmentPlanCard() {
     return;
   }
   const p = ai.plan;
-  const stale = rd && ai.hash && treatmentPlanHash(rd, q.address) !== ai.hash;
+  const reportChanged = rd && ai.hash && treatmentPlanHash(rd, q.address) !== ai.hash;
+  // Their quote changed after SAYON compared it (only before Add to my
+  // quote, which changes it on purpose).
+  const quoteChanged = !ai.applied && ai.quoteHash && treatmentPlanQuoteHash(q) !== ai.quoteHash;
+  const stale = reportChanged || quoteChanged;
   if (ai.applied) el.classList.add('tp-applied');
   el.innerHTML = `${head("SAYON's suggestion", escapeHtml(p.summary || TP_SYSTEM_LABELS[p.system] || ''), ai.applied ? 'In the quote' : 'Guide only')}
-    ${p.versusInspector ? `<div class="tp-versus"><span class="tp-versus-label">Your plan vs SAYON</span>${escapeHtml(p.versusInspector)}</div>` : ''}
-    ${stale ? '<div class="tp-stale">The report has changed since SAYON looked at it.</div>' : ''}
+    ${tpVersusHTML(ai, q)}
+    ${stale ? `<div class="tp-stale">${reportChanged && quoteChanged ? 'The report and your quote have' : reportChanged ? 'The report has' : 'Your quote has'} changed since SAYON looked at it.</div>` : ''}
     ${ai.error ? `<div class="tp-error">${escapeHtml(ai.error)}</div>` : ''}
     ${treatmentPlanBodyHTML(ai)}
     <div class="tp-actions">

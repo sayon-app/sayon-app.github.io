@@ -1839,7 +1839,7 @@ AREAS INSPECTED (areaStatus): one key per area the note actually covers; leave o
 - An area named only in a recommendation, a conducive condition or a finding ("pull the soil back from the garage", "soil against the fence") gets no status unless the inspector says they looked at it.
 - "Everything was accessible" or "full access everywhere" sets every area mentioned in the note to INSPECTED; it never adds areas the note does not mention.
 - A later note re-covering an area ("got into the back of the subfloor now, all clear") simply states that area's new status.
-- areaResult: what was found in each area the note covers, same keys. "FOUND" when the note records termites or termite evidence (live termites, workings, mud, galleries or damage: what makes a findings entry), borers, wood decay or chemical delignification in that area: workings in a fence post is fences FOUND, a skirting board in a bedroom is interior FOUND, a bearer under the house is subfloor FOUND, a tree in the yard is site FOUND, a sleeper is landscapingtimbers FOUND. "CLEAR" only when the inspector says that area had nothing ("fences all good, no activity", "roof void clear", "no termites or borers in the subfloor"), or says the whole property was clear, which makes every area the note covers CLEAR. "All clear" said about termites does not outweigh borers, decay or delignification the note reports in the same area: "interior all clear... old borer holes in the back bedroom floorboards" is interior FOUND. A clear remark about one room or part ("no activity in the bathroom") is not the whole area: leave that area out unless they say the rest was clear too. When the rest of that area could not be inspected and the note says why (batts, low clearance, stored goods), the clear remark covers everything that could be inspected, so the area is CLEAR and the part not seen goes in obstructions: "front half of the roof void is fine, no termite activity, the back half has batts over everything so I couldn't see" is roofvoid CLEAR. Walking an area without saying what was found gives no areaResult. Moisture, leaks and other conducive conditions are not timber pest evidence. A suspicion with nothing seen (see "Suspected only" below) is not FOUND either.
+- areaResult: what was found in each area the note covers, same keys. "FOUND" when the note records termites or termite evidence (live termites, workings, mud, galleries or damage: what makes a findings entry), borers, wood decay or chemical delignification in that area: workings in a fence post is fences FOUND, a skirting board in a bedroom is interior FOUND, a bearer under the house is subfloor FOUND, a tree in the yard is site FOUND, a sleeper is landscapingtimbers FOUND, a pergola, shed, carport or garage is outbuildings FOUND. "CLEAR" only when the inspector says that area had nothing ("fences all good, no activity", "roof void clear", "no termites or borers in the subfloor"), or says the whole property was clear, which makes every area the note covers CLEAR. "All clear" said about termites does not outweigh borers, decay or delignification the note reports in the same area: "interior all clear... old borer holes in the back bedroom floorboards" is interior FOUND. A clear remark about one room or part ("no activity in the bathroom") is not the whole area: leave that area out unless they say the rest was clear too. When the rest of that area could not be inspected and the note says why (batts, low clearance, stored goods), the clear remark covers everything that could be inspected, so the area is CLEAR and the part not seen goes in obstructions: "front half of the roof void is fine, no termite activity, the back half has batts over everything so I couldn't see" is roofvoid CLEAR. Walking an area without saying what was found gives no areaResult. Moisture, leaks and other conducive conditions are not timber pest evidence. A suspicion with nothing seen (see "Suspected only" below) is not FOUND either.
 
 HINDERED AND RESTRICTED ACCESS: five fields, each with one meaning. The report sorts every access limit into two kinds. HINDERED access is a temporary obstruction at the time of the inspection: furniture, stored goods, floor coverings, insulation, vegetation, a manhole blocked by stored items, or low clearance in the subfloor or roof void. RESTRICTED access is a permanent restriction or locked entry: a locked room, a subfloor with no access hatch, a manhole sealed or screwed shut, a roof with no void, a part beyond safe height, or a yard the inspector could not safely enter because of a dog or other animal.
 - obstructions: which areas were not fully inspected and roughly where, e.g. "Subfloor: back section behind stored items. Roof void: outer edges and corners". Only PARTIAL or NOT areas appear here. Null when nothing was in the way.
@@ -12608,6 +12608,9 @@ function dashboardJob(r, quotes) {
   // Ready: every required field filled, or a PDF made. Done: completed or sent.
   const reportSent = !!(d.issue || d.sent);
   const reportDone = reportSent || !!d.pdfAt || (r.completion || 0) >= 100;
+  // The quote's link carries the report too, so a quote sent that way gave
+  // the client the report.
+  const reportWentWithQuote = !!(hasQuote && q.sentAt && q.linkRequest && q.linkRequest.files && q.linkRequest.files.report);
   const needsQuote = d.treatmentRecommended === 'YES';
   const total = hasQuote ? quoteTotals(q).total : 0;
   const who = (r.client || '').trim() || 'the client';
@@ -12648,6 +12651,14 @@ function dashboardJob(r, quotes) {
   } else {
     group = 'done'; status = 'Treated';
     hint = 'Finished. ' + who.charAt(0).toUpperCase() + who.slice(1) + ' has their treatment certificate.';
+  }
+
+  // Everything else is finished (a declined quote, say) but the report
+  // itself never went: that's still the inspector's to do.
+  if (group === 'done' && reportDone && !reportSent && !reportWentWithQuote) {
+    group = 'todo'; status = 'Send the report';
+    hint = 'The report is ready but hasn\'t gone to ' + who + '. Send it from the Sign-Off page.';
+    next = { label: 'Open report', to: 'report' };
   }
 
   // A baiting system keeps the job going: back to To do when a station
@@ -12697,7 +12708,6 @@ function dashboardJob(r, quotes) {
   // A PDF made but never sent isn't a finished report: the client still
   // hasn't got it (unless it went on the quote's link), so the step says so
   // instead of "Completed".
-  const reportWentWithQuote = !!(hasQuote && q.sentAt && q.linkRequest && q.linkRequest.files && q.linkRequest.files.report);
   if (!reportSent && reportDone && !reportWentWithQuote) Object.assign(steps[0], { state: 'now', ready: true, text: d.pdfAt ? 'PDF made, not sent yet' : 'Ready to send' });
   // Recorded but the certificate hasn't gone: the treatment isn't finished.
   if (q && q.treatment && !certificateGiven(q) && steps[3].state === 'done') Object.assign(steps[3], { state: 'now', text: 'Certificate not emailed yet' });
@@ -13290,6 +13300,10 @@ function reportSummary() {
   const conducive = conduciveConditions(reportData);
   const places = list => list.map(f => f.activityLocation).filter(Boolean).join('; ');
   const NR = 'NOT RECORDED';
+  // A borer-only recommendation ("Borer treatment of the floorboards") is
+  // not a termite treatment: the summary and next steps say so.
+  const borerOnlyTreatment = !live.length && /borer|beetle|anobium|lyctus/i.test(reportData.treatmentType || '') && !/termite|barrier|bait|reticulation/i.test(reportData.treatmentType || '');
+  const termiteTreatment = borerOnlyTreatment && reportData.treatmentRecommended === 'YES' ? 'NO' : reportData.treatmentRecommended;
   const limitedZones = areasNotFullyInspected();
   // What the risk rating rests on: the property, never the termite species.
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -13340,8 +13354,8 @@ function reportSummary() {
         !structural && unanswered.length ? `Finding${unanswered.length === 1 ? '' : 's'} ${unanswered.join(', ')}: not answered` : ''],
       ['Conditions conducive to timber pests?', conducive.length ? `${conducive.length} FOUND` : 'NONE RECORDED', conducive.length ? 'warn' : 'none', REPORT_PARTS.conducive,
         conducive.join('; ').replace(/^./, ch => ch.toUpperCase())],
-      ['Termite treatment recommended?', { YES: 'YES', NO: 'NO' }[reportData.treatmentRecommended] || NR,
-        { YES: 'bad', NO: 'good' }[reportData.treatmentRecommended] || 'none', REPORT_PARTS.recommendations, reportData.treatmentType || ''],
+      ['Termite treatment recommended?', { YES: 'YES', NO: 'NO' }[termiteTreatment] || NR,
+        { YES: 'bad', NO: 'good' }[termiteTreatment] || 'none', REPORT_PARTS.recommendations, reportData.treatmentType || ''],
       ['Risk of termite attack', reportData.riskLevel || NR, { HIGH: 'bad', MEDIUM: 'warn', LOW: 'good' }[reportData.riskLevel] || 'none', REPORT_PARTS.recommendations,
         reportData.riskLevel && basis.length ? `Based on ${basis.join(', ')}` : ''],
       ['Next inspection', nextInspectionChip(reportData.inspectionFrequency), 'none', REPORT_PARTS.recommendations,
@@ -13354,14 +13368,14 @@ function reportSummary() {
     return `${OBS_ZONES[z].label}: ${areaStatusOf(z) === 'NOT' ? 'not inspected' : 'inspected with limits'}${why ? ` (${why})` : ''}`;
   });
   const next = [];
-  if (live.length || reportData.treatmentRecommended === 'YES') {
+  if (live.length || (reportData.treatmentRecommended === 'YES' && !borerOnlyTreatment)) {
     next.push(`Termite treatment${reportData.treatmentType ? `: ${reportData.treatmentType}` : ` (see Section ${REPORT_PARTS.recommendations})`}.`);
   }
   if (structural) {
     const what = termiteReferral && borerReferral ? 'termite and borer damage' : termiteReferral ? 'termite damage' : 'borer damage';
     next.push(`Have a licensed builder or structural engineer assess the ${what} before any repairs.`);
   }
-  if (reportData.borerActivity === 'ACTIVE') next.push('Treat the active borers and replace badly affected timbers.');
+  if (reportData.borerActivity === 'ACTIVE' || borerOnlyTreatment) next.push(borerOnlyTreatment ? `${reportData.treatmentType.trim().replace(/\.$/, '')}, and replace badly affected timbers.` : 'Treat the active borers and replace badly affected timbers.');
   if (reportData.decayFound === 'YES') next.push('Have a builder repair the decayed timbers, and fix the moisture that caused the decay.');
   if (reportData.delignification === 'YES') next.push('Have a builder check and replace the delignified timbers where needed.');
   if (conducive.length) next.push(`Fix the conditions that attract termites: ${conducive.join('; ')}.`);
@@ -13797,7 +13811,10 @@ function openSendReview() {
   const address = getFullAddress();
   const client = document.getElementById('jobClient').value.trim();
   const email = (reportData.jobClientEmail || '').trim();
-  const withQuote = quoteHasItems(quote);
+  // A quote the client already declined isn't sent again with the report.
+  const answer = quoteHasItems(quote) && typeof quoteAnswerState === 'function' ? quoteAnswerState(quote) : null;
+  const declined = !!(answer && !answer.stale && answer.status !== 'accepted');
+  const withQuote = quoteHasItems(quote) && !declined;
   sendReview = { files: null, quote: withQuote ? quote : null };
 
   const esc = escapeHtml;
@@ -13816,7 +13833,7 @@ function openSendReview() {
     attach.push(`<div class="send-review-file"><div><div class="send-review-file-name">Treatment quote</div>` +
       `<div class="send-review-file-meta">${esc(quote.number || '')} · ${formatAUD(quoteTotals(quote).total)}${quote.gst !== false ? ' inc GST' : ''}</div></div>` +
       `<button class="link-btn" onclick="previewSendFile(1)">Preview</button></div>`);
-  } else if (!reportData.noQuoteNeeded) {
+  } else if (!reportData.noQuoteNeeded && !declined) {
     attach.push('<div class="send-review-gap"><span class="send-review-warn">No quote is attached.</span>' +
       '<span class="send-review-fixes"><button class="link-btn" onclick="fixSendGap(\'quote\')">Build quote now</button></span></div>');
   }

@@ -850,8 +850,40 @@ function openQuote(from, preferKey) {
   renderQuoteSourceOptions(preferKey);
   onQuoteSourceChange();
   renderDocStrips();
+  applyQuoteBarsFolded();
   document.querySelector('#quoteScreen .quote-scroll').scrollTop = 0;
   track('screen_viewed', { screen: 'quote' });
+}
+
+// The top bar (with the job's documents) and the total bar each fold to a
+// slim row to clear space. The choice is remembered on this device.
+const QUOTE_BARS_KEY = 'korva_quote_bars_folded';
+let quoteBarsState = null;
+function quoteBarsFolded() {
+  if (!quoteBarsState) {
+    try { quoteBarsState = JSON.parse(localStorage.getItem(QUOTE_BARS_KEY)) || {}; } catch (e) { quoteBarsState = {}; }
+  }
+  return quoteBarsState;
+}
+function applyQuoteBarsFolded() {
+  const f = quoteBarsFolded();
+  const screen = document.getElementById('quoteScreen');
+  screen.classList.toggle('top-folded', !!f.top);
+  screen.classList.toggle('bottom-folded', !!f.bottom);
+  // The total bar's button is the total itself, so it keeps its own words
+  // for a screen reader and says what a tap does in its title.
+  [['quoteTopFold', f.top, 'top bar', 'aria-label'], ['quoteBottomFold', f.bottom, 'total bar', 'title']].forEach(([id, folded, what, attr]) => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    b.setAttribute('aria-expanded', folded ? 'false' : 'true');
+    b.setAttribute(attr, (folded ? 'Open the ' : 'Fold the ') + what);
+  });
+}
+function toggleQuoteBar(which) {
+  const f = quoteBarsFolded();
+  f[which] = !f[which];
+  try { localStorage.setItem(QUOTE_BARS_KEY, JSON.stringify(f)); } catch (e) { /* kept for this visit */ }
+  applyQuoteBarsFolded();
 }
 
 function openQuoteFromReport() {

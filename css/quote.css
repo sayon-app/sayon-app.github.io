@@ -340,14 +340,34 @@ body:not(.dark-screen) .quote-card-head {
   border-top: 1px solid var(--border);
   box-shadow: 0 -10px 30px rgba(0,0,0,0.25);
 }
-.quote-bar-total { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.quote-bar-label { font-size: 11px; font-weight: 600; color: var(--text3); }
+/* The total is also the fold button for the bar: label and chevron over
+   the amount; folded, one row. */
+.quote-bar-total { flex: 1; min-width: 0; display: grid; grid-template-columns: auto auto 1fr; grid-template-areas: "label chev ." "amount amount amount"; column-gap: 4px; align-items: center; justify-items: start; align-content: center; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.quote-bar-label { grid-area: label; font-size: 11px; font-weight: 600; color: var(--text3); }
+.quote-bar-chev { grid-area: chev; color: var(--text3); transition: transform 0.2s; }
+.quote-bar-amount { grid-area: amount; }
 .quote-bar-amount { font: 800 19px 'Space Grotesk', sans-serif; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .quote-bar .quote-btn { flex: none; height: 46px; padding: 0 14px; }
 .quote-bar-send { padding: 0 18px; }
 
 body:not(.dark-screen) .quote-bar { background: var(--ink); border-top-color: rgba(255,255,255,0.08); }
-body:not(.dark-screen) .quote-bar-label { color: var(--on-ink2); }
+body:not(.dark-screen) .quote-bar-label, body:not(.dark-screen) .quote-bar-chev { color: var(--on-ink2); }
+
+/* Folding the bars (toggleQuoteBar): the top bar loses the job's documents
+   and slims to one row; the total bar slims to the total alone. */
+.quote-fold-btn { flex-shrink: 0; width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); cursor: pointer; }
+.quote-fold-btn .icon { transition: transform 0.2s; }
+body:not(.dark-screen) .quote-fold-btn { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
+#quoteScreen.top-folded .doc-strip-bar { display: none; }
+#quoteScreen.top-folded .quote-topbar { min-height: calc(42px + env(safe-area-inset-top, 0px)); padding-top: calc(4px + env(safe-area-inset-top, 0px)); padding-bottom: 4px; }
+#quoteScreen.top-folded .quote-topbar-title { font-size: 15px; }
+#quoteScreen.top-folded .quote-fold-btn { width: 32px; height: 32px; }
+#quoteScreen.top-folded .quote-fold-btn .icon { transform: rotate(180deg); }
+#quoteScreen.bottom-folded .quote-bar { padding-top: 2px; padding-bottom: calc(2px + env(safe-area-inset-bottom)); box-shadow: none; }
+#quoteScreen.bottom-folded .quote-bar .quote-btn { display: none; }
+#quoteScreen.bottom-folded .quote-bar-total { grid-template-columns: auto auto auto 1fr; grid-template-areas: "label amount chev ."; column-gap: 8px; min-height: 40px; }
+#quoteScreen.bottom-folded .quote-bar-amount { font-size: 15px; }
+#quoteScreen.bottom-folded .quote-bar-chev { transform: rotate(180deg); }
 body:not(.dark-screen) .quote-bar-amount { color: var(--on-ink); }
 body:not(.dark-screen) .quote-bar .quote-bar-pdf { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.16); color: var(--on-ink); }
 body:not(.dark-screen) .quote-fold > summary .quote-card-title { padding: 0; border: none; }

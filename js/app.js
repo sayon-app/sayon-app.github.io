@@ -443,7 +443,9 @@ function textAreas(text) {
   // A stump out in the yard is a tree stump, not one under the house.
   const yardStump = (AREA_EVIDENCE_WORDS.site).some(has);
   const hit = z => (AREA_EVIDENCE_WORDS[z] || []).some(w => has(w) && !(z === 'subfloor' && w === 'stump' && yardStump));
-  const specific = Object.keys(AREA_EVIDENCE_WORDS).filter(z => !AREA_EVIDENCE_GENERAL.has(z) && hit(z));
+  let specific = Object.keys(AREA_EVIDENCE_WORDS).filter(z => !AREA_EVIDENCE_GENERAL.has(z) && hit(z));
+  // A sleeper retaining wall is a retaining wall, not landscaping timbers.
+  if (specific.includes('retainingwalls') && !['landscaping timber', 'garden edging', 'edging timber'].some(has)) specific = specific.filter(z => z !== 'landscapingtimbers');
   if (specific.length) return specific;
   const general = [...AREA_EVIDENCE_GENERAL].filter(hit);
   // "Skirting board, external wall, laundry" is inside the house, on the
@@ -7646,7 +7648,8 @@ function agreementFormValues() {
     standard, inspectionDate, fee, notes,
     text: fillAgreementText(getAgreementTemplate(), {
       company: getCompanyDetails().name || 'The inspecting company',
-      client: document.getElementById('agreementSignerName').value.trim() || document.getElementById('jobClient').value.trim(),
+      // The inspection is for the client; someone else may sign for them.
+      client: document.getElementById('jobClient').value.trim() || document.getElementById('agreementSignerName').value.trim(),
       address: getFullAddress(),
       date: formatAgreementDate(inspectionDate),
       standard,
@@ -13863,7 +13866,8 @@ function openSendReview() {
   };
   sendReview.defaultBody = clientMessage(sendReview.message);
   document.getElementById('sendReviewBody').value = sendReview.defaultBody;
-  if (withQuote) prepareSendReviewLink(sendReview);
+  // A quote the client already accepted goes as a copy, without a link to accept it again.
+  if (withQuote && !(answer && !answer.stale)) prepareSendReviewLink(sendReview);
   sendReview.label = gaps.length ? 'Send anyway'
     : directEmail && email ? `Send to ${email}` : 'Open email to send';
   const btn = document.getElementById('sendReviewBtn');

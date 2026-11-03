@@ -850,8 +850,40 @@ function openQuote(from, preferKey) {
   renderQuoteSourceOptions(preferKey);
   onQuoteSourceChange();
   renderDocStrips();
+  applyQuoteBarsFolded();
   document.querySelector('#quoteScreen .quote-scroll').scrollTop = 0;
   track('screen_viewed', { screen: 'quote' });
+}
+
+// The top bar (with the job's documents) and the total bar each fold to a
+// slim row to clear space. The choice is remembered on this device.
+const QUOTE_BARS_KEY = 'korva_quote_bars_folded';
+let quoteBarsState = null;
+function quoteBarsFolded() {
+  if (!quoteBarsState) {
+    try { quoteBarsState = JSON.parse(localStorage.getItem(QUOTE_BARS_KEY)) || {}; } catch (e) { quoteBarsState = {}; }
+  }
+  return quoteBarsState;
+}
+function applyQuoteBarsFolded() {
+  const f = quoteBarsFolded();
+  const screen = document.getElementById('quoteScreen');
+  screen.classList.toggle('top-folded', !!f.top);
+  screen.classList.toggle('bottom-folded', !!f.bottom);
+  // The total bar's button is the total itself, so it keeps its own words
+  // for a screen reader and says what a tap does in its title.
+  [['quoteTopFold', f.top, 'top bar', 'aria-label'], ['quoteBottomFold', f.bottom, 'total bar', 'title']].forEach(([id, folded, what, attr]) => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    b.setAttribute('aria-expanded', folded ? 'false' : 'true');
+    b.setAttribute(attr, (folded ? 'Open the ' : 'Fold the ') + what);
+  });
+}
+function toggleQuoteBar(which) {
+  const f = quoteBarsFolded();
+  f[which] = !f[which];
+  try { localStorage.setItem(QUOTE_BARS_KEY, JSON.stringify(f)); } catch (e) { /* kept for this visit */ }
+  applyQuoteBarsFolded();
 }
 
 function openQuoteFromReport() {
@@ -1125,7 +1157,7 @@ function quoteItemHTML(it) {
         <label class="quote-field"><span>Price each, ex GST</span><input class="quote-input" type="number" min="0" step="any" inputmode="decimal" value="${escapeHtml(String(it.price))}"
           oninput="markQuotePriceSet('${id}'); updateQuoteItem('${id}','price',this.value)" onchange="rememberQuotePrice('${it.key}', parseFloat(this.value))"></label>
       </div>
-      ${it.source ? `<div class="quote-item-source">From the report: ${escapeHtml(it.source)}</div>` : ''}
+      ${it.source ? `<div class="quote-item-source">${/^SAYON plan/.test(it.source) ? escapeHtml(it.source.replace(/^SAYON plan(: [^(]*)?/, "From the SAYON recommendation").trim()) : 'From the report: ' + escapeHtml(it.source)}</div>` : ''}
       <div class="qi-edit-btns">
         <button type="button" class="quote-text-btn danger" onclick="removeQuoteItem('${id}')">Remove line</button>
         <button type="button" class="quote-link-btn qi-done" onclick="toggleQuoteItem('${id}')">Done</button>

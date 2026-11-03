@@ -642,13 +642,25 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 @media (prefers-reduced-motion: reduce) { .tp-spinner { animation-duration: 3s; } }
 .tp-error { margin: 10px 0 0 46px; font-size: 13px; color: var(--yellow-text); line-height: 1.45; }
 .tp-stale { margin-top: 10px; font-size: 12.5px; color: var(--yellow-text); }
-/* Your plan vs SAYON: change, add, same, one short row each. */
-.tp-vs { margin-top: 12px; padding: 10px 12px 12px; border-radius: 12px; background: rgba(var(--accent-rgb),0.06); border: 1px solid rgba(var(--accent-rgb),0.18); }
+/* The whole suggestion folds to one row: title, tag and a one-line count. */
+.tp-wrap > summary { list-style: none; display: flex; align-items: center; gap: 8px; cursor: pointer; min-height: 44px; }
+.tp-wrap > summary::-webkit-details-marker { display: none; }
+.tp-wrap > summary .tp-head { flex: 1; min-width: 0; align-items: center; }
+.tp-wrap .tp-mark { width: 30px; height: 30px; border-radius: 9px; }
+.tp-wrap .tp-title-row { flex-wrap: wrap; row-gap: 2px; }
+.tp-wrap .tp-title { white-space: nowrap; }
+.tp-wrap .tp-tag { font-size: 9.5px; padding: 2px 7px; }
+.tp-wrap .tp-head-sub { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tp-wrap-chev { flex-shrink: 0; color: var(--text3); transition: transform 0.2s; }
+.tp-wrap[open] > summary .tp-wrap-chev { transform: rotate(180deg); }
+.tp-gist-warn { color: var(--yellow-text); font-weight: 600; }
+.tp-summary { margin-top: 10px; font-size: 13.5px; line-height: 1.45; color: var(--text2); }
+/* Compared with your quote: change, add, agreed, one short row each. */
+.tp-vs { margin-top: 10px; padding: 8px 12px 8px; border-radius: 12px; background: rgba(var(--accent-rgb),0.06); border: 1px solid rgba(var(--accent-rgb),0.18); }
 .tp-vs-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .tp-vs-label { font-size: 10.5px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--accent); white-space: nowrap; }
-.tp-vs-tally { font-size: 12px; font-weight: 600; color: var(--text2); text-align: right; }
 .tp-vs-list { list-style: none; margin: 0; padding: 0; }
-.tp-vs-list li { display: flex; align-items: flex-start; gap: 9px; padding: 6px 0; font-size: 13.5px; line-height: 1.45; color: var(--text); }
+.tp-vs-list li { display: flex; align-items: flex-start; gap: 9px; padding: 5px 0; font-size: 13.5px; line-height: 1.45; color: var(--text); }
 .tp-vs-list li + li { border-top: 1px solid rgba(var(--accent-rgb),0.12); }
 .tp-vs-icon { flex-shrink: 0; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; display: grid; place-items: center; }
 .tp-vs-change .tp-vs-icon { color: var(--yellow-text); background: rgba(212,146,10,0.16); }
@@ -659,9 +671,9 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 .tp-vs-empty { font-size: 12.5px; line-height: 1.45; color: var(--text2); background: var(--surface2); border-color: var(--border); }
 
 /* The sections: one row each, a heading and its one-line gist; tap to open. */
-.tp-secs { margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.tp-secs { margin-top: 10px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .tp-sec + .tp-sec { border-top: 1px solid var(--border); }
-.tp-sec > summary { list-style: none; display: flex; align-items: center; gap: 12px; padding: 11px 12px; min-height: 52px; cursor: pointer; }
+.tp-sec > summary { list-style: none; display: flex; align-items: center; gap: 12px; padding: 8px 12px; min-height: 46px; cursor: pointer; }
 .tp-sec > summary::-webkit-details-marker { display: none; }
 .tp-sec-mark { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: var(--accent); background: rgba(var(--accent-rgb),0.1); }
 .tp-sec-warn .tp-sec-mark { color: var(--yellow-text); background: rgba(212,146,10,0.14); }
@@ -681,17 +693,17 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 .tp-list { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.5; color: var(--text); }
 .tp-list li + li { margin-top: 5px; }
 .tp-why-not { color: var(--text2); }
-.tp-who { display: inline-block; flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); color: var(--text2); margin-left: 4px; white-space: nowrap; }
+.tp-who { display: inline-block; flex-shrink: 0; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); color: var(--text2); margin-left: 4px; white-space: nowrap; }
 .tp-who-us { background: rgba(var(--accent-rgb),0.1); border-color: rgba(var(--accent-rgb),0.25); color: var(--accent); }
 .tp-who-owner { background: rgba(212,146,10,0.12); border-color: rgba(212,146,10,0.35); color: var(--yellow-text); }
 
 /* The scope of works: every action in order, who does it on the right. */
-.tp-scope { margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
-.tp-scope-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 10px 12px 4px; }
+.tp-scope { margin-top: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.tp-scope-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 8px 12px 2px; }
 .tp-scope-label { font-size: 10.5px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text); }
 .tp-scope-count { font-size: 12px; font-weight: 600; color: var(--text3); }
 .tp-scope-list { list-style: none; margin: 0; padding: 0 12px 4px; }
-.tp-scope-list li { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; font-size: 13.5px; line-height: 1.4; color: var(--text); }
+.tp-scope-list li { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; font-size: 13.5px; line-height: 1.4; color: var(--text); }
 .tp-scope-list li + li { border-top: 1px solid var(--border); }
 .tp-scope-n { flex-shrink: 0; width: 20px; height: 20px; margin-top: 0; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--text2); background: var(--surface2); }
 .tp-scope-do { flex: 1; min-width: 0; padding-top: 1px; }
@@ -704,16 +716,16 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 .tp-line-qty.warn { color: var(--yellow-text); }
 .tp-client { padding-left: 10px; border-left: 2px solid var(--accent); }
 
-.tp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.tp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
 .tp-actions:empty { display: none; }
 .tp-use { flex: 1 1 auto; }
 .tp-status { flex: 1; font-size: 12.5px; color: var(--text2); line-height: 1.4; }
 .tp-again { margin-top: 8px; }
 .tp-again summary { font-size: 13px; font-weight: 600; color: var(--accent); cursor: pointer; min-height: 36px; display: flex; align-items: center; }
+.tp-again-hint { font-size: 12.5px; line-height: 1.45; color: var(--text2); }
 .tp-again .quote-textarea { margin: 6px 0 8px; }
-.tp-foot { margin-top: 10px; font-size: 11.5px; color: var(--text3); }
-.tp-folded { padding: 10px 14px; }
-.tp-fold-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; background: none; border: 0; padding: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.tp-again .quote-btn { width: 100%; flex: none; }
+.tp-foot { margin-top: 8px; font-size: 11.5px; color: var(--text3); }
 .tp-report-link { display: flex; align-items: center; gap: 12px; width: calc(100% - 28px); margin: 4px 14px 14px; padding: 12px 14px; min-height: 44px; text-align: left; border-radius: 12px; border: 1px dashed rgba(var(--accent-rgb),0.45); background: transparent; color: var(--text); font: inherit; cursor: pointer; }
 .tp-report-link .icon { flex-shrink: 0; color: var(--accent); }
 .tp-report-link span { display: flex; flex-direction: column; gap: 2px; }

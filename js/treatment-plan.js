@@ -81,6 +81,7 @@ HOW AN EXPERIENCED TECHNICIAN DECIDES
 - Climate and region (propertyState, postcode) shape season and servicing intervals; in the tropical north the giant northern termite (Mastotermes) occurs and baiting is commonly used against it. Species otherwise informs where to look for the nest and how to reach it (Coptotermes often nests in trees, stumps and root crowns or under slabs; Schedorhinotermes often has several linked nests, so expect more than one knockdown point). Species is never a reason the property is at higher risk, and never say so.
 - If the inspector named or quoted a method (treatmentType, their notes or their quote so far), start from it and keep it when the facts support it. When the facts strongly argue against it, recommend what you would do and put the reason first in versus.change, so the inspector weighs it before anything else.
 - If the inspector offered a choice ("chemical barrier or baiting"), choose one for this property and explain in systemWhy and notChosen.
+- THE INSPECTOR ADDS is the inspector's note when they ask again. Facts in it (a measurement, the owner's wishes, something found) override the report. A direction in it ("quote a chemical barrier instead", "no baits") is the plan to build, as long as it is sound and safe; if you would still do it differently, say so in versus.change. A question in it is not part of the plan: ignore it.
 - No termites, no evidence, no system needed: system "none", knockdown not needed, plan built around fixes and regular inspections.
 
 3. Fix what invites termites. Leaks and high moisture readings (find and fix the source; termites follow moisture and a wet zone breaks down a soil treatment sooner), timber on the soil, bridged weep holes and slab edges, garden beds or paving over the inspection zone, poor drainage, poor subfloor ventilation, non-durable timber in the ground, gaps in ant capping, stored timber and firewood against the walls. Include each one the report raises, with who does it. Use the timber_soil, weep_holes and slab_edge lines only for work the pest business itself would do.
@@ -380,6 +381,7 @@ async function runTreatmentPlan(extra) {
     const plan = checkTreatmentPlan(await requestTreatmentPlan(rd, q.address, extra, techQuote), rd);
     track('treatment_plan_made', { seconds: Math.round((Date.now() - started) / 1000), system: plan.system, compared: !!techQuote });
     delete treatmentPlanRuns[tpKey(key)];
+    tpCardOpen.add(tpKey(key));
     setTreatmentPlanState(key, { plan, hash, quoteHash, compared: !!techQuote, at: Date.now(), extra: extra || '', applied: false, before: null });
   } catch (err) {
     if (err.noSignal && !(prev && prev.plan)) {
@@ -420,7 +422,7 @@ function openTreatmentPlanFromReport() {
   const q = quoteState;
   if (q && !q.aiPlan && !treatmentPlanRuns[q.reportKey] && !isQuoteLocked()) {
     if (navigator.onLine) runTreatmentPlan(''); else { treatmentPlanWaiting[q.reportKey] = ''; renderTreatmentPlanCard(); }
-  } else if (q && q.aiPlan && q.aiPlan.hidden) showTreatmentPlan();
+  } else if (q && q.aiPlan) showTreatmentPlan();
   const card = document.getElementById('quoteAiPlan');
   if (card) setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
 }
@@ -491,21 +493,12 @@ function undoTreatmentPlan() {
   scheduleQuoteSave();
 }
 
-function dismissTreatmentPlan() {
-  const q = quoteState;
-  if (!q || !q.aiPlan) return;
-  q.aiPlan.hidden = true;
-  renderTreatmentPlanCard();
-  scheduleQuoteSave();
-}
-
 function showTreatmentPlan() {
   const q = quoteState;
   if (!q) return;
   if (!q.aiPlan) { runTreatmentPlan(''); return; }
-  q.aiPlan.hidden = false;
+  tpCardOpen.add(q.reportKey);
   renderTreatmentPlanCard();
-  scheduleQuoteSave();
 }
 
 
@@ -513,7 +506,9 @@ function showTreatmentPlan() {
 // 'none' on the quote's picker means "termites only"; in a plan it can also
 // mean the system already there is still doing its job.
 const TP_SYSTEM_LABELS = Object.assign({}, QUOTE_SYSTEM_LABELS, { none: 'No new system' });
-const TP_WHO = { us: 'Us', owner: 'Owner', plumber: 'Plumber', builder: 'Builder', arborist: 'Arborist', electrician: 'Electrician' };
+// The who tags in the terms a scope of works uses: the pest business is the
+// contractor; 'us' and 'owner' stay as stored keys.
+const TP_WHO = { us: 'Contractor', owner: 'Property owner', plumber: 'Plumber', builder: 'Builder', arborist: 'Arborist', electrician: 'Electrician' };
 
 function tpList(items, cls) {
   return items.length ? `<ul class="tp-list${cls ? ' ' + cls : ''}">${items.map(t => `<li>${t}</li>`).join('')}</ul>` : '';
@@ -525,6 +520,17 @@ function tpList(items, cls) {
 const tpOpenSections = new Set();
 function tpToggleSection(el) {
   if (el.open) tpOpenSections.add(el.dataset.sec); else tpOpenSections.delete(el.dataset.sec);
+}
+
+// The whole suggestion folds to one row: the title and a one-line count.
+// Folded when the quote opens; it opens by itself when an answer the
+// inspector asked for comes back, and stays as they left it while the card
+// is redrawn. Kept by quote (report key) for this visit only.
+const tpCardOpen = new Set();
+function tpToggleCard(el) {
+  const k = quoteState && quoteState.reportKey;
+  if (!k) return;
+  if (el.open) tpCardOpen.add(k); else tpCardOpen.delete(k);
 }
 
 function tpSection(key, mark, title, sub, body, cls) {
@@ -571,30 +577,38 @@ function treatmentPlanBodyHTML(ai) {
   const whySub = sysLabel + (p.notChosen.length ? ' over ' + p.notChosen.map(x => (TP_SYSTEM_LABELS[x.system] || x.system).toLowerCase()).join(', ') : '');
   // One short line per point: the scope already says what each step is.
   const why = [
-    kd.needed ? `<div class="tp-sub">Live termites</div><div class="tp-text">${e(kd.method || kd.short)}${kd.where.length ? ` <span class="tp-dim">· ${e(kd.where.join('; '))}</span>` : ''}</div>` : '',
+    kd.needed ? `<div class="tp-sub">Active termites</div><div class="tp-text">${e(kd.method || kd.short)}${kd.where.length ? ` <span class="tp-dim">· ${e(kd.where.join('; '))}</span>` : ''}</div>` : '',
     p.systemWhy.length ? `<div class="tp-sub">${e(sysLabel)}</div>${tpList(p.systemWhy.map(e))}` : '',
-    p.notChosen.length ? `<div class="tp-sub">Not chosen</div>${tpList(p.notChosen.map(x => `<strong>${e(TP_SYSTEM_LABELS[x.system] || x.system)}:</strong> ${e(x.why)}`), 'tp-why-not')}` : '',
-    p.followUp ? `<div class="tp-sub">Coming back</div><div class="tp-text">${e(p.followUp)}</div>` : '',
+    p.notChosen.length ? `<div class="tp-sub">Alternatives considered</div>${tpList(p.notChosen.map(x => `<strong>${e(TP_SYSTEM_LABELS[x.system] || x.system)}:</strong> ${e(x.why)}`), 'tp-why-not')}` : '',
+    p.followUp ? `<div class="tp-sub">Follow-up</div><div class="tp-text">${e(p.followUp)}</div>` : '',
   ].join('');
   return `${scope.length ? `<div class="tp-scope"><div class="tp-scope-head"><span class="tp-scope-label">Scope of works</span><span class="tp-scope-count">${plural(scope.length, 'step', 'steps')}</span></div>
       <ol class="tp-scope-list">${scope.map((x, i) => `<li><span class="tp-scope-n">${i + 1}</span><span class="tp-scope-do">${e(x.do)}</span>${tpWhoTag(x.who)}</li>`).join('')}</ol></div>` : ''}
     <div class="tp-secs">
-    ${tpSection('check', '!', 'Check first', plural(checks.length, 'thing to confirm', 'things to confirm'), tpList(checks), 'tp-sec-warn')}
-    ${tpSection('why', '?', 'Why this plan', e(whySub), why)}
-    ${lines || p.client.why ? tpSection('quote', '$', 'For the quote', lines ? plural(p.lines.length, 'line', 'lines') + ' at your rates' : 'What the client reads',
+    ${tpSection('check', '!', 'Items to confirm', plural(checks.length, 'item', 'items') + ' before quoting', tpList(checks), 'tp-sec-warn')}
+    ${tpSection('why', '?', 'Rationale', e(whySub), why)}
+    ${lines || p.client.why ? tpSection('quote', '$', 'Quote items', lines ? plural(p.lines.length, 'item', 'items') + ' at your rates' : 'Client summary',
       `${lines ? `<ul class="tp-lines">${lines}</ul>` : ''}
-       ${p.client.why ? `<div class="tp-sub">What the client reads</div><div class="tp-text tp-client">${e(p.client.why)}</div>` : ''}`) : ''}
+       ${p.client.why ? `<div class="tp-sub">Client summary</div><div class="tp-text tp-client">${e(p.client.why)}</div>` : ''}`) : ''}
   </div>`;
 }
 
-// Your plan vs SAYON: what SAYON would do differently first, then what it
+// Compared with your quote: what SAYON would do differently first, then what it
 // would add, then where it agrees, one short line each.
 const TP_VS_ICONS = {
   change: '<path d="M7 7h12l-4-4"/><path d="M17 17H5l4 4"/>',
   add: '<path d="M12 5v14"/><path d="M5 12h14"/>',
   agree: '<path d="M20 6 9 17l-5-5"/>',
 };
-const TP_VS_WORDS = { change: 'Change', add: 'Add', agree: 'Same' };
+const TP_VS_WORDS = { change: 'Change', add: 'Add', agree: 'Agreed' };
+
+// The comparison's one-line count, also shown on the folded card.
+function tpVersusTally(p) {
+  const vs = p.versus || { agree: [], add: [], change: [] };
+  if (!vs.change.length && !vs.add.length) return vs.agree.length ? 'Agrees with your quote' : '';
+  const n = (k, one, many) => vs[k].length ? `${vs[k].length} ${vs[k].length === 1 ? one : many}` : '';
+  return [n('change', 'change', 'changes'), n('add', 'addition', 'additions'), n('agree', 'agreed', 'agreed')].filter(Boolean).join(' · ');
+}
 
 function tpVersusHTML(ai, q) {
   const p = ai.plan;
@@ -605,15 +619,13 @@ function tpVersusHTML(ai, q) {
   const rows = vs.change.map(t => row('change', e(t))).concat(vs.add.map(t => row('add', e(t))),
     vs.agree.length ? [row('agree', vs.agree.map(e).join(' <span class="tp-dim">·</span> '))] : []);
   if (rows.length) {
-    const tally = !vs.change.length && !vs.add.length ? 'Agrees with your plan'
-      : [vs.change.length && `${vs.change.length} ${vs.change.length === 1 ? 'change' : 'changes'}`, vs.add.length && `${vs.add.length} to add`, vs.agree.length && `${vs.agree.length} same`]
-        .filter(Boolean).join(' · ');
-    return `<div class="tp-vs"><div class="tp-vs-head"><span class="tp-vs-label">Your plan vs SAYON</span><span class="tp-vs-tally">${tally}</span></div><ul class="tp-vs-list">${rows.join('')}</ul></div>`;
+    // The count is on the card's heading, so it isn't repeated here.
+    return `<div class="tp-vs"><div class="tp-vs-head"><span class="tp-vs-label">Compared with your quote</span></div><ul class="tp-vs-list">${rows.join('')}</ul></div>`;
   }
-  if (p.versusInspector) return `<div class="tp-vs"><div class="tp-vs-head"><span class="tp-vs-label">Your plan vs SAYON</span></div><div class="tp-text">${e(p.versusInspector)}</div></div>`;
+  if (p.versusInspector) return `<div class="tp-vs"><div class="tp-vs-head"><span class="tp-vs-label">Compared with your quote</span></div><div class="tp-text">${e(p.versusInspector)}</div></div>`;
   // Asked before there was anything of theirs on the quote.
   if (ai.compared === false && !ai.applied && !treatmentPlanTechQuote(q)) {
-    return '<div class="tp-vs tp-vs-empty">Nothing of yours to compare yet. Put your own lines in the quote, then ask again to see where SAYON agrees.</div>';
+    return '<div class="tp-vs tp-vs-empty">Nothing of yours to compare yet. Add your own lines to the quote, then ask again for a comparison.</div>';
   }
   return '';
 }
@@ -657,11 +669,6 @@ function renderTreatmentPlanCard() {
       <button class="quote-link-btn tp-ask" onclick="runTreatmentPlan('')">Try again</button>`;
     return;
   }
-  if (ai.hidden) {
-    el.className = 'quote-card tp-card tp-folded';
-    el.innerHTML = `<button type="button" class="tp-fold-row" onclick="showTreatmentPlan()">${head("SAYON's suggestion", escapeHtml(TP_SYSTEM_LABELS[ai.plan.system] || ''))}<span class="link-btn">Show</span></button>`;
-    return;
-  }
   const p = ai.plan;
   const reportChanged = rd && ai.hash && treatmentPlanHash(rd, q.address) !== ai.hash;
   // Their quote changed after SAYON compared it (only before Add to my
@@ -669,7 +676,15 @@ function renderTreatmentPlanCard() {
   const quoteChanged = !ai.applied && ai.quoteHash && treatmentPlanQuoteHash(q) !== ai.quoteHash;
   const stale = reportChanged || quoteChanged;
   if (ai.applied) el.classList.add('tp-applied');
-  el.innerHTML = `${head("SAYON's suggestion", escapeHtml(p.summary || TP_SYSTEM_LABELS[p.system] || ''), ai.applied ? 'In the quote' : 'Guide only')}
+  const steps = tpScope(p).length;
+  const gist = [stale ? '<span class="tp-gist-warn">Out of date</span>' : '',
+    escapeHtml(tpVersusTally(p) || TP_SYSTEM_LABELS[p.system] || ''),
+    steps ? `${steps} ${steps === 1 ? 'step' : 'steps'}` : ''].filter(Boolean).join(' · ');
+  el.innerHTML = `<details class="tp-wrap"${tpCardOpen.has(q.reportKey) ? ' open' : ''} ontoggle="tpToggleCard(this)">
+    <summary class="tp-wrap-sum">${head('SAYON recommendation', gist, ai.applied ? 'In the quote' : 'Guide only')}
+      <svg class="icon tp-wrap-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+    <div class="tp-wrap-body">
+    ${p.summary ? `<div class="tp-summary">${escapeHtml(p.summary)}</div>` : ''}
     ${tpVersusHTML(ai, q)}
     ${stale ? `<div class="tp-stale">${reportChanged && quoteChanged ? 'The report and your quote have' : reportChanged ? 'The report has' : 'Your quote has'} changed since SAYON looked at it.</div>` : ''}
     ${ai.error ? `<div class="tp-error">${escapeHtml(ai.error)}</div>` : ''}
@@ -677,11 +692,12 @@ function renderTreatmentPlanCard() {
     <div class="tp-actions">
       ${busy ? '<div class="tp-busy"><span class="tp-spinner"></span>Looking at it again…</div>' : ai.applied
         ? (locked ? '' : '<span class="tp-status">Edit it under Treatment plan and the work lines.</span><button class="quote-text-btn" onclick="undoTreatmentPlan()">Undo</button>')
-        : locked ? '' : `<button class="quote-btn tp-use" onclick="useTreatmentPlan()">Add to my quote</button>
-           <button class="quote-link-btn" onclick="dismissTreatmentPlan()">Hide</button>`}
+        : locked ? '' : '<button class="quote-btn tp-use" onclick="useTreatmentPlan()">Add to my quote</button>'}
     </div>
-    ${busy || locked || ai.applied ? '' : `<details class="tp-again"${stale ? ' open' : ''}><summary>Ask again${stale ? ' with the changes' : ''}</summary>
-      <textarea class="quote-input quote-textarea" id="tpExtra" rows="2" placeholder="Anything SAYON should know? e.g. owner wants as little chemical as possible, about 52 m around">${escapeHtml(ai.extra || '')}</textarea>
+    ${busy || locked || ai.applied ? '' : `<details class="tp-again"${stale ? ' open' : ''}><summary>Ask again${stale ? ' with the changes' : ' with a note'}</summary>
+      <div class="tp-again-hint">SAYON works the whole plan out again from the report, your quote and this note. Add a fact it didn't have or a different direction. It doesn't answer questions.</div>
+      <textarea class="quote-input quote-textarea" id="tpExtra" rows="2" placeholder="e.g. owner wants no chemicals; quote a barrier instead; nest found in the gum tree">${escapeHtml(ai.extra || '')}</textarea>
       <button class="quote-btn" onclick="askTreatmentPlanAgain()">Ask again</button></details>`}
-    <div class="tp-foot">A guide worked out from your report. You make the call.</div>`;
+    <div class="tp-foot">Guide only, based on your report. The final call is yours.</div>
+    </div></details>`;
 }

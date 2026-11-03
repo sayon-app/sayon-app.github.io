@@ -143,21 +143,32 @@ async function backend(ctx) {
   await p.locator('#quoteAiPlan').screenshot({ path: `${OUT}/2c-dark-screen.png` });
   await p.evaluate(() => document.body.classList.remove('dark-screen'));
   const text = await p.locator('#quoteAiPlan').innerText();
-  check(/Scope of works/i.test(text) && /Check first/.test(text) && /Why this plan/.test(text) && /Your plan vs SAYON/i.test(text) && /Guide only/i.test(text), 'card shows the scope of works, the folded rows, the comparison and Guide only');
+  check(await p.evaluate(() => document.querySelector('#quoteAiPlan .tp-wrap').open), 'the card opens by itself when the answer comes back');
+  check(/SAYON recommendation/.test(text) && /Scope of works/i.test(text) && /Items to confirm/.test(text) && /Rationale/.test(text) && /Quote items/.test(text) && /Compared with your quote/i.test(text) && /Guide only/i.test(text), 'card shows the scope of works, the folded rows, the comparison and Guide only');
   const scope = await p.evaluate(() => ({ n: document.querySelectorAll('#quoteAiPlan .tp-scope-list li').length, owner: document.querySelectorAll('#quoteAiPlan .tp-scope-list .tp-who-owner').length, trade: (document.querySelector('#quoteAiPlan .tp-scope-list .tp-who-trade') || {}).textContent }));
-  check(scope.n === 6 && scope.owner === 1 && scope.trade === 'Plumber', 'each scope step says who does it (Us, Owner, Plumber)');
-  check(!/Live termites|Long-term system/.test(text), 'the reasons are folded under Why this plan');
-  check(!/Not chosen/.test(text), 'sections start folded');
+  const tags = await p.$$eval('#quoteAiPlan .tp-scope-list .tp-who', els => [...new Set(els.map(e => e.textContent))].join(','));
+  check(scope.n === 6 && scope.owner === 1 && scope.trade === 'Plumber' && tags === 'Contractor,Plumber,Property owner', 'each scope step says who does it (Contractor, Property owner, Plumber): ' + tags);
+  check(!/Active termites|Long-term system/.test(text), 'the reasons are folded under Rationale');
+  check(!/Alternatives considered/.test(text), 'sections start folded');
   const vs = await p.evaluate(() => ({ change: document.querySelectorAll('#quoteAiPlan .tp-vs-change').length, add: document.querySelectorAll('#quoteAiPlan .tp-vs-add').length, agree: document.querySelectorAll('#quoteAiPlan .tp-vs-agree').length,
-    first: (document.querySelector('#quoteAiPlan .tp-vs-list li') || {}).className, tally: (document.querySelector('#quoteAiPlan .tp-vs-tally') || {}).textContent }));
-  check(vs.change === 1 && vs.add === 1 && vs.agree === 1 && vs.first === 'tp-vs-change' && vs.tally === '1 change · 1 to add · 2 same', 'Your plan vs SAYON lists change and add, then what is the same on one row');
+    first: (document.querySelector('#quoteAiPlan .tp-vs-list li') || {}).className, tally: (document.querySelector('#quoteAiPlan .tp-head-sub') || {}).textContent }));
+  check(vs.change === 1 && vs.add === 1 && vs.agree === 1 && vs.first === 'tp-vs-change' && vs.tally === '1 change · 1 addition · 2 agreed · 6 steps', 'the comparison lists change and add, then what is agreed on one row: ' + vs.tally);
   check(!/changed since SAYON/.test(text), 'nothing marked changed straight after asking');
   await p.click('#quoteAiPlan .tp-sec[data-sec="why"] > summary');
   await p.click('#quoteAiPlan .tp-sec[data-sec="check"] > summary');
   await p.waitForTimeout(200);
   const opened = await p.locator('#quoteAiPlan').innerText();
-  check(/Not chosen/.test(opened) && /Live termites/.test(opened) && /Coming back/.test(opened), 'Why this plan opens to the knockdown, the system reasons and coming back');
+  check(/Alternatives considered/.test(opened) && /Active termites/.test(opened) && /Follow-up/.test(opened), 'Rationale opens to the knockdown, the system reasons, the alternatives and the follow-up');
   await p.locator('#quoteAiPlan').screenshot({ path: `${OUT}/2b-sections-open.png` });
+  // Folded, the card is one row with the count; it stays as left while it is redrawn.
+  await p.click('#quoteAiPlan .tp-wrap > summary');
+  await p.waitForTimeout(200);
+  await p.evaluate(() => renderTreatmentPlanCard());
+  const folded = await p.evaluate(() => { const c = document.getElementById('quoteAiPlan'); return { open: c.querySelector('.tp-wrap').open, h: c.getBoundingClientRect().height, gist: c.querySelector('.tp-head-sub').textContent }; });
+  check(!folded.open && folded.h < 100 && folded.gist === '1 change · 1 addition · 2 agreed · 6 steps', 'folds to one compact row with the count, and stays folded when redrawn: ' + JSON.stringify(folded));
+  await p.locator('#quoteAiPlan').screenshot({ path: `${OUT}/2d-card-folded.png` });
+  await p.click('#quoteAiPlan .tp-wrap > summary');
+  await p.waitForTimeout(200);
   await p.setViewportSize({ width: 390, height: 844 });
 
   // The inspector edits their quote after asking: the card says so.
@@ -167,14 +178,21 @@ async function backend(ctx) {
   await p.evaluate(() => { quoteState.items.pop(); renderQuoteItems(); });
   await p.waitForTimeout(200);
   check(!/changed since SAYON/.test(await p.locator('#quoteAiPlan').innerText()), 'taking it out again clears the note');
+  // Ask again with a note: says what it does, and the button is full width.
+  await p.click('#quoteAiPlan .tp-again > summary');
+  await p.waitForTimeout(200);
+  const again = await p.evaluate(() => { const d = document.querySelector('#quoteAiPlan .tp-again'); const b = d.querySelector('.quote-btn').getBoundingClientRect(); return { hint: d.querySelector('.tp-again-hint').textContent, w: b.width, dw: d.getBoundingClientRect().width }; });
+  check(/works the whole plan out again/.test(again.hint) && /doesn't answer questions/.test(again.hint) && again.w > again.dw * 0.9, 'Ask again says it reworks the plan, not a chat, and its button is full width');
+  check(await p.evaluate(() => /A question in it is not part of the plan/.test(TREATMENT_PLAN_PROMPT) && /THE INSPECTOR ADDS:\nowner wants no baits/.test(treatmentPlanMessage({ report: {}, notes: [] }, 'owner wants no baits', null))), "the planner reads the inspector's note and ignores questions in it");
+  await p.click('#quoteAiPlan .tp-again > summary');
   const older = await p.evaluate(() => [
     tpVersusHTML({ plan: { versus: { agree: [], add: [], change: [] }, versusInspector: 'Agrees with baiting.' } }, quoteState),
     tpVersusHTML({ plan: { versus: { agree: [], add: [], change: [] }, versusInspector: '' }, compared: false }, { items: [] }),
-    tpVersusHTML({ plan: { versus: { agree: ['Baiting'], add: [], change: [] }, versusInspector: '' }, compared: true }, quoteState),
+    tpVersusTally({ versus: { agree: ['Baiting'], add: [], change: [] } }),
   ]);
   check(older[0].includes('Agrees with baiting.'), 'a plan saved before the three lists still shows its one line');
   check(older[1].includes('Nothing of yours to compare yet'), 'asked with an empty quote: says there was nothing to compare');
-  check(older[2].includes('Agrees with your plan'), 'all agreed: says so in the heading');
+  check(older[2] === 'Agrees with your quote', 'all agreed: says so in the heading');
   const oldScope = await p.evaluate(() => tpScope({ knockdown: { needed: true, short: 'Dust the frame' }, system: 'bait', fixes: [{ what: 'Fix the leak', who: 'plumber' }], client: { inspections: 'In 3 months' } }));
   check(oldScope.length === 4 && oldScope[0].do === 'Dust the frame' && oldScope[2].who === 'plumber', 'a plan saved before the scope gets one built from its parts');
 
@@ -195,7 +213,7 @@ async function backend(ctx) {
   check(after.plan.why.includes('fish pond') && after.plan.we.split('\n').length === 5 && after.plan.time === 'Half a day' && after.plan.service === '12 months', 'plan steps, why, time and service filled');
   check(!after.choice, 'the system question is answered by the plan');
   const srcs = await p.$$eval('.quote-item-source', els => els.map(e => e.textContent.trim()));
-  check(srcs.some(t => t === "From SAYON's suggestion") && !srcs.some(t => /Nest found|perimeter|Servicing/.test(t)), "SAYON's lines carry one short tag, with no reason under each");
+  check(srcs.some(t => t === 'From the SAYON recommendation') && !srcs.some(t => /Nest found|perimeter|Servicing/.test(t)), "SAYON's lines carry one short tag, with no reason under each");
   const tq = await p.evaluate(() => treatmentPlanTechQuote(quoteState));
   check(!tq || (!tq.lines.some(l => /bait station/i.test(l)) && !tq.steps.length), "SAYON's own lines and steps don't count as the inspector's plan");
   check(!/changed since SAYON/.test(await p.locator('#quoteAiPlan').innerText()), 'adding the plan to the quote is not flagged as a change');

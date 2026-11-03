@@ -5694,3 +5694,30 @@ body.dark-screen .send-review-file .link-btn, body.dark-screen .send-review-fixe
 .saved-item-risk, .saved-item-quote, .saved-item-status { font-size: 11px; padding: 2px 8px; border-radius: 99px; }
 .saved-item-delete { width: 40px; height: 40px; border-radius: 10px; font-size: 16px; }
 body.dark-screen .saved-item:hover { background: var(--surface2); }
+
+/* ── YOUR PRICES (js/price-book.js) ─────────────────────────────────────── */
+.pb-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.pb-row:last-child { border-bottom: none; }
+.pb-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; cursor: pointer; }
+.pb-row-title { font-size: 13px; font-weight: 650; color: var(--text); line-height: 1.35; }
+.pb-row-unit { font-size: 11.5px; color: var(--text3); line-height: 1.4; }
+.pb-start { color: #8a5a00; font-weight: 600; }
+body.dark-screen .pb-start { color: var(--yellow); }
+.pb-price { position: relative; flex: none; width: 104px; }
+.pb-dollar { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--text3); pointer-events: none; }
+.pb-price .pb-input { width: 100%; padding-left: 24px; text-align: right; font-variant-numeric: tabular-nums; font-size: 15px; min-height: 44px; }
+.pb-price .pb-input::placeholder { color: var(--text3); opacity: 0.6; }
+.pb-intro { margin-bottom: 8px; }
+.pb-back { width: 100%; margin-bottom: 10px; }
+.pb-back[hidden] { display: none; }
+.pb-status { padding: 8px 10px; border-radius: 8px; background: rgba(var(--accent-rgb),0.06); color: var(--text2, var(--text)); margin-bottom: 4px; }
+.pb-status.warn { background: rgba(183,121,31,0.10); }
+.pb-owner { margin-bottom: 4px; }
+.pb-owner[hidden] { display: none; }
+.pb-terms { padding: 12px 0 4px; display: flex; flex-direction: column; gap: 6px; }
+.pb-terms-input { width: 100%; resize: vertical; font-family: inherit; }
+.ob-price-list { width: 100%; text-align: left; margin: 4px 0 6px; }
+.ob-gst-row { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; font-size: 13px; color: var(--text); line-height: 1.45; padding: 8px 0 4px; cursor: pointer; }
+.ob-gst-row input { width: 20px; height: 20px; flex: none; margin-top: 1px; accent-color: var(--accent); }
+.ob-price-more { font-size: 11.5px; color: var(--text3); line-height: 1.5; margin: 2px 0 10px; text-align: left; width: 100%; }
+.quote-hint-link { background: none; border: none; padding: 0; font: inherit; color: var(--accent2); font-weight: 600; text-decoration: underline; cursor: pointer; }

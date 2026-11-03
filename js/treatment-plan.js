@@ -33,6 +33,7 @@ The inspector is the licensed professional and makes the final call. You are a s
 Return ONLY a valid JSON object, no markdown and no commentary, in exactly this shape:
 {"summary":string,
 "versus":{"agree":[string],"add":[string],"change":[string]},
+"scope":[{"do":string,"who":"us"|"owner"|"plumber"|"builder"|"arborist"|"electrician"}],
 "system":"bait"|"barrier"|"retic"|"physical"|"system"|"none",
 "knockdown":{"needed":boolean,"short":string,"method":string,"where":[string],"why":string},
 "systemWhy":[string],
@@ -46,6 +47,7 @@ Return ONLY a valid JSON object, no markdown and no commentary, in exactly this 
 WHAT EACH FIELD IS
 - summary: one line for the inspector, the plan in short, at most 20 words ("Treat the nest in the stump, then in-ground baits: paving covers most of the perimeter").
 - versus: your plan against the inspector's own plan: their quote so far (THE INSPECTOR'S QUOTE SO FAR), the method they named (treatmentType or the notes) and the steps they wrote. agree: what in their plan you would also do ("Baiting over a soil treatment"). add: what you would add that their plan leaves out, with the fact behind it ("A nest search at the gum stump by the back fence"). change: what you would do differently, what instead and why ("Dust the window frame instead of AG baits: only a few termites left to carry it"). Name the line or method each time; never repeat an item across the three lists, and never pad agree with small items. All three are empty arrays when the inspector gave no plan, quote or method.
+- scope: the scope of works, the one list the inspector reads first: every action in this plan, in the order it happens (treat the live termites, search for or treat the nest, put in or service the long-term system, each fix, the follow-up visits). do: the action with its place or amount, at most 10 words ("Dust the workings in the kitchen window frame", "Install about 18 bait stations around the house", "Fix the leaking shower in the ensuite", "Come back in 3 weeks to check the nest"). who: who does it. Only actions, never reasons: the reasons go in the other fields.
 - system: the long-term termite management system you recommend. bait = in-ground baiting and monitoring system; barrier = chemical soil treatment (a treated zone); retic = reticulation system charged with termiticide; physical = physical barrier; system = service, top up or recharge the system already on the property; none = no new system (no termites and nothing calling for one, an existing system that is still working, or the inspector said no system).
 - knockdown: what to do about LIVE termites now, separate from the long-term system. needed is false when no live termites were found. short: the method in at most 8 words ("Dust the workings, AG baits on the frame"). method names the method and its sequence ("Above-ground bait stations fixed over the live workings, checked every 2 to 3 weeks until feeding stops"). where lists each place, in the inspector's words. why ties it to what was found (how many places, nest found or not, what the timber is, whether termites can be reached).
 - systemWhy: 2 or 3 reasons this system suits this property better than the others, each naming the fact behind it ("Paving and the driveway cover the slab edge along most of the perimeter, so a soil treatment would mean drilling through concrete every 150 to 300 mm; stations can go in the garden beds and lawn").
@@ -99,6 +101,7 @@ RULES THAT MUST NEVER BE BROKEN
 KEEP IT SHORT (the inspector reads it on a phone, at a glance; every extra word is noise)
 - summary at most 20 words; knockdown.short at most 8 words; knockdown.method at most 20 words; knockdown.why at most 25 words.
 - versus: at most 3 items in each list; agree items at most 10 words, add at most 15, change at most 20.
+- scope: at most 8 actions, each at most 10 words.
 - systemWhy: at most 3 reasons, each at most 20 words. notChosen: at most 3, each at most 15 words.
 - fixes: at most 5; what at most 10 words; why at most 12 words.
 - followUp at most 25 words. unknowns: at most 4, each a short question of at most 15 words, most decisive first.
@@ -279,6 +282,8 @@ function cleanTreatmentPlan(p) {
     summary: str(p.summary),
     system: systems.includes(p.system) ? p.system : 'none',
     versus: { agree: list(vs.agree).slice(0, 3), add: list(vs.add).slice(0, 3), change: list(vs.change).slice(0, 3) },
+    scope: (Array.isArray(p.scope) ? p.scope : []).filter(x => x && str(x.do)).slice(0, 8)
+      .map(x => ({ do: str(x.do), who: x.who in TP_WHO ? x.who : 'us' })),
     // Plans from before the three lists said it in one line.
     versusInspector: str(p.versusInspector),
     knockdown: { needed: kd.needed === true, short: str(kd.short), method: str(kd.method), where: list(kd.where), why: str(kd.why) },
@@ -524,10 +529,30 @@ function tpSection(key, mark, title, sub, body, cls) {
     <div class="tp-sec-body">${body}</div></details>`;
 }
 
+// The scope of works: every action in order, each with who does it. Plans
+// from before the scope was asked for get one built from their parts.
+function tpScope(p) {
+  if (p.scope && p.scope.length) return p.scope;
+  const out = [];
+  const kd = p.knockdown || {};
+  if (kd.needed && (kd.short || kd.method)) out.push({ do: kd.short || kd.method, who: 'us' });
+  if (p.system && p.system !== 'none') out.push({ do: TP_SYSTEM_LABELS[p.system] || p.system, who: 'us' });
+  (p.fixes || []).forEach(f => out.push({ do: f.what, who: f.who in TP_WHO ? f.who : 'us' }));
+  if (p.client && p.client.inspections) out.push({ do: 'Inspect again: ' + p.client.inspections, who: 'us' });
+  return out;
+}
+
+function tpWhoTag(who) {
+  return `<span class="tp-who tp-who-${who === 'us' || who === 'owner' ? who : 'trade'}">${escapeHtml(TP_WHO[who] || who)}</span>`;
+}
+
+// The suggestion as one scope of works the inspector reads at a glance,
+// with the reasons, the questions and the quote lines folded below it.
 function treatmentPlanBodyHTML(ai) {
   const p = ai.plan;
   const e = escapeHtml;
   const kd = p.knockdown;
+  const scope = tpScope(p);
   const checks = p.unknowns.map(e).concat((p.checks || []).map(t => `<span class="tp-own-check">${e(t)}</span>`));
   const lines = p.lines.map(l => {
     const cat = QUOTE_CATALOGUE[l.key] || {};
@@ -536,19 +561,24 @@ function treatmentPlanBodyHTML(ai) {
     return `<li><span class="tp-line-desc">${e(cat.desc || l.key)}${l.detail ? ` <span class="tp-dim">· ${e(l.detail)}</span>` : ''}</span><span class="tp-line-qty${l.qty == null ? ' warn' : ''}">${e(qty)}</span></li>`;
   }).join('');
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-  let n = 0;
-  return `<div class="tp-secs">
-    ${tpSection('check', '!', 'Check first', plural(checks.length, 'thing to confirm', 'things to confirm'), tpList(checks), 'tp-sec-warn')}
-    ${kd.needed ? tpSection('kill', ++n, 'Live termites', e(kd.short || kd.method),
-      `<div class="tp-text"><strong>${e(kd.method)}</strong></div>
+  const sysLabel = TP_SYSTEM_LABELS[p.system] || p.system;
+  const whySub = sysLabel + (p.notChosen.length ? ' over ' + p.notChosen.map(x => (TP_SYSTEM_LABELS[x.system] || x.system).toLowerCase()).join(', ') : '');
+  const fixWhys = p.fixes.filter(f => f.why);
+  const why = [
+    kd.needed ? `<div class="tp-sub">Live termites</div>
+       <div class="tp-text"><strong>${e(kd.method || kd.short)}</strong></div>
        ${kd.where.length ? `<div class="tp-dim">${e(kd.where.join('; '))}</div>` : ''}
-       ${kd.why ? `<div class="tp-text">${e(kd.why)}</div>` : ''}`) : ''}
-    ${tpSection('system', ++n, 'Long-term system', e(TP_SYSTEM_LABELS[p.system] || p.system),
-      `${tpList(p.systemWhy.map(e))}
-       ${p.notChosen.length ? `<div class="tp-sub">Not chosen here</div>${tpList(p.notChosen.map(x => `<strong>${e(TP_SYSTEM_LABELS[x.system] || x.system)}:</strong> ${e(x.why)}`), 'tp-why-not')}` : ''}`)}
-    ${p.fixes.length ? tpSection('fix', ++n, 'Fix', e(p.fixes.map(f => f.what).join(' · ')),
-      tpList(p.fixes.map(f => `${e(f.what)}${f.who ? ` <span class="tp-who">${e(TP_WHO[f.who] || f.who)}</span>` : ''}${f.why ? `<div class="tp-dim">${e(f.why)}</div>` : ''}`))) : ''}
-    ${p.followUp ? tpSection('back', ++n, 'Coming back', e(p.followUp), `<div class="tp-text">${e(p.followUp)}</div>`) : ''}
+       ${kd.why ? `<div class="tp-text">${e(kd.why)}</div>` : ''}` : '',
+    p.systemWhy.length ? `<div class="tp-sub">${e(sysLabel)}</div>${tpList(p.systemWhy.map(e))}` : '',
+    p.notChosen.length ? `<div class="tp-sub">Not chosen here</div>${tpList(p.notChosen.map(x => `<strong>${e(TP_SYSTEM_LABELS[x.system] || x.system)}:</strong> ${e(x.why)}`), 'tp-why-not')}` : '',
+    fixWhys.length ? `<div class="tp-sub">The fixes</div>${tpList(fixWhys.map(f => `<strong>${e(f.what)}:</strong> ${e(f.why)}`), 'tp-why-not')}` : '',
+    p.followUp ? `<div class="tp-sub">Coming back</div><div class="tp-text">${e(p.followUp)}</div>` : '',
+  ].join('');
+  return `${scope.length ? `<div class="tp-scope"><div class="tp-scope-head"><span class="tp-scope-label">Scope of works</span><span class="tp-scope-count">${plural(scope.length, 'step', 'steps')}</span></div>
+      <ol class="tp-scope-list">${scope.map((x, i) => `<li><span class="tp-scope-n">${i + 1}</span><span class="tp-scope-do">${e(x.do)}</span>${tpWhoTag(x.who)}</li>`).join('')}</ol></div>` : ''}
+    <div class="tp-secs">
+    ${tpSection('check', '!', 'Check first', plural(checks.length, 'thing to confirm', 'things to confirm'), tpList(checks), 'tp-sec-warn')}
+    ${tpSection('why', '?', 'Why this plan', e(whySub), why)}
     ${lines || p.client.why ? tpSection('quote', '$', 'For the quote', lines ? plural(p.lines.length, 'line', 'lines') + ' at your rates' : 'What the client reads',
       `${lines ? `<ul class="tp-lines">${lines}</ul>` : ''}
        ${p.client.why ? `<div class="tp-sub">What the client reads</div><div class="tp-text tp-client">${e(p.client.why)}</div>` : ''}`) : ''}
@@ -568,7 +598,10 @@ function tpVersusHTML(ai, q) {
   const p = ai.plan;
   const e = escapeHtml;
   const vs = p.versus || { agree: [], add: [], change: [] };
-  const rows = ['change', 'add', 'agree'].flatMap(k => vs[k].map(t => `<li class="tp-vs-${k}"><span class="tp-vs-icon" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${TP_VS_ICONS[k]}</svg></span><span class="tp-vs-text"><span class="tp-vs-word">${TP_VS_WORDS[k]}</span>${e(t)}</span></li>`));
+  const row = (k, t) => `<li class="tp-vs-${k}"><span class="tp-vs-icon" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${TP_VS_ICONS[k]}</svg></span><span class="tp-vs-text"><span class="tp-vs-word">${TP_VS_WORDS[k]}</span>${t}</span></li>`;
+  // Changes and additions one per row; what's the same on a single row.
+  const rows = vs.change.map(t => row('change', e(t))).concat(vs.add.map(t => row('add', e(t))),
+    vs.agree.length ? [row('agree', vs.agree.map(e).join(' <span class="tp-dim">·</span> '))] : []);
   if (rows.length) {
     const tally = !vs.change.length && !vs.add.length ? 'Agrees with your plan'
       : [vs.change.length && `${vs.change.length} ${vs.change.length === 1 ? 'change' : 'changes'}`, vs.add.length && `${vs.add.length} to add`, vs.agree.length && `${vs.agree.length} same`]

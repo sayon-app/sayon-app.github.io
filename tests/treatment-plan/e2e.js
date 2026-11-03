@@ -5,8 +5,9 @@
 //   2. opening the quote asks nothing; Ask SAYON works out the plan once,
 //      with the cached planner prompt, and sends the inspector's own quote
 //      lines (no prices) so SAYON can compare;
-//   3. the card shows Your plan vs SAYON (change, add, same), the folded
-//      sections, and changes nothing in the quote until Add to my quote;
+//   3. the card shows Your plan vs SAYON (change, add, same), one scope
+//      of works with who does each step, the reasons and questions folded,
+//      and changes nothing in the quote until Add to my quote;
 //      it notes when the inspector's quote changes after SAYON compared it;
 //   4. Use this plan fills the quote's plan and lines at the business's
 //      rates; Undo puts them back; the plan isn't part of what the client
@@ -32,6 +33,14 @@ const PLAN = {
     add: ['Treat the nest in the gum tree first: it was found'],
     change: ['Bait stations, not a chemical barrier: the fish pond and dogs digging the beds'],
   },
+  scope: [
+    { do: 'Treat the nest in the gum tree', who: 'us' },
+    { do: 'Install about 18 bait stations around the house', who: 'us' },
+    { do: 'Remove the timber touching the soil', who: 'us' },
+    { do: 'Find why the back room reads 28% moisture', who: 'plumber' },
+    { do: 'Keep the dogs off the stations', who: 'owner' },
+    { do: 'Check the nest in 2 to 3 weeks', who: 'us' },
+  ],
   system: 'bait',
   knockdown: { needed: true, short: 'Treat the nest in the gum tree', method: 'Drill into the nest in the gum tree and treat it with a non-repellent dust or foam as the label directs', where: ['Gum tree in the backyard, about 15 m from the house'], why: 'The nest was found, so treating it directly is the quickest way to reach the colony. The subfloor workings are inactive, so there is nothing live to treat inside.' },
   systemWhy: ['A fish pond near the back fence: liquid termiticides carry strict limits near water.', 'The owner would rather avoid chemicals, and two dogs dig in the garden beds where a treated zone would be.', 'The house is about 54 m around, so about 18 stations at roughly 3 m apart.'],
@@ -134,16 +143,20 @@ async function backend(ctx) {
   await p.locator('#quoteAiPlan').screenshot({ path: `${OUT}/2c-dark-screen.png` });
   await p.evaluate(() => document.body.classList.remove('dark-screen'));
   const text = await p.locator('#quoteAiPlan').innerText();
-  check(/Check first/.test(text) && /Live termites/.test(text) && /Long-term system/.test(text) && /Your plan vs SAYON/i.test(text) && /Guide only/i.test(text), 'card shows the folded sections, the comparison and Guide only');
+  check(/Scope of works/i.test(text) && /Check first/.test(text) && /Why this plan/.test(text) && /Your plan vs SAYON/i.test(text) && /Guide only/i.test(text), 'card shows the scope of works, the folded rows, the comparison and Guide only');
+  const scope = await p.evaluate(() => ({ n: document.querySelectorAll('#quoteAiPlan .tp-scope-list li').length, owner: document.querySelectorAll('#quoteAiPlan .tp-scope-list .tp-who-owner').length, trade: (document.querySelector('#quoteAiPlan .tp-scope-list .tp-who-trade') || {}).textContent }));
+  check(scope.n === 6 && scope.owner === 1 && scope.trade === 'Plumber', 'each scope step says who does it (Us, Owner, Plumber)');
+  check(!/Live termites|Long-term system/.test(text), 'the reasons are folded under Why this plan');
   check(!/Not chosen here/.test(text), 'sections start folded');
   const vs = await p.evaluate(() => ({ change: document.querySelectorAll('#quoteAiPlan .tp-vs-change').length, add: document.querySelectorAll('#quoteAiPlan .tp-vs-add').length, agree: document.querySelectorAll('#quoteAiPlan .tp-vs-agree').length,
     first: (document.querySelector('#quoteAiPlan .tp-vs-list li') || {}).className, tally: (document.querySelector('#quoteAiPlan .tp-vs-tally') || {}).textContent }));
-  check(vs.change === 1 && vs.add === 1 && vs.agree === 2 && vs.first === 'tp-vs-change' && vs.tally === '1 change · 1 to add · 2 same', 'Your plan vs SAYON lists change, add and same, changes first');
+  check(vs.change === 1 && vs.add === 1 && vs.agree === 1 && vs.first === 'tp-vs-change' && vs.tally === '1 change · 1 to add · 2 same', 'Your plan vs SAYON lists change and add, then what is the same on one row');
   check(!/changed since SAYON/.test(text), 'nothing marked changed straight after asking');
-  await p.click('#quoteAiPlan .tp-sec[data-sec="system"] > summary');
+  await p.click('#quoteAiPlan .tp-sec[data-sec="why"] > summary');
   await p.click('#quoteAiPlan .tp-sec[data-sec="check"] > summary');
   await p.waitForTimeout(200);
-  check(/Not chosen here/.test(await p.locator('#quoteAiPlan').innerText()), 'a section opens to its detail');
+  const opened = await p.locator('#quoteAiPlan').innerText();
+  check(/Not chosen here/.test(opened) && /Live termites/.test(opened) && /Coming back/.test(opened), 'Why this plan opens to the knockdown, the system reasons and coming back');
   await p.locator('#quoteAiPlan').screenshot({ path: `${OUT}/2b-sections-open.png` });
   await p.setViewportSize({ width: 390, height: 844 });
 
@@ -162,6 +175,8 @@ async function backend(ctx) {
   check(older[0].includes('Agrees with baiting.'), 'a plan saved before the three lists still shows its one line');
   check(older[1].includes('Nothing of yours to compare yet'), 'asked with an empty quote: says there was nothing to compare');
   check(older[2].includes('Agrees with your plan'), 'all agreed: says so in the heading');
+  const oldScope = await p.evaluate(() => tpScope({ knockdown: { needed: true, short: 'Dust the frame' }, system: 'bait', fixes: [{ what: 'Fix the leak', who: 'plumber' }], client: { inspections: 'In 3 months' } }));
+  check(oldScope.length === 4 && oldScope[0].do === 'Dust the frame' && oldScope[2].who === 'plumber', 'a plan saved before the scope gets one built from its parts');
 
   // 3. Reopening the quote doesn't ask again.
   await p.evaluate(() => { closeQuote(); openQuoteFromReport(); });

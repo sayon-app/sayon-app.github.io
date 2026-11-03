@@ -674,9 +674,6 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 .tp-sec[open] > summary .tp-sec-sub { white-space: normal; }
 .tp-sec[open] { background: var(--surface2); }
 .tp-sec-body { padding: 0 14px 14px 50px; }
-.tp-sec[data-sec="kill"][open] > summary .tp-sec-sub,
-.tp-sec[data-sec="back"][open] > summary .tp-sec-sub,
-.tp-sec[data-sec="fix"][open] > summary .tp-sec-sub { display: none; }
 
 .tp-sub { font-size: 12px; font-weight: 700; color: var(--text2); margin: 10px 0 4px; }
 .tp-text { font-size: 13.5px; line-height: 1.5; color: var(--text); margin-top: 3px; }
@@ -684,7 +681,21 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 .tp-list { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.5; color: var(--text); }
 .tp-list li + li { margin-top: 5px; }
 .tp-why-not { color: var(--text2); }
-.tp-who { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); color: var(--text2); margin-left: 4px; }
+.tp-who { display: inline-block; flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); color: var(--text2); margin-left: 4px; white-space: nowrap; }
+.tp-who-us { background: rgba(var(--accent-rgb),0.1); border-color: rgba(var(--accent-rgb),0.25); color: var(--accent); }
+.tp-who-owner { background: rgba(212,146,10,0.12); border-color: rgba(212,146,10,0.35); color: var(--yellow-text); }
+
+/* The scope of works: every action in order, who does it on the right. */
+.tp-scope { margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.tp-scope-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 10px 12px 4px; }
+.tp-scope-label { font-size: 10.5px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text); }
+.tp-scope-count { font-size: 12px; font-weight: 600; color: var(--text3); }
+.tp-scope-list { list-style: none; margin: 0; padding: 0 12px 4px; }
+.tp-scope-list li { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; font-size: 13.5px; line-height: 1.4; color: var(--text); }
+.tp-scope-list li + li { border-top: 1px solid var(--border); }
+.tp-scope-n { flex-shrink: 0; width: 20px; height: 20px; margin-top: 0; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--text2); background: var(--surface2); }
+.tp-scope-do { flex: 1; min-width: 0; padding-top: 1px; }
+.tp-scope-list .tp-who { margin-top: 0; }
 .tp-own-check { color: var(--text2); font-style: italic; }
 .tp-lines { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface); }
 .tp-lines li { display: flex; justify-content: space-between; gap: 10px; padding: 9px 12px; font-size: 13px; line-height: 1.4; color: var(--text); }

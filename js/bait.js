@@ -502,7 +502,7 @@ function emailBaitVisit(id) {
   }
   sendPdfsToClient({
     files: [buildBaitVisitPDF(q, v)],
-    to: (q.clientEmail || '').trim(),
+    to: quoteClientEmail(q),
     subject: `Bait station visit report — ${q.address || 'your property'}`,
     body: clientMessage({ client: q.client, address: q.address, docs: 'bait station visit report', signOff: v.technician }),
   }).then(sent => {

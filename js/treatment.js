@@ -147,6 +147,12 @@ function treatmentReportFor(q) {
   return (r && r.reportData) || {};
 }
 
+// Where the certificate and visit reports go: the quote's email, or the
+// job's when the quote went out without one.
+function quoteClientEmail(q) {
+  return ((q.clientEmail || '').trim() || (treatmentReportFor(q).jobClientEmail || '').trim());
+}
+
 // Same day N months on, or the month's last day when it's shorter
 // (31 August + 6 months is 28 or 29 February, not 2 or 3 March).
 function addMonthsIso(iso, months) {
@@ -252,7 +258,7 @@ function renderTreatmentBlock(q) {
   const many = installedSystems(t).length > 0;
   const docs = many ? 'certificates' : 'certificate';
   const who = (q.client || '').trim();
-  const to = (q.clientEmail || '').trim();
+  const to = quoteClientEmail(q);
   return `<div class="quote-step">
       <div><strong>Treatment done</strong> on ${escapeHtml(formatAnswerDate(t.date))}${t.technician ? ` by ${escapeHtml(t.technician)}` : ''}</div>
       ${t.nextInspection ? `<div class="quote-answer-note">Next inspection due ${escapeHtml(formatAnswerDate(t.nextInspection))}</div>` : ''}
@@ -718,7 +724,7 @@ function emailTreatmentCertificate() {
   const install = installedSystems(q.treatment).length > 0;
   sendPdfsToClient({
     files: [buildTreatmentCertificatePDF(q), ...(install ? [buildTreatmentCertificatePDF(q, { install: true })] : [])],
-    to: (q.clientEmail || '').trim(),
+    to: quoteClientEmail(q),
     subject: `Termite treatment ${install ? 'and installation certificates' : 'certificate'} — ${q.address || 'your property'}`,
     body: clientMessage({ client: q.client, address: q.address, docs: install ? 'termite treatment certificate and certificate of installation' : 'termite treatment certificate', signOff: q.treatment.technician }),
   }).then(sent => { if (sent) { markCertificateSent(q); track('certificate_sent'); } });

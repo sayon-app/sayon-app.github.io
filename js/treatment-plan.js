@@ -45,12 +45,12 @@ Return ONLY a valid JSON object, no markdown and no commentary, in exactly this 
 "lines":[{"key":string,"qty":number or null,"detail":string,"why":string}]}
 
 WHAT EACH FIELD IS
-- summary: one line for the inspector, the plan in short, at most 20 words ("Treat the nest in the stump, then in-ground baits: paving covers most of the perimeter").
+- summary: one line for the inspector, the plan in short ("Nest in the stump first, then in-ground baits: paving blocks trenching").
 - versus: your plan against the inspector's own plan: their quote so far (THE INSPECTOR'S QUOTE SO FAR), the method they named (treatmentType or the notes) and the steps they wrote. agree: what in their plan you would also do ("Baiting over a soil treatment"). add: what you would add that their plan leaves out, with the fact behind it ("A nest search at the gum stump by the back fence"). change: what you would do differently, what instead and why ("Dust the window frame instead of AG baits: only a few termites left to carry it"). Name the line or method each time; never repeat an item across the three lists, and never pad agree with small items. All three are empty arrays when the inspector gave no plan, quote or method.
 - scope: the scope of works, the one list the inspector reads first: every action in this plan, in the order it happens (treat the live termites, search for or treat the nest, put in or service the long-term system, each fix, the follow-up visits). do: the action with its place or amount, at most 10 words ("Dust the workings in the kitchen window frame", "Install about 18 bait stations around the house", "Fix the leaking shower in the ensuite", "Come back in 3 weeks to check the nest"). who: who does it. Only actions, never reasons: the reasons go in the other fields.
 - system: the long-term termite management system you recommend. bait = in-ground baiting and monitoring system; barrier = chemical soil treatment (a treated zone); retic = reticulation system charged with termiticide; physical = physical barrier; system = service, top up or recharge the system already on the property; none = no new system (no termites and nothing calling for one, an existing system that is still working, or the inspector said no system).
-- knockdown: what to do about LIVE termites now, separate from the long-term system. needed is false when no live termites were found. short: the method in at most 8 words ("Dust the workings, AG baits on the frame"). method names the method and its sequence ("Above-ground bait stations fixed over the live workings, checked every 2 to 3 weeks until feeding stops"). where lists each place, in the inspector's words. why ties it to what was found (how many places, nest found or not, what the timber is, whether termites can be reached).
-- systemWhy: 2 or 3 reasons this system suits this property better than the others, each naming the fact behind it ("Paving and the driveway cover the slab edge along most of the perimeter, so a soil treatment would mean drilling through concrete every 150 to 300 mm; stations can go in the garden beds and lawn").
+- knockdown: what to do about LIVE termites now, separate from the long-term system. needed is false when no live termites were found. short: the method in at most 8 words ("Dust the workings, AG baits on the frame"). method names the method and its sequence ("AG stations on the live workings, checked every 2 to 3 weeks"). where lists each place, in the inspector's words. why ties it to what was found (how many places, nest found or not, what the timber is, whether termites can be reached).
+- systemWhy: 2 or 3 reasons this system suits this property better than the others, each naming the fact behind it ("Paving covers most of the slab edge: a soil treatment means drilling concrete").
 - notChosen: each of the other realistic options and the property-specific reason it lost here. Skip options that were never realistic (a physical barrier on an existing house is rarely realistic; say so once only if the inspector or owner raised it).
 - fixes: conditions that invite or hide termites, each with who does it and why it matters for the plan (a leak keeps the soil and timber wet, which draws termites in and breaks down a soil treatment's working life; a garden bed over the slab edge hides any entry and bridges the treated zone).
 - followUp: the visits after the job, for the inspector: when to check knockdown stations or treated workings, when to confirm activity has stopped, station servicing, and the next full inspection.
@@ -99,14 +99,17 @@ RULES THAT MUST NEVER BE BROKEN
 - Australian terms and spelling: metres, colour, licence (noun), paving, garden beds, meter box, durable notice.
 
 KEEP IT SHORT (the inspector reads it on a phone, at a glance; every extra word is noise)
-- summary at most 20 words; knockdown.short at most 8 words; knockdown.method at most 20 words; knockdown.why at most 25 words.
-- versus: at most 3 items in each list; agree items at most 10 words, add at most 15, change at most 20.
-- scope: at most 8 actions, each at most 10 words.
-- systemWhy: at most 3 reasons, each at most 20 words. notChosen: at most 3, each at most 15 words.
-- fixes: at most 5; what at most 10 words; why at most 12 words.
-- followUp at most 25 words. unknowns: at most 4, each a short question of at most 15 words, most decisive first.
-- client.why: at most 2 sentences, 40 words in all. client.we: at most 6 steps; client.owner: at most 4; each step at most 15 words.
-- No filler ("It is important to note", "In order to"), no repeating a fact in two places.`;
+- Write like a technician's notes: the fact, then what it means, in a few words ("Fish pond near the back fence: liquid limits near water"). No filler, no full sentences where a phrase will do, never the same fact in two places.
+- Never put the report's field names or codes in any text ("slabEdge", "OBSTRUCTED", "zone75mmVisible", "ACTIVE"); say it in plain words ("garden bed over the slab edge").
+- summary at most 15 words.
+- versus: at most 3 items in each list; agree items at most 8 words, add at most 12, change at most 15.
+- scope: at most 8 actions, each at most 8 words.
+- knockdown: short at most 8 words; method at most 12; why at most 12.
+- systemWhy: at most 3 reasons, each at most 12 words. notChosen: at most 3, each at most 10 words.
+- fixes: at most 5; what at most 8 words; why at most 8 words.
+- followUp at most 15 words. unknowns: at most 4 questions, each at most 12 words, most decisive first.
+- client.why: 1 or 2 short sentences, 25 words in all. client.we: at most 6 steps; client.owner: at most 4; each step at most 10 words.
+- lines: detail at most 8 words; why at most 6 words.`;
 
 // What the planner reads: every report field that bears on the plan, as
 // the app holds it, plus what the inspector said. No client name, phone,
@@ -272,8 +275,11 @@ async function requestTreatmentPlan(rd, address, extra, techQuote) {
 // Only what the card and the quote can use, in the shapes they expect.
 function cleanTreatmentPlan(p) {
   if (!p || typeof p !== 'object') throw new Error('The answer was not readable');
-  const str = v => (typeof v === 'string' ? v.trim() : '');
-  const list = v => (Array.isArray(v) ? v.map(x => (typeof x === 'string' ? x.trim() : '')).filter(Boolean) : []);
+  // A report field name that slips into the text, like "(slabEdge
+  // OBSTRUCTED, zone75mmVisible NO)", comes out.
+  const tidy = t => t.replace(/\s*\((?=[^)]*\b[a-z]+[A-Z]\w*)[^)]*\)/g, '').trim();
+  const str = v => (typeof v === 'string' ? tidy(v.trim()) : '');
+  const list = v => (Array.isArray(v) ? v.map(str).filter(Boolean) : []);
   const systems = Object.keys(QUOTE_SYSTEM_LABELS);
   const kd = p.knockdown && typeof p.knockdown === 'object' ? p.knockdown : {};
   const client = p.client && typeof p.client === 'object' ? p.client : {};
@@ -442,7 +448,7 @@ function useTreatmentPlan() {
     const fresh = p.lines.map(l => newQuoteItem(l.key, {
       detail: l.detail,
       qty: l.qty != null ? l.qty : tpStartQty(l.key),
-      source: 'SAYON plan' + (l.why ? ': ' + l.why : '') + (l.qty == null ? ' (quantity to check)' : ''),
+      source: 'SAYON plan' + (l.qty == null ? ' (quantity to check)' : ''),
     }));
     q.items = fresh.concat(own);
     q.systemChoice = null;
@@ -563,15 +569,11 @@ function treatmentPlanBodyHTML(ai) {
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   const sysLabel = TP_SYSTEM_LABELS[p.system] || p.system;
   const whySub = sysLabel + (p.notChosen.length ? ' over ' + p.notChosen.map(x => (TP_SYSTEM_LABELS[x.system] || x.system).toLowerCase()).join(', ') : '');
-  const fixWhys = p.fixes.filter(f => f.why);
+  // One short line per point: the scope already says what each step is.
   const why = [
-    kd.needed ? `<div class="tp-sub">Live termites</div>
-       <div class="tp-text"><strong>${e(kd.method || kd.short)}</strong></div>
-       ${kd.where.length ? `<div class="tp-dim">${e(kd.where.join('; '))}</div>` : ''}
-       ${kd.why ? `<div class="tp-text">${e(kd.why)}</div>` : ''}` : '',
+    kd.needed ? `<div class="tp-sub">Live termites</div><div class="tp-text">${e(kd.method || kd.short)}${kd.where.length ? ` <span class="tp-dim">· ${e(kd.where.join('; '))}</span>` : ''}</div>` : '',
     p.systemWhy.length ? `<div class="tp-sub">${e(sysLabel)}</div>${tpList(p.systemWhy.map(e))}` : '',
-    p.notChosen.length ? `<div class="tp-sub">Not chosen here</div>${tpList(p.notChosen.map(x => `<strong>${e(TP_SYSTEM_LABELS[x.system] || x.system)}:</strong> ${e(x.why)}`), 'tp-why-not')}` : '',
-    fixWhys.length ? `<div class="tp-sub">The fixes</div>${tpList(fixWhys.map(f => `<strong>${e(f.what)}:</strong> ${e(f.why)}`), 'tp-why-not')}` : '',
+    p.notChosen.length ? `<div class="tp-sub">Not chosen</div>${tpList(p.notChosen.map(x => `<strong>${e(TP_SYSTEM_LABELS[x.system] || x.system)}:</strong> ${e(x.why)}`), 'tp-why-not')}` : '',
     p.followUp ? `<div class="tp-sub">Coming back</div><div class="tp-text">${e(p.followUp)}</div>` : '',
   ].join('');
   return `${scope.length ? `<div class="tp-scope"><div class="tp-scope-head"><span class="tp-scope-label">Scope of works</span><span class="tp-scope-count">${plural(scope.length, 'step', 'steps')}</span></div>

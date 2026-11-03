@@ -147,7 +147,7 @@ async function backend(ctx) {
   const scope = await p.evaluate(() => ({ n: document.querySelectorAll('#quoteAiPlan .tp-scope-list li').length, owner: document.querySelectorAll('#quoteAiPlan .tp-scope-list .tp-who-owner').length, trade: (document.querySelector('#quoteAiPlan .tp-scope-list .tp-who-trade') || {}).textContent }));
   check(scope.n === 6 && scope.owner === 1 && scope.trade === 'Plumber', 'each scope step says who does it (Us, Owner, Plumber)');
   check(!/Live termites|Long-term system/.test(text), 'the reasons are folded under Why this plan');
-  check(!/Not chosen here/.test(text), 'sections start folded');
+  check(!/Not chosen/.test(text), 'sections start folded');
   const vs = await p.evaluate(() => ({ change: document.querySelectorAll('#quoteAiPlan .tp-vs-change').length, add: document.querySelectorAll('#quoteAiPlan .tp-vs-add').length, agree: document.querySelectorAll('#quoteAiPlan .tp-vs-agree').length,
     first: (document.querySelector('#quoteAiPlan .tp-vs-list li') || {}).className, tally: (document.querySelector('#quoteAiPlan .tp-vs-tally') || {}).textContent }));
   check(vs.change === 1 && vs.add === 1 && vs.agree === 1 && vs.first === 'tp-vs-change' && vs.tally === '1 change · 1 to add · 2 same', 'Your plan vs SAYON lists change and add, then what is the same on one row');
@@ -156,7 +156,7 @@ async function backend(ctx) {
   await p.click('#quoteAiPlan .tp-sec[data-sec="check"] > summary');
   await p.waitForTimeout(200);
   const opened = await p.locator('#quoteAiPlan').innerText();
-  check(/Not chosen here/.test(opened) && /Live termites/.test(opened) && /Coming back/.test(opened), 'Why this plan opens to the knockdown, the system reasons and coming back');
+  check(/Not chosen/.test(opened) && /Live termites/.test(opened) && /Coming back/.test(opened), 'Why this plan opens to the knockdown, the system reasons and coming back');
   await p.locator('#quoteAiPlan').screenshot({ path: `${OUT}/2b-sections-open.png` });
   await p.setViewportSize({ width: 390, height: 844 });
 
@@ -194,6 +194,8 @@ async function backend(ctx) {
   check(!after.items.some(([k]) => k === 'direct'), 'the guessed report lines make way');
   check(after.plan.why.includes('fish pond') && after.plan.we.split('\n').length === 5 && after.plan.time === 'Half a day' && after.plan.service === '12 months', 'plan steps, why, time and service filled');
   check(!after.choice, 'the system question is answered by the plan');
+  const srcs = await p.$$eval('.quote-item-source', els => els.map(e => e.textContent.trim()));
+  check(srcs.some(t => t === "From SAYON's suggestion") && !srcs.some(t => /Nest found|perimeter|Servicing/.test(t)), "SAYON's lines carry one short tag, with no reason under each");
   const tq = await p.evaluate(() => treatmentPlanTechQuote(quoteState));
   check(!tq || (!tq.lines.some(l => /bait station/i.test(l)) && !tq.steps.length), "SAYON's own lines and steps don't count as the inspector's plan");
   check(!/changed since SAYON/.test(await p.locator('#quoteAiPlan').innerText()), 'adding the plan to the quote is not flagged as a change');

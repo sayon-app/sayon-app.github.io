@@ -1125,7 +1125,7 @@ function quoteItemHTML(it) {
         <label class="quote-field"><span>Price each, ex GST</span><input class="quote-input" type="number" min="0" step="any" inputmode="decimal" value="${escapeHtml(String(it.price))}"
           oninput="markQuotePriceSet('${id}'); updateQuoteItem('${id}','price',this.value)" onchange="rememberQuotePrice('${it.key}', parseFloat(this.value))"></label>
       </div>
-      ${it.source ? `<div class="quote-item-source">From the report: ${escapeHtml(it.source)}</div>` : ''}
+      ${it.source ? `<div class="quote-item-source">${/^SAYON plan/.test(it.source) ? escapeHtml(it.source.replace(/^SAYON plan(: [^(]*)?/, "From SAYON's suggestion").trim()) : 'From the report: ' + escapeHtml(it.source)}</div>` : ''}
       <div class="qi-edit-btns">
         <button type="button" class="quote-text-btn danger" onclick="removeQuoteItem('${id}')">Remove line</button>
         <button type="button" class="quote-link-btn qi-done" onclick="toggleQuoteItem('${id}')">Done</button>

@@ -337,7 +337,10 @@ function buildQuoteItemsFromReport(rd, system) {
   const findings = (Array.isArray(rd.findings) ? rd.findings : []).filter(f => f && f.termiteActivity);
   const active = findings.filter(f => f.termiteActivity === 'ACTIVE');
   const treatmentType = (rd.treatmentType || '').trim();
-  const wantsTreatment = rd.treatmentRecommended === 'YES' || (treatmentType && rd.treatmentRecommended !== 'NO') || active.length > 0;
+  // A recommendation that is only about borers ("Borer treatment of the
+  // floorboards") is the borer line below, not a termite treatment as well.
+  const borerOnly = !active.length && /borer|beetle|anobium|lyctus/i.test(treatmentType) && !/termite|barrier|bait|reticulation/i.test(treatmentType);
+  const wantsTreatment = !borerOnly && (rd.treatmentRecommended === 'YES' || (treatmentType && rd.treatmentRecommended !== 'NO') || active.length > 0);
 
   // Active workings get one direct-treatment line, priced per area, that
   // names every location the report found live termites at (two lines
@@ -385,7 +388,7 @@ function buildQuoteItemsFromReport(rd, system) {
   // Active borers get treated; old borer damage and rot are repairs for a
   // builder, so they go in the exclusions instead (buildQuoteExclusions).
   // The detail names the places with live borers, not the old damage.
-  if (rd.borerActivity === 'ACTIVE') {
+  if (rd.borerActivity === 'ACTIVE' || borerOnly) {
     const live = (Array.isArray(rd.borerFindings) ? rd.borerFindings : []).filter(b => b && b.borerActivity === 'ACTIVE')
       .map(b => [b.location, b.timberAffected].filter(Boolean).join(', ')).filter(Boolean);
     items.push(newQuoteItem('borer', { detail: live.length ? live.join('; ') : (rd.borerDetails || ''), source: 'Finding: active borers' }));

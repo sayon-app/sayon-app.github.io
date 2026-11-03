@@ -128,6 +128,15 @@ function formatPlanMetres(m) {
   return `${m < 10 ? Math.round(m * 10) / 10 : Math.round(m)} m`;
 }
 
+// The house's walls all round, in metres, once the plan has a scale: every
+// house or main building on the site (garages and sheds aren't counted).
+function sitePlanPerimeter(plan) {
+  if (!plan || !plan.mpu) return 0;
+  return planLayerItems(plan).filter(sitePlanIsHouse)
+    .reduce((a, it) => a + planPathLength(planItemPts(it), true), 0) * plan.mpu;
+}
+const sitePlanIsHouse = it => it.k === 'house' || (it.k === 'outline' && (it.pts || []).length > 2);
+
 // The items on one view: the site ('site') or the subfloor ('sub').
 function planLayerItems(plan, layer = 'site') {
   return ((plan && plan.items) || []).filter(it => (it.layer || 'site') === layer);
@@ -709,7 +718,7 @@ function drawSitePlanStationListPdf(doc, plan, { x, y, w, cols = 3 } = {}) {
 // in it, step a corner in for an L shape, or remove a corner. Two fingers
 // pinch to zoom. Opened from the treatment record; Save hands the plan back
 // through sitePlanEditor.onSave.
-const sitePlanEditor = { plan: null, layer: 'site', tool: null, group: 'build', sel: null, part: null, drawing: null, drag: null, undo: [], onSave: null,
+const sitePlanEditor = { plan: null, layer: 'site', tool: null, group: 'build', sel: null, part: null, drawing: null, drag: null, undo: [], onSave: null, stationsWanted: 0, note: '',
   zoom: 1, cx: PLAN_W / 2, cy: PLAN_H / 2, upx: 3, ptrs: new Map(), pinch: null, down: null, partBase: null, grab: false, space: false };
 const PLAN_MAX_ZOOM = 4;
 
@@ -720,11 +729,14 @@ function newSitePlan() {
 
 function planId() { return 'p' + Math.random().toString(36).slice(2, 9); }
 
-function openSitePlan(plan, onSave) {
+// opts.stations: how many bait stations the treatment record has, which
+// Stations all round places.
+function openSitePlan(plan, onSave, opts = {}) {
   const E = sitePlanEditor;
+  E.stationsWanted = opts.stations > 0 ? Math.round(opts.stations) : 0;
   E.plan = sitePlanHasContent(plan) ? JSON.parse(JSON.stringify(plan)) : newSitePlan();
   if (E.plan.north == null) E.plan.north = 0;
-  E.tool = null; E.sel = null; E.part = null; E.drawing = null; E.drag = null; E.undo = []; E.onSave = onSave;
+  E.tool = null; E.sel = null; E.part = null; E.drawing = null; E.drag = null; E.undo = []; E.onSave = onSave; E.note = '';
   E.layer = 'site'; E.group = 'build'; E.zoom = 1; E.cx = PLAN_W / 2; E.cy = PLAN_H / 2;
   E.ptrs.clear(); E.pinch = null; E.down = null; E.grab = false; E.space = false;
   track('screen_viewed', { screen: 'site_plan' });
@@ -792,14 +804,16 @@ function undoSitePlan() {
   const E = sitePlanEditor;
   if (!E.undo.length) return;
   E.plan = JSON.parse(E.undo.pop());
-  E.drawing = null; E.part = null;
+  E.drawing = null; E.part = null; E.note = '';
   if (E.sel && !E.plan.items.some(it => it.id === E.sel)) E.sel = null;
   renderSitePlanEditor();
 }
 
 function setSitePlanGroup(g) {
   sitePlanEditor.group = g;
+  sitePlanEditor.note = '';
   renderSitePlanTray();
+  renderSitePlanEditor();
 }
 
 // Switch between the site plan and the subfloor plan. The first time, the
@@ -808,7 +822,7 @@ function setSitePlanLayer(layer) {
   const E = sitePlanEditor;
   finishSitePlanLine();
   if (E.layer === layer) return;
-  E.layer = layer; E.tool = null; E.sel = null; E.part = null;
+  E.layer = layer; E.tool = null; E.sel = null; E.part = null; E.note = '';
   E.group = SITE_PLAN_TRAYS[layer][0];
   if (layer === 'sub' && !sitePlanHasSubfloor(E.plan)) {
     pushSitePlanUndo();
@@ -827,7 +841,7 @@ function setSitePlanTool(k) {
   const E = sitePlanEditor;
   finishSitePlanLine();
   E.tool = E.tool === k ? null : k;
-  E.sel = null; E.part = null;
+  E.sel = null; E.part = null; E.note = '';
   renderSitePlanTray();
   renderSitePlanEditor();
 }
@@ -839,7 +853,10 @@ function renderSitePlanTray() {
     `<button type="button" role="tab" aria-selected="${E.group === g}" class="sp-group${E.group === g ? ' on' : ''}" onclick="setSitePlanGroup('${g}')">${name}</button>`).join('');
   const swatch = k => { const P = svgPainter(); drawPlanSwatch(P, k, 0, 0); return `<svg viewBox="-42 -30 84 60" aria-hidden="true">${k === 'text' ? '<text x="0" y="2" font-size="30" font-weight="800" text-anchor="middle" dominant-baseline="central" fill="#0C121C">Aa</text>' : P.out.join('')}</svg>`; };
   const keys = E.layer === 'sub' ? SITE_PLAN_SUB_TRAY[E.group] || [] : Object.keys(SITE_PLAN_SYMBOLS).filter(k => SITE_PLAN_SYMBOLS[k].group === E.group);
-  document.getElementById('spTools').innerHTML = keys.map(k => [k, SITE_PLAN_SYMBOLS[k]]).map(([k, s]) =>
+  const round = E.layer === 'site' && sitePlanRoundHouse() ? (SITE_PLAN_ROUND[E.group] || []) : [];
+  document.getElementById('spTools').innerHTML = round.map(k =>
+    `<button type="button" class="sp-tool sp-round" onclick="addSitePlanRound('${k}')">${sitePlanRoundSwatch(k)}<span>${sitePlanRoundLabel(k)}</span></button>`).join('') +
+    keys.map(k => [k, SITE_PLAN_SYMBOLS[k]]).map(([k, s]) =>
     `<button type="button" class="sp-tool${E.tool === k ? ' on' : ''}" aria-pressed="${E.tool === k}" onclick="setSitePlanTool('${k}')">${swatch(k)}<span>${s.label}</span></button>`).join('');
 }
 
@@ -848,6 +865,7 @@ const sitePlanClosed = it => SITE_PLAN_SYMBOLS[it.k].kind !== 'line' || !!it.loo
 
 function sitePlanHint() {
   const E = sitePlanEditor;
+  if (E.note) return E.note;
   if (E.grab || E.space) return 'Moving the map: drag it to look around, pinch or + and − to zoom. Tap Grab again to draw.';
   if (E.drawing) {
     const area = SITE_PLAN_SYMBOLS[(E.plan.items.find(x => x.id === E.drawing) || {}).k || 'fence'].kind === 'area';
@@ -1047,8 +1065,9 @@ function renderSitePlanEditor() {
   document.getElementById('spBgLabel').firstChild.textContent = E.plan.bg ? 'Change the photo underneath' : 'Trace over a map or photo';
   document.getElementById('spUndo').disabled = !E.undo.length;
   document.getElementById('spNorth').textContent = `North: ${['up', 'up-right', 'right', 'down-right', 'down', 'down-left', 'left', 'up-left'][E.plan.north || 0]}`;
+  const per = E.plan.mpu ? sitePlanPerimeter(E.plan) : 0;
   document.getElementById('spScaleNote').textContent = E.plan.mpu
-    ? 'The plan has a scale. Lengths show on the treatment lines and walls, and fill the record\'s metres.'
+    ? (per ? `House walls about ${formatPlanMetres(per)} all round. ` : '') + 'Lengths show on the treatment lines and walls, and fill the record\'s metres.'
     : 'Tip: tap the house, then type its real width, and the plan works out every length from it.';
   document.getElementById('spLegend').innerHTML = sitePlanLegendHTML(E.plan, { layer: E.layer });
   const sum = E.layer === 'sub' ? sitePlanSubSummary(E.plan) : sitePlanSummary(E.plan);
@@ -1423,6 +1442,7 @@ function mergeSitePlanLine(it, ends = 'both') {
 function onSitePlanDown(e) {
   const E = sitePlanEditor;
   e.preventDefault();
+  E.note = '';
   // A tap on the plan puts the keyboard away.
   const typing = document.activeElement;
   if (typing && typing.closest && typing.closest('#spSelBar')) typing.blur();
@@ -1845,3 +1865,121 @@ function clearSitePlan() {
 
 // The label box starts a fresh undo step each time it gains focus.
 function onSitePlanLabelFocus(inp) { delete inp.dataset.undo; }
+
+// ── ALL ROUND THE HOUSE ── Most treatments go all the way round the
+// building, so one tap puts them there, instead of a tap for every corner
+// or every station: a chemical barrier or reticulation as a line just
+// outside the walls, or in-ground stations spaced evenly round it,
+// numbered clockwise from the corner at the top left. They go round the
+// house that's selected, else the biggest one, and come out like any line
+// or station drawn by hand: drag to adjust, Leave this stretch out for a
+// part not treated, Undo to take them off.
+const SITE_PLAN_ROUND = { treat: ['barrier', 'retic'], stations: ['inground'] };
+const PLAN_ROUND_LINE_M = 0.15;   // the treated zone's line, out from the wall
+const PLAN_STATION_GAP_M = 3;     // about one station every 3 m
+const PLAN_STATION_OUT = 36;      // a station's centre, out from the wall (plan units)
+
+function sitePlanRoundHouse() {
+  const E = sitePlanEditor, sel = sitePlanSelected();
+  if (sel && sitePlanIsHouse(sel) && (sel.layer || 'site') === 'site') return sel;
+  const houses = planLayerItems(E.plan).filter(sitePlanIsHouse);
+  const area = it => Math.abs(planArea(planItemPts(it)));
+  return houses.sort((a, b) => area(b) - area(a))[0] || null;
+}
+
+// How many stations go round the walls: the record's count, else one
+// every 3 m of wall on a plan with a scale, else one every 90 plan units.
+// Never closer together than the stations are wide.
+function sitePlanRoundStations(walls) {
+  const E = sitePlanEditor, W = planPathLength(walls, true), L = planPathLength(planOffset(walls, PLAN_STATION_OUT), true);
+  const want = E.stationsWanted || (E.plan.mpu ? Math.ceil(W * E.plan.mpu / PLAN_STATION_GAP_M - 0.05) : Math.round(W / 90));
+  return Math.max(1, Math.min(want, Math.floor(L / 52)));
+}
+
+function sitePlanRoundLabel(k) {
+  if (k !== 'inground') return `${SITE_PLAN_SYMBOLS[k].label} all round`;
+  const house = sitePlanRoundHouse();
+  const n = house ? sitePlanRoundStations(planClockwise(planItemPts(house))) : 0;
+  return `Stations all round${n ? ` (${n})` : ''}`;
+}
+
+function sitePlanRoundSwatch(k) {
+  const P = svgPainter(), I = PLAN_INK;
+  P.poly(rectPts(-17, -10, 34, 20), { fill: I.building, stroke: I.ink, lw: 2 });
+  if (k === 'inground') {
+    [[-26, -18], [0, -18], [26, -18], [26, 18], [0, 18], [-26, 18]].forEach(q => P.circle(q[0], q[1], 5.5, { fill: I.paper, stroke: I.blue, lw: 2.5 }));
+  } else {
+    drawPlanLine(P, k, rectPts(-25, -17, 50, 34).concat([[-25, -17]]));
+  }
+  return `<svg viewBox="-42 -30 84 60" aria-hidden="true">${P.out.join('')}</svg>`;
+}
+
+// A closed shape's corners going clockwise on screen.
+function planClockwise(pts) {
+  return planArea(pts) < 0 ? pts.slice().reverse() : pts.slice();
+}
+
+// The shape d plan units further out all round: each wall moved out
+// square to itself, and the corners where the moved walls meet.
+function planOffset(pts, d) {
+  const n = pts.length, lines = [];
+  for (let i = 0; i < n; i++) {
+    const a = pts[i], b = pts[(i + 1) % n], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    // Out, for a shape going clockwise on screen (y down), is to the left.
+    const nx = (b[1] - a[1]) / L, ny = -(b[0] - a[0]) / L;
+    lines.push({ p: [a[0] + nx * d, a[1] + ny * d], v: [b[0] - a[0], b[1] - a[1]] });
+  }
+  return lines.map((l, i) => {
+    const m = lines[(i - 1 + n) % n];
+    const den = m.v[0] * l.v[1] - m.v[1] * l.v[0];
+    // Walls in a straight line: the corner just moves out.
+    if (Math.abs(den) < 1e-9) return l.p.slice();
+    const t = ((l.p[0] - m.p[0]) * l.v[1] - (l.p[1] - m.p[1]) * l.v[0]) / den;
+    return [m.p[0] + m.v[0] * t, m.p[1] + m.v[1] * t];
+  });
+}
+
+// The point at distance s along a closed path.
+function planPointAlong(path, s) {
+  const n = path.length;
+  for (let i = 0; i < n; i++) {
+    const a = path[i], b = path[(i + 1) % n], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (s <= L || i === n - 1) { const t = L ? Math.min(1, s / L) : 0; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; }
+    s -= L;
+  }
+  return path[0];
+}
+
+function addSitePlanRound(k) {
+  const E = sitePlanEditor;
+  const house = sitePlanRoundHouse();
+  if (!house) return;
+  finishSitePlanLine();
+  pushSitePlanUndo();
+  const walls = planClockwise(planItemPts(house));
+  if (k === 'inground') {
+    let path = planOffset(walls, PLAN_STATION_OUT);
+    // Start at the corner nearest the top left of the plan.
+    const first = path.reduce((best, q, i) => q[0] + q[1] < path[best][0] + path[best][1] ? i : best, 0);
+    path = path.slice(first).concat(path.slice(0, first));
+    const n = sitePlanRoundStations(walls), L = planPathLength(path, true);
+    let num = sitePlanStations(E.plan).reduce((m, st) => Math.max(m, st.n || 0), 0);
+    for (let i = 0; i < n; i++) {
+      const q = planPointAlong(path, i * L / n);
+      E.plan.items.push({ id: planId(), k: 'inground', x: Math.round(planClamp(q[0], 26, PLAN_W - 26)), y: Math.round(planClamp(q[1], 26, PLAN_H - 26)), n: ++num });
+    }
+    E.sel = null;
+    const gap = E.plan.mpu ? ` about ${formatPlanMetres(planPathLength(walls, true) * E.plan.mpu / n)} of wall apart` : '';
+    E.note = `${n} stations all round,${gap} and numbered from the top left. Drag any to move it, or tap one to name or delete it.`;
+  } else {
+    const d = Math.max(6, Math.min(14, E.plan.mpu ? PLAN_ROUND_LINE_M / E.plan.mpu : 8));
+    const it = { id: planId(), k, pts: planRound(planOffset(walls, d)), loop: true };
+    E.plan.items.push(it);
+    // Left unpicked, so it shows clear of the handles.
+    E.sel = null; E.part = null;
+    E.note = `${SITE_PLAN_SYMBOLS[k].label} all round the house. For a stretch it doesn't cover, tap the line, then that stretch's pink tab, then Leave this stretch out.`;
+  }
+  E.tool = null;
+  renderSitePlanTray();
+  renderSitePlanEditor();
+}

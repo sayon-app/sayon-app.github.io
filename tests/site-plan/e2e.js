@@ -40,7 +40,7 @@ let shotN = 0;
   const at = (bb, x, y) => [bb.x + x / 1000 * bb.width, bb.y + y / 750 * bb.height];
   const tapPlan = async (x, y) => { const bb = await planBox(); const [sx, sy] = at(bb, x, y); await p.mouse.click(sx, sy); await p.waitForTimeout(60); };
   const dragPlan = async (x0, y0, x1, y1) => { const bb = await planBox(); const a = at(bb, x0, y0), c = at(bb, x1, y1); await p.mouse.move(...a); await p.mouse.down(); for (let i = 1; i <= 8; i++) await p.mouse.move(a[0] + (c[0] - a[0]) * i / 8, a[1] + (c[1] - a[1]) * i / 8); await p.mouse.up(); await p.waitForTimeout(60); };
-  const tool = async (group, label) => { await tap(p.locator('#spGroups .sp-group', { hasText: group }), group); await tap(p.locator('#spTools .sp-tool', { hasText: label }), label); };
+  const tool = async (group, label) => { await tap(p.locator('#spGroups .sp-group', { hasText: group }), group); await tap(p.locator('#spTools .sp-tool:not(.sp-round)', { hasText: label }), label); };
   const pdfShots = async (b64, name) => {
     fs.writeFileSync(`${OUT}/${name}.pdf`, Buffer.from(b64, 'base64'));
     try { execFileSync('pdftoppm', ['-png', '-r', '80', `${OUT}/${name}.pdf`, `${OUT}/${name}`]); } catch (e) {}
@@ -239,6 +239,8 @@ let shotN = 0;
   await p.evaluate(() => { document.body.classList.add('dark-screen'); openTreatmentRecord(); document.getElementById('trPlan').scrollIntoView({ block: 'start' }); });
   await shot('record-plan-dark');
   await p.evaluate(() => openTreatmentSitePlan()); await p.waitForTimeout(300); await shot('editor-dark');
+  const wanted = await p.evaluate(() => ({ n: sitePlanEditor.stationsWanted, qty: document.querySelector('#trMethods [data-qty="bait"]').value }));
+  check(wanted.n > 0 && String(wanted.n) === wanted.qty, `the record's station count goes to Stations all round (${wanted.n})`);
   await p.evaluate(() => { closeSitePlan(); closeTreatmentRecord(); document.body.classList.remove('dark-screen'); });
 
   check(!errs.length, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));

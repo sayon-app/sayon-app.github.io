@@ -356,6 +356,9 @@ function renderTreatmentPlan() {
 }
 
 function openTreatmentSitePlan(layer) {
+  // The stations counted on the record are how many Stations all round places.
+  const baitQty = document.querySelector('#trMethods [data-qty="bait"]');
+  const stations = baitQty && !baitQty.hidden ? parseInt(baitQty.value, 10) || 0 : 0;
   openSitePlan(treatmentPlanDraft, plan => {
     treatmentPlanDraft = sitePlanHasContent(plan) ? plan : null;
     renderTreatmentPlan();
@@ -373,7 +376,7 @@ function openTreatmentSitePlan(layer) {
       const lQty = document.querySelector(`#trMethods [data-qty="${k}"]`);
       if (lm && lBox && lBox.checked && lQty && !lQty.value.trim()) lQty.value = String(lm);
     });
-  });
+  }, { stations });
   if (layer === 'sub') setSitePlanLayer('sub');
 }
 

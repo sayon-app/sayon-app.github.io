@@ -253,14 +253,14 @@ function treatmentPestFromReport(rd, methods) {
 function renderTreatmentBlock(q) {
   const t = q.treatment;
   if (!t) {
-    return `<button class="quote-btn primary quote-step-btn" onclick="openTreatmentRecord()">Treatment done? Record it</button>`;
+    return `<button class="quote-btn primary quote-step-btn" onclick="openTreatmentRecord()">Record the treatment</button>`;
   }
   const many = installedSystems(t).length > 0;
   const docs = many ? 'certificates' : 'certificate';
   const who = (q.client || '').trim();
   const to = quoteClientEmail(q);
   return `<div class="quote-step">
-      <div><strong>Treatment done</strong> on ${escapeHtml(formatAnswerDate(t.date))}${t.technician ? ` by ${escapeHtml(t.technician)}` : ''}</div>
+      <div><strong>Treatment recorded</strong>: done on ${escapeHtml(formatAnswerDate(t.date))}${t.technician ? ` by ${escapeHtml(t.technician)}` : ''}</div>
       ${t.nextInspection ? `<div class="quote-answer-note">Next inspection due ${escapeHtml(formatAnswerDate(t.nextInspection))}</div>` : ''}
     </div>
     <div class="qp-cert ${certificateGiven(q) ? 'sent' : ''}">

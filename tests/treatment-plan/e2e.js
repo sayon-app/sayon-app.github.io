@@ -154,6 +154,8 @@ async function backend(ctx) {
     first: (document.querySelector('#quoteAiPlan .tp-vs-list li') || {}).className, tally: (document.querySelector('#quoteAiPlan .tp-head-sub') || {}).textContent }));
   check(vs.change === 1 && vs.add === 1 && vs.agree === 1 && vs.first === 'tp-vs-change' && vs.tally === '1 change · 1 addition · 2 agreed · 6 steps', 'the comparison lists change and add, then what is agreed on one row: ' + vs.tally);
   check(!/changed since SAYON/.test(text), 'nothing marked changed straight after asking');
+  const priced = await p.evaluate(() => ({ sub: (document.querySelector('#quoteAiPlan .tp-sec[data-sec="quote"] .tp-sec-sub') || {}).textContent, n: document.querySelectorAll('#quoteAiPlan .tp-line-price').length, first: (document.querySelector('#quoteAiPlan .tp-line-price') || {}).textContent }));
+  check(/^5 items · \$[\d,]+\.\d\d inc GST$/.test(priced.sub) && priced.n === 5 && /^\$[\d,]+\.\d\d$/.test(priced.first), 'Quote items shows each line priced at your rates and the total: ' + priced.sub);
   await p.click('#quoteAiPlan .tp-sec[data-sec="why"] > summary');
   await p.click('#quoteAiPlan .tp-sec[data-sec="check"] > summary');
   await p.waitForTimeout(200);
@@ -212,6 +214,7 @@ async function backend(ctx) {
   check(!after.items.some(([k]) => k === 'direct'), 'the guessed report lines make way');
   check(after.plan.why.includes('fish pond') && after.plan.we.split('\n').length === 5 && after.plan.time === 'Half a day' && after.plan.service === '12 months', 'plan steps, why, time and service filled');
   check(!after.choice, 'the system question is answered by the plan');
+  check(await p.evaluate(() => formatAUD(quoteTotals(quoteState).total)) === priced.sub.replace(/^5 items · | inc GST$/g, ''), "the quote's total matches the total SAYON's card showed");
   const srcs = await p.$$eval('.quote-item-source', els => els.map(e => e.textContent.trim()));
   check(srcs.some(t => t === 'From the SAYON recommendation') && !srcs.some(t => /Nest found|perimeter|Servicing/.test(t)), "SAYON's lines carry one short tag, with no reason under each");
   const tq = await p.evaluate(() => treatmentPlanTechQuote(quoteState));

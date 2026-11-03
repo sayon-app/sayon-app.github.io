@@ -566,12 +566,19 @@ function treatmentPlanBodyHTML(ai) {
   const kd = p.knockdown;
   const scope = tpScope(p);
   const checks = p.unknowns.map(e).concat((p.checks || []).map(t => `<span class="tp-own-check">${e(t)}</span>`));
+  // Priced here at the business's own rates, as Add to my quote would;
+  // the planner itself never sees or gives a price.
+  let subCents = 0;
   const lines = p.lines.map(l => {
     const cat = QUOTE_CATALOGUE[l.key] || {};
     const n = l.qty != null ? l.qty : tpStartQty(l.key);
     const qty = `${n} ${pluralUnit(cat.unit, n)}${l.qty == null ? ', to check' : ''}`;
-    return `<li><span class="tp-line-desc">${e(cat.desc || l.key)}${l.detail ? ` <span class="tp-dim">· ${e(l.detail)}</span>` : ''}</span><span class="tp-line-qty${l.qty == null ? ' warn' : ''}">${e(qty)}</span></li>`;
+    const cost = lineTotal(newQuoteItem(l.key, { qty: n }));
+    subCents += toCents(cost);
+    return `<li><span class="tp-line-desc">${e(cat.desc || l.key)}${l.detail ? ` <span class="tp-dim">· ${e(l.detail)}</span>` : ''}</span><span class="tp-line-qty${l.qty == null ? ' warn' : ''}">${e(qty)}<span class="tp-line-price">${e(formatAUD(cost))}</span></span></li>`;
   }).join('');
+  const gst = !quoteState || quoteState.gst !== false;
+  const linesTotal = formatAUD((subCents + (gst ? Math.round(subCents / 10) : 0)) / 100) + (gst ? ' inc GST' : '');
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   const sysLabel = TP_SYSTEM_LABELS[p.system] || p.system;
   const whySub = sysLabel + (p.notChosen.length ? ' over ' + p.notChosen.map(x => (TP_SYSTEM_LABELS[x.system] || x.system).toLowerCase()).join(', ') : '');
@@ -587,8 +594,8 @@ function treatmentPlanBodyHTML(ai) {
     <div class="tp-secs">
     ${tpSection('check', '!', 'Items to confirm', plural(checks.length, 'item', 'items') + ' before quoting', tpList(checks), 'tp-sec-warn')}
     ${tpSection('why', '?', 'Rationale', e(whySub), why)}
-    ${lines || p.client.why ? tpSection('quote', '$', 'Quote items', lines ? plural(p.lines.length, 'item', 'items') + ' at your rates' : 'Client summary',
-      `${lines ? `<ul class="tp-lines">${lines}</ul>` : ''}
+    ${lines || p.client.why ? tpSection('quote', '$', 'Quote items', lines ? `${plural(p.lines.length, 'item', 'items')} · ${e(linesTotal)}` : 'Client summary',
+      `${lines ? `<ul class="tp-lines">${lines}</ul><div class="tp-lines-note">Priced at your rates.</div>` : ''}
        ${p.client.why ? `<div class="tp-sub">Client summary</div><div class="tp-text tp-client">${e(p.client.why)}</div>` : ''}`) : ''}
   </div>`;
 }

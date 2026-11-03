@@ -642,8 +642,21 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 @media (prefers-reduced-motion: reduce) { .tp-spinner { animation-duration: 3s; } }
 .tp-error { margin: 10px 0 0 46px; font-size: 13px; color: var(--yellow-text); line-height: 1.45; }
 .tp-stale { margin-top: 10px; font-size: 12.5px; color: var(--yellow-text); }
-.tp-versus { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: rgba(var(--accent-rgb),0.07); border-left: 3px solid var(--accent); font-size: 13px; line-height: 1.45; color: var(--text); }
-.tp-versus-label { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--accent); margin-bottom: 3px; }
+/* Your plan vs SAYON: change, add, same, one short row each. */
+.tp-vs { margin-top: 12px; padding: 10px 12px 12px; border-radius: 12px; background: rgba(var(--accent-rgb),0.06); border: 1px solid rgba(var(--accent-rgb),0.18); }
+.tp-vs-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.tp-vs-label { font-size: 10.5px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--accent); white-space: nowrap; }
+.tp-vs-tally { font-size: 12px; font-weight: 600; color: var(--text2); text-align: right; }
+.tp-vs-list { list-style: none; margin: 0; padding: 0; }
+.tp-vs-list li { display: flex; align-items: flex-start; gap: 9px; padding: 6px 0; font-size: 13.5px; line-height: 1.45; color: var(--text); }
+.tp-vs-list li + li { border-top: 1px solid rgba(var(--accent-rgb),0.12); }
+.tp-vs-icon { flex-shrink: 0; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; display: grid; place-items: center; }
+.tp-vs-change .tp-vs-icon { color: var(--yellow-text); background: rgba(212,146,10,0.16); }
+.tp-vs-add .tp-vs-icon { color: var(--accent); background: rgba(var(--accent-rgb),0.14); }
+.tp-vs-agree .tp-vs-icon { color: var(--green); background: rgba(var(--green-rgb),0.15); }
+.tp-vs-word { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text3); margin-bottom: 1px; }
+.tp-vs-change .tp-vs-word { color: var(--yellow-text); }
+.tp-vs-empty { font-size: 12.5px; line-height: 1.45; color: var(--text2); background: var(--surface2); border-color: var(--border); }
 
 /* The sections: one row each, a heading and its one-line gist; tap to open. */
 .tp-secs { margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }

@@ -1155,6 +1155,8 @@ function renderQuoteItems() {
   }
   renderQuoteStartHint();
   renderQuoteTotals();
+  // SAYON's second opinion notes when the lines it compared have changed.
+  if (quoteState.aiPlan && quoteState.aiPlan.quoteHash && typeof renderTreatmentPlanCard === 'function') renderTreatmentPlanCard();
 }
 
 // The folded work row: how many lines, any prices still to check, the total.

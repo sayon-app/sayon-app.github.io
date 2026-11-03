@@ -2,10 +2,12 @@
 // call is made):
 //   1. a dictated note is kept on the report (reportData.heardNotes) and
 //      reaches the planner with the report fields;
-//   2. opening the quote works out the plan once, by itself, with the
-//      cached planner prompt;
-//   3. the card shows the plan, the reasons and what to check, and changes
-//      nothing in the quote until Use this plan;
+//   2. opening the quote asks nothing; Ask SAYON works out the plan once,
+//      with the cached planner prompt, and sends the inspector's own quote
+//      lines (no prices) so SAYON can compare;
+//   3. the card shows Your plan vs SAYON (change, add, same), the folded
+//      sections, and changes nothing in the quote until Add to my quote;
+//      it notes when the inspector's quote changes after SAYON compared it;
 //   4. Use this plan fills the quote's plan and lines at the business's
 //      rates; Undo puts them back; the plan isn't part of what the client
 //      signs (quoteContentHash);
@@ -25,7 +27,11 @@ const NOTE = 'owner has two dogs that dig in the garden beds and a fish pond nea
 // The answer the planner would give for the standard scenario.
 const PLAN = {
   summary: 'Treat the nest in the gum tree, then in-ground baits: the pond and less chemical rule out a soil treatment.',
-  versusInspector: 'Agrees a system is needed; of your two options, baiting suits the pond and the dogs better than a chemical barrier.',
+  versus: {
+    agree: ['A long-term system is needed', 'Removing the timber on the soil'],
+    add: ['Treat the nest in the gum tree first: it was found'],
+    change: ['Bait stations, not a chemical barrier: the fish pond and dogs digging the beds'],
+  },
   system: 'bait',
   knockdown: { needed: true, short: 'Treat the nest in the gum tree', method: 'Drill into the nest in the gum tree and treat it with a non-repellent dust or foam as the label directs', where: ['Gum tree in the backyard, about 15 m from the house'], why: 'The nest was found, so treating it directly is the quickest way to reach the colony. The subfloor workings are inactive, so there is nothing live to treat inside.' },
   systemWhy: ['A fish pond near the back fence: liquid termiticides carry strict limits near water.', 'The owner would rather avoid chemicals, and two dogs dig in the garden beds where a treated zone would be.', 'The house is about 54 m around, so about 18 stations at roughly 3 m apart.'],
@@ -114,6 +120,9 @@ async function backend(ctx) {
   check(msg.includes('fish pond') && msg.includes('"floorType":"Suspended timber floor"') && msg.includes('Gum tree'), 'the planner reads the fields and the dictated note');
   check(!msg.includes('Sam Taylor') && !msg.includes('7 Banksia'), 'no client name or street address goes to the planner');
   check(/"propertyState":"NSW"/.test(msg), 'state is read from the address');
+  const own = await p.evaluate(() => quoteState.items.map(i => ({ desc: i.desc, price: i.price, source: i.source })));
+  check(own.length > 0 && msg.includes("THE INSPECTOR'S QUOTE SO FAR") && own.every(i => msg.includes(i.desc.trim())), "the inspector's own quote lines go to the planner");
+  check(own.every(i => !msg.includes('$' + i.price) && !msg.includes('"price"')), 'no prices go to the planner');
 
   const before = await p.evaluate(() => ({ items: quoteState.items.map(i => i.key), we: quoteState.plan && quoteState.plan.we }));
   check(!before.items.includes('bait_install'), 'nothing in the quote changes before Use this plan');
@@ -121,15 +130,38 @@ async function backend(ctx) {
   await p.screenshot({ path: `${OUT}/2-plan-card.png` });
   await p.setViewportSize({ width: 390, height: 2400 });
   await p.locator('#quoteAiPlan').screenshot({ path: `${OUT}/2a-sections-folded.png` });
+  await p.evaluate(() => document.body.classList.add('dark-screen'));
+  await p.locator('#quoteAiPlan').screenshot({ path: `${OUT}/2c-dark-screen.png` });
+  await p.evaluate(() => document.body.classList.remove('dark-screen'));
   const text = await p.locator('#quoteAiPlan').innerText();
   check(/Check first/.test(text) && /Live termites/.test(text) && /Long-term system/.test(text) && /Your plan vs SAYON/i.test(text) && /Guide only/i.test(text), 'card shows the folded sections, the comparison and Guide only');
   check(!/Not chosen here/.test(text), 'sections start folded');
+  const vs = await p.evaluate(() => ({ change: document.querySelectorAll('#quoteAiPlan .tp-vs-change').length, add: document.querySelectorAll('#quoteAiPlan .tp-vs-add').length, agree: document.querySelectorAll('#quoteAiPlan .tp-vs-agree').length,
+    first: (document.querySelector('#quoteAiPlan .tp-vs-list li') || {}).className, tally: (document.querySelector('#quoteAiPlan .tp-vs-tally') || {}).textContent }));
+  check(vs.change === 1 && vs.add === 1 && vs.agree === 2 && vs.first === 'tp-vs-change' && vs.tally === '1 change · 1 to add · 2 same', 'Your plan vs SAYON lists change, add and same, changes first');
+  check(!/changed since SAYON/.test(text), 'nothing marked changed straight after asking');
   await p.click('#quoteAiPlan .tp-sec[data-sec="system"] > summary');
   await p.click('#quoteAiPlan .tp-sec[data-sec="check"] > summary');
   await p.waitForTimeout(200);
   check(/Not chosen here/.test(await p.locator('#quoteAiPlan').innerText()), 'a section opens to its detail');
   await p.locator('#quoteAiPlan').screenshot({ path: `${OUT}/2b-sections-open.png` });
   await p.setViewportSize({ width: 390, height: 844 });
+
+  // The inspector edits their quote after asking: the card says so.
+  await p.evaluate(() => { quoteState.items.push(newQuoteItem('weep_holes', { source: '' })); renderQuoteItems(); });
+  await p.waitForTimeout(200);
+  check(/Your quote has changed since SAYON looked at it/.test(await p.locator('#quoteAiPlan').innerText()), 'a line added after asking marks the comparison as changed');
+  await p.evaluate(() => { quoteState.items.pop(); renderQuoteItems(); });
+  await p.waitForTimeout(200);
+  check(!/changed since SAYON/.test(await p.locator('#quoteAiPlan').innerText()), 'taking it out again clears the note');
+  const older = await p.evaluate(() => [
+    tpVersusHTML({ plan: { versus: { agree: [], add: [], change: [] }, versusInspector: 'Agrees with baiting.' } }, quoteState),
+    tpVersusHTML({ plan: { versus: { agree: [], add: [], change: [] }, versusInspector: '' }, compared: false }, { items: [] }),
+    tpVersusHTML({ plan: { versus: { agree: ['Baiting'], add: [], change: [] }, versusInspector: '' }, compared: true }, quoteState),
+  ]);
+  check(older[0].includes('Agrees with baiting.'), 'a plan saved before the three lists still shows its one line');
+  check(older[1].includes('Nothing of yours to compare yet'), 'asked with an empty quote: says there was nothing to compare');
+  check(older[2].includes('Agrees with your plan'), 'all agreed: says so in the heading');
 
   // 3. Reopening the quote doesn't ask again.
   await p.evaluate(() => { closeQuote(); openQuoteFromReport(); });
@@ -147,6 +179,9 @@ async function backend(ctx) {
   check(!after.items.some(([k]) => k === 'direct'), 'the guessed report lines make way');
   check(after.plan.why.includes('fish pond') && after.plan.we.split('\n').length === 5 && after.plan.time === 'Half a day' && after.plan.service === '12 months', 'plan steps, why, time and service filled');
   check(!after.choice, 'the system question is answered by the plan');
+  const tq = await p.evaluate(() => treatmentPlanTechQuote(quoteState));
+  check(!tq || (!tq.lines.some(l => /bait station/i.test(l)) && !tq.steps.length), "SAYON's own lines and steps don't count as the inspector's plan");
+  check(!/changed since SAYON/.test(await p.locator('#quoteAiPlan').innerText()), 'adding the plan to the quote is not flagged as a change');
   await p.evaluate(() => { document.getElementById('quotePlanFold').open = true; document.getElementById('quoteAiPlan').scrollIntoView({ block: 'start' }); });
   await p.waitForTimeout(300);
   await p.screenshot({ path: `${OUT}/3-used.png` });

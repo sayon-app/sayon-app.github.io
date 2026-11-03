@@ -9031,9 +9031,9 @@ function jobGo(to) {
   if (to === 'bait') {
     const card = document.getElementById('qpBait');
     if (card) card.scrollIntoView({ block: 'center' });
-    // Nothing recorded, or a check due: straight onto the sheet.
+    // Nothing recorded yet, or a check due: straight onto the sheet.
     const b = typeof baitProgram === 'function' ? baitProgram(quoteState) : null;
-    if (b && !b.finished && !(b.last && !b.last.sentAt) && b.dueNow) openBaitVisit();
+    if (b && !b.finished && !(b.last && !b.last.sentAt) && (b.dueNow || !b.visits.length || !card)) openBaitVisit();
   }
   if (to === 'answer' || to === 'certificate') {
     const step = document.getElementById('qgStep3');
@@ -9049,14 +9049,14 @@ function jobGo(to) {
 
 // The strip at the top of the report and the quote: back to the job's page,
 // then its documents, the one on show lit. Treatment joins once the client
-// has accepted.
+// has accepted (or once it's recorded), Bait visits once stations are in.
 function renderDocStrips() {
   if (typeof quoteHasItems !== 'function') return; // js/quote.js not loaded yet
   const q = currentJobQuote();
   const accepted = quoteHasItems(q) && (quoteAnswerState(q) || {}).status === 'accepted';
   const docs = [['agreement', 'Agreement', !!reportData.agreement], ['report', 'Report'], ['quote', 'Quote', quoteHasItems(q)]];
-  if (accepted) docs.push(['treatment', 'Treatment', !!q.treatment]);
-  if (accepted && typeof baitInstalled === 'function' && baitInstalled(q)) docs.push(['bait', 'Bait visits', !!(baitProgram(q) || {}).finished]);
+  if (accepted || q && q.treatment) docs.push(['treatment', 'Treatment', !!q.treatment]);
+  if (typeof baitInstalled === 'function' && baitInstalled(q)) docs.push(['bait', 'Bait visits', !!(baitProgram(q) || {}).finished]);
   document.querySelectorAll('.doc-strip').forEach(strip => {
     const here = strip.dataset.doc;
     strip.innerHTML = `<button type="button" class="doc-chip doc-chip-job" onclick="jobGo('job')"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Job</button>`

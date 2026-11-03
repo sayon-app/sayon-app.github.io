@@ -679,7 +679,9 @@ function saveTreatmentRecord() {
   renderQuoteAnswer();
   if (typeof renderIssueState === 'function') renderIssueState();
   if (typeof renderSavedList === 'function') renderSavedList();
-  showToast('Treatment recorded. The certificate is ready to send', 'success');
+  // On to the certificate, with the bait station visits under it.
+  setTimeout(() => { const st = document.getElementById('qgStep4'); if (st) st.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 60);
+  showToast(typeof baitInstalled === 'function' && baitInstalled(q) ? 'Treatment recorded. Send the certificate, and record bait visits just under it' : 'Treatment recorded. The certificate is ready to send', 'success');
   track('treatment_recorded', { methods: Object.keys(methods).length });
 }
 

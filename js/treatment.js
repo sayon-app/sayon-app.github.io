@@ -168,7 +168,8 @@ function draftTreatment(q) {
     areas: places.join('; '),
     notTreated: '',
     site: treatmentSiteFromReport(rd),
-    plan: null,
+    // The plan drawn to measure the house for the quote, to carry on with.
+    plan: sitePlanHasContent(q.sitePlan) ? JSON.parse(JSON.stringify(q.sitePlan)) : null,
     notice: 'new',
     noticeWhere: 'Meter box',
     cautions: TREATMENT_DEFAULT_CAUTIONS,

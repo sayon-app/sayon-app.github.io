@@ -336,6 +336,10 @@
                       <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                     </summary>
                     <div id="quoteSystemChoice" class="quote-system-choice" style="display:none"></div>
+                    <!-- The house measured (typed or drawn), which fills the
+                         metres and stations (HOUSE PERIMETER in js/quote.js). -->
+                    <div class="fsub">House perimeter</div>
+                    <div id="quoteMeasure" class="quote-measure"></div>
                     <div class="fsub">The work</div>
                     <div id="quoteItems"></div>
                     <button class="quote-add-btn" onclick="addQuoteItem()">+ Add a line</button>
@@ -734,7 +738,7 @@
   </div>
 </div>
 
-<!-- SITE PLAN (js/site-plan.js): the drawn plan with its legend, from the treatment record -->
+<!-- SITE PLAN (js/site-plan.js): the drawn plan with its legend, from the quote or the treatment record -->
 <div class="page-sheet-overlay" id="sitePlanOverlay">
   <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="spTitle">
     <div class="page-sheet-header">

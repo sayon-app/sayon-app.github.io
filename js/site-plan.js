@@ -128,6 +128,46 @@ function formatPlanMetres(m) {
   return `${m < 10 ? Math.round(m * 10) / 10 : Math.round(m)} m`;
 }
 
+// The house's walls all round, in metres, once the plan has a scale: every
+// house or main building on the site (garages and sheds aren't counted).
+// It prices a barrier or reticulation by the metre and bait stations by
+// the spacing.
+function sitePlanPerimeter(plan) {
+  if (!plan || !plan.mpu) return 0;
+  return planLayerItems(plan).filter(it => it.k === 'house' || (it.k === 'outline' && (it.pts || []).length > 2))
+    .reduce((a, it) => a + planPathLength(planItemPts(it), true), 0) * plan.mpu;
+}
+
+// A plan that is only a house typed in by its size on the quote: one
+// square house, not turned or reshaped, with a scale and nothing else.
+// Its size can be typed again; anything drawn makes it a drawn plan.
+function sitePlanIsSizeOnly(plan) {
+  const items = (plan && plan.items) || [];
+  const it = items[0];
+  return !!(plan && plan.mpu && !plan.bg && items.length === 1 && it.k === 'house' && !it.pts && !it.rot && !it.layer);
+}
+
+// The house's length and width in metres, for a size-only plan.
+function sitePlanHouseSize(plan) {
+  if (!sitePlanIsSizeOnly(plan)) return null;
+  const it = plan.items[0], r = v => Math.round(v * plan.mpu * 10) / 10;
+  return { length: r(it.w), width: r(it.h) };
+}
+
+// A plan holding just the house, drawn to scale from its length and width
+// and centred with room around it for the yard. A size-only plan given
+// keeps its house's id, name and the north arrow.
+function sitePlanFromSize(length, width, base) {
+  const upm = Math.min(500 / length, 375 / width);
+  const w = Math.round(length * upm * 10) / 10, h = Math.round(width * upm * 10) / 10;
+  const old = sitePlanIsSizeOnly(base) ? base.items[0] : null;
+  return {
+    v: 1, north: (base && base.north) || 0, mpu: 1 / upm,
+    items: [{ id: old ? old.id : planId(), k: 'house', x: Math.round((PLAN_W - w) / 2), y: Math.round((PLAN_H - h) / 2), w, h,
+      label: old ? old.label : SITE_PLAN_SYMBOLS.house.def.label }],
+  };
+}
+
 // The items on one view: the site ('site') or the subfloor ('sub').
 function planLayerItems(plan, layer = 'site') {
   return ((plan && plan.items) || []).filter(it => (it.layer || 'site') === layer);
@@ -707,8 +747,8 @@ function drawSitePlanStationListPdf(doc, plan, { x, y, w, cols = 3 } = {}) {
 // turn handle to set it at any angle (a house built on the diagonal). Tap a
 // corner or a tab to pick it: then give the wall's real length, add a corner
 // in it, step a corner in for an L shape, or remove a corner. Two fingers
-// pinch to zoom. Opened from the treatment record; Save hands the plan back
-// through sitePlanEditor.onSave.
+// pinch to zoom. Opened from the quote (to measure the house) or the
+// treatment record; Save hands the plan back through sitePlanEditor.onSave.
 const sitePlanEditor = { plan: null, layer: 'site', tool: null, group: 'build', sel: null, part: null, drawing: null, drag: null, undo: [], onSave: null,
   zoom: 1, cx: PLAN_W / 2, cy: PLAN_H / 2, upx: 3, ptrs: new Map(), pinch: null, down: null, partBase: null, grab: false, space: false };
 const PLAN_MAX_ZOOM = 4;
@@ -1047,8 +1087,9 @@ function renderSitePlanEditor() {
   document.getElementById('spBgLabel').firstChild.textContent = E.plan.bg ? 'Change the photo underneath' : 'Trace over a map or photo';
   document.getElementById('spUndo').disabled = !E.undo.length;
   document.getElementById('spNorth').textContent = `North: ${['up', 'up-right', 'right', 'down-right', 'down', 'down-left', 'left', 'up-left'][E.plan.north || 0]}`;
+  const per = E.plan.mpu ? sitePlanPerimeter(E.plan) : 0;
   document.getElementById('spScaleNote').textContent = E.plan.mpu
-    ? 'The plan has a scale. Lengths show on the treatment lines and walls, and fill the record\'s metres.'
+    ? (per ? `House perimeter about ${formatPlanMetres(per)}. ` : '') + 'Lengths show on the walls and treatment lines, and fill the metres on the quote and the record.'
     : 'Tip: tap the house, then type its real width, and the plan works out every length from it.';
   document.getElementById('spLegend').innerHTML = sitePlanLegendHTML(E.plan, { layer: E.layer });
   const sum = E.layer === 'sub' ? sitePlanSubSummary(E.plan) : sitePlanSummary(E.plan);

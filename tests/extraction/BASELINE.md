@@ -182,3 +182,13 @@ The owner read Test A again as one long note, on the live site with #303's fixes
 **After** (effort medium): `live-script-take-two` 97/97 on both runs (38.8 and 45.2 s), `live-script-one-note` 96/96.
 
 Cost: 3 calls, about $0.25.
+
+## 2026-11-03: field test fixes
+
+A technician-style run of a whole job (live termites in a laundry skirting and a subfloor pier, firewood on the soil, a cracked shower with a 32% reading, "fine and sunny, it rained a bit overnight") lost the shower leak, put the firewood only in other recommendations, and dropped the overnight rain.
+
+**Changes:** new field `timberSoilDetails` (where and what), firewood or stored timber on the soil counts as timberSoil YES, several leaks go in `leakLocation` separated by semicolons with cracked shower grout plus a reading as a leak at the shower, `weatherConditions` is the weather now with earlier rain in `rainLast24h` (which may be words), and a pergola, shed, carport or garage is `outbuildings` in `areaResult`.
+
+**After** (effort medium, 1 run each, tag `thread-fix`): 100% on all ten cases run: `decay-and-leak` 89/89, `slab-barrier` 97/97, `site-conditions-tools` 91/91, `borers-rot` 97/97, `chatter-and-asides` 50/50, `wet-day-partial` 89/89, `phone-full-job` 37/37, `clear-but-conducive` 95/95, `queenslander-stumps` 99/99, `live-script-take-two` 97/97. The field test's own note, run through the app: weather "Fine and dry", rain "Light rain overnight", timber-to-soil YES with "Firewood stacked against the back wall", leak at "Bathroom shower, cracked grout; hot water system overflow beside the laundry".
+
+Cost: 11 calls, about $0.65.

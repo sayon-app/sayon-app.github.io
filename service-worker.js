@@ -28,6 +28,8 @@ const APP_SHELL = [
   './js/treatment-plan.js',
   './js/treatment.js',
   './js/bait.js',
+  './js/job-pack.js',
+  './js/vendor/pdf-lib-1.17.1.min.js',
   './js/site-plan.js',
   './js/business-sync.js',
   './js/telemetry.js',

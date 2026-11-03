@@ -1444,7 +1444,9 @@ function renderQuoteAnswer() {
     };
   }
 
-  const treatment = answered && a.status === 'accepted'
+  // A treatment recorded before the answer was (from the job's page, say)
+  // still shows here, with its certificate and bait visits.
+  const treatment = answered && a.status === 'accepted' || q.treatment
     ? { title: 'Treatment', state: q.treatment && certificateGiven(q) ? 'done' : 'now',
         text: !q.treatment ? 'Record it once the work is done.'
           : q.certificateSentAt ? `Finished. Certificate emailed ${esc(formatIssueDate(q.certificateSentAt))}.`

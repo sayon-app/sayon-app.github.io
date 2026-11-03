@@ -445,7 +445,16 @@ function textAreas(text) {
   const hit = z => (AREA_EVIDENCE_WORDS[z] || []).some(w => has(w) && !(z === 'subfloor' && w === 'stump' && yardStump));
   const specific = Object.keys(AREA_EVIDENCE_WORDS).filter(z => !AREA_EVIDENCE_GENERAL.has(z) && hit(z));
   if (specific.length) return specific;
-  return [...AREA_EVIDENCE_GENERAL].filter(hit);
+  const general = [...AREA_EVIDENCE_GENERAL].filter(hit);
+  // "Skirting board, external wall, laundry" is inside the house, on the
+  // external wall: a room or fixture inside wins over "external" or
+  // "perimeter" alone. Only a part of the outside itself (fascia, eave,
+  // cladding, deck...) or "outside" / "exterior" keeps the exterior too.
+  if (general.length === 2) {
+    const outsidePart = AREA_EVIDENCE_WORDS.exterior.filter(w => !['external', 'perimeter'].includes(w)).some(has);
+    if (!outsidePart) return ['interior'];
+  }
+  return general;
 }
 // The evidence recorded in an area, as short references for the report:
 // "Finding 2 (rear left fence post)", "Borers (front bedroom floorboards)".
@@ -1762,7 +1771,7 @@ const SECTIONS = {
   obstructions:    { fields:['areaStatus'], total:1 },
   restrictions:    { fields:['hinderedAreas','hinderedAreasDetail','noAccessAreas','highRiskAreas','invasiveInspection','invasiveInspectionDetails'], total:2 },
   findings:        { fields:['findings','borerActivity','decayFound','delignification','previousTreatment','previousTreatmentDetails'], total:4 },
-  conducive:       { fields:['waterLeaks','moistureReadings','leakLocation','siteDrainage','subfloorDrainage','subfloorVentilation','mouldSeen','mouldWhere','timberSoil','slabEdge','weepHoles','antCapping','antCappingDetails','nonDurableTimber','nonDurableTimberDetails'], total:6 },
+  conducive:       { fields:['waterLeaks','moistureReadings','leakLocation','siteDrainage','subfloorDrainage','subfloorVentilation','mouldSeen','mouldWhere','timberSoil','timberSoilDetails','slabEdge','weepHoles','antCapping','antCappingDetails','nonDurableTimber','nonDurableTimberDetails'], total:6 },
   recommendations: { fields:['riskLevel','treatmentRecommended','treatmentType','inspectionFrequency','otherRecommendations'], total:4 },
   photos:          { fields:['photos'], total:1 },
   signoff:         { fields:['inspectorLicence','inspectorSignature','agreement'], total:3 }
@@ -1795,7 +1804,7 @@ FIELDS (every one null unless the note gives it):
 "areaStatus":{"interior"|"exterior"|"subfloor"|"roofvoid"|"outbuildings"|"site"|"fences"|"retainingwalls"|"landscapingtimbers":"INSPECTED"|"PARTIAL"|"NOT"|"NA"},"areaResult":{same area keys:"CLEAR"|"FOUND"},"obstructions":string,"restrictedAccess":string,"noAccessAreas":string,"highRiskAreas":string,"hinderedAreas":string,"hinderedAreasDetail":string,
 "findings":[{"termiteActivity":"ACTIVE"|"INACTIVE"|"NONE","species":string,"damageDescription":string,"activityLocation":string,"timberAffected":string,"nestLocated":"YES"|"NO","structuralConcern":"YES"|"NO"}],
 "borerActivity":"ACTIVE"|"INACTIVE"|"NONE","borerFindings":[{"borerActivity":"ACTIVE"|"INACTIVE","borerType":string,"location":string,"timberAffected":string,"description":string,"structuralConcern":"YES"|"NO"}],"decayFound":"YES"|"NO","decayDetails":string,"decayWhere":string,"delignification":"YES"|"NO","delignificationDetails":string,"delignificationWhere":string,"previousTreatment":"YES"|"NO","previousTreatmentDetails":string,"previousTreatmentWhere":string,
-"moistureReadings":"YES"|"NO","waterLeaks":"YES"|"NO","mouldSeen":"YES"|"NO","mouldWhere":string,"leakLocation":string,"moistureMeterReadings":[{"location":string,"reading":string}],"timberSoil":"YES"|"NO","slabEdge":"CLEAR"|"OBSTRUCTED","weepHoles":"CLEAR"|"BRIDGED"|"NONE","siteDrainage":"ADEQUATE"|"POOR","subfloorDrainage":"ADEQUATE"|"POOR","antCapping":"INTACT"|"GAPS"|"NONE","antCappingDetails":string,"subfloorVentilation":"ADEQUATE"|"POOR","nonDurableTimber":"YES"|"NO","nonDurableTimberDetails":string,"nonDurableTimberWhere":string,
+"moistureReadings":"YES"|"NO","waterLeaks":"YES"|"NO","mouldSeen":"YES"|"NO","mouldWhere":string,"leakLocation":string,"moistureMeterReadings":[{"location":string,"reading":string}],"timberSoil":"YES"|"NO","timberSoilDetails":string,"slabEdge":"CLEAR"|"OBSTRUCTED","weepHoles":"CLEAR"|"BRIDGED"|"NONE","siteDrainage":"ADEQUATE"|"POOR","subfloorDrainage":"ADEQUATE"|"POOR","antCapping":"INTACT"|"GAPS"|"NONE","antCappingDetails":string,"subfloorVentilation":"ADEQUATE"|"POOR","nonDurableTimber":"YES"|"NO","nonDurableTimberDetails":string,"nonDurableTimberWhere":string,
 "riskLevel":"LOW"|"MEDIUM"|"HIGH","treatmentRecommended":"YES"|"NO","treatmentType":string,"inspectionFrequency":string,"invasiveInspection":"YES"|"NO","invasiveInspectionDetails":string,"otherRecommendations":string,
 "quote":{"items":[{"description":string,"qty":number,"unit":string,"price":number}],"exclusions":[string],"paymentTerms":string,"timeframe":string,"servicePeriod":string,"notes":string}}
 
@@ -1809,13 +1818,13 @@ DROPDOWN FIELDS: the app shows these as pick-lists. Return the list value EXACTL
 - occupancyStatus: "Occupied — residential" | "Owner occupied" | "Tenanted" | "Vacant" | "Under renovation" | "Commercial / industrial". "Occupied" alone is "Occupied — residential". Furniture is furnishing, not occupancy: "furnished" alone sets furnishing and leaves occupancyStatus null.
 - furnishing: "Fully furnished" | "Partly furnished" | "Unfurnished". "Empty", "no furniture" or "nothing in it" is "Unfurnished"; "a few things left", "half moved out" is "Partly furnished".
 - peoplePresent: who was at the property during the inspection, only when the inspector says so: "Client" | "Client and agent" | "Real estate agent" | "Vendor" | "Purchaser" | "Tenant" | "No one". Any other mix is written as a short list in their words, e.g. "Vendor and purchaser".
-- weatherConditions: "Fine and dry" | "Overcast" | "Light rain" | "Heavy rain" | "Humid" | "Windy".
+- weatherConditions: "Fine and dry" | "Overcast" | "Light rain" | "Heavy rain" | "Humid" | "Windy". It is the weather now: "fine and sunny, it rained a bit overnight" is "Fine and dry", with the overnight rain in rainLast24h.
 - recentWeather: the weather over the past weeks, only when the inspector describes it: "Normal for the season" | "Prolonged dry period" | "Prolonged wet period". "Hasn't rained in weeks" is "Prolonged dry period"; "rained all week" or "a wet month" is "Prolonged wet period".
 - toolsUsed: the tools the inspector says they used, as a short list in this order: moisture meter, sounding tool, thermal camera, movement detector, e.g. "Moisture meter and sounding tool" or "Moisture meter, sounding tool and thermal camera". A Termatrac is a movement detector; "tapped the timbers" or "sounded" means a sounding tool. Add anything else they name in their words ("torch, ladder"). Never list a tool they did not name.
 - siteSurroundings: what is around the property, only when the inspector describes it: "Suburban, few trees" | "Trees close to the building" | "Next to bushland or a reserve" | "Rural". A big gum, trees overhanging the house, or any tree they place within about 10 metres of the house ("a gum tree in the back yard about 8 metres from the house") is "Trees close to the building"; a creek, park or bush behind is "Next to bushland or a reserve". Anything else in their words.
 - siteSlope: "Flat" | "Slopes away from the building" | "Slopes towards the building" | "Steep". Only when the inspector says how the ground falls. "Away" and "towards" need the inspector to say it relative to the house; when they only say which way the block falls ("the block slopes gently down to the back"), keep their words ("Gentle slope down to the back") and never decide towards or away from that.
 - termiteHistory: what the inspector was told or found about termites here before, only when it comes up: "None known" | "Termites reported before" | "Treated before" | "Unknown". "The owner said they had termites a few years ago" is "Termites reported before"; "had it treated in 2019" is "Treated before". Add the detail in their words when they give one, e.g. "Treated before (2019, Termidor)". Signs of a past treatment seen at the inspection are previousTreatment, not this.
-- temperature, humidity, rainLast24h: only a reading the inspector states, written as "22°C", "70%" and "5 mm" (rainLast24h "None" when they say there was no rain). Never estimate one from the weather description.
+- temperature, humidity, rainLast24h: only a reading the inspector states, written as "22°C", "70%" and "5 mm" (rainLast24h "None" when they say there was no rain). rainLast24h may also be what they say about rain since yesterday with no amount: "rained a bit overnight" is "Light rain overnight". Never estimate a figure from the weather description.
 - constructionEra: only from a stated age, decade or year ("built in the 70s" is "1965-1985", "around 1998" is "1985-2003", "2005" is "Post-2003") or from an era-specific material the inspector names (fibro sheeting, asbestos). A year on the line between two ranges (1945, 1965, 1985, 2003, "around 1985") takes the EARLIER range, because the earlier range carries the stronger asbestos warning. Never date a house from its wall, floor or roof type: the era prints an asbestos warning in the report, so a guessed era is a false fact.
 - existingSystem (the TYPE of termite management system found): "Physical Barrier" | "Chemical Reticulation System" | "Termite Baiting System" | "Chemical Barrier" | "Combination System — Physical + Chemical" | "System Present — Type Unidentified". A chemical soil treatment or chemical barrier with no reticulation pipes mentioned (e.g. Termidor sprayed around the perimeter) is "Chemical Barrier". When the inspector says there is no system, no barrier or nothing installed, return "No System Found" (never "No", "None", "Nil"); when they don't say either way, null.
 - existingSystemOther: the brand, product or chemical the system is recorded as (HomeGuard Blue, Kordon, Termimesh, Exterra, Sentricon, Termidor, Altriset ...), plus the install year if read from the notice. Only when the inspector names it.
@@ -1876,8 +1885,8 @@ MOISTURE AND CONDUCIVE CONDITIONS:
 - moistureMeterReadings: one row per reading taken, location and the value as said ("28%"). A reading taken with no value stated keeps the row with reading null; never invent a number or a placeholder. Readings called normal or dry are still rows.
 - moistureReadings: "YES" when any reading or timber is called high, elevated, damp or wet, or a leak is found. "NO" when the inspector checks and reports no moisture, dry, or readings normal. Null when moisture is not raised. A reading on its own, not called high, does not make it YES.
 - waterLeaks: "YES" when a leak or water source is found (tap, pipe, gutter, downpipe, roof, shower, hot water system). "NO" when the inspector checked for leaks and found none, even when a reading was elevated. Elevated moisture with its source not found is moistureReadings YES and waterLeaks NO. Null when leaks are not raised.
-- leakLocation: where the leak or water is getting in, anywhere in the building (roof, gutter, wall, wet area, hot water system, subfloor), keeping the fixture or part they name ("under the bathroom vanity", "kitchen sink", "laundry tap"), not just the room. Null unless waterLeaks is YES. It is the leak itself, not where a moisture reading was taken: "a leak in the bathroom, high readings on the hallway wall outside" is leakLocation "Bathroom", with the hallway wall going in moistureMeterReadings.
-- timberSoil: "YES" for timber in contact with soil (timber lying on the subfloor soil, sleepers or landscaping timbers against the house, fence timber with soil built up, stumps buried by built-up soil). Stumps, piers or posts set in the ground as built are not timberSoil when the inspector calls them normal or only mentions them; "stumps in the ground, which is normal, no timber lying on the soil" is "NO". "NO" when they say none or that it has been removed. Null when not raised.
+- leakLocation: where the leak or water is getting in, anywhere in the building (roof, gutter, wall, wet area, hot water system, subfloor), keeping the fixture or part they name ("under the bathroom vanity", "kitchen sink", "laundry tap"), not just the room. Null unless waterLeaks is YES. More than one leak: name each, separated by semicolons ("shower in the bathroom, cracked grout; hot water system overflow beside the laundry"). Cracked shower grout or a failed shower seal, with a high reading or a water stain beside it, is a leak at the shower. It is the leak itself, not where a moisture reading was taken: "a leak in the bathroom, high readings on the hallway wall outside" is leakLocation "Bathroom", with the hallway wall going in moistureMeterReadings.
+- timberSoil: "YES" for timber in contact with soil (timber lying on the subfloor soil, sleepers or landscaping timbers against the house, fence timber with soil built up, stumps buried by built-up soil). Stumps, piers or posts set in the ground as built are not timberSoil when the inspector calls them normal or only mentions them; "stumps in the ground, which is normal, no timber lying on the soil" is "NO". Firewood, stored timber or building offcuts stacked on the soil against the walls is timberSoil YES too. "NO" when they say none or that it has been removed. Null when not raised. timberSoilDetails: what and where, in their words ("firewood stacked against the back wall; rotted sleeper wall at the back"). Null when timberSoil is not YES.
 - slabEdge: "CLEAR" when the slab edge is visible around the building; "OBSTRUCTED" when soil, a garden bed, paving, render or cladding covers or bridges it anywhere. Null when there is no slab or it was not raised.
 - weepHoles: "CLEAR" or "BRIDGED" (blocked, covered, below soil or paving, anywhere). "NONE" only when the inspector says no weep holes were found or located. Subfloor vents are not weep holes: "vents are clear" is subfloorVentilation and leaves weepHoles null. Null when not raised, or for a building that has none by design (weatherboard) when the inspector says nothing about them.
 - siteDrainage: "ADEQUATE" when the inspector says the site drains well; "POOR" for poor, inadequate or no drainage around the building: water pooling, ponding, ground falling towards the house, soggy soil against the walls, downpipes discharging at the walls. Null when not raised.
@@ -2173,6 +2182,14 @@ function openApp(appName) {
     // The draft is the job as it was left, saved or not, so this doesn't say "unsaved".
     if (restored) showToast('Picked up where you left off', 'info');
     if (!reportData.standard) setStandard('AS 3660.2-2017');
+    // A first job (nothing to pick up) starts with the inspector filled in too.
+    if (!restored && !currentReportId) {
+      const me = lastInspectorDetails();
+      const insp = document.getElementById('jobInspector');
+      if (insp && !insp.value) insp.value = me.name;
+      if (me.licence && !reportData.inspectorLicence) { reportData.inspectorLicence = me.licence; restoreLicenceField(); }
+      if (!reportData.jobInspectionDate) reportData.jobInspectionDate = todayIsoDate();
+    }
     enableKeyboardActivation();
     restoreA11ySettings();
     restoreAudioCaptureSetting();
@@ -4913,9 +4930,9 @@ function renderField(el, key, val) {
 // Text fields that hold a list of places or observations. A later note
 // adds to them instead of replacing them, so "borer holes in the subfloor"
 // survives a second note about rot in a fascia.
-const APPEND_TEXT_KEYS = new Set(['hinderedAreas', 'hinderedAreasDetail', 'noAccessAreas', 'highRiskAreas', 'borerDetails', 'decayDetails', 'decayWhere', 'delignificationDetails', 'delignificationWhere', 'nonDurableTimberDetails', 'nonDurableTimberWhere', 'previousTreatmentDetails', 'previousTreatmentWhere', 'leakLocation', 'otherRecommendations', 'invasiveInspectionDetails']);
+const APPEND_TEXT_KEYS = new Set(['hinderedAreas', 'hinderedAreasDetail', 'noAccessAreas', 'highRiskAreas', 'borerDetails', 'decayDetails', 'decayWhere', 'delignificationDetails', 'delignificationWhere', 'nonDurableTimberDetails', 'nonDurableTimberWhere', 'previousTreatmentDetails', 'previousTreatmentWhere', 'leakLocation', 'timberSoilDetails', 'otherRecommendations', 'invasiveInspectionDetails']);
 // Free-text fields where "None", "Nil" or "N/A" means nothing to record.
-const NIL_TEXT_KEYS = new Set(['hinderedAreas', 'hinderedAreasDetail', 'noAccessAreas', 'highRiskAreas', 'borerDetails', 'decayDetails', 'decayWhere', 'delignificationDetails', 'delignificationWhere', 'nonDurableTimberDetails', 'nonDurableTimberWhere', 'previousTreatmentDetails', 'previousTreatmentWhere', 'leakLocation', 'treatmentType', 'existingSystemOther']);
+const NIL_TEXT_KEYS = new Set(['hinderedAreas', 'hinderedAreasDetail', 'noAccessAreas', 'highRiskAreas', 'borerDetails', 'decayDetails', 'decayWhere', 'delignificationDetails', 'delignificationWhere', 'nonDurableTimberDetails', 'nonDurableTimberWhere', 'previousTreatmentDetails', 'previousTreatmentWhere', 'leakLocation', 'timberSoilDetails', 'treatmentType', 'existingSystemOther']);
 const isNilText = v => /^\s*(nil|none|no|n\/a|na|not applicable|nothing|not stated|not mentioned|unknown)\s*[.!]?\s*$/i.test(String(v));
 const hasRealFinding = list => list.some(f => f.termiteActivity === 'ACTIVE' || f.termiteActivity === 'INACTIVE');
 const findingHasData = f => !!(f.termiteActivity || f.species || f.damageDescription || f.activityLocation || f.timberAffected || f.nestLocated || f.structuralConcern);
@@ -5394,6 +5411,7 @@ const DETAIL_FIELD_FOR = {
   nonDurableTimber: ['nonDurableTimberDetails', ['NO', 'N/A']],
   mouldSeen: ['mouldWhere', ['NO']],
   antCapping: ['antCappingDetails', ['INTACT']],
+  timberSoil: ['timberSoilDetails', ['NO', 'N/A']],
 };
 
 // More detail boxes that show and hide with the first one.
@@ -6049,7 +6067,7 @@ function checkSystemVerify() {
 const ABOVE_GROUND_LEAK_KEYWORDS = [
   'roof', 'ceiling', 'wall cavity', 'gutter', 'ridge', 'attic', 'sarking',
   'upstairs', 'second storey', 'second story', 'second floor', 'ensuite',
-  'bathroom', 'shower', 'hot water', 'skylight', 'flashing', 'downpipe'
+  'bathroom', 'shower', 'skylight', 'flashing', 'downpipe'
 ];
 function isAboveGroundLeak(text) {
   if (!text) return false;
@@ -7645,11 +7663,12 @@ function renderAgreementBanner() {
   const a = reportData.agreement;
   banner.classList.toggle('signed', !!a);
   const sent = !a && reportData.agreementRequest;
+  banner.classList.toggle('waiting', !!sent);
   document.getElementById('agreementBannerText').textContent = a
     ? `Agreement signed by ${a.signerName} · ${formatAgreementSignedAt(a.signedAt)}`
     : sent ? `Link sent to ${sent.signerName}, waiting for them to sign` : 'Pre-inspection agreement not signed yet';
   if (sent) checkAgreementLink(false);
-  document.getElementById('agreementBannerBtn').textContent = a ? 'View' : 'Get it signed';
+  document.getElementById('agreementBannerBtn').textContent = a ? 'View' : sent ? 'Open' : 'Get it signed';
   const so = document.getElementById('signoffAgreementStatus');
   if (so) {
     so.textContent = a
@@ -8934,6 +8953,8 @@ function closeJobPage() {
 
 function jobAgreementStep() {
   const a = reportData.agreement;
+  const sent = !a && reportData.agreementRequest;
+  if (sent) return { label: 'Agreement', to: 'agreement', state: 'now', text: `Link sent${sent.signerName ? ' to ' + sent.signerName : ''}, waiting for them to sign` };
   if (!a) return { label: 'Agreement', to: 'agreement', state: 'now', text: 'Not signed yet. Get it signed before you start' };
   const how = a.method === 'onsite' ? 'Signed on site' : a.method === 'email' ? 'Signed by email' : a.method === 'paper' ? 'Signed on paper' : 'Signed';
   return { label: 'Agreement', to: 'agreement', state: 'done', text: `${how}${a.signerName ? ' by ' + a.signerName : ''}` };
@@ -8956,7 +8977,7 @@ function renderJobPage() {
   const dot = (st, i) => st.state === 'done' ? icon('<path d="M20 6 9 17l-5-5"/>')
     : st.state === 'bad' ? icon('<path d="M18 6 6 18"/><path d="M6 6l12 12"/>') : st.state === 'skip' ? '–' : i + 1;
   const pct = calculateCompletion();
-  const detail = (st) => st.to === 'report' && st.state !== 'done' && st.state !== 'skip' ? `${pct}% filled in`
+  const detail = (st) => st.to === 'report' && st.state !== 'done' && st.state !== 'skip' && !st.ready ? `${pct}% filled in`
     : st.to === 'quote' && j.total ? `${formatAUD(j.total).replace(/\.00$/, '')}${j.q && j.q.sentAt ? ', sent' : ', not sent yet'}` : st.text;
   const chev = '<svg class="icon dash-timeline-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
   const group = (DASHBOARD_TABS.find(([k]) => k === j.group) || [, ''])[1];
@@ -9670,6 +9691,8 @@ function onInspectionTypeChange() {
 function loadJobInfo() {
   // Older reports kept the fee only on the signed agreement.
   if (!reportData.jobFee && reportData.agreement && reportData.agreement.fee) reportData.jobFee = reportData.agreement.fee;
+  // The agreement carries the inspection date too.
+  if (!reportData.jobInspectionDate && reportData.agreement && reportData.agreement.inspectionDate) reportData.jobInspectionDate = reportData.agreement.inspectionDate;
   JOB_INFO_FIELDS.forEach(id => {
     const el = document.getElementById(id);
     if (el && reportData[id] !== undefined) el.value = reportData[id];
@@ -12426,8 +12449,10 @@ function lastInspectorDetails() {
   const latest = getSavedReports()
     .filter(r => r.inspector || (r.reportData && r.reportData.inspectorLicence))
     .sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))[0];
+  // No report yet: the signed-in person's own name is the best guess.
+  const meta = (typeof authUser !== 'undefined' && authUser && authUser.user_metadata) || {};
   return {
-    name: latest ? latest.inspector || '' : '',
+    name: (latest ? latest.inspector || '' : '') || (meta.name || '').trim(),
     licence: latest && latest.reportData ? latest.reportData.inspectorLicence || '' : '',
   };
 }
@@ -12457,6 +12482,9 @@ function startBlankReport() {
   document.getElementById('jobInspector').value = lastInspector.name;
   if (lastInspector.licence) reportData.inspectorLicence = lastInspector.licence;
   restoreLicenceField();
+  // A new job is usually inspected the day it's started.
+  reportData.jobInspectionDate = todayIsoDate();
+  loadJobInfo();
   updateJob();
   clearDraft();
   lastReportSig = reportSig();
@@ -12666,6 +12694,11 @@ function dashboardJob(r, quotes) {
   steps.forEach(s => { if (s.state === 'skip') s.text = 'Not needed'; });
   // Each step just says whether it's done; the preview has the detail. A declined answer keeps its wording.
   steps.forEach(s => { if (s.state === 'done' || s.state === 'todo') s.text = s.state === 'done' ? 'Completed' : 'Not completed'; });
+  // A PDF made but never sent isn't a finished report: the client still
+  // hasn't got it (unless it went on the quote's link), so the step says so
+  // instead of "Completed".
+  const reportWentWithQuote = !!(hasQuote && q.sentAt && q.linkRequest && q.linkRequest.files && q.linkRequest.files.report);
+  if (!reportSent && reportDone && !reportWentWithQuote) Object.assign(steps[0], { state: 'now', ready: true, text: d.pdfAt ? 'PDF made, not sent yet' : 'Ready to send' });
   // Recorded but the certificate hasn't gone: the treatment isn't finished.
   if (q && q.treatment && !certificateGiven(q) && steps[3].state === 'done') Object.assign(steps[3], { state: 'now', text: 'Certificate not emailed yet' });
   // Bait station visits, as a fifth stage once a baiting system is in.
@@ -13227,7 +13260,7 @@ function conduciveConditions(rd) {
   const conducive = [];
   if (rd.waterLeaks === 'YES') conducive.push(`water leak${rd.leakLocation ? ` (${rd.leakLocation})` : ''}`);
   else if (rd.moistureReadings === 'YES') conducive.push('elevated moisture');
-  if (rd.timberSoil === 'YES') conducive.push('timber in contact with soil');
+  if (rd.timberSoil === 'YES') conducive.push(`timber in contact with soil${rd.timberSoilDetails ? ` (${rd.timberSoilDetails})` : ''}`);
   if (rd.weepHoles === 'BRIDGED') conducive.push('weep holes bridged');
   if (rd.antCapping === 'GAPS') conducive.push('gaps in the ant capping');
   else if (rd.antCapping === 'NONE') conducive.push('no ant capping on piers');
@@ -13239,6 +13272,10 @@ function conduciveConditions(rd) {
   if (rd.nonDurableTimber === 'YES') conducive.push(`untreated or non-durable timber in a damp area${whatWhere(rd.nonDurableTimberDetails, rd.nonDurableTimberWhere) ? ` (${whatWhere(rd.nonDurableTimberDetails, rd.nonDurableTimberWhere)})` : ''}`);
   return conducive;
 }
+
+// What a "what to do next" line is about, to spot one that repeats another.
+const NEXT_STEP_TOPICS = [/builder|engineer|structural/i, /leak|plumb|overflow|drip/i, /firewood|sleeper|timber\b.{0,25}\b(soil|ground)|stored timber/i,
+  /weep/i, /slab edge/i, /\bvent/i, /gutter|downpipe/i, /\bmould/i, /drainage/i];
 
 function reportSummary() {
   const fs = (reportData.findings || []).filter(f => f && f.termiteActivity);
@@ -13332,8 +13369,15 @@ function reportSummary() {
     next.push(`Invasive timber pest inspection${reportData.invasiveInspectionDetails ? `: ${reportData.invasiveInspectionDetails}` : ''}. This needs a separate agreement.`);
   }
   if (!isBlankValue(reportData.otherRecommendations)) {
-    const other = String(reportData.otherRecommendations).trim().replace(/\.$/, '');
-    next.push(`Also recommended: ${other.charAt(0).toLowerCase()}${other.slice(1)}.`);
+    // The other recommendations often say again what's above (the builder,
+    // the leak, the firewood). Each part that only repeats it is left out
+    // here; Section ${REPORT_PARTS.recommendations} still has them in full.
+    const said = next.join(' ');
+    const other = String(reportData.otherRecommendations).trim().replace(/\.$/, '')
+      .split(/;\s*|\.\s+/).map(c => c.trim()).filter(Boolean)
+      .filter(c => { const topics = NEXT_STEP_TOPICS.filter(t => t.test(c)); return !topics.length || !topics.every(t => t.test(said)); })
+      .join('; ');
+    if (other) next.push(`Also recommended: ${other.charAt(0).toLowerCase()}${other.slice(1)}.`);
   }
   getRecLines().forEach(l => next.push(l.text));
   if (limitedZones.length) next.push(`Provide access to ${limitedZones.map(z => OBS_ZONES[z].label.replace(/^The /, '').toLowerCase()).join(', ')} for a follow-up inspection.`);
@@ -13354,7 +13398,13 @@ function reportPrepGaps(from = 'send') {
   const fixBtn = (kind, label) => `<button class="link-btn" onclick="fixReportGap('${kind}', '${from}')">${label}</button>`;
   if (!document.getElementById('jobAddress').value.trim()) push('address', 'The job has no property address');
   const unmarked = Object.keys(OBS_ZONES).filter(z => !areaStatusOf(z));
-  if (unmarked.length) push('status', `${unmarked.length} area${unmarked.length === 1 ? ' has' : 's have'} no inspection status (${unmarked.map(z => OBS_ZONES[z].label).join(', ')})`,
+  // A few areas each get their own answer: "no outbuildings" and "the
+  // sleeper wall was looked at" need different taps, and one button for
+  // both got one of them wrong. Many at once keep the quick buttons.
+  if (unmarked.length && unmarked.length <= 3) {
+    unmarked.forEach(z => push('status', `${OBS_ZONES[z].label}: no inspection status${areaEvidence(z).length ? ' (a finding mentions it)' : ''}`,
+      fixBtn('inspected:' + z, 'Inspected') + fixBtn('na:' + z, 'Not applicable')));
+  } else if (unmarked.length) push('status', `${unmarked.length} areas have no inspection status (${unmarked.map(z => OBS_ZONES[z].label).join(', ')})`,
     fixBtn('inspected', 'Mark the rest as inspected') + fixBtn('na', 'Mark the rest not applicable'));
   const noResult = areasMissingResult();
   if (noResult.length) push('result', `${noResult.length} area${noResult.length === 1 ? ' has' : 's have'} no result for what was found there (${noResult.map(z => OBS_ZONES[z].label.replace(/^The /, '')).join(', ')})`,
@@ -13367,7 +13417,8 @@ function reportPrepGaps(from = 'send') {
   const pending = (reportData.pendingNotes || []).length;
   if (pending) push('pending', `${pending} voice note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
   if (!reportData.inspectorSignature) push('signature', 'The inspector hasn\'t signed');
-  if (!reportData.agreement) push('agreement', 'No pre-inspection agreement is recorded', from === 'extract' ? fixBtn('agreement', 'Get it signed') : '');
+  if (!reportData.agreement && reportData.agreementRequest) push('agreement', `The agreement link is waiting on ${reportData.agreementRequest.signerName || 'the client'} to sign`, from === 'extract' ? fixBtn('agreement', 'Check it') : '');
+  else if (!reportData.agreement) push('agreement', 'No pre-inspection agreement is recorded', from === 'extract' ? fixBtn('agreement', 'Get it signed') : '');
   // Photos the account never received are only on this phone: the PDF
   // has them today, but a lost phone or another device's copy won't.
   const onlyHere = photosOnlyOnThisPhone().length;
@@ -13853,7 +13904,12 @@ function fixReportGap(kind, from = 'send') {
   if (kind === 'agreement') { leave(); openAgreementSheet(); return; }
   if (kind === 'photos') { backUpPhotosFromGap(from); return; }
   if (kind.startsWith('finding:')) { leave(); addFindingForArea(kind.slice(8)); return; }
-  if (kind.startsWith('found:')) { if (!reportData.areaResult) reportData.areaResult = {}; reportData.areaResult[kind.slice(6)] = 'FOUND'; syncObstructionData(); }
+  if (/^(inspected|na):/.test(kind)) {
+    const [k, z] = kind.split(':');
+    if (!reportData.areaStatus) reportData.areaStatus = {};
+    reportData.areaStatus[z] = k === 'na' ? 'NA' : 'INSPECTED';
+    syncObstructionData();
+  } else if (kind.startsWith('found:')) { if (!reportData.areaResult) reportData.areaResult = {}; reportData.areaResult[kind.slice(6)] = 'FOUND'; syncObstructionData(); }
   else if (kind === 'clear') markRemainingAreasClear();
   else markRemainingAreasInspected(kind === 'na' ? 'NA' : 'INSPECTED');
   reopen();
@@ -14300,6 +14356,10 @@ async function buildReportPdf() {
       doc.setTextColor(...C.inkMuted); doc.setFont('helvetica','italic');
     } else if (invert === 'plain') {
       doc.setTextColor(...C.ink); doc.setFont('helvetica','bold');
+    } else if (invert === 'bad') {
+      // A condition that counts against the property (no ant caps, poor
+      // drainage) is red whatever word it reads as.
+      doc.setTextColor(...C.danger); doc.setFont('helvetica','bold');
     } else if (invert && (v === 'YES' || v === 'NO')) {
       doc.setTextColor(...(v === 'NO' ? C.danger : C.safe)); doc.setFont('helvetica','bold');
     } else if (['YES','HIGH','OBSTRUCTED','BRIDGED','ACTIVE'].includes(v)) {
@@ -14485,7 +14545,10 @@ async function buildReportPdf() {
 
   function photoGallery() {
     const photos = reportData.photos || [];
-    startPart('Photographs');
+    // With no photos it's two lines: they fit under the recommendations
+    // instead of taking a near-empty page of their own.
+    if (!photos.length) { pageLabel = 'Photographs'; if (y + 24 > 278) newPage(); else gap(8); _rowShade = false; }
+    else startPart('Photographs');
     sectionTitle('PHOTOGRAPHS', REPORT_PARTS.photos);
     if (!photos.length) {
       doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...C.inkLight);
@@ -14506,7 +14569,7 @@ async function buildReportPdf() {
     previousTreatment:'Evidence of Previous Treatment', previousTreatmentDetails:'Previous Treatment: What', previousTreatmentWhere:'Previous Treatment: Where', siteDrainage:'Site Drainage', subfloorDrainage:'Subfloor Drainage',
     borerActivity:'Borers of Seasoned Timber', borerDetails:'Borer Type, Location & Evidence', decayFound:'Wood Decay Fungi (Rot)', decayDetails:'Wood Decay: What', decayWhere:'Wood Decay: Where',
     termiteActivity:'Termite Activity Status', species:'Species', damageDescription:'Damage Description', activityLocation:'Location of Activity', nestLocated:'Termite Nest Found?', structuralConcern:'Builder / Engineer Referral',
-    waterLeaks:'Water Leaks', leakLocation:'Location of Moisture Ingress', moistureReadings:'Moisture Readings', timberSoil:'Timber-to-Soil Contact', slabEdge:'Slab Edge Concealed', weepHoles:'Weep Holes (Clear / Bridged)', existingSystem:'Existing System',
+    waterLeaks:'Water Leaks', leakLocation:'Location of Moisture Ingress', moistureReadings:'Moisture Readings', timberSoil:'Timber-to-Soil Contact', timberSoilDetails:'Timber-to-Soil: Where and What', slabEdge:'Slab Edge Concealed', weepHoles:'Weep Holes (Clear / Bridged)', existingSystem:'Existing System',
     durableNoticePresent:'Durable Notice Present', hardLandscaping:'Hard Landscaping Adjacent', zone25mmVisible:'25mm Inspection Zone Visible', softLandscaping:'Soft Landscaping Adjacent', zone75mmVisible:'75mm Inspection Zone Visible', antCapSoldered:'Ant Cap Joins Soldered',
     treatmentRecommended:'Treatment Recommended', treatmentType:'Treatment Type', inspectionFrequency:'Inspection Frequency', riskLevel:'Risk of Termite Attack',
     invasiveInspection:'Invasive Inspection Recommended', invasiveInspectionDetails:'Invasive Inspection: Where, Why and When', otherRecommendations:'Other Recommendations', antCapping:'Ant Capping', antCappingDetails:'Ant Capping: Where and What',
@@ -15088,7 +15151,7 @@ async function buildReportPdf() {
     timberSoil: ['YES'], slabEdge: ['OBSTRUCTED'], weepHoles: ['BRIDGED'], antCapping: ['GAPS', 'NONE'], nonDurableTimber: ['YES'] };
   function condRow(label, key, shown) {
     const v = reportData[key];
-    row(label, shown || v);
+    row(label, shown || v, v && (ADVERSE[key] || []).includes(v) ? 'bad' : undefined);
     if (v && (ADVERSE[key] || []).includes(v) && WHY_IT_MATTERS[key]) {
       doc.setFont('helvetica','italic'); doc.setFontSize(7.3);
       const lines = doc.splitTextToSize(WHY_IT_MATTERS[key], CW - 8);
@@ -15123,6 +15186,7 @@ async function buildReportPdf() {
   // ── Construction group ─────────────────────────────────────────────────
   subhead('CONSTRUCTION & PHYSICAL BARRIERS');
   condRow('Timber-to-Soil Contact', 'timberSoil');
+  if (reportData.timberSoilDetails) row('Timber-to-Soil: Where and What', reportData.timberSoilDetails);
   condRow('Slab Edge Concealed', 'slabEdge');
   condRow('Weep Holes', 'weepHoles', reportData.weepHoles === 'NONE' ? 'None located' : '');
   condRow('Ant Capping', 'antCapping');

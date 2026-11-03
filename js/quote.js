@@ -339,16 +339,18 @@ function buildQuoteItemsFromReport(rd, system) {
   const treatmentType = (rd.treatmentType || '').trim();
   const wantsTreatment = rd.treatmentRecommended === 'YES' || (treatmentType && rd.treatmentRecommended !== 'NO') || active.length > 0;
 
-  // Active workings get a direct treatment each, so the client sees every
-  // location the report found live termites at.
-  // The detail is the location only: the species line and the report's
+  // Active workings get one direct-treatment line, priced per area, that
+  // names every location the report found live termites at (two lines
+  // looked like the same job charged twice).
+  // The detail is the locations only: the species line and the report's
   // recommendation wording are for the report, not the client's quote.
-  active.forEach((f, i) => {
+  if (active.length) {
     items.push(newQuoteItem('direct', {
-      detail: (f.activityLocation || '').trim(),
-      source: `Finding ${findings.indexOf(f) + 1}: active termites`,
+      qty: active.length,
+      detail: active.map(f => (f.activityLocation || '').trim()).filter(Boolean).join('; '),
+      source: active.map(f => `Finding ${findings.indexOf(f) + 1}`).join(', ') + ': active termites',
     }));
-  });
+  }
 
   if (wantsTreatment) {
     const choices = treatmentChoices(treatmentType);
@@ -617,7 +619,7 @@ function buildPlanOwner(rd) {
     out.push(`Improve the drainage so water runs away from the building${rd.subfloorDrainage === 'POOR' ? ' and out of the subfloor' : ''}.`);
   }
   if (rd.subfloorVentilation === 'POOR') out.push('Improve the subfloor ventilation so it stays dry.');
-  if (rd.timberSoil === 'YES') out.push('Keep timber, firewood and stored goods off the soil and away from the walls.');
+  if (rd.timberSoil === 'YES') out.push(`Keep timber, firewood and stored goods off the soil and away from the walls${rd.timberSoilDetails ? ` (${rd.timberSoilDetails})` : ''}.`);
   if (rd.weepHoles === 'BRIDGED') out.push('Keep garden beds, mulch and paving below the weep holes.');
   if (rd.slabEdge === 'OBSTRUCTED' || rd.zone25mmVisible === 'NO' || rd.zone75mmVisible === 'NO') {
     out.push('Keep the slab edge clear and visible all the way around.');

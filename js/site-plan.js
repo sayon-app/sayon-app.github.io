@@ -1068,7 +1068,7 @@ function renderSitePlanEditor() {
   const per = E.plan.mpu ? sitePlanPerimeter(E.plan) : 0;
   document.getElementById('spScaleNote').textContent = E.plan.mpu
     ? (per ? `House walls about ${formatPlanMetres(per)} all round. ` : '') + 'Lengths show on the treatment lines and walls, and fill the record\'s metres.'
-    : 'Tip: tap the house, then type its real width, and the plan works out every length from it.';
+    : 'No measuring needed. If you know a width, tap the house and type it to show lengths.';
   document.getElementById('spLegend').innerHTML = sitePlanLegendHTML(E.plan, { layer: E.layer });
   const sum = E.layer === 'sub' ? sitePlanSubSummary(E.plan) : sitePlanSummary(E.plan);
   document.getElementById('spSummary').textContent = sum ? `The ${E.layer === 'sub' ? 'subfloor plan' : 'plan'} shows ${sum}.` : '';

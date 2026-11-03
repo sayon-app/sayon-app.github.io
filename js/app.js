@@ -7697,7 +7697,7 @@ function openAgreementSheet() {
   } else {
     document.getElementById('agreementAddr').textContent = getFullAddress() || 'No address yet';
     document.getElementById('agreementAddr').classList.toggle('empty', !getFullAddress());
-    document.getElementById('agreementSignerName').value = document.getElementById('jobClient').value.trim();
+    document.getElementById('agreementSignerName').value = document.getElementById('jobClient').value.trim() || ((typeof currentJobQuote === 'function' && currentJobQuote()) || {}).client || '';
     document.getElementById('agreementInspectionType').value = reportData.jobInspectionType || '';
     // Job Details may already have the inspection date and fee.
     document.getElementById('agreementDate').value = reportData.jobInspectionDate || todayIsoDate();

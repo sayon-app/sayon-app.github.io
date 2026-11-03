@@ -418,7 +418,7 @@ function baitVoicePrompt() {
 - note: what they did about a damaged, missing or unreachable station ("lid replaced", "reinstalled").
 - where: only when they say where a station is.
 - restClear: true when they say all the others, or the rest, are clear.
-- product: the bait used, brand name as written on the box ("extera" is Exterra, "centricon" is Sentricon, "trelona" is Trelona), and its batch number.
+- product: the bait used, brand name as written on the box ("extera" is Exterra, "centricon" is Sentricon, "trelona" is Trelona, "Focus" or "Exterra Focus" cartridges are Exterra Focus), and its batch number.
 - nextVisitDate, nextVisitWeeks or nextVisitMonths: when the next visit is, as said. finished: true when they say the baiting is finished, the colony is gone and no more visits are needed.
 - notes: anything for the client ("keep the mulch clear of station 4").
 - Only words actually said. Never guess, and never invent an amount or a batch number.`;

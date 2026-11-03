@@ -26,7 +26,7 @@
 
 const TREATMENT_PLAN_TIMEOUT_MS = 120000;
 
-const TREATMENT_PLAN_PROMPT = `You are SAYON's treatment planner. SAYON is an app for licensed Australian timber pest inspectors. The user message is one inspection: the report fields the app filled from the inspector's dictation (JSON), the notes the inspector actually said, often the inspector's own quote so far, sometimes the house as the inspector measured it, and sometimes extra words from the inspector. Work out the plan of attack a highly experienced Australian termite technician would choose for THIS property, and explain it so the inspector can check your reasoning in ten seconds and the client can understand what they are paying for.
+const TREATMENT_PLAN_PROMPT = `You are SAYON's treatment planner. SAYON is an app for licensed Australian timber pest inspectors. The user message is one inspection: the report fields the app filled from the inspector's dictation (JSON), the notes the inspector actually said, often the inspector's own quote so far, and sometimes extra words from the inspector. Work out the plan of attack a highly experienced Australian termite technician would choose for THIS property, and explain it so the inspector can check your reasoning in ten seconds and the client can understand what they are paying for.
 
 The inspector is the licensed professional and makes the final call. You are a second opinion: most inspectors have already formed their own plan and ask you to check it against yours. Give your honest best plan, and where the inspector has said or quoted what they intend, say plainly where you agree, what you would add and what you would do differently, and why. A generic answer ("install a termite management system") is useless to them. Every choice must be tied to the facts of this property, and every reason must name the fact it rests on.
 
@@ -56,7 +56,7 @@ WHAT EACH FIELD IS
 - followUp: the visits after the job, for the inspector: when to check knockdown stations or treated workings, when to confirm activity has stopped, station servicing, and the next full inspection.
 - unknowns: what the plan depends on that the report does not say, each as a short question the inspector can answer on site ("Perimeter length? Needed to price stations or metres.", "Is the slab edge exposed on the left side? Not said."). Put the most decisive ones first. Never fill these gaps with assumptions elsewhere in the plan.
 - client: the plan as the client reads it on the quote, in plain Australian English and short sentences, no trade jargon. why: 1 or 2 sentences on why this plan suits their home, naming the property facts in everyday words. we: the steps we will do from the treatment visit on, in order, one action each (never what was done at the inspection). owner: what the owner must do to keep the treatment working (no repairs by trades: those go on the quote as exclusions). time: time on site for the treatment visit, as one of "1 to 2 hours", "Half a day", "1 day", "2 days", or your own short words. service: free service period, "None" or "12 months" (most businesses offer 12 months after a full treatment; use "None" when there is no treatment). inspections: when the next inspections are ("In 3 months, then every 12 months").
-- lines: the work lines for the quote, using ONLY these keys: direct (direct treatment of live termite workings, unit area, one per place), nest (locate and treat the nest), barrier_lm (chemical soil treatment per linear metre), barrier_job (chemical soil treatment, whole job, only when the length is unknown), bait_install (supply and install in-ground bait stations, per station), bait_monitor (bait station monitoring and servicing, 12 months), retic_lm (reticulation system, per metre), physical_lm (physical barrier, per metre), system_topup (top up or recharge the existing system), borer (treat timbers with live borers), timber_soil (remove timber-to-soil contact), weep_holes (clear bridged weep holes), slab_edge (expose a concealed slab edge), followup (follow-up timber pest inspection), invasive (invasive inspection). qty is the number of units: a length or station count only from a figure in SITE MEASUREMENTS, the report or the notes (a perimeter of about 48 metres gives 48 lm, or about 16 stations at roughly 3 m apart; a barrier line or stations drawn on the plan give their own length or count), the number of places for direct, always 1 for a job or visit line (slab_edge, weep_holes, timber_soil, system_topup, nest, barrier_job, bait_monitor, followup, invasive), never its length. When you cannot get a quantity from what was said, qty is null and the matching question goes in unknowns. detail: the client-facing place or scope ("Kitchen window frame", "Full perimeter, including drilling the rear patio"), or "". why: a few words for the inspector. Never give prices: the app prices each line at the business's own rates.
+- lines: the work lines for the quote, using ONLY these keys: direct (direct treatment of live termite workings, unit area, one per place), nest (locate and treat the nest), barrier_lm (chemical soil treatment per linear metre), barrier_job (chemical soil treatment, whole job, only when the length is unknown), bait_install (supply and install in-ground bait stations, per station), bait_monitor (bait station monitoring and servicing, 12 months), retic_lm (reticulation system, per metre), physical_lm (physical barrier, per metre), system_topup (top up or recharge the existing system), borer (treat timbers with live borers), timber_soil (remove timber-to-soil contact), weep_holes (clear bridged weep holes), slab_edge (expose a concealed slab edge), followup (follow-up timber pest inspection), invasive (invasive inspection). qty is the number of units: a length or station count only from a figure in the report or notes (a perimeter said as "about 48 metres" gives 48 lm, or about 16 stations at roughly 3 m apart), the number of places for direct, always 1 for a job or visit line (slab_edge, weep_holes, timber_soil, system_topup, nest, barrier_job, bait_monitor, followup, invasive), never its length. When you cannot get a quantity from what was said, qty is null and the matching question goes in unknowns. detail: the client-facing place or scope ("Kitchen window frame", "Full perimeter, including drilling the rear patio"), or "". why: a few words for the inspector. Never give prices: the app prices each line at the business's own rates.
 
 HOW AN EXPERIENCED TECHNICIAN DECIDES
 
@@ -82,7 +82,6 @@ HOW AN EXPERIENCED TECHNICIAN DECIDES
 - If the inspector named or quoted a method (treatmentType, their notes or their quote so far), start from it and keep it when the facts support it. When the facts strongly argue against it, recommend what you would do and put the reason first in versus.change, so the inspector weighs it before anything else.
 - If the inspector offered a choice ("chemical barrier or baiting"), choose one for this property and explain in systemWhy and notChosen.
 - THE INSPECTOR ADDS is the inspector's note when they ask again. Facts in it (a measurement, the owner's wishes, something found) override the report. A direction in it ("quote a chemical barrier instead", "no baits") is the plan to build, as long as it is sound and safe; if you would still do it differently, say so in versus.change. A question in it is not part of the plan: ignore it.
-- SITE MEASUREMENTS is the house as the inspector measured or drew it on the site plan. Its lengths and counts are measured: use them for the quantities, and never ask for a measurement it gives in unknowns. Take off any stretch your plan leaves out (under paving that isn't drilled, a side with no access) and say so in the line's detail.
 - No termites, no evidence, no system needed: system "none", knockdown not needed, plan built around fixes and regular inspections.
 
 3. Fix what invites termites. Leaks and high moisture readings (find and fix the source; termites follow moisture and a wet zone breaks down a soil treatment sooner), timber on the soil, bridged weep holes and slab edges, garden beds or paving over the inspection zone, poor drainage, poor subfloor ventilation, non-durable timber in the ground, gaps in ant capping, stored timber and firewood against the walls. Include each one the report raises, with who does it. Use the timber_soil, weep_holes and slab_edge lines only for work the pest business itself would do.
@@ -196,43 +195,11 @@ function treatmentPlanTechQuote(q) {
   return lines.length || steps.length ? { lines, steps } : null;
 }
 
-// The house as measured on the quote's site plan, in words for SAYON:
-// the perimeter (and size, when it was typed in), any treatment lines or
-// stations drawn, and what else is drawn around it. '' when it hasn't
-// been measured.
-function treatmentPlanSite(q) {
-  const plan = q && q.sitePlan;
-  const per = sitePlanPerimeter(plan);
-  if (!per) return '';
-  const size = sitePlanHouseSize(plan);
-  const out = [`House perimeter: about ${Math.round(per)} m` + (size ? ` (house about ${size.length} × ${size.width} m)` : '') + '.'];
-  [['barrier', 'Chemical barrier line drawn'], ['retic', 'Reticulation line drawn'], ['physical', 'Physical barrier line drawn']].forEach(([k, words]) => {
-    const m = sitePlanLength(plan, k);
-    if (m) out.push(`${words}: about ${Math.round(m)} m.`);
-  });
-  const items = planLayerItems(plan);
-  const stations = items.filter(it => it.k === 'inground').length;
-  if (stations) out.push(`In-ground bait stations drawn: ${stations}.`);
-  // What else is drawn, by its name on the plan, or its kind.
-  const around = items.filter(it => !['house', 'outline', 'text', 'barrier', 'retic', 'physical', 'inground'].includes(it.k))
-    .map(it => {
-      const kind = SITE_PLAN_SYMBOLS[it.k].label.replace(', square', '').toLowerCase();
-      const name = String(it.label || '').trim();
-      return name && name.toLowerCase() !== kind ? `${kind} (${name})` : kind;
-    });
-  if (around.length) out.push('Also drawn: ' + around.join(', ') + '.');
-  return out.join('\n');
-}
-
-// What SAYON compared: the inspector's quote and the house as measured. A
-// quote with no measurement hashes as it did before there was one.
 function treatmentPlanQuoteHash(q) {
-  const site = treatmentPlanSite(q);
-  const tech = treatmentPlanTechQuote(q);
-  return sha256Hex(stableJson(site ? { tech, site } : tech)).slice(0, 16);
+  return sha256Hex(stableJson(treatmentPlanTechQuote(q))).slice(0, 16);
 }
 
-function treatmentPlanMessage(input, extra, techQuote, site) {
+function treatmentPlanMessage(input, extra, techQuote) {
   const parts = ['REPORT FIELDS (JSON):\n' + JSON.stringify(input.report)];
   parts.push(input.notes.length
     ? 'WHAT THE INSPECTOR SAID (notes in the order dictated):\n' + input.notes.map((t, i) => `[${i + 1}] ${t}`).join('\n')
@@ -245,7 +212,6 @@ function treatmentPlanMessage(input, extra, techQuote, site) {
   } else {
     parts.push("THE INSPECTOR'S QUOTE SO FAR: empty.");
   }
-  if (site) parts.push('SITE MEASUREMENTS (from the site plan the inspector drew):\n' + site);
   if ((extra || '').trim()) parts.push('THE INSPECTOR ADDS:\n' + extra.trim());
   return parts.join('\n\n');
 }
@@ -270,7 +236,7 @@ const treatmentPlanRuns = {};
 // the phone is back online, not shown as an error.
 const treatmentPlanWaiting = {};
 
-async function requestTreatmentPlan(rd, address, extra, techQuote, site) {
+async function requestTreatmentPlan(rd, address, extra, techQuote) {
   if (!navigator.onLine) throw Object.assign(new Error('No signal'), { noSignal: true });
   const input = treatmentPlanInput(rd, address);
   const controller = new AbortController();
@@ -288,7 +254,7 @@ async function requestTreatmentPlan(rd, address, extra, techQuote, site) {
         output_config: { effort: 'medium' },
         // Same for every plan, so cached for an hour.
         system: [{ type: 'text', text: TREATMENT_PLAN_PROMPT, cache_control: { type: 'ephemeral', ttl: '1h' } }],
-        messages: [{ role: 'user', content: treatmentPlanMessage(input, extra, techQuote, site) }],
+        messages: [{ role: 'user', content: treatmentPlanMessage(input, extra, techQuote) }],
       }),
       signal: controller.signal,
     });
@@ -416,7 +382,6 @@ async function runTreatmentPlan(extra) {
   const prev = q.aiPlan || {};
   const hash = treatmentPlanHash(rd, q.address);
   const techQuote = treatmentPlanTechQuote(q);
-  const site = treatmentPlanSite(q);
   const quoteHash = treatmentPlanQuoteHash(q);
   const started = Date.now();
   treatmentPlanRuns[key] = true;
@@ -424,7 +389,7 @@ async function runTreatmentPlan(extra) {
   if (q.aiPlan) q.aiPlan.error = '';
   renderTreatmentPlanCard();
   try {
-    const plan = checkTreatmentPlan(await requestTreatmentPlan(rd, q.address, extra, techQuote, site), rd);
+    const plan = checkTreatmentPlan(await requestTreatmentPlan(rd, q.address, extra, techQuote), rd);
     track('treatment_plan_made', { seconds: Math.round((Date.now() - started) / 1000), system: plan.system, compared: !!techQuote });
     delete treatmentPlanRuns[tpKey(key)];
     tpCardOpen.add(tpKey(key));
@@ -496,8 +461,6 @@ function useTreatmentPlan() {
     const fresh = p.lines.map(l => newQuoteItem(l.key, {
       detail: l.detail,
       qty: l.qty != null ? l.qty : tpStartQty(l.key),
-      // A starting amount, which a measured house fills (HOUSE PERIMETER in js/quote.js).
-      qtyGuess: l.qty == null,
       source: 'SAYON plan' + (l.qty == null ? ' (quantity to check)' : ''),
     }));
     q.items = fresh.concat(own);
@@ -639,14 +602,11 @@ function treatmentPlanBodyHTML(ai) {
   let subCents = 0;
   const lines = p.lines.map(l => {
     const cat = QUOTE_CATALOGUE[l.key] || {};
-    // No amount said: the measured house gives one, else a starting amount to check.
-    const measured = l.qty == null && quoteMeasuredQty(quoteState, l.key);
-    const n = l.qty != null ? l.qty : measured || tpStartQty(l.key);
-    const check = l.qty == null && !measured;
-    const qty = `${n} ${pluralUnit(cat.unit, n)}${check ? ', to check' : measured ? ', measured' : ''}`;
+    const n = l.qty != null ? l.qty : tpStartQty(l.key);
+    const qty = `${n} ${pluralUnit(cat.unit, n)}${l.qty == null ? ', to check' : ''}`;
     const cost = lineTotal(newQuoteItem(l.key, { qty: n }));
     subCents += toCents(cost);
-    return `<li><span class="tp-line-desc">${e(cat.desc || l.key)}${l.detail ? ` <span class="tp-dim">· ${e(l.detail)}</span>` : ''}</span><span class="tp-line-qty${check ? ' warn' : ''}">${e(qty)}<span class="tp-line-price">${e(formatAUD(cost))}</span></span></li>`;
+    return `<li><span class="tp-line-desc">${e(cat.desc || l.key)}${l.detail ? ` <span class="tp-dim">· ${e(l.detail)}</span>` : ''}</span><span class="tp-line-qty${l.qty == null ? ' warn' : ''}">${e(qty)}<span class="tp-line-price">${e(formatAUD(cost))}</span></span></li>`;
   }).join('');
   const gst = !quoteState || quoteState.gst !== false;
   const linesTotal = formatAUD((subCents + (gst ? Math.round(subCents / 10) : 0)) / 100) + (gst ? ' inc GST' : '');

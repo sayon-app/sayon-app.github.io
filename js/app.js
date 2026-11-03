@@ -7648,7 +7648,8 @@ function agreementFormValues() {
     standard, inspectionDate, fee, notes,
     text: fillAgreementText(getAgreementTemplate(), {
       company: getCompanyDetails().name || 'The inspecting company',
-      client: document.getElementById('agreementSignerName').value.trim() || document.getElementById('jobClient').value.trim(),
+      // The inspection is for the client; someone else may sign for them.
+      client: document.getElementById('jobClient').value.trim() || document.getElementById('agreementSignerName').value.trim(),
       address: getFullAddress(),
       date: formatAgreementDate(inspectionDate),
       standard,

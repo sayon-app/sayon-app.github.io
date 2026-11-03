@@ -8973,7 +8973,17 @@ function renderJobPage() {
   // Before the agreement is signed, that is the next step.
   const next = !reportData.agreement && addr ? { status: 'Get the agreement signed', hint: 'The client signs it before the inspection starts.', next: { label: 'Open the agreement', to: 'agreement' } }
     : !addr ? { status: 'Start the job', hint: 'Type the address and the client\'s name below, get the agreement signed, then tap the mic and talk through the inspection.', next: null }
+    : j.finished && !reportData.jobPdfAt && typeof jobPdfSectionHTML === 'function' ? {
+        status: 'Finalise the job',
+        hint: j.onlyReportUnsent
+          ? 'Everything\'s done except sending the report. Email the job PDF and the report goes with it, or send the report on its own.'
+          : 'Everything\'s done' + (j.group === 'waiting' ? ' apart from the bait station checks' : '') + '. Put it all into one PDF for the client or your records.',
+        next: j.onlyReportUnsent && jobClientEmailOf() ? { label: `Finalise and email to ${(j.r.client || '').trim().split(/\s+/)[0] || 'the client'}`, to: 'jobpdf-email' } : { label: 'Finalise job', to: 'jobpdf' } }
     : { status: j.status, hint: j.hint, next: j.next };
+  // Treatment recommended but the client isn't having a quote: skip it, and
+  // the treatment and bait steps with it.
+  const skipLink = j.status === 'Write the quote' ? '<button type="button" onclick="setClientNotGoingAhead(true)">Client isn\'t going ahead</button>'
+    : j.clientNotGoingAhead && !quoteHasItems(j.q) ? '<button type="button" onclick="setClientNotGoingAhead(false)">Write a quote after all</button>' : '';
   if (reportData.agreement && j.steps.some(st => st.state === 'now')) steps[0].state = 'done';
   else if (!reportData.agreement) steps.slice(1).forEach(st => { if (st.state === 'now') st.state = 'todo'; });
   const icon = d => `<svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -8995,6 +9005,7 @@ function renderJobPage() {
       <div class="dash-next-title">${escapeHtml(next.status)}</div>
       ${next.hint ? `<p class="dash-next-hint">${escapeHtml(next.hint)}</p>` : ''}
       ${next.next ? `<button type="button" class="dash-detail-primary" onclick="jobGo('${next.next.to}')">${next.next.label}</button>` : ''}
+      ${skipLink ? `<div class="dash-detail-links">${skipLink}</div>` : ''}
     </section>
     <div class="job-section-head">The job, step by step</div>
     <ol class="dash-timeline job-steps">
@@ -9008,6 +9019,7 @@ function renderJobPage() {
           </button>
         </li>`).join('')}
     </ol>
+    ${typeof jobPdfSectionHTML === 'function' ? jobPdfSectionHTML() : ''}
     <div class="job-section-head" id="jobDetailsHead">Job details</div>
     <div id="jobPageSlot"></div>`;
   const panel = document.getElementById('jobPanel');
@@ -9017,6 +9029,7 @@ function renderJobPage() {
 // Opens one of the open job's documents from its page (or from the strip
 // at the top of a document).
 function jobGo(to) {
+  if (to === 'jobpdf' || to === 'jobpdf-email') { makeJobPdf(to === 'jobpdf' ? 'save' : 'email'); return; }
   closeJobPage();
   if (document.getElementById('quoteScreen').classList.contains('open') && to !== 'quote' && to !== 'answer' && to !== 'treatment' && to !== 'certificate' && to !== 'bait') {
     closeQuote();
@@ -12614,10 +12627,13 @@ function dashboardJob(r, quotes) {
   // The quote's link carries the report too, so a quote sent that way gave
   // the client the report.
   const reportWentWithQuote = !!(hasQuote && q.sentAt && q.linkRequest && q.linkRequest.files && q.linkRequest.files.report);
-  const needsQuote = d.treatmentRecommended === 'YES';
+  // "Client isn't going ahead" (noQuoteNeeded) skips the quote and what follows it.
+  const clientNotGoingAhead = d.treatmentRecommended === 'YES' && !!d.noQuoteNeeded;
+  const needsQuote = d.treatmentRecommended === 'YES' && !d.noQuoteNeeded;
   const total = hasQuote ? quoteTotals(q).total : 0;
   const who = (r.client || '').trim() || 'the client';
   let group, status, hint = '', next = null;
+  let onlyReportUnsent = false;
   if (!reportDone) {
     group = 'todo'; status = 'Finish the report';
     hint = 'Fill in the rest of the report, then make the PDF from the Sign-Off page.';
@@ -12628,8 +12644,9 @@ function dashboardJob(r, quotes) {
     next = { label: 'Write the quote', to: 'quote' };
   } else if (!hasQuote) {
     group = reportSent ? 'done' : 'todo';
-    status = reportSent ? 'No quote needed' : 'Send the report';
-    hint = reportSent ? 'The report has gone to ' + who + ' and no treatment was recommended.' : 'The report is ready. Send it to ' + who + '.';
+    status = reportSent ? (clientNotGoingAhead ? 'Client not going ahead' : 'No quote needed') : 'Send the report';
+    onlyReportUnsent = !reportSent;
+    hint = reportSent ? 'The report has gone to ' + who + (clientNotGoingAhead ? ' and they aren\'t going ahead with treatment.' : ' and no treatment was recommended.') : 'The report is ready. Send it to ' + who + '.';
     if (!reportSent) next = { label: 'Open report', to: 'report' };
   } else if (!a) {
     group = q.sentAt ? 'waiting' : 'todo';
@@ -12659,6 +12676,7 @@ function dashboardJob(r, quotes) {
   // Everything else is finished (a declined quote, say) but the report
   // itself never went: that's still the inspector's to do.
   if (group === 'done' && reportDone && !reportSent && !reportWentWithQuote) {
+    onlyReportUnsent = true;
     group = 'todo'; status = 'Send the report';
     hint = 'The report is ready but hasn\'t gone to ' + who + '. Send it from the Sign-Off page.';
     next = { label: 'Open report', to: 'report' };
@@ -12667,6 +12685,7 @@ function dashboardJob(r, quotes) {
   // A baiting system keeps the job going: back to To do when a station
   // check is due or a visit report hasn't gone, Waiting between visits.
   const bait = typeof baitProgram === 'function' ? baitProgram(q) : null;
+  let baitWaiting = false;
   if (bait && !bait.finished && group === 'done') {
     const unsent = bait.last && !bait.last.sentAt;
     if (unsent) {
@@ -12678,7 +12697,7 @@ function dashboardJob(r, quotes) {
       hint = (bait.overdue ? 'Was due ' : 'Due ') + dashDay(bait.due) + '. Check the stations and record what you found.';
       next = { label: 'Record the visit', to: 'bait' };
     } else {
-      group = 'waiting'; status = `Bait check due ${dashDay(bait.due)}`;
+      group = 'waiting'; status = `Bait check due ${dashDay(bait.due)}`; baitWaiting = true;
       hint = 'The stations are in. Come back on ' + dashDay(bait.due) + ' to check them and record the visit.';
       next = { label: 'Record a visit', to: 'bait' };
     }
@@ -12705,7 +12724,7 @@ function dashboardJob(r, quotes) {
     { label: 'Treatment', to: 'treatment', state: q && q.treatment ? 'done' : answered && a.status !== 'accepted' || !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
       text: q && q.treatment ? `Done ${dashDay(q.treatment.date)} · certificate ${q.certificateSentAt ? 'sent' : q.certificateHandedAt ? 'given' : 'not sent'}` : 'Not recorded yet' },
   ];
-  steps.forEach(s => { if (s.state === 'skip') s.text = 'Not needed'; });
+  steps.forEach(s => { if (s.state === 'skip') s.text = clientNotGoingAhead ? 'Skipped, client not going ahead' : 'Not needed'; });
   // Each step just says whether it's done; the preview has the detail. A declined answer keeps its wording.
   steps.forEach(s => { if (s.state === 'done' || s.state === 'todo') s.text = s.state === 'done' ? 'Completed' : 'Not completed'; });
   // A PDF made but never sent isn't a finished report: the client still
@@ -12721,7 +12740,10 @@ function dashboardJob(r, quotes) {
     steps.push(st);
   }
   if (group !== 'done' && !steps.some(s => s.state === 'now')) { const s = steps.find(s => s.state === 'todo'); if (s) s.state = 'now'; }
-  return { r, q, group, status, hint, next, steps, total, time: dashboardJobTime(r) };
+  // Everything the job needs is done (bait checks may still be coming):
+  // the job page offers to finalise it into one PDF.
+  const finished = group === 'done' || baitWaiting || onlyReportUnsent;
+  return { r, q, group, status, hint, next, steps, total, time: dashboardJobTime(r), finished, onlyReportUnsent, clientNotGoingAhead };
 }
 
 // A ring of four arcs, one per step, filled as the job moves along.
@@ -13170,7 +13192,7 @@ else installToastScreenWatch();
 //   reportData.amending      { reason, startedAt } - unlocked for an amendment
 //   reportData.noQuoteNeeded true when the job needs no quote
 // The quote's own sent state lives on the quote (see SENT AND LOCKED in js/quote.js).
-const ISSUE_META_KEYS = ['reportNumber', 'sent', 'issue', 'issueHistory', 'amending', 'pendingNotes', 'noQuoteNeeded', 'noteText', 'heardNotes', 'weatherFilled'];
+const ISSUE_META_KEYS = ['reportNumber', 'sent', 'issue', 'issueHistory', 'amending', 'pendingNotes', 'noQuoteNeeded', 'noteText', 'heardNotes', 'weatherFilled', 'jobPdfAt', 'jobPdfSentAt'];
 const ISSUE_SECTION_NAMES = { job:'Job details', quote:'Quote', property:'Property', obstructions:'Areas inspected', restrictions:'Areas unable to be inspected',
   findings:'Findings', conducive:'Conducive', recommendations:'Recommendations', photos:'Photos', signoff:'Sign-off' };
 
@@ -13499,6 +13521,15 @@ function setNoQuoteNeeded(on) {
   if (on) reportData.noQuoteNeeded = true; else delete reportData.noQuoteNeeded;
   saveDraft();
   renderIssueState();
+}
+
+// From the job's page: the client isn't going ahead, so no quote (and no
+// treatment or bait visits) is owed. The same flag as "No quote needed".
+function setClientNotGoingAhead(on) {
+  setNoQuoteNeeded(on);
+  saveOpenReportNow();
+  renderJobPage();
+  showToast(on ? 'Quote skipped. Send the report and finalise the job when you\'re ready' : 'Quote back on the list', 'info');
 }
 
 function inspectorDisplayName() {

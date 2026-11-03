@@ -1422,7 +1422,7 @@ function quoteAnswerSummary(q) {
   if (!a && q.linkRequest) checkQuoteLink(q, false);
   if (!a) return q.sentAt ? { short: 'Quote sent', text: quoteLinkCurrent(q) ? 'Quote sent with a link to accept it. Waiting on the client' : 'Waiting on the client\'s answer to the quote', tone: 'wait' } : null;
   if (a.stale) return { short: 'Quote changed', text: 'The quote changed after the client answered. Get their answer on the new version', tone: 'warn' };
-  if (a.status === 'accepted' && q.treatment) return { short: 'Treatment done', text: `Treatment done on ${formatAnswerDate(q.treatment.date)}. ${certificateGiven(q) ? 'Certificate given' : 'Send the client the certificate'}`, tone: 'good' };
+  if (a.status === 'accepted' && q.treatment) return { short: 'Treatment recorded', text: `Treatment recorded, done on ${formatAnswerDate(q.treatment.date)}. ${certificateGiven(q) ? 'Certificate given' : 'Send the client the certificate'}`, tone: 'good' };
   if (a.status === 'accepted') return { short: 'Quote accepted', text: `Quote accepted by ${a.by} on ${formatAnswerDate(a.date)}. Record the treatment once it's done`, tone: 'good' };
   return { short: 'Quote declined', text: `Quote declined on ${formatAnswerDate(a.date)}${a.note ? ` · ${a.note}` : ''}`, tone: 'bad' };
 }

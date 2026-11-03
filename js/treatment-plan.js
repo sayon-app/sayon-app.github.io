@@ -56,7 +56,7 @@ WHAT EACH FIELD IS
 - followUp: the visits after the job, for the inspector: when to check knockdown stations or treated workings, when to confirm activity has stopped, station servicing, and the next full inspection.
 - unknowns: what the plan depends on that the report does not say, each as a short question the inspector can answer on site ("Perimeter length? Needed to price stations or metres.", "Is the slab edge exposed on the left side? Not said."). Put the most decisive ones first. Never fill these gaps with assumptions elsewhere in the plan.
 - client: the plan as the client reads it on the quote, in plain Australian English and short sentences, no trade jargon. why: 1 or 2 sentences on why this plan suits their home, naming the property facts in everyday words. we: the steps we will do from the treatment visit on, in order, one action each (never what was done at the inspection). owner: what the owner must do to keep the treatment working (no repairs by trades: those go on the quote as exclusions). time: time on site for the treatment visit, as one of "1 to 2 hours", "Half a day", "1 day", "2 days", or your own short words. service: free service period, "None" or "12 months" (most businesses offer 12 months after a full treatment; use "None" when there is no treatment). inspections: when the next inspections are ("In 3 months, then every 12 months").
-- lines: the work lines for the quote, using ONLY these keys: direct (direct treatment of live termite workings, unit area, one per place), nest (locate and treat the nest), barrier_lm (chemical soil treatment per linear metre), barrier_job (chemical soil treatment, whole job, only when the length is unknown), bait_install (supply and install in-ground bait stations, per station), bait_monitor (bait station monitoring and servicing, 12 months), retic_lm (reticulation system, per metre), physical_lm (physical barrier, per metre), system_topup (top up or recharge the existing system), borer (treat timbers with live borers), timber_soil (remove timber-to-soil contact), weep_holes (clear bridged weep holes), slab_edge (expose a concealed slab edge), followup (follow-up timber pest inspection), invasive (invasive inspection). qty is the number of units: a length or station count only from a figure in the report or notes (a perimeter said as "about 48 metres" gives 48 lm, or about 16 stations at roughly 3 m apart), the number of places for direct, 1 for a job or visit. When you cannot get a quantity from what was said, qty is null and the matching question goes in unknowns. detail: the client-facing place or scope ("Kitchen window frame", "Full perimeter, including drilling the rear patio"), or "". why: a few words for the inspector. Never give prices: the app prices each line at the business's own rates.
+- lines: the work lines for the quote, using ONLY these keys: direct (direct treatment of live termite workings, unit area, one per place), nest (locate and treat the nest), barrier_lm (chemical soil treatment per linear metre), barrier_job (chemical soil treatment, whole job, only when the length is unknown), bait_install (supply and install in-ground bait stations, per station), bait_monitor (bait station monitoring and servicing, 12 months), retic_lm (reticulation system, per metre), physical_lm (physical barrier, per metre), system_topup (top up or recharge the existing system), borer (treat timbers with live borers), timber_soil (remove timber-to-soil contact), weep_holes (clear bridged weep holes), slab_edge (expose a concealed slab edge), followup (follow-up timber pest inspection), invasive (invasive inspection). qty is the number of units: a length or station count only from a figure in the report or notes (a perimeter said as "about 48 metres" gives 48 lm, or about 16 stations at roughly 3 m apart), the number of places for direct, always 1 for a job or visit line (slab_edge, weep_holes, timber_soil, system_topup, nest, barrier_job, bait_monitor, followup, invasive), never its length. When you cannot get a quantity from what was said, qty is null and the matching question goes in unknowns. detail: the client-facing place or scope ("Kitchen window frame", "Full perimeter, including drilling the rear patio"), or "". why: a few words for the inspector. Never give prices: the app prices each line at the business's own rates.
 
 HOW AN EXPERIENCED TECHNICIAN DECIDES
 
@@ -101,6 +101,7 @@ RULES THAT MUST NEVER BE BROKEN
 
 KEEP IT SHORT (the inspector reads it on a phone, at a glance; every extra word is noise)
 - Write like a technician's notes: the fact, then what it means, in a few words ("Fish pond near the back fence: liquid limits near water"). No filler, no full sentences where a phrase will do, never the same fact in two places.
+- Lead with the fact, then a colon, then what it means, in versus add and change, systemWhy and notChosen ("Fish pond out back: liquid limits near water"). The app prints the part before the colon in bold, so keep that part to a few words. unknowns: the question, then why it matters ("Perimeter length? Needed to price stations."). scope do: the action, then a comma and where ("Clear bridged weep holes, west side"); one action per step.
 - Never put the report's field names or codes in any text ("slabEdge", "OBSTRUCTED", "zone75mmVisible", "ACTIVE"); say it in plain words ("garden bed over the slab edge").
 - summary at most 15 words.
 - versus: at most 3 items in each list; agree items at most 8 words, add at most 12, change at most 15.
@@ -276,6 +277,10 @@ async function requestTreatmentPlan(rd, address, extra, techQuote) {
 // Only what the card and the quote can use, in the shapes they expect.
 function cleanTreatmentPlan(p) {
   if (!p || typeof p !== 'object') throw new Error('The answer was not readable');
+  // Now and then the answer stops after the first few fields (seen once in
+  // a real run: summary and the comparison only). Half a plan is worse than
+  // none, so it's an error the inspector can try again from.
+  if (typeof p.system !== 'string' || !p.client || typeof p.client !== 'object') throw new Error('the answer came back incomplete');
   // A report field name that slips into the text, like "(slabEdge
   // OBSTRUCTED, zone75mmVisible NO)", comes out.
   const tidy = t => t.replace(/\s*\((?=[^)]*\b[a-z]+[A-Z]\w*)[^)]*\)/g, '').trim();
@@ -302,7 +307,13 @@ function cleanTreatmentPlan(p) {
     unknowns: list(p.unknowns),
     client: { why: str(client.why), we: list(client.we), owner: list(client.owner), time: str(client.time), service: str(client.service), inspections: str(client.inspections) },
     lines: (Array.isArray(p.lines) ? p.lines : []).filter(l => l && l.key in QUOTE_CATALOGUE && l.key !== 'custom' && l.key !== 'treatment')
-      .map(l => ({ key: l.key, qty: typeof l.qty === 'number' && isFinite(l.qty) && l.qty > 0 ? l.qty : null, detail: str(l.detail), why: str(l.why) })),
+      .map(l => {
+        let qty = typeof l.qty === 'number' && isFinite(l.qty) && l.qty > 0 ? l.qty : null;
+        // A job, visit or year is one, whatever count came with it (a real
+        // run gave the slab edge 45, its length in metres, at a job's price).
+        if (qty != null && ['job', 'visit', 'year'].includes(QUOTE_CATALOGUE[l.key].unit)) qty = 1;
+        return { key: l.key, qty, detail: str(l.detail), why: str(l.why) };
+      }),
   };
 }
 
@@ -554,6 +565,26 @@ function tpScope(p) {
   return out;
 }
 
+// Each line leads with its key fact in bold and says what it means after
+// it, softer: "Fish pond out back: liquid limits near water", "Perimeter
+// length? Needed to price stations". A line without that break stays as
+// written.
+function tpLead(t) {
+  const m = /^(.{2,70}?)(:\s|\?\s|\s[-–—]\s)(.+)$/.exec(t || '');
+  if (!m) return escapeHtml(t || '');
+  // A dash reads as a colon once the lead is bold.
+  return `<span class="tp-lead">${escapeHtml(m[1] + (m[2].trim() === '?' ? '?' : ':'))}</span> <span class="tp-rest">${escapeHtml(m[3])}</span>`;
+}
+
+// A scope step: the action, then where, quieter ("Clear bridged weep
+// holes, west side"). Only a short place after the first comma is dimmed.
+function tpStep(t) {
+  const i = (t || '').indexOf(', ');
+  const where = i > 0 ? t.slice(i + 2) : '';
+  if (i < 8 || !where || where.split(/\s+/).length > 5) return escapeHtml(t || '');
+  return `${escapeHtml(t.slice(0, i))}<span class="tp-step-where">, ${escapeHtml(where)}</span>`;
+}
+
 function tpWhoTag(who) {
   return `<span class="tp-who tp-who-${who === 'us' || who === 'owner' ? who : 'trade'}">${escapeHtml(TP_WHO[who] || who)}</span>`;
 }
@@ -565,7 +596,7 @@ function treatmentPlanBodyHTML(ai) {
   const e = escapeHtml;
   const kd = p.knockdown;
   const scope = tpScope(p);
-  const checks = p.unknowns.map(e).concat((p.checks || []).map(t => `<span class="tp-own-check">${e(t)}</span>`));
+  const checks = p.unknowns.map(tpLead).concat((p.checks || []).map(t => `<span class="tp-own-check">${e(t)}</span>`));
   // Priced here at the business's own rates, as Add to my quote would;
   // the planner itself never sees or gives a price.
   let subCents = 0;
@@ -585,12 +616,12 @@ function treatmentPlanBodyHTML(ai) {
   // One short line per point: the scope already says what each step is.
   const why = [
     kd.needed ? `<div class="tp-sub">Active termites</div><div class="tp-text">${e(kd.method || kd.short)}${kd.where.length ? ` <span class="tp-dim">· ${e(kd.where.join('; '))}</span>` : ''}</div>` : '',
-    p.systemWhy.length ? `<div class="tp-sub">${e(sysLabel)}</div>${tpList(p.systemWhy.map(e))}` : '',
-    p.notChosen.length ? `<div class="tp-sub">Alternatives considered</div>${tpList(p.notChosen.map(x => `<strong>${e(TP_SYSTEM_LABELS[x.system] || x.system)}:</strong> ${e(x.why)}`), 'tp-why-not')}` : '',
+    p.systemWhy.length ? `<div class="tp-sub">${e(sysLabel)}</div>${tpList(p.systemWhy.map(tpLead))}` : '',
+    p.notChosen.length ? `<div class="tp-sub">Alternatives considered</div>${tpList(p.notChosen.map(x => `<span class="tp-lead">${e(TP_SYSTEM_LABELS[x.system] || x.system)}:</span> <span class="tp-rest">${e(x.why)}</span>`))}` : '',
     p.followUp ? `<div class="tp-sub">Follow-up</div><div class="tp-text">${e(p.followUp)}</div>` : '',
   ].join('');
   return `${scope.length ? `<div class="tp-scope"><div class="tp-scope-head"><span class="tp-scope-label">Scope of works</span><span class="tp-scope-count">${plural(scope.length, 'step', 'steps')}</span></div>
-      <ol class="tp-scope-list">${scope.map((x, i) => `<li><span class="tp-scope-n">${i + 1}</span><span class="tp-scope-do">${e(x.do)}</span>${tpWhoTag(x.who)}</li>`).join('')}</ol></div>` : ''}
+      <ol class="tp-scope-list">${scope.map((x, i) => `<li><span class="tp-scope-n">${i + 1}</span><span class="tp-scope-do">${tpStep(x.do)}</span>${tpWhoTag(x.who)}</li>`).join('')}</ol></div>` : ''}
     <div class="tp-secs">
     ${tpSection('check', '!', 'Items to confirm', plural(checks.length, 'item', 'items') + ' before quoting', tpList(checks), 'tp-sec-warn')}
     ${tpSection('why', '?', 'Rationale', e(whySub), why)}
@@ -623,7 +654,7 @@ function tpVersusHTML(ai, q) {
   const vs = p.versus || { agree: [], add: [], change: [] };
   const row = (k, t) => `<li class="tp-vs-${k}"><span class="tp-vs-icon" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${TP_VS_ICONS[k]}</svg></span><span class="tp-vs-text"><span class="tp-vs-word">${TP_VS_WORDS[k]}</span>${t}</span></li>`;
   // Changes and additions one per row; what's the same on a single row.
-  const rows = vs.change.map(t => row('change', e(t))).concat(vs.add.map(t => row('add', e(t))),
+  const rows = vs.change.map(t => row('change', tpLead(t))).concat(vs.add.map(t => row('add', tpLead(t))),
     vs.agree.length ? [row('agree', vs.agree.map(e).join(' <span class="tp-dim">·</span> '))] : []);
   if (rows.length) {
     // The count is on the card's heading, so it isn't repeated here.

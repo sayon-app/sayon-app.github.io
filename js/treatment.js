@@ -40,11 +40,16 @@ const TREATMENT_METHODS = {
 const TREATMENT_PRODUCTS = {
   'Termidor': 'fipronil',
   'Termidor Foam': 'fipronil',
+  'Termidor HE': 'fipronil',
+  'Termidor Dry': 'fipronil',
+  'Termidust': 'triflumuron',
   'Premise': 'imidacloprid',
   'Premise Foam': 'imidacloprid',
   'Altriset': 'chlorantraniliprole',
   'Biflex': 'bifenthrin',
   'Exterra': 'chlorfluazuron',
+  'Exterra Focus': 'chlorfluazuron',
+  'Requiem': 'chlorfluazuron',
   'Sentricon': 'noviflumuron',
   'Trelona': 'novaluron',
   'Kordon': 'physical barrier with deltamethrin',
@@ -52,7 +57,7 @@ const TREATMENT_PRODUCTS = {
 
 // The termite baits among them (and their actives), which have no chemical
 // life on the durable notice and are what a bait station visit tops up.
-const BAIT_PRODUCT_RE = /exterra|sentricon|trelona|chlorfluazuron|noviflumuron|novaluron|bistrifluron|hexaflumuron/i;
+const BAIT_PRODUCT_RE = /exterra|requiem|sentricon|trelona|chlorfluazuron|noviflumuron|novaluron|bistrifluron|hexaflumuron/i;
 
 const TREATMENT_NOTICE = {
   new: 'New durable notice placed',
@@ -76,11 +81,23 @@ function installedSystems(t) {
 // treated areas without the spots that were only treated directly (the
 // active workings the report found), which aren't part of the system.
 function installedSystemAreas(t, rd) {
-  const spots = ['direct', 'nest'].some(k => t.methods && k in t.methods)
-    ? ((rd && rd.findings) || []).filter(f => f && f.termiteActivity === 'ACTIVE' && f.activityLocation).map(f => f.activityLocation.trim().toLowerCase())
-    : [];
-  if (!spots.length) return t.areas || '';
-  return String(t.areas || '').split(';').map(s => s.trim()).filter(s => s && !spots.includes(s.toLowerCase())).join('; ');
+  if (!['direct', 'nest'].some(k => t.methods && k in t.methods)) return t.areas || '';
+  // The spots: where the report found live termites, and where the products
+  // that aren't part of the system went ("laundry skirting").
+  const systems = installedSystems(t);
+  const sysProduct = p => BAIT_PRODUCT_RE.test(`${p.name || ''} ${p.active || ''}`) ? systems.includes('bait') : systems.some(k => k === 'barrier' || k === 'retic');
+  const spots = [
+    ...((rd && rd.findings) || []).filter(f => f && f.termiteActivity === 'ACTIVE').map(f => f.activityLocation),
+    ...(t.products || []).filter(p => p && !sysProduct(p)).map(p => p.where),
+  ].filter(Boolean).map(s => ' ' + s.toLowerCase().replace(/[^a-z0-9]+/g, ' ') + ' ');
+  const SMALL = /^(the|a|an|on|in|of|at|near|by|and|to|into|with)$/;
+  // A part is a spot when every word of it is in one of the spots.
+  const isSpot = part => {
+    const words = part.toLowerCase().split(/[^a-z0-9]+/).filter(w => w && !SMALL.test(w));
+    return words.length && spots.some(s => words.every(w => s.includes(' ' + w + ' ')));
+  };
+  return String(t.areas || '').split(';').map(seg => seg.split(',').map(x => x.trim()).filter(x => x && !isSpot(x)).join(', '))
+    .filter(Boolean).join('; ');
 }
 
 function formatClockTime(t) {
@@ -442,11 +459,11 @@ function treatmentVoicePrompt() {
 {"date":"YYYY-MM-DD","start":"HH:MM","finish":"HH:MM","technician":string,"licence":string,"supervisor":string,"supervisorLicence":string,"pest":string,"weather":string,"equipment":string,"methods":{"<method>":{"qty":number|null}},"products":[{"name":string,"rate":string,"amount":string,"batch":string,"life":string,"where":string}],"areas":string,"notTreated":string,"notice":"new"|"updated"|"none","noticeWhere":string,"nextInspectionMonths":number,"nextInspectionDate":"YYYY-MM-DD","warranty":string,"notes":string}
 - date: the day it was done. "Today" and "yesterday" count from today's date. start and finish in 24-hour time ("8 till half 11" is 08:00 and 11:30).
 - methods: only the methods they did, from: ${methods}. qty is the linear metres of barrier, reticulation or physical barrier, or the number of bait stations, when said.
-- products: each product used, with the mix or application rate, the amount used, the batch number, the life on the label and where it went, as said. Brand names as written on the drum ("termite door" is Termidor).
+- products: each product used, with the mix or application rate, the amount used, the batch number, the life on the label and where it went, as said. Brand names as written on the drum ("termite door" is Termidor), using one of these names when it is one of them: ${Object.keys(TREATMENT_PRODUCTS).join(', ')} ("Focus termite bait" is Exterra Focus).
 - areas: where they treated, in brief. notTreated: anywhere they didn't treat and why ("Under the rear deck, no access").
 - notice: "new" when they put a new durable notice up, "updated" when they updated the existing one, "none" when none was placed. noticeWhere: where it is ("Meter box").
 - weather: as said ("Fine, 22°C"). equipment: what they used ("Rodding gun, foam rig").
-- nextInspectionMonths or nextInspectionDate: when the next inspection is due, as said.
+- nextInspectionMonths or nextInspectionDate: when the next timber pest inspection is due, as said. A return visit to check bait stations or the knockdown is not the next inspection: it goes in notes.
 - Only words actually said. Never guess, and never invent a rate, an amount or a batch number.`;
 }
 
@@ -812,7 +829,13 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   }
 
   // ── PRODUCTS ──
-  const products = (t.products || []).filter(p => p.name || p.active);
+  // The installation certificate lists what went into the system: a
+  // baiting-only system leaves out the foam or dust used on the workings,
+  // and a chemical system leaves out the baits.
+  const isBait = p => BAIT_PRODUCT_RE.test(`${p.name || ''} ${p.active || ''}`);
+  const baitOnly = systems.length && systems.every(k => k === 'bait');
+  const products = (t.products || []).filter(p => p.name || p.active)
+    .filter(p => !install || !systems.length || (baitOnly ? isBait(p) : !isBait(p) || systems.includes('bait')));
   if (products.length) {
     section('PRODUCTS APPLIED');
     // The product cell carries the active constituent on its second line.
@@ -874,11 +897,17 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   const methodNames = Object.keys(t.methods || {}).filter(k => !(install || systems.length) || systems.includes(k) || k === 'topup').map(k => TREATMENT_METHODS[k] && TREATMENT_METHODS[k].label).filter(Boolean);
   // Chemical life only when a chemical was applied, not on a baiting-only
   // job, and only for the chemicals (not the baits).
-  const chemicalApplied = Object.keys(t.methods || {}).some(k => k !== 'bait' && k !== 'physical');
+  // When a system went in, the notice is about that system: a chemical life
+  // only for a chemical soil treatment or reticulation, not the foam or dust
+  // used on the workings beside a baiting system.
+  const chemicalApplied = systems.length ? systems.some(k => k === 'barrier' || k === 'retic')
+    : Object.keys(t.methods || {}).some(k => k !== 'bait' && k !== 'physical');
   const productLife = !chemicalApplied ? [] : products.filter(p => !BAIT_PRODUCT_RE.test(`${p.name || ''} ${p.active || ''}`)).map(p => `${p.name || p.active}${p.name && p.active ? ` (${p.active})` : ''}: ${p.life || 'see label'}`);
   const every = ongoingInspectionMonths(treatmentReportFor(q));
   const everyText = `at least every ${every} month${every === 1 ? '' : 's'}`;
-  const installer = [company.name, [t.technician, t.licence ? `licence ${t.licence}` : ''].filter(Boolean).join(', ')].filter(Boolean).join('. ');
+  // A trainee's work carries the licensed supervisor's name on the notice too.
+  const installer = [company.name, [t.technician, t.licence ? `licence ${t.licence}` : ''].filter(Boolean).join(', '),
+    t.supervisor ? `Supervised by ${t.supervisor}${t.supervisorLicence ? `, licence ${t.supervisorLicence}` : ''}` : ''].filter(Boolean).join('. ');
   const noticeCells = t.notice === 'none' ? [['Notice', 'No durable notice was placed at this treatment.']] : [
     ['System', methodNames.join('; ')],
     ['Date installed', formatLongDate(t.date)],

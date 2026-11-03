@@ -54,9 +54,9 @@ WHAT EACH FIELD IS
 - notChosen: each of the other realistic options and the property-specific reason it lost here. Skip options that were never realistic (a physical barrier on an existing house is rarely realistic; say so once only if the inspector or owner raised it).
 - fixes: conditions that invite or hide termites, each with who does it and why it matters for the plan (a leak keeps the soil and timber wet, which draws termites in and breaks down a soil treatment's working life; a garden bed over the slab edge hides any entry and bridges the treated zone).
 - followUp: the visits after the job, for the inspector: when to check knockdown stations or treated workings, when to confirm activity has stopped, station servicing, and the next full inspection.
-- unknowns: what the plan depends on that the report does not say, each as a short question the inspector can answer on site ("Perimeter length? Needed to price stations or metres.", "Is the slab edge exposed on the left side? Not said."). Put the most decisive ones first. Never fill these gaps with assumptions elsewhere in the plan.
+- unknowns: what the plan depends on that the report does not say, each as a short question the inspector can answer on site ("Is the slab edge exposed on the left side? Not said.", "Any trees or stumps near the back fence? Nest search."). Never ask for a perimeter, a wall length or any other measurement: inspectors don't measure the house, and the app prices a soil treatment as one job. Put the most decisive ones first. Never fill these gaps with assumptions elsewhere in the plan.
 - client: the plan as the client reads it on the quote, in plain Australian English and short sentences, no trade jargon. why: 1 or 2 sentences on why this plan suits their home, naming the property facts in everyday words. we: the steps we will do from the treatment visit on, in order, one action each (never what was done at the inspection). owner: what the owner must do to keep the treatment working (no repairs by trades: those go on the quote as exclusions). time: time on site for the treatment visit, as one of "1 to 2 hours", "Half a day", "1 day", "2 days", or your own short words. service: free service period, "None" or "12 months" (most businesses offer 12 months after a full treatment; use "None" when there is no treatment). inspections: when the next inspections are ("In 3 months, then every 12 months").
-- lines: the work lines for the quote, using ONLY these keys: direct (direct treatment of live termite workings, unit area, one per place), nest (locate and treat the nest), barrier_lm (chemical soil treatment per linear metre), barrier_job (chemical soil treatment, whole job, only when the length is unknown), bait_install (supply and install in-ground bait stations, per station), bait_monitor (bait station monitoring and servicing, 12 months), retic_lm (reticulation system, per metre), physical_lm (physical barrier, per metre), system_topup (top up or recharge the existing system), borer (treat timbers with live borers), timber_soil (remove timber-to-soil contact), weep_holes (clear bridged weep holes), slab_edge (expose a concealed slab edge), followup (follow-up timber pest inspection), invasive (invasive inspection). qty is the number of units: a length or station count only from a figure in the report or notes (a perimeter said as "about 48 metres" gives 48 lm, or about 16 stations at roughly 3 m apart), the number of places for direct, always 1 for a job or visit line (slab_edge, weep_holes, timber_soil, system_topup, nest, barrier_job, bait_monitor, followup, invasive), never its length. When you cannot get a quantity from what was said, qty is null and the matching question goes in unknowns. detail: the client-facing place or scope ("Kitchen window frame", "Full perimeter, including drilling the rear patio"), or "". why: a few words for the inspector. Never give prices: the app prices each line at the business's own rates.
+- lines: the work lines for the quote, using ONLY these keys: direct (direct treatment of live termite workings, unit area: one line, qty the number of places, detail naming them all), nest (locate and treat the nest), barrier_lm (chemical soil treatment per linear metre), barrier_job (chemical soil treatment, whole job, only when the length is unknown), bait_install (supply and install in-ground bait stations, per station), bait_monitor (bait station monitoring and servicing, 12 months), retic_lm (reticulation system, per metre), physical_lm (physical barrier, per metre), system_topup (top up or recharge the existing system), borer (treat timbers with live borers), timber_soil (remove timber-to-soil contact), weep_holes (clear bridged weep holes), slab_edge (expose a concealed slab edge), followup (follow-up timber pest inspection), invasive (invasive inspection). qty is the number of units: a length or station count only from a figure in the report or notes (a perimeter said as "about 48 metres" gives 48 lm, or about 16 stations at roughly 3 m apart), the number of places for direct, always 1 for a job or visit line (slab_edge, weep_holes, timber_soil, system_topup, nest, barrier_job, bait_monitor, followup, invasive), never its length. When you cannot get a quantity from what was said, qty is null (the app starts it at a usual amount for the inspector to check); never add a question about it to unknowns. A chemical soil treatment with no length said is barrier_job, never barrier_lm with qty null. detail: the client-facing place or scope ("Kitchen window frame", "Full perimeter, including drilling the rear patio"), or "". why: a few words for the inspector. Never give prices: the app prices each line at the business's own rates.
 
 HOW AN EXPERIENCED TECHNICIAN DECIDES
 
@@ -84,7 +84,7 @@ HOW AN EXPERIENCED TECHNICIAN DECIDES
 - THE INSPECTOR ADDS is the inspector's note when they ask again. Facts in it (a measurement, the owner's wishes, something found) override the report. A direction in it ("quote a chemical barrier instead", "no baits") is the plan to build, as long as it is sound and safe; if you would still do it differently, say so in versus.change. A question in it is not part of the plan: ignore it.
 - No termites, no evidence, no system needed: system "none", knockdown not needed, plan built around fixes and regular inspections.
 
-3. Fix what invites termites. Leaks and high moisture readings (find and fix the source; termites follow moisture and a wet zone breaks down a soil treatment sooner), timber on the soil, bridged weep holes and slab edges, garden beds or paving over the inspection zone, poor drainage, poor subfloor ventilation, non-durable timber in the ground, gaps in ant capping, stored timber and firewood against the walls. Include each one the report raises, with who does it. Use the timber_soil, weep_holes and slab_edge lines only for work the pest business itself would do.
+3. Fix what invites termites. Leaks and high moisture readings (find and fix the source; termites follow moisture and a wet zone breaks down a soil treatment sooner), timber on the soil, bridged weep holes and slab edges, garden beds or paving over the inspection zone, poor drainage, poor subfloor ventilation, non-durable timber in the ground, gaps in ant capping, stored timber and firewood against the walls. Include each one the report raises, with who does it. Use the timber_soil, weep_holes and slab_edge lines only for work the pest business itself would do: such a line needs a scope step for it with who "us". When the owner does it, there is no line for it, and it goes in client.owner. Never charge for a job and also ask the owner to do it.
 
 4. Borers and decay. Active borers in timber you can treat: a borer line, treated as the label directs. Old borer damage or decay: no treatment line; the owner's builder repairs it and fixes the moisture causing decay.
 
@@ -101,7 +101,7 @@ RULES THAT MUST NEVER BE BROKEN
 
 KEEP IT SHORT (the inspector reads it on a phone, at a glance; every extra word is noise)
 - Write like a technician's notes: the fact, then what it means, in a few words ("Fish pond near the back fence: liquid limits near water"). No filler, no full sentences where a phrase will do, never the same fact in two places.
-- Lead with the fact, then a colon, then what it means, in versus add and change, systemWhy and notChosen ("Fish pond out back: liquid limits near water"). The app prints the part before the colon in bold, so keep that part to a few words. unknowns: the question, then why it matters ("Perimeter length? Needed to price stations."). scope do: the action, then a comma and where ("Clear bridged weep holes, west side"); one action per step.
+- Lead with the fact, then a colon, then what it means, in versus add and change, systemWhy and notChosen ("Fish pond out back: liquid limits near water"). The app prints the part before the colon in bold, so keep that part to a few words. unknowns: the question, then why it matters ("Stump by the back fence? Possible nest."). scope do: the action, then a comma and where ("Clear bridged weep holes, west side"); one action per step.
 - Never put the report's field names or codes in any text ("slabEdge", "OBSTRUCTED", "zone75mmVisible", "ACTIVE"); say it in plain words ("garden bed over the slab edge").
 - summary at most 15 words.
 - versus: at most 3 items in each list; agree items at most 8 words, add at most 12, change at most 15.
@@ -121,7 +121,7 @@ const TREATMENT_PLAN_FIELDS = [
   'structureType', 'height', 'wallConstruction', 'roofType', 'floorType', 'constructionEra', 'occupancyStatus',
   'siteSurroundings', 'siteSlope', 'termiteHistory', 'accessNotes', 'recentWeather', 'rainLast24h',
   'existingSystem', 'existingSystemOther', 'durableNoticePresent', 'hardLandscaping', 'zone25mmVisible', 'softLandscaping', 'zone75mmVisible',
-  'antCapping', 'antCappingDetails', 'antCapSoldered',
+  'antCapping', 'antCappingDetails', 'antCapSoldered', 'timberSoilDetails',
   'areaStatus', 'areaResult', 'obstructions', 'restrictedAccess', 'noAccessAreas', 'highRiskAreas', 'hinderedAreas', 'hinderedAreasDetail',
   'borerActivity', 'decayFound', 'decayDetails', 'decayWhere', 'delignification', 'delignificationDetails',
   'previousTreatment', 'previousTreatmentDetails', 'previousTreatmentWhere',
@@ -271,7 +271,7 @@ async function requestTreatmentPlan(rd, address, extra, techQuote) {
   const out = (data.content || []).map(c => c.text || '').join('');
   let plan;
   try { plan = JSON.parse(out.replace(/```json|```/g, '').trim()); } catch (e) { throw new Error('The answer was not readable'); }
-  return cleanTreatmentPlan(plan);
+  return dropOwnerUpkeepLines(cleanTreatmentPlan(plan));
 }
 
 // Only what the card and the quote can use, in the shapes they expect.
@@ -313,8 +313,42 @@ function cleanTreatmentPlan(p) {
         // run gave the slab edge 45, its length in metres, at a job's price).
         if (qty != null && ['job', 'visit', 'year'].includes(QUOTE_CATALOGUE[l.key].unit)) qty = 1;
         return { key: l.key, qty, detail: str(l.detail), why: str(l.why) };
-      }),
+      }).reduce(mergeDirectLines, []),
   };
+}
+
+// Live termites in two places are one knockdown visit over two areas, so
+// they go on the quote as one line (qty 2, both places named), not two lines
+// that read like the same job charged twice.
+function mergeDirectLines(out, l) {
+  const first = l.key === 'direct' && out.find(o => o.key === 'direct');
+  if (!first) { out.push(l); return out; }
+  first.qty = (first.qty || 1) + (l.qty || 1);
+  first.detail = [first.detail, l.detail].filter(Boolean).join('; ');
+  return out;
+}
+
+// The upkeep lines (timber off the soil, weep holes, slab edge) are only
+// for work the business does. When the plan gives that job to the owner
+// (or another trade) and not to us, the line goes: otherwise the quote
+// charges the client for a job its own plan asks them to do.
+const TP_UPKEEP_TOPICS = {
+  timber_soil: /timber\b.{0,25}\b(soil|ground)|soil contact|sleeper|firewood/i,
+  weep_holes: /weep/i,
+  slab_edge: /slab edge|slab/i,
+};
+function dropOwnerUpkeepLines(plan) {
+  const steps = plan.scope.concat(plan.fixes.map(f => ({ do: f.what, who: f.who || 'us' })));
+  const ownerText = plan.client.owner.join(' ');
+  plan.lines = plan.lines.filter(l => {
+    const topic = TP_UPKEEP_TOPICS[l.key];
+    if (!topic) return true;
+    const about = steps.filter(s => topic.test(s.do));
+    const ours = about.some(s => s.who === 'us');
+    const theirs = about.some(s => s.who !== 'us') || topic.test(ownerText);
+    return ours || !theirs;
+  });
+  return plan;
 }
 
 // The lines each long-term system needs on the quote.

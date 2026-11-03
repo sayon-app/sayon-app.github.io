@@ -72,6 +72,17 @@ function installedSystems(t) {
   return INSTALLED_SYSTEMS.filter(k => t && t.methods && k in t.methods);
 }
 
+// Where the installed system went, for the certificate of installation: the
+// treated areas without the spots that were only treated directly (the
+// active workings the report found), which aren't part of the system.
+function installedSystemAreas(t, rd) {
+  const spots = ['direct', 'nest'].some(k => t.methods && k in t.methods)
+    ? ((rd && rd.findings) || []).filter(f => f && f.termiteActivity === 'ACTIVE' && f.activityLocation).map(f => f.activityLocation.trim().toLowerCase())
+    : [];
+  if (!spots.length) return t.areas || '';
+  return String(t.areas || '').split(';').map(s => s.trim()).filter(s => s && !spots.includes(s.toLowerCase())).join('; ');
+}
+
 function formatClockTime(t) {
   const [h, m] = String(t).split(':').map(Number);
   if (!isFinite(h)) return t;
@@ -590,7 +601,12 @@ function removeTreatmentProduct(i) {
 function onTreatmentProductName(inp) {
   const name = Object.keys(TREATMENT_PRODUCTS).find(p => p.toLowerCase() === inp.value.trim().toLowerCase());
   const active = inp.closest('.treat-product').querySelector('[data-f="active"]');
-  if (name && !active.value.trim()) active.value = TREATMENT_PRODUCTS[name];
+  if (name && !active.value.trim()) {
+    active.value = TREATMENT_PRODUCTS[name];
+    // Filled in for them: a tap on it selects it, so typing the full
+    // constituent ("fipronil 9.1 g/L") replaces it instead of adding to it.
+    active.addEventListener('focus', () => setTimeout(() => active.select(), 0), { once: true });
+  }
 }
 
 function updateTreatmentSaveBtn() {
@@ -785,7 +801,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   // Where, in the same row style.
   // A drawn plan prints on the last page; the row says so.
   const planNote = !sitePlanHasContent(t.plan) ? '' : sitePlanHasSubfloor(t.plan) ? 'Site and subfloor plans on the last pages, with legends' : 'Drawn on the last page, with a legend';
-  if (install) { y += 1.5; cellRow([['Where it was installed', t.areas], ['Areas not covered', t.notTreated], ['Installed to', 'AS 3660.2 and the manufacturer\'s directions'], ['Site plan', planNote]]); }
+  if (install) { y += 1.5; cellRow([['Where it was installed', installedSystemAreas(t, treatmentReportFor(q))], ['Areas not covered', t.notTreated], ['Installed to', 'AS 3660.2 and the manufacturer\'s directions'], ['Site plan', planNote]]); }
   else if (t.areas || t.notTreated || planNote) { y += 1.5; cellRow([['Areas treated', t.areas], ['Areas not treated', t.notTreated], ['Site plan', planNote]]); }
 
   // ── THE SITE ──
@@ -854,7 +870,8 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   const planW = sketch ? 64 : 0, planH = planW * 0.75;
   const boxW = sketch ? CW - planW - 5 : CW, ncols = sketch ? 2 : 3;
   const cellW = (boxW - 8 - (ncols - 1) * 5) / ncols;
-  const methodNames = Object.keys(t.methods || {}).filter(k => !install || systems.includes(k)).map(k => TREATMENT_METHODS[k] && TREATMENT_METHODS[k].label).filter(Boolean);
+  // The notice names the system left in place; a spot treatment isn't one.
+  const methodNames = Object.keys(t.methods || {}).filter(k => !(install || systems.length) || systems.includes(k) || k === 'topup').map(k => TREATMENT_METHODS[k] && TREATMENT_METHODS[k].label).filter(Boolean);
   // Chemical life only when a chemical was applied, not on a baiting-only
   // job, and only for the chemicals (not the baits).
   const chemicalApplied = Object.keys(t.methods || {}).some(k => k !== 'bait' && k !== 'physical');

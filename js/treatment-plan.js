@@ -196,21 +196,16 @@ function treatmentPlanTechQuote(q) {
   return lines.length || steps.length ? { lines, steps } : null;
 }
 
-// The house as measured on the quote, in words for SAYON: the perimeter
-// and the sides walked, or what's drawn on the site plan (treatment lines,
-// stations, and what else is around the house). '' when it hasn't been
-// measured.
+// The house as measured on the quote's site plan, in words for SAYON:
+// the perimeter (and size, when it was typed in), any treatment lines or
+// stations drawn, and what else is drawn around it. '' when it hasn't
+// been measured.
 function treatmentPlanSite(q) {
-  const per = quoteHousePerimeter(q);
+  const plan = q && q.sitePlan;
+  const per = sitePlanPerimeter(plan);
   if (!per) return '';
-  const plan = q.sitePlan && q.sitePlan.mpu ? q.sitePlan : null;
-  const fromPlan = !!(plan && sitePlanPerimeter(plan));
-  const sides = quoteSides(q).map(v => Math.round(v * 10) / 10);
-  const how = fromPlan ? ' (from the site plan)'
-    : sides.length === 2 ? ` (house about ${sides[0]} × ${sides[1]} m${q.houseUnit === 'pace' ? ', paced out' : ''})`
-    : ` (sides walked: ${sides.join(', ')} m${q.houseUnit === 'pace' ? ', paced out' : ''})`;
-  const out = [`House perimeter: about ${Math.round(per)} m${how}.`];
-  if (!plan) return out.join('\n');
+  const size = sitePlanHouseSize(plan);
+  const out = [`House perimeter: about ${Math.round(per)} m` + (size ? ` (house about ${size.length} × ${size.width} m)` : '') + '.'];
   [['barrier', 'Chemical barrier line drawn'], ['retic', 'Reticulation line drawn'], ['physical', 'Physical barrier line drawn']].forEach(([k, words]) => {
     const m = sitePlanLength(plan, k);
     if (m) out.push(`${words}: about ${Math.round(m)} m.`);

@@ -168,8 +168,8 @@ function draftTreatment(q) {
     areas: places.join('; '),
     notTreated: '',
     site: treatmentSiteFromReport(rd),
-    // The house as drawn or walked for the quote, to carry on with.
-    plan: (p => p ? JSON.parse(JSON.stringify(p)) : null)(quoteHousePlan(q)),
+    // The plan drawn to measure the house for the quote, to carry on with.
+    plan: sitePlanHasContent(q.sitePlan) ? JSON.parse(JSON.stringify(q.sitePlan)) : null,
     notice: 'new',
     noticeWhere: 'Meter box',
     cautions: TREATMENT_DEFAULT_CAUTIONS,

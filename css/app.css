@@ -4628,6 +4628,9 @@ body:not(.dark-screen) #jobPanel:not(.menu-page-active) { border-color: transpar
 body:not(.dark-screen) .agreement-banner { background: linear-gradient(135deg, #FFE4E4 0%, #FFF1F1 60%, #FFF7F7 100%); border-color: #F2A3A3; color: #9B1C1C; box-shadow: 0 0 0 1px rgba(215,38,30,0.08), 0 6px 22px -6px rgba(215,38,30,0.45); }
 body:not(.dark-screen) .agreement-banner:not(.signed) .agreement-banner-btn { background: #D7261E; border-color: #D7261E; color: #FFFFFF; box-shadow: 0 3px 10px rgba(215,38,30,0.35); }
 body:not(.dark-screen) .agreement-banner.signed { background: var(--green-wash); border-color: var(--green-edge); color: var(--green); }
+/* Link sent: it's on the client now, so amber rather than the red "get it signed". */
+body:not(.dark-screen) .agreement-banner.waiting { background: rgba(212,146,10,0.1); border-color: var(--yellow); color: var(--yellow-text); box-shadow: none; }
+body:not(.dark-screen) .agreement-banner.waiting .agreement-banner-btn { background: transparent; border-color: currentColor; color: inherit; box-shadow: none; }
 body:not(.dark-screen) .issue-banner { background: #FFFFFF; border-color: transparent; box-shadow: 0 14px 36px rgba(0,0,0,0.35); }
 body:not(.dark-screen) .issue-banner.locked { background: #FFFFFF; border-color: var(--accent-edge); }
 /* ── BLUE GLOW DETAILS ──
@@ -5590,6 +5593,11 @@ body:not(.dark-screen) .job-hero-sub,
 body:not(.dark-screen) .job-section-head { color: var(--on-ink2); }
 body:not(.dark-screen) .job-section-head { color: var(--accent-glow); }
 body:not(.dark-screen) .job-steps .dash-timeline-btn { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
+/* The job page sits on dark ink: a see-through hover would take the card's
+   white away and its dark title with it (and touch keeps hover after a tap). */
+body:not(.dark-screen) .job-steps .dash-timeline-btn:hover,
+body:not(.dark-screen) .job-steps .dash-timeline-btn:focus-visible { background: var(--surface); border-color: rgba(var(--accent-rgb), 0.45); }
+body:not(.dark-screen) .job-steps .dash-timeline-btn:active { background: var(--surface2, var(--surface)); }
 body:not(.dark-screen) .job-steps li::before { background: rgba(255,255,255,0.18); }
 body:not(.dark-screen) .job-steps li.done::before { background: var(--accent-hi); }
 body:not(.dark-screen) .job-steps .dash-timeline-dot { border-color: rgba(255,255,255,0.3); background: #0F1A23; color: var(--on-ink2); }

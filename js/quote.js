@@ -19,8 +19,8 @@
 
 // Starting prices (AUD, ex GST) for a business's first quote. After that,
 // each line starts at the rate the business last quoted for it (see
-// quotePriceMemory). There's no price list to fill in: treatment prices come
-// from the job, mostly per linear metre or per station.
+// quotePriceMemory), or at the price set in Your prices (js/price-book.js),
+// which writes the same store. Most lines are per linear metre or per station.
 const QUOTE_CATALOGUE = {
   barrier_lm:    { desc: 'Chemical soil treatment (termite barrier)', unit: 'lm', price: 28 },
   barrier_job:   { desc: 'Chemical soil treatment (termite barrier)', unit: 'job', price: 2400 },
@@ -1263,7 +1263,7 @@ function renderQuoteStartHint() {
   renderQuoteWorkSummary();
   const any = quoteState.items.some(isStartingPrice);
   el.style.display = '';
-  el.innerHTML = (any ? '<b>Starting price</b> is a suggested rate. Tap a line to set your own, and new quotes start at your price. ' : '') +
+  el.innerHTML = (any ? '<b>Starting price</b> is SAYON\'s suggested rate. Tap a line to set your own, or <button type="button" class="quote-hint-link" onclick="openPriceBook()">set all your prices</button>, and new quotes start at your price. ' : '') +
     'You can also say the quote in your report voice notes: the work, prices, what isn\'t included and how they pay.';
 }
 

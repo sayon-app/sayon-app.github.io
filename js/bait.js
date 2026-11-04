@@ -209,6 +209,49 @@ function openBaitVisit(id) {
   if (!baitPad) baitPad = createSignaturePad(document.getElementById('bvSigCanvas'), document.getElementById('bvSigPlaceholder'), updateBaitSaveBtn);
   baitPad.show(v.signature || '');
   updateBaitSaveBtn();
+  renderBaitFolds(true);
+  const sheet = document.getElementById('baitOverlay');
+  if (!sheet.dataset.folds) {
+    sheet.dataset.folds = '1';
+    ['input', 'change'].forEach(ev => sheet.addEventListener(ev, () => renderBaitFolds()));
+  }
+}
+
+// ── THE FOLDS ── As on the treatment record: each part folds to a line of
+// what it holds, amber when something's missing, and opening the sheet (or
+// a voice fill) opens only the parts with a gap.
+function baitFoldLines() {
+  const v = id => document.getElementById(id).value.trim();
+  const tech = v('bvTech'), lic = v('bvLicence');
+  const when = v('bvDate') ? formatAnswerDate(v('bvDate')) : '';
+  const s = baitDraft ? baitDraft.stations : [];
+  const left = s.filter(x => !x.status).length;
+  const summary = (document.getElementById('bvSummary').textContent || '').trim();
+  const finished = document.getElementById('bvFinished').checked;
+  const product = [v('bvProduct'), v('bvBatch') ? 'batch ' + v('bvBatch') : ''].filter(Boolean).join(', ');
+  const baitAdded = s.some(x => (x.bait || '').trim());
+  const next = finished ? 'Baiting finished' : v('bvNext') ? 'Next visit ' + formatAnswerDate(v('bvNext')) : '';
+  return [
+    !tech ? { warn: true, text: `${when ? when + '. ' : ''}Technician not filled in` }
+      : !lic ? { warn: true, text: `${when ? when + ' · ' : ''}${tech}, licence no. missing` }
+      : { text: [when, `${tech}, ${lic}`].filter(Boolean).join(' · ') },
+    !s.length ? { warn: true, text: 'No stations listed yet' }
+      : left ? { warn: true, text: summary || `${left} still to mark` }
+      : { text: summary },
+    !next ? { warn: true, text: [product, 'next visit not set'].filter(Boolean).join(' · ') }
+      : baitAdded && !v('bvProduct') ? { warn: true, text: `Say which bait was added · ${next}` }
+      : { text: [product, next].filter(Boolean).join(' · ') },
+  ];
+}
+
+function renderBaitFolds(reset) {
+  if (!document.getElementById('bvFold1') || !baitDraft) return;
+  baitFoldLines().forEach((line, i) => {
+    const sub = document.getElementById('bvSub' + (i + 1));
+    sub.textContent = line.text;
+    sub.classList.toggle('warn', !!line.warn);
+    if (reset) document.getElementById('bvFold' + (i + 1)).open = !!line.warn;
+  });
 }
 
 function closeBaitVisit() {
@@ -365,6 +408,7 @@ function updateBaitSaveBtn() {
   el.hidden = !need;
   const by = document.getElementById('bvSigBy');
   if (by) by.textContent = document.getElementById('bvTech').value.trim() || 'the technician';
+  renderBaitFolds();
 }
 
 function saveBaitVisit() {
@@ -463,6 +507,7 @@ function applyBaitVoice(f) {
   renderBaitStations();
   onBaitFinishedChange();
   baitStatusChanged();
+  renderBaitFolds(true);
   return n;
 }
 
@@ -502,7 +547,7 @@ function emailBaitVisit(id) {
   }
   sendPdfsToClient({
     files: [buildBaitVisitPDF(q, v)],
-    to: (q.clientEmail || '').trim(),
+    to: quoteClientEmail(q),
     subject: `Bait station visit report — ${q.address || 'your property'}`,
     body: clientMessage({ client: q.client, address: q.address, docs: 'bait station visit report', signOff: v.technician }),
   }).then(sent => {

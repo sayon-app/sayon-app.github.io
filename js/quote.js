@@ -826,6 +826,7 @@ function createQuoteFromSource(src) {
     client: src.client,
     clientPhone: rd.jobClientPhone || '',
     clientEmail: rd.jobClientEmail || '',
+    clientSeen: jobClientDetails(src),
     address: src.address,
     // The report's address when the quote was made (see quoteForReport).
     sourceAddress: src.address || '',
@@ -842,6 +843,52 @@ function createQuoteFromSource(src) {
     notes: withSpokenNotes(QUOTE_DEFAULT_NOTES, rd),
     spokenAt: sq ? sq.at || 0 : 0,
   };
+}
+
+// ── THE CLIENT'S DETAILS, TYPED ONCE ────────────────────────────────────────
+// The client's name, phone and email can go in on the job, the agreement or
+// the quote, and whichever has them fills the others. A change on one carries
+// to the other while the two still match, so a name typed differently on
+// purpose (the owner on the quote, the buyer on the job) stays as typed. A
+// quote that has gone to the client, or been answered, keeps what they got.
+const QUOTE_CLIENT_FIELDS = [['client', 'jobClient'], ['clientPhone', 'jobClientPhone'], ['clientEmail', 'jobClientEmail']];
+
+function jobClientDetails(src) {
+  const rd = src.reportData || {};
+  return { client: (src.client || '').trim(), clientPhone: (rd.jobClientPhone || '').trim(), clientEmail: (rd.jobClientEmail || '').trim() };
+}
+
+// On opening a saved quote: blanks, or values still as the job last had
+// them, take the job's. True when anything changed.
+function fillQuoteClientFromJob(q, src) {
+  if (q.sentAt || q.answer) return false;
+  const job = jobClientDetails(src);
+  const seen = q.clientSeen || {};
+  let changed = false;
+  QUOTE_CLIENT_FIELDS.forEach(([f]) => {
+    const v = (q[f] || '').trim(), j = job[f];
+    if (j && v !== j && (!v || v === seen[f])) { q[f] = j; changed = true; }
+  });
+  q.clientSeen = job;
+  return changed;
+}
+
+// Typing on the quote of the job that's open: the job's field follows when
+// it was empty or matched what the quote had.
+function carryQuoteClientToJob(q, before) {
+  if (q.reportKey !== (currentReportId || 'draft')) return;
+  let name = false, info = false;
+  QUOTE_CLIENT_FIELDS.forEach(([f, id]) => {
+    const el = document.getElementById(id);
+    const nv = q[f] || '';
+    if (!el || nv === (before[f] || '')) return;
+    if (el.value.trim() && el.value.trim() !== (before[f] || '').trim()) return;
+    el.value = nv;
+    if (f === 'client') name = true; else info = true;
+    q.clientSeen = Object.assign({}, q.clientSeen, { [f]: nv.trim() });
+  });
+  if (info && typeof saveJobInfo === 'function') saveJobInfo();
+  if (name && typeof updateJob === 'function') updateJob();
 }
 
 // ── NAVIGATION ──────────────────────────────────────────────────────────────
@@ -945,7 +992,8 @@ function onQuoteSourceChange() {
   const saved = quoteForReport(src.key, src.address);
   quoteState = saved || createQuoteFromSource(src);
   const heard = saved && applySpokenQuote(quoteState, src.key === (currentReportId || 'draft') ? reportData : src.reportData);
-  if (!saved || heard) persistQuote();
+  const filled = saved && fillQuoteClientFromJob(quoteState, src);
+  if (!saved || heard || filled) persistQuote();
   else setQuoteSaveState('Saved');
   if (heard) showToast('Quote updated from your voice notes', 'success');
   renderQuoteEditor();
@@ -1262,9 +1310,11 @@ function renderQuoteTotals() {
 function onQuoteFieldInput() {
   const q = quoteState;
   if (!q) return;
+  const before = { client: q.client, clientPhone: q.clientPhone, clientEmail: q.clientEmail };
   q.client = document.getElementById('qClient').value;
   q.clientPhone = document.getElementById('qClientPhone').value;
   q.clientEmail = document.getElementById('qClientEmail').value;
+  carryQuoteClientToJob(q, before);
   q.address = document.getElementById('qAddress').value;
   q.number = document.getElementById('qNumber').value;
   q.validDays = parseInt(document.getElementById('qValidDays').value, 10) || '';
@@ -1372,7 +1422,7 @@ function quoteAnswerSummary(q) {
   if (!a && q.linkRequest) checkQuoteLink(q, false);
   if (!a) return q.sentAt ? { short: 'Quote sent', text: quoteLinkCurrent(q) ? 'Quote sent with a link to accept it. Waiting on the client' : 'Waiting on the client\'s answer to the quote', tone: 'wait' } : null;
   if (a.stale) return { short: 'Quote changed', text: 'The quote changed after the client answered. Get their answer on the new version', tone: 'warn' };
-  if (a.status === 'accepted' && q.treatment) return { short: 'Treatment done', text: `Treatment done on ${formatAnswerDate(q.treatment.date)}. ${certificateGiven(q) ? 'Certificate given' : 'Send the client the certificate'}`, tone: 'good' };
+  if (a.status === 'accepted' && q.treatment) return { short: 'Treatment recorded', text: `Treatment recorded, done on ${formatAnswerDate(q.treatment.date)}. ${certificateGiven(q) ? 'Certificate given' : 'Send the client the certificate'}`, tone: 'good' };
   if (a.status === 'accepted') return { short: 'Quote accepted', text: `Quote accepted by ${a.by} on ${formatAnswerDate(a.date)}. Record the treatment once it's done`, tone: 'good' };
   return { short: 'Quote declined', text: `Quote declined on ${formatAnswerDate(a.date)}${a.note ? ` · ${a.note}` : ''}`, tone: 'bad' };
 }
@@ -1444,7 +1494,9 @@ function renderQuoteAnswer() {
     };
   }
 
-  const treatment = answered && a.status === 'accepted'
+  // A treatment recorded before the answer was (from the job's page, say)
+  // still shows here, with its certificate and bait visits.
+  const treatment = answered && a.status === 'accepted' || q.treatment
     ? { title: 'Treatment', state: q.treatment && certificateGiven(q) ? 'done' : 'now',
         text: !q.treatment ? 'Record it once the work is done.'
           : q.certificateSentAt ? `Finished. Certificate emailed ${esc(formatIssueDate(q.certificateSentAt))}.`
@@ -1617,7 +1669,7 @@ function quoteContentHash(q) {
   // 'booking' and 'invoice' are left over from features that were removed;
   // older quotes may still carry them, and they never counted as content.
   ['updatedAt', 'createdAt', 'sentAt', 'sentHash', 'certificateSentAt', 'certificateHandedAt', 'reportKey', 'answer', 'booking', 'treatment', 'baitVisits', 'invoice',
-    'sourceAddress', 'issuedAt', 'issuedHash', 'linkRequest', 'aiPlan'].forEach(k => delete content[k]);
+    'sourceAddress', 'issuedAt', 'issuedHash', 'linkRequest', 'aiPlan', 'clientSeen'].forEach(k => delete content[k]);
   return sha256Hex(stableJson(content));
 }
 // The day this version of the quote was first given to the client. The PDF

@@ -24,15 +24,15 @@
 // What was done. qty labels the number asked for, if any. quoteKeys are
 // the quote lines that mean the method was quoted.
 const TREATMENT_METHODS = {
-  barrier: { label: 'Chemical soil treatment (termite barrier)', qty: 'linear metres', quoteKeys: ['barrier_lm', 'barrier_job'] },
-  bait:    { label: 'Termite baiting system installed', qty: 'stations', quoteKeys: ['bait_install'] },
-  retic:   { label: 'Reticulation system installed and charged', qty: 'linear metres', quoteKeys: ['retic_lm'] },
-  physical: { label: 'Physical termite barrier installed', qty: 'linear metres', quoteKeys: ['physical_lm'] },
-  direct:  { label: 'Direct treatment of active termite workings', quoteKeys: ['direct'] },
-  nest:    { label: 'Termite nest located and treated', quoteKeys: ['nest'] },
-  topup:   { label: 'Top-up of existing termite management system', quoteKeys: ['system_topup'] },
-  general: { label: 'Termite management treatment', quoteKeys: ['treatment'] },
-  borer:   { label: 'Borer treatment of affected timbers', quoteKeys: ['borer'] },
+  barrier: { label: 'Chemical soil treatment (termite barrier)', short: 'Chemical barrier', qty: 'linear metres', quoteKeys: ['barrier_lm', 'barrier_job'] },
+  bait:    { label: 'Termite baiting system installed', short: 'Baiting system', qty: 'stations', quoteKeys: ['bait_install'] },
+  retic:   { label: 'Reticulation system installed and charged', short: 'Reticulation', qty: 'linear metres', quoteKeys: ['retic_lm'] },
+  physical: { label: 'Physical termite barrier installed', short: 'Physical barrier', qty: 'linear metres', quoteKeys: ['physical_lm'] },
+  direct:  { label: 'Direct treatment of active termite workings', short: 'Direct treatment', quoteKeys: ['direct'] },
+  nest:    { label: 'Termite nest located and treated', short: 'Nest treated', quoteKeys: ['nest'] },
+  topup:   { label: 'Top-up of existing termite management system', short: 'System top-up', quoteKeys: ['system_topup'] },
+  general: { label: 'Termite management treatment', short: 'Termite treatment', quoteKeys: ['treatment'] },
+  borer:   { label: 'Borer treatment of affected timbers', short: 'Borer treatment', quoteKeys: ['borer'] },
 };
 
 // Common Australian termiticides and baits with their active constituent,
@@ -147,6 +147,12 @@ function treatmentReportFor(q) {
   return (r && r.reportData) || {};
 }
 
+// Where the certificate and visit reports go: the quote's email, or the
+// job's when the quote went out without one.
+function quoteClientEmail(q) {
+  return ((q.clientEmail || '').trim() || (treatmentReportFor(q).jobClientEmail || '').trim());
+}
+
 // Same day N months on, or the month's last day when it's shorter
 // (31 August + 6 months is 28 or 29 February, not 2 or 3 March).
 function addMonthsIso(iso, months) {
@@ -247,14 +253,14 @@ function treatmentPestFromReport(rd, methods) {
 function renderTreatmentBlock(q) {
   const t = q.treatment;
   if (!t) {
-    return `<button class="quote-btn primary quote-step-btn" onclick="openTreatmentRecord()">Treatment done? Record it</button>`;
+    return `<button class="quote-btn primary quote-step-btn" onclick="openTreatmentRecord()">Record the treatment</button>`;
   }
   const many = installedSystems(t).length > 0;
   const docs = many ? 'certificates' : 'certificate';
   const who = (q.client || '').trim();
-  const to = (q.clientEmail || '').trim();
+  const to = quoteClientEmail(q);
   return `<div class="quote-step">
-      <div><strong>Treatment done</strong> on ${escapeHtml(formatAnswerDate(t.date))}${t.technician ? ` by ${escapeHtml(t.technician)}` : ''}</div>
+      <div><strong>Treatment recorded</strong>: done on ${escapeHtml(formatAnswerDate(t.date))}${t.technician ? ` by ${escapeHtml(t.technician)}` : ''}</div>
       ${t.nextInspection ? `<div class="quote-answer-note">Next inspection due ${escapeHtml(formatAnswerDate(t.nextInspection))}</div>` : ''}
     </div>
     <div class="qp-cert ${certificateGiven(q) ? 'sent' : ''}">
@@ -342,6 +348,57 @@ function openTreatmentRecord() {
   treatmentSketch.show(t.sketch || '');
   document.getElementById('trSketchMore').open = !!t.sketch && !treatmentPlanDraft;
   updateTreatmentSaveBtn();
+  renderTreatmentFolds(true);
+  const sheet = document.getElementById('treatmentOverlay');
+  if (!sheet.dataset.folds) {
+    sheet.dataset.folds = '1';
+    ['input', 'change'].forEach(ev => sheet.addEventListener(ev, () => renderTreatmentFolds()));
+  }
+  document.querySelector('#treatmentOverlay .page-sheet-body').scrollTop = 0;
+}
+
+// ── THE FOLDS ── Each part of the record folds to one line saying what it
+// holds, amber when something the certificate needs is missing. On opening
+// (and after a voice fill) the parts with a gap open and the rest fold.
+function treatmentFoldLines() {
+  const v = id => document.getElementById(id).value.trim();
+  const tech = v('trTech'), lic = v('trLicence');
+  const times = [v('trStart'), v('trFinish')].filter(Boolean).map(formatClockTime).join('–');
+  const when = [v('trDate') ? formatAnswerDate(v('trDate')) : '', times].filter(Boolean).join(', ');
+  const ticked = [...document.querySelectorAll('#trMethods input[type=checkbox]:checked')].map(box => {
+    const m = TREATMENT_METHODS[box.dataset.key] || {};
+    const qty = document.querySelector(`#trMethods [data-qty="${box.dataset.key}"]`);
+    const n = qty && qty.value.trim();
+    return (m.short || m.label || box.dataset.key) + (n ? ` (${n} ${m.qty === 'stations' ? 'stations' : 'm'})` : '');
+  });
+  const products = readTreatmentProducts().map(p => p.name).filter(Boolean);
+  const areas = v('trAreas');
+  const plan = sitePlanHasContent(treatmentPlanDraft) ? 'site plan drawn' : treatmentSketch && !treatmentSketch.empty ? 'sketch drawn' : '';
+  const notice = v('trNotice');
+  const noticeText = notice === 'none' ? 'No notice placed' : `${notice === 'updated' ? 'Notice updated' : 'New notice'}${v('trNoticeWhere') ? ', ' + v('trNoticeWhere') : ''}`;
+  const next = v('trNext');
+  return [
+    !tech ? { warn: true, text: `${when ? when + '. ' : ''}Technician not filled in` }
+      : !lic ? { warn: true, text: `${tech}, licence no. missing` }
+      : { text: [when, `${tech}, ${lic}`].filter(Boolean).join(' · ') },
+    !ticked.length ? { warn: true, text: 'Nothing ticked yet' }
+      : !products.length ? { warn: true, text: `${ticked.join(', ')} · no product named` }
+      : { text: `${ticked.join(', ')} · ${products.join(', ')}` },
+    !areas ? { warn: true, text: `Areas treated not filled in${plan ? ' · ' + plan : ''}` }
+      : { text: [areas.split(/\n/)[0], plan || 'no site plan'].join(' · ') },
+    notice !== 'none' && !v('trNoticeWhere') ? { warn: true, text: 'Say where the notice went' }
+      : { warn: !next, text: [noticeText, next ? 'next inspection ' + formatAnswerDate(next) : 'next inspection date missing'].join(' · ') },
+  ];
+}
+
+function renderTreatmentFolds(reset) {
+  if (!document.getElementById('trFold1')) return;
+  treatmentFoldLines().forEach((line, i) => {
+    const sub = document.getElementById('trSub' + (i + 1));
+    sub.textContent = line.text;
+    sub.classList.toggle('warn', !!line.warn);
+    if (reset) document.getElementById('trFold' + (i + 1)).open = !!line.warn;
+  });
 }
 
 // The site, folded away as it comes from the report: its building, or what's
@@ -358,6 +415,10 @@ function renderTreatmentSiteSummary() {
 let treatmentPlanDraft = null;
 
 function renderTreatmentPlan() {
+  drawTreatmentPlan();
+  renderTreatmentFolds();
+}
+function drawTreatmentPlan() {
   const el = document.getElementById('trPlan');
   const plan = treatmentPlanDraft;
   if (!sitePlanHasContent(plan)) {
@@ -512,6 +573,7 @@ function applyTreatmentVoice(f) {
     renderTreatmentProducts(rows.length ? rows : [{}]);
   }
   updateTreatmentSaveBtn();
+  renderTreatmentFolds(true);
   return n;
 }
 
@@ -679,7 +741,9 @@ function saveTreatmentRecord() {
   renderQuoteAnswer();
   if (typeof renderIssueState === 'function') renderIssueState();
   if (typeof renderSavedList === 'function') renderSavedList();
-  showToast('Treatment recorded. The certificate is ready to send', 'success');
+  // On to the certificate, with the bait station visits under it.
+  setTimeout(() => { const st = document.getElementById('qgStep4'); if (st) st.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 60);
+  showToast(typeof baitInstalled === 'function' && baitInstalled(q) ? 'Treatment recorded. Send the certificate, and record bait visits just under it' : 'Treatment recorded. The certificate is ready to send', 'success');
   track('treatment_recorded', { methods: Object.keys(methods).length });
 }
 
@@ -716,7 +780,7 @@ function emailTreatmentCertificate() {
   const install = installedSystems(q.treatment).length > 0;
   sendPdfsToClient({
     files: [buildTreatmentCertificatePDF(q), ...(install ? [buildTreatmentCertificatePDF(q, { install: true })] : [])],
-    to: (q.clientEmail || '').trim(),
+    to: quoteClientEmail(q),
     subject: `Termite treatment ${install ? 'and installation certificates' : 'certificate'} — ${q.address || 'your property'}`,
     body: clientMessage({ client: q.client, address: q.address, docs: install ? 'termite treatment certificate and certificate of installation' : 'termite treatment certificate', signOff: q.treatment.technician }),
   }).then(sent => { if (sent) { markCertificateSent(q); track('certificate_sent'); } });

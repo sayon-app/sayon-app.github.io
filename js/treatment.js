@@ -590,6 +590,13 @@ function onTreatmentNoticeChange() {
 
 function renderTreatmentProducts(products) {
   const esc = escapeHtml;
+  // The product list offers the chemical register first, then the products
+  // SAYON knows that aren't in it.
+  const list = document.getElementById('trProductList');
+  if (list && typeof getChemicalRegister === 'function') {
+    const names = [...new Set([...getChemicalRegister().products.map(c => c.name).filter(Boolean), ...Object.keys(TREATMENT_PRODUCTS)])];
+    list.innerHTML = names.map(n => `<option value="${esc(n)}">`).join('');
+  }
   document.getElementById('trProducts').innerHTML = products.map((p, i) => `
     <div class="treat-product" data-i="${i}">
       <div class="job-row">
@@ -602,10 +609,12 @@ function renderTreatmentProducts(products) {
           <input class="job-input" data-f="active" value="${esc(p.active || '')}" placeholder="e.g. fipronil">
         </div>
       </div>
+      <div class="treat-use" data-chem="${esc(((typeof findChemical === 'function' && findChemical(p.name)) || {}).id || '')}">${treatmentUseHtml(p)}</div>
       <div class="job-row">
         <div class="job-field">
           <div class="job-field-label">Mix or application rate</div>
-          <input class="job-input" data-f="rate" value="${esc(p.rate || '')}" placeholder="As on the label">
+          <input class="job-input" data-f="rate" value="${esc(p.rate || '')}" placeholder="As on the label" oninput="onTreatmentRateInput(this)">
+          <button type="button" class="quote-link-btn treat-keep-rate" hidden onclick="keepTreatmentRate(this)">Keep this rate for next time</button>
         </div>
         <div class="job-field">
           <div class="job-field-label">Amount used</div>
@@ -677,11 +686,95 @@ function removeTreatmentProduct(i) {
   renderTreatmentProducts(products.length ? products : [{}]);
 }
 
+// ── WHAT IT'S FOR (the chemical register, js/chemicals.js) ──
+// A product in the register asks what it's being used for: the label's
+// uses, grouped by pest. Picking one fills the rate and life from the
+// register. The choice is kept on the product as useId and use (its words).
+function treatmentUseHtml(p) {
+  const esc = escapeHtml;
+  const chem = typeof findChemical === 'function' ? findChemical(p.name) : null;
+  const uses = (chem && chem.uses) || [];
+  if (!chem) return '';
+  const pests = [...new Set(uses.map(u => u.pest || 'Other'))];
+  const opt = u => `<option value="${esc(u.id)}"${u.id === p.useId ? ' selected' : ''}>${esc(chemicalUseLabel(u))}${u.rate ? '' : ' (no rate yet)'}</option>`;
+  const options = pests.length > 1
+    ? pests.map(pe => `<optgroup label="${esc(pe)}">${uses.filter(u => (u.pest || 'Other') === pe).map(opt).join('')}</optgroup>`).join('')
+    : uses.map(opt).join('');
+  const picked = uses.find(u => u.id === p.useId);
+  return `<div class="job-field">
+      <div class="job-field-label">What it's used for${pests.length === 1 ? ` <span class="treat-use-pest">· ${esc(pests[0])}</span>` : ''}</div>
+      ${uses.length ? `<select class="job-input" data-f="useId" onchange="onTreatmentUse(this)">
+        <option value="">Pick from the label's uses</option>${options}
+        <option value="other"${p.useId === 'other' ? ' selected' : ''}>Something else (type the rate)</option>
+      </select>` : '<div class="settings-row-desc">No uses in your chemical register for this product yet.</div>'}
+      <input type="hidden" data-f="use" value="${esc(p.use || '')}">
+      <div class="treat-use-note" ${picked && !picked.rate ? '' : 'hidden'}>No rate in your chemical register for this use yet. Type it from the label.</div>
+      ${chemicalLinksHtml(chem)}
+    </div>`;
+}
+
+function treatmentRowChemical(row) {
+  const chem = findChemical(row.querySelector('[data-f="name"]').value);
+  const sel = row.querySelector('[data-f="useId"]');
+  const use = chem && sel ? (chem.uses || []).find(u => u.id === sel.value) : null;
+  return { chem, use };
+}
+
+function onTreatmentUse(sel) {
+  const row = sel.closest('.treat-product');
+  const { chem, use } = treatmentRowChemical(row);
+  const rate = row.querySelector('[data-f="rate"]');
+  const life = row.querySelector('[data-f="life"]');
+  const active = row.querySelector('[data-f="active"]');
+  row.querySelector('[data-f="use"]').value = use ? [use.pest, chemicalUseLabel(use)].filter(Boolean).join(' · ') : '';
+  // A rate the register filled is replaced by the next use's; one the
+  // technician typed is kept.
+  if (use && use.rate) { rate.value = chemicalUseRate(use); rate.dataset.filled = '1'; }
+  else if (rate.dataset.filled) { rate.value = ''; delete rate.dataset.filled; }
+  if (use && use.life && (!life.value.trim() || life.dataset.filled)) { life.value = use.life; life.dataset.filled = '1'; }
+  if (chem && chem.active && !active.value.trim()) active.value = chem.active;
+  row.querySelector('.treat-use-note').hidden = !use || !!use.rate;
+  onTreatmentRateInput(rate);
+  if (use && !use.rate) rate.focus();
+}
+
+function onTreatmentRateInput(inp) {
+  const row = inp.closest('.treat-product');
+  const { use } = treatmentRowChemical(row);
+  if (inp.value !== chemicalUseRate(use || {})) delete inp.dataset.filled;
+  row.querySelector('.treat-keep-rate').hidden = !(use && !use.rate && inp.value.trim() && canEditBusiness());
+}
+
+function keepTreatmentRate(btn) {
+  const row = btn.closest('.treat-product');
+  const { chem, use } = treatmentRowChemical(row);
+  const rate = row.querySelector('[data-f="rate"]').value.trim();
+  if (!chem || !use || !rate) return;
+  if (!keepChemicalRate(chem.name, use.id, rate, row.querySelector('[data-f="life"]').value.trim())) return;
+  btn.hidden = true;
+  row.querySelector('.treat-use-note').hidden = true;
+  const opt = row.querySelector(`[data-f="useId"] option[value="${CSS.escape(use.id)}"]`);
+  if (opt) opt.textContent = chemicalUseLabel(use);
+  showToast(`Saved to your chemical register for ${chem.name}`, 'success');
+}
+
 function onTreatmentProductName(inp) {
-  const name = Object.keys(TREATMENT_PRODUCTS).find(p => p.toLowerCase() === inp.value.trim().toLowerCase());
-  const active = inp.closest('.treat-product').querySelector('[data-f="active"]');
-  if (name && !active.value.trim()) {
-    active.value = TREATMENT_PRODUCTS[name];
+  const row = inp.closest('.treat-product');
+  const chem = typeof findChemical === 'function' ? findChemical(inp.value) : null;
+  const useWrap = row.querySelector('.treat-use');
+  const wasChem = useWrap.dataset.chem || '';
+  if ((chem ? chem.id : '') !== wasChem) {
+    useWrap.dataset.chem = chem ? chem.id : '';
+    useWrap.innerHTML = treatmentUseHtml({ name: inp.value });
+    // One use on the label: it's the one.
+    const sel = useWrap.querySelector('[data-f="useId"]');
+    if (sel && chem.uses.length === 1) { sel.value = chem.uses[0].id; onTreatmentUse(sel); }
+  }
+  const name = chem ? chem.name : Object.keys(TREATMENT_PRODUCTS).find(p => p.toLowerCase() === inp.value.trim().toLowerCase());
+  const known = chem && chem.active ? chem.active : name && TREATMENT_PRODUCTS[name];
+  const active = row.querySelector('[data-f="active"]');
+  if (known && !active.value.trim()) {
+    active.value = known;
     // Filled in for them: a tap on it selects it, so typing the full
     // constituent ("fipronil 9.1 g/L") replaces it instead of adding to it.
     active.addEventListener('focus', () => setTimeout(() => active.select(), 0), { once: true });

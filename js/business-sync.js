@@ -4,7 +4,8 @@
 // They're kept in businesses.settings so a new phone, or a technician already
 // on the business, starts with them:
 //   settings = { company: {..., updatedAt}, prices: {..., __updatedAt},
-//                learned: { fields, words, removed, updatedAt } }
+//                learned: { fields, words, removed, updatedAt },
+//                chemicals: { products, updatedAt } (js/chemicals.js) }
 // The owner's phone writes them; the team only reads (see
 // supabase/business-settings.sql). Company details and prices each go by
 // their own time, newest wins. What SAYON learned from corrections (see
@@ -23,11 +24,16 @@ function hasContent(obj) {
 }
 
 function localBusinessSettings() {
-  return {
+  const out = {
     company: getCompanyDetails(),
     prices: quotePriceMemory(),
     learned: getLearned(),
   };
+  // The chemical register only once this business has changed it: until
+  // then it's SAYON's starting list, and the account copy is left alone.
+  const chemicals = typeof storedChemicalRegister === 'function' ? storedChemicalRegister() : null;
+  if (chemicals) out.chemicals = chemicals;
+  return out;
 }
 
 // Writes what the account has that's newer than this phone's copy. Runs when
@@ -41,6 +47,10 @@ function applyCloudBusinessSettings() {
     }
     if (hasContent(cloud.prices) && (cloud.prices.__updatedAt || 0) > (local.prices.__updatedAt || 0)) {
       localStorage.setItem(quotePricesStorageKey(), JSON.stringify(takeCloudCopy(cloud.prices, local.prices, '__updatedAt')));
+    }
+    const chem = cloud.chemicals;
+    if (chem && Array.isArray(chem.products) && (chem.updatedAt || 0) > ((local.chemicals || {}).updatedAt || 0)) {
+      localStorage.setItem(chemicalsStorageKey(), JSON.stringify(chem));
     }
     if (cloud.learned && typeof cloud.learned === 'object') storeLearned(mergeLearned(cloud.learned, local.learned), { sync: false });
   } catch (e) { console.warn('Could not apply business settings:', e); }
@@ -68,6 +78,7 @@ function localSettingsAhead(cloud) {
   const newer = (mine, theirs, key) => hasContent(mine) && (!hasContent(theirs) || (mine[key] || 0) > (theirs[key] || 0));
   return newer(local.company, cloud.company, 'updatedAt') ||
     newer(local.prices, cloud.prices, '__updatedAt') ||
+    (!!local.chemicals && newer(local.chemicals, cloud.chemicals, 'updatedAt')) ||
     learnedAhead(local.learned, cloud.learned);
 }
 

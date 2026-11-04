@@ -4664,7 +4664,7 @@ function goToReportField(target, referral) {
   if (section && section.id.startsWith('section-')) showSection(section.id.slice(8));
   openFieldGroups(el);
   if (referral) {
-    // The "Refer to a Builder or Engineer?" field inside the finding card.
+    // The "Builder / Engineer Referral" field inside the finding card.
     const label = [...el.querySelectorAll('.field-label')].find(l => /builder or engineer/i.test(l.textContent));
     if (label && label.nextElementSibling) el = label.nextElementSibling;
   }
@@ -5559,7 +5559,7 @@ function findingCardHTML(finding, index, total) {
             <div class="field field-wide"><div class="field-label">Damage Description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${pickFieldHTML(id, 'damageDescription', TERMITE_SIGNS, finding.damageDescription)}</div>
             <div class="field field-wide"><div class="field-label">Species / Genus</div>${fv('species','specieslist')}</div>
             <div class="field choice-field"><div class="field-label">Termite Nest Found?</div>${fv('nestLocated','yesno')}</div>
-            <div class="field choice-field"><div class="field-label">Refer to a Builder or Engineer?</div>${fv('structuralConcern','yesno')}</div>
+            <div class="field choice-field"><div class="field-label">Builder / Engineer Referral</div>${fv('structuralConcern','yesno')}</div>
             <div class="field field-wide finding-photos"><div class="field-label">Photos of this finding</div>${spotPhotosHTML(findingPhotoSection(id))}</div>
           </div>
           ${act === 'INACTIVE' ? `<div class="inactive-reminder" style="display:flex"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg><span>Inactive workings can mean termites have temporarily abandoned the area, not that the risk is gone. Continued, regular inspections remain essential.</span></div>` : ''}
@@ -5900,7 +5900,7 @@ function borerCardHTML(b, index) {
       </div>
       <div class="finding-card-body">
         <div class="findings-gate choice-panel${act ? '' : ' unset'}" role="radiogroup" aria-label="Borer activity here">
-          <div class="field-label">Borer Activity Here</div>
+          <div class="field-label">Borer Activity</div>
           ${choiceCardsHTML('borerCard', 'borer-' + id, act, `data-finding="${id}" data-fkey="borerActivity"`)}
         </div>
         <div class="findings-details" style="display:block">
@@ -5909,7 +5909,7 @@ function borerCardHTML(b, index) {
           <div class="field field-wide"><div class="field-label">Timber Affected</div>${pickFieldHTML(id, 'timberAffected', TIMBER_PARTS, b.timberAffected)}</div>
           <div class="field field-wide"><div class="field-label">Borer Type</div>${pickFieldHTML(id, 'borerType', BORER_TYPES, b.borerType)}</div>
           <div class="field field-wide"><div class="field-label">What Was Seen <span class="field-hint">Exit holes, frass, tunnelling. No severity opinion.</span></div>${pickFieldHTML(id, 'description', BORER_SIGNS, b.description)}</div>
-          <div class="field choice-field"><div class="field-label">Refer to a Builder or Engineer?</div><div class="choice-panel${b.structuralConcern ? '' : ' unset'}" role="radiogroup">${choiceCardsHTML('finding', `structuralConcern-${id}`, b.structuralConcern, `data-finding="${id}" data-fkey="structuralConcern"`)}</div></div>
+          <div class="field choice-field"><div class="field-label">Builder / Engineer Referral</div><div class="choice-panel${b.structuralConcern ? '' : ' unset'}" role="radiogroup">${choiceCardsHTML('finding', `structuralConcern-${id}`, b.structuralConcern, `data-finding="${id}" data-fkey="structuralConcern"`)}</div></div>
           <div class="field field-wide finding-photos"><div class="field-label">Photos of this finding</div>${spotPhotosHTML(findingPhotoSection(id))}</div>
         </div>
         ${b.structuralConcern === 'YES' ? `<div class="warn-note note-info" style="margin:0 0 10px"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Referral recorded. The PDF recommends a licensed builder or engineer assess this damage.</div>` : ''}
@@ -6081,7 +6081,7 @@ function isAboveGroundLeak(text) {
 }
 
 // Inspectors always recommend treatment when live termites are found, so a
-// live finding fills Treatment Required with YES when it's still blank. It
+// live finding fills Treatment Recommended with YES when it's still blank. It
 // never overrides an answer the inspector gave. The banner stays up while
 // that auto answer stands and no treatment type has been added.
 function ensureTreatmentForLiveTermites() {
@@ -6094,7 +6094,7 @@ function ensureTreatmentForLiveTermites() {
     if (el) renderField(el, 'treatmentRecommended', 'YES');
     updateProgress();
     saveDraft();
-    showToast('Live termites found, so Treatment Required is set to Yes', 'info');
+    showToast('Live termites found, so Treatment Recommended is set to Yes', 'info');
   }
   const banner = document.getElementById('treatmentAutoBanner');
   if (banner) {
@@ -9287,7 +9287,7 @@ function visitFacts(rd) {
   ];
 }
 
-// What the last report found, in the words the Known Termite History field uses.
+// What the last report found, in the words the Termite History field uses.
 function termiteHistoryFrom(entry) {
   const rd = entry.reportData || {};
   const when = formatIssueDate(visitDate(entry));
@@ -14765,15 +14765,15 @@ async function buildReportPdf() {
   // ── NOTES BLOCK ───────────────────────────────────────────────────────────
   const FIELD_LABELS = {
     structureType:'Structure Type', wallConstruction:'Wall Construction', floorType:'Floor Type', roofType:'Roof Type',
-    height:'Height', facadeDirection:'Orientation', occupancyStatus:'Occupancy Status', furnishing:'Furnishing', peoplePresent:'People Present', weatherConditions:'Weather Conditions', temperature:'Temperature', humidity:'Humidity', rainLast24h:'Rain in the Last 24 Hours', recentWeather:'Recent Weather', toolsUsed:'Tools Used', siteSurroundings:'Surroundings', siteSlope:'Site Slope', termiteHistory:'Known Termite History', mouldSeen:'Mould Seen', mouldWhere:'Mould: Where',
+    height:'Height', facadeDirection:'Orientation', occupancyStatus:'Occupancy Status', furnishing:'Furnishing', peoplePresent:'People Present', weatherConditions:'Weather Conditions', temperature:'Temperature', humidity:'Humidity', rainLast24h:'Rain in the Last 24 Hours', recentWeather:'Recent Weather', toolsUsed:'Tools Used', siteSurroundings:'Surroundings', siteSlope:'Site Slope', termiteHistory:'Termite History', mouldSeen:'Mould Seen', mouldWhere:'Mould: Where',
     constructionEra:'Year or Period Built', standard:'Applicable Standard',
     hinderedAreas:'Hindered Access: Where', obstructions:'Areas Not Inspected', restrictedAccess:'Obstructions', hinderedAreasDetail:'What Hindered Access', noAccessAreas:'Restricted Access: Where & Why', highRiskAreas:'High Risk Areas',
     previousTreatment:'Evidence of Previous Treatment', previousTreatmentDetails:'Previous Treatment: What', previousTreatmentWhere:'Previous Treatment: Where', siteDrainage:'Site Drainage', subfloorDrainage:'Subfloor Drainage',
     borerActivity:'Borers of Seasoned Timber', borerDetails:'Borer Type, Location & Evidence', decayFound:'Wood Decay Fungi (Rot)', decayDetails:'Wood Decay: What', decayWhere:'Wood Decay: Where',
     termiteActivity:'Termite Activity Status', species:'Species', damageDescription:'Damage Description', activityLocation:'Location of Activity', nestLocated:'Termite Nest Found?', structuralConcern:'Builder / Engineer Referral',
-    waterLeaks:'Water Leaks', leakLocation:'Location of Moisture Ingress', moistureReadings:'Moisture Readings', timberSoil:'Timber-to-Soil Contact', timberSoilDetails:'Timber-to-Soil: Where and What', slabEdge:'Slab Edge Concealed', weepHoles:'Weep Holes (Clear / Bridged)', existingSystem:'Existing System',
+    waterLeaks:'Water Leaks', leakLocation:'Location of Moisture Ingress', moistureReadings:'Moisture Readings', timberSoil:'Timber-to-Soil Contact', timberSoilDetails:'Timber-to-Soil: Where and What', slabEdge:'Slab Edge Exposure', weepHoles:'Weep Holes', existingSystem:'Existing System',
     durableNoticePresent:'Durable Notice Present', hardLandscaping:'Hard Landscaping Adjacent', zone25mmVisible:'25mm Inspection Zone Visible', softLandscaping:'Soft Landscaping Adjacent', zone75mmVisible:'75mm Inspection Zone Visible', antCapSoldered:'Ant Cap Joins Soldered',
-    treatmentRecommended:'Treatment Recommended', treatmentType:'Treatment Type', inspectionFrequency:'Inspection Frequency', riskLevel:'Risk of Termite Attack',
+    treatmentRecommended:'Treatment Recommended', treatmentType:'Treatment Type', inspectionFrequency:'Re-inspection Interval', riskLevel:'Risk of Termite Attack',
     invasiveInspection:'Invasive Inspection Recommended', invasiveInspectionDetails:'Invasive Inspection: Where, Why and When', otherRecommendations:'Other Recommendations', antCapping:'Ant Capping', antCappingDetails:'Ant Capping: Where and What',
     delignification:'Chemical Delignification', delignificationDetails:'Delignification: What', delignificationWhere:'Delignification: Where', subfloorVentilation:'Subfloor Ventilation', nonDurableTimber:'Non-durable Timber in Damp Areas', nonDurableTimberDetails:'Non-durable Timber: What', nonDurableTimberWhere:'Non-durable Timber: Where',
   };
@@ -15064,7 +15064,7 @@ async function buildReportPdf() {
       ['Furnishing', reportData.furnishing],
       ['Site Slope', reportData.siteSlope],
       ['Surroundings', reportData.siteSurroundings],
-      ['Known Termite History', reportData.termiteHistory],
+      ['Termite History', reportData.termiteHistory],
     ]);
     // What the way it's built and used means for the inspection, as short
     // notes under the facts rather than between them.
@@ -15094,7 +15094,7 @@ async function buildReportPdf() {
       const identified = hasIdentifiedSystem(reportData.existingSystem);
       facts([
         ['Existing System', RENAMED_CHOICES.existingSystem[reportData.existingSystem] || reportData.existingSystem || 'None recorded'],
-        ['Specific System Name', reportData.existingSystemOther],
+        ['System Name', reportData.existingSystemOther],
         ['Durable Notice Present (Meter Box)', reportData.durableNoticePresent, true],
         ...(identified ? [
           ['Hard Landscaping Adjacent', reportData.hardLandscaping, 'plain'],
@@ -15437,7 +15437,7 @@ async function buildReportPdf() {
       subhead('CONSTRUCTION & PHYSICAL BARRIERS');
       condRow('Timber-to-Soil Contact', 'timberSoil');
       if (reportData.timberSoilDetails) row('Timber-to-Soil: Where and What', reportData.timberSoilDetails);
-      condRow('Slab Edge Concealed', 'slabEdge');
+      condRow('Slab Edge Exposure', 'slabEdge');
       condRow('Weep Holes', 'weepHoles', reportData.weepHoles === 'NONE' ? 'None located' : '');
       condRow('Ant Capping', 'antCapping');
       if (reportData.antCappingDetails) row('Ant Capping: Where and What', reportData.antCappingDetails);

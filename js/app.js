@@ -14317,7 +14317,10 @@ async function buildReportPdf() {
   // under a section title, subheading or intro that sits at the top of it.
   // Anything starting there is at the top of its page, for keep().
   let pageTopUntil = 0;
-  function newPage() { doc.addPage(); compactHeader(pageLabel); _rowShade = false; pageTopUntil = y; }
+  // titleUntil: where the room just under the last section title on this
+  // page ends (the title and the lines straight after it), or -1.
+  let titleUntil = -1;
+  function newPage() { doc.addPage(); compactHeader(pageLabel); _rowShade = false; pageTopUntil = y; titleUntil = -1; }
   const atPageTop = () => y <= pageTopUntil + 0.5;
   function gap(n=5) { y += n; }
   // Starts a part of the report: on a fresh page when asked or when little of
@@ -14335,29 +14338,48 @@ async function buildReportPdf() {
   // keep(draw) draws a part where it falls, with draw(false). If it runs
   // over onto another page and didn't start at the top of one, it's taken
   // off again and drawn from a fresh page, with draw(true). So a part that
-  // fits on a page is never split across two, and a longer one starts at the
-  // top of its own page rather than part way down another. Taking it off
-  // cuts the pages it added and the page's drawing back to where they were.
+  // fits on a page is never split across two. A longer one starts at the top
+  // of its own page, unless a good part of the page before was left: then it
+  // starts there, as it splits either way. Taking a part off cuts the pages
+  // it added and the page's drawing back to where they were.
   function pdfState() {
     const n = doc.internal.getNumberOfPages();
-    return { n, len: doc.internal.pages[n].length, y, pageNum, pageLabel, pageTopUntil, shade: _rowShade, photoNo, parts: { ...partPages },
+    return { n, len: doc.internal.pages[n].length, y, pageNum, pageLabel, pageTopUntil, titleUntil, shade: _rowShade, photoNo, parts: { ...partPages },
       font: doc.getFont(), size: doc.getFontSize(), text: doc.getTextColor() };
   }
   function restorePdfState(s) {
     while (doc.internal.getNumberOfPages() > s.n) doc.deletePage(doc.internal.getNumberOfPages());
     doc.setPage(s.n);
     doc.internal.pages[s.n].length = s.len;
-    y = s.y; pageNum = s.pageNum; pageLabel = s.pageLabel; pageTopUntil = s.pageTopUntil; _rowShade = s.shade; photoNo = s.photoNo;
+    y = s.y; pageNum = s.pageNum; pageLabel = s.pageLabel; pageTopUntil = s.pageTopUntil; titleUntil = s.titleUntil; _rowShade = s.shade; photoNo = s.photoNo;
     Object.keys(partPages).forEach(k => delete partPages[k]);
     Object.assign(partPages, s.parts);
     doc.setFont(s.font.fontName, s.font.fontStyle); doc.setFontSize(s.size); doc.setTextColor(s.text);
   }
+  // leftTitle: set when a part straight under a section title was moved on
+  // to the next page, leaving the title behind.
+  let leftTitle = false;
   function keep(draw) {
+    const outer = leftTitle;
     const s = pdfState();
-    draw(false);
-    if (doc.internal.getNumberOfPages() === s.n || s.y <= s.pageTopUntil + 4) return;
-    restorePdfState(s);
-    draw(true);
+    const run = fresh => { leftTitle = false; draw(fresh); };
+    run(false);
+    if (doc.internal.getNumberOfPages() > s.n && s.y > s.pageTopUntil + 4) {
+      restorePdfState(s);
+      run(true);
+      let moved = true;
+      // Longer than a page even from the top of one, it splits either way,
+      // so it goes back where it fell when a good part of that page was
+      // left, unless that leaves its title without the first thing under it.
+      if (doc.internal.getNumberOfPages() > s.n + 1 && s.y < 190) {
+        restorePdfState(s);
+        run(false);
+        moved = false;
+        if (leftTitle) { restorePdfState(s); run(true); moved = true; }
+      }
+      if (moved && s.y <= s.titleUntil + 4) leftTitle = true;
+    }
+    leftTitle = outer || leftTitle;
   }
   // A subheading and its rows, kept together the same way.
   function keepGroup(draw) { keep(fresh => { if (fresh) newPage(); draw(); }); }
@@ -14414,6 +14436,7 @@ async function buildReportPdf() {
     drawPdfFadeRule(doc, M, y+8.8, CW, 0.3);
     y += 15;
     if (top) pageTopUntil = y;
+    titleUntil = y;
   }
 
   // ── DATA ROW ──────────────────────────────────────────────────────────────
@@ -14421,37 +14444,16 @@ async function buildReportPdf() {
   // invert: for questions where YES is the good answer (e.g. "inspection
   // zone visible"), so NO shows red and YES green. 'plain' prints the
   // answer in ink, for a fact that is neither good nor bad.
-  function row(label, value, invert) {
-    const v     = String(value || '');
-    const isEmpty = !value && value !== 0;
-    // Nothing recorded: leave the row out rather than print a dash.
-    if (isEmpty) return;
-    const LABEL_W = 62;
-    doc.setFontSize(9);
-    const wrapped = doc.splitTextToSize(v, CW - LABEL_W - 6);
-    const rowH = Math.max(8.5, wrapped.length * 4.6 + 4);
-    if (y + rowH > 277) { newPage(); _rowShade = false; }
-
-    // Alternating shade
-    if (_rowShade) { doc.setFillColor(...C.rowAlt); doc.rect(M, y, CW, rowH, 'F'); }
-    _rowShade = !_rowShade;
-
-    // Bottom rule
-    doc.setDrawColor(...C.ruleLight); doc.setLineWidth(0.25);
-    doc.line(M, y+rowH, M+CW, y+rowH);
-
-    // Label
-    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);
-    doc.text(label.toUpperCase(), M+3, y+5.7);
-
-    // Value — colour-coded
-    if (isEmpty) {
-      doc.setTextColor(...C.inkMuted); doc.setFont('helvetica','italic');
-    } else if (invert === 'plain') {
+  // Sets the font and colour for an answer: red, green or amber for the
+  // answers that mean something on their own (YES, NO, HIGH...), ink for the
+  // rest. invert: for questions where YES is the good answer (e.g. "inspection
+  // zone visible"), so NO shows red and YES green. 'plain' prints the answer
+  // in ink, for a fact that is neither good nor bad. 'bad' is red whatever
+  // word it reads as (no ant caps, poor drainage).
+  function valueStyle(v, invert) {
+    if (invert === 'plain') {
       doc.setTextColor(...C.ink); doc.setFont('helvetica','bold');
     } else if (invert === 'bad') {
-      // A condition that counts against the property (no ant caps, poor
-      // drainage) is red whatever word it reads as.
       doc.setTextColor(...C.danger); doc.setFont('helvetica','bold');
     } else if (invert && (v === 'YES' || v === 'NO')) {
       doc.setTextColor(...(v === 'NO' ? C.danger : C.safe)); doc.setFont('helvetica','bold');
@@ -14464,9 +14466,82 @@ async function buildReportPdf() {
     } else {
       doc.setTextColor(...C.ink); doc.setFont('helvetica','normal');
     }
+  }
+
+  // A label and its answer across the page. A long label wraps in its
+  // column rather than running into the answer.
+  const LABEL_W = 62;
+  function row(label, value, invert) {
+    const v = String(value || '');
+    // Nothing recorded: leave the row out rather than print a dash.
+    if (!value && value !== 0) return;
+    doc.setFont('helvetica','bold'); doc.setFontSize(7);
+    const labelLines = doc.splitTextToSize(label.toUpperCase(), LABEL_W - 7);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    const wrapped = doc.splitTextToSize(v, CW - LABEL_W - 6);
+    const rowH = Math.max(7.6, wrapped.length * 4.3 + 3.4, labelLines.length * 3.1 + 4.4);
+    if (y + rowH > 277) { newPage(); _rowShade = false; }
+
+    if (_rowShade) { doc.setFillColor(...C.rowAlt); doc.rect(M, y, CW, rowH, 'F'); }
+    _rowShade = !_rowShade;
+    doc.setDrawColor(...C.ruleLight); doc.setLineWidth(0.25);
+    doc.line(M, y+rowH, M+CW, y+rowH);
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);
+    doc.text(labelLines, M+3, y+5.2, { lineHeightFactor: 1.25 });
+    valueStyle(v, invert);
     doc.setFontSize(9);
-    doc.text(wrapped, M+LABEL_W, y+5.7);
+    doc.text(wrapped, M+LABEL_W, y+5.2, { lineHeightFactor: 1.35 });
     y += rowH;
+  }
+
+  // ── FACTS ── short answers two to a line, each column a label and its
+  // answer, so a run of one-word facts takes half the room of full rows.
+  // A long answer, or one marked 'wide', takes the full width, its answer
+  // lined up with the left column's answers.
+  // items: [label, value, invert?, 'wide'?]; empty values are left out.
+  function facts(items) {
+    const list = items.filter(([, v]) => v || v === 0);
+    const half = (CW - 6) / 2, labW = 33, valW = half - labW - 4, wideW = CW - labW - 6;
+    const fits = ([label, v, , wide]) => {
+      if (wide) return false;
+      doc.setFont('helvetica','normal'); doc.setFontSize(9);
+      const vl = doc.splitTextToSize(String(v), valW).length;
+      doc.setFont('helvetica','bold'); doc.setFontSize(7);
+      return vl <= 2 && doc.splitTextToSize(label.toUpperCase(), labW - 4).length <= 3;
+    };
+    let pending = [];
+    const flush = (wide) => {
+      if (!pending.length) return;
+      const cells = pending.map(([label, v, invert]) => {
+        doc.setFont('helvetica','bold'); doc.setFontSize(7);
+        const ll = doc.splitTextToSize(label.toUpperCase(), labW - 4);
+        doc.setFont('helvetica','normal'); doc.setFontSize(9);
+        return { ll, vl: doc.splitTextToSize(String(v), wide ? wideW : valW), v: String(v), invert };
+      });
+      const rowH = Math.max(7.6, ...cells.map(c => Math.max(c.vl.length * 4.3 + 3.4, c.ll.length * 3.1 + 4.4)));
+      if (y + rowH > 277) { newPage(); _rowShade = false; }
+      if (_rowShade) { doc.setFillColor(...C.rowAlt); doc.rect(M, y, CW, rowH, 'F'); }
+      _rowShade = !_rowShade;
+      doc.setDrawColor(...C.ruleLight); doc.setLineWidth(0.25);
+      doc.line(M, y+rowH, M+CW, y+rowH);
+      cells.forEach((c, k) => {
+        const x = M + 3 + k * (half + 6);
+        doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);
+        doc.text(c.ll, x, y+5.2, { lineHeightFactor: 1.25 });
+        valueStyle(c.v, c.invert);
+        doc.setFontSize(9);
+        doc.text(c.vl, x + labW, y+5.2, { lineHeightFactor: 1.35 });
+      });
+      y += rowH;
+      pending = [];
+    };
+    list.forEach(item => {
+      if (!fits(item)) { flush(); pending = [item]; flush(true); return; }
+      pending.push(item);
+      if (pending.length === 2) flush();
+    });
+    flush();
   }
 
   function resetRowShade() { _rowShade = false; }
@@ -14500,13 +14575,14 @@ async function buildReportPdf() {
   // ── SUBHEADING ── a small label and rule over a group of rows
   function subhead(label) {
     if (y > 250) newPage();
-    const top = atPageTop();
+    const top = atPageTop(), underTitle = y <= titleUntil + 0.5;
     y += 3;
     doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...C.accentDark);
     doc.text(label, M, y); y += 2.2;
     doc.setFillColor(...C.accentLight); doc.rect(M, y, CW, 0.5, 'F'); y += 1.5;
     _rowShade = false;
     if (top) pageTopUntil = y;
+    if (underTitle) titleUntil = y;
   }
 
   // Draws wrapped lines, carrying on over the page break where needed, so a
@@ -14529,6 +14605,20 @@ async function buildReportPdf() {
     // Subtle left bar
     doc.setFillColor(...C.accentLight); doc.rect(M, y, 1.5, blockH, 'F');
     doc.text(lines, M+4, y+3); y += blockH + 2;
+    doc.setFont('helvetica','normal');
+  }
+
+  // Several short notes in one block, a line or two each.
+  function noteList(notes) {
+    doc.setFont('helvetica','italic'); doc.setFontSize(7.8);
+    const blocks = notes.map(n => doc.splitTextToSize(n, CW - 6));
+    const blockH = blocks.reduce((h, l) => h + l.length * 3.6 + 1.6, 0) + 1.6;
+    if (y + blockH > 280) newPage();
+    doc.setFillColor(...C.accentLight); doc.rect(M, y, 1.5, blockH, 'F');
+    doc.setTextColor(...C.inkLight);
+    let ty = y + 3.2;
+    blocks.forEach(lines => { doc.text(lines, M + 4, ty, { lineHeightFactor: 1.3 }); ty += lines.length * 3.6 + 1.6; });
+    y += blockH + 2;
     doc.setFont('helvetica','normal');
   }
 
@@ -14589,13 +14679,18 @@ async function buildReportPdf() {
   }
 
   // Photos two to a row, each with its number and caption under it.
+  // The height of one row of the grid: two photos and their captions.
+  function photoRow(pair, w = CW) {
+    const boxW = (w - 5) / 2, boxH = boxW * 0.72;
+    doc.setFontSize(7);
+    const caps = pair.map(p => doc.splitTextToSize((p.caption || '').trim(), boxW - 16).slice(0, 2));
+    return { boxW, boxH, caps, h: boxH + 5 + Math.max(...caps.map(c => Math.max(1, c.length))) * 3.3 + 4 };
+  }
   function photoGrid(photos, x = M, w = CW) {
-    const gutter = 5, boxW = (w - gutter) / 2, boxH = boxW * 0.72;
+    const gutter = 5;
     for (let i = 0; i < photos.length; i += 2) {
       const pair = photos.slice(i, i + 2);
-      doc.setFontSize(7);
-      const caps = pair.map(p => doc.splitTextToSize((p.caption || '').trim(), boxW - 16).slice(0, 2));
-      const rowH = boxH + 5 + Math.max(...caps.map(c => Math.max(1, c.length))) * 3.3 + 4;
+      const { boxW, boxH, caps, h: rowH } = photoRow(pair, w);
       if (y + rowH > 280) newPage();
       pair.forEach((p, k) => {
         const px = x + k * (boxW + gutter);
@@ -14619,7 +14714,8 @@ async function buildReportPdf() {
     const photos = list || (reportData.photosBySection || {})[sectionKey] || [];
     if (photos.length === 0) return;
     gap(2);
-    if (y + 70 > 278) newPage(); // keep the label with the first photos
+    // Keep the label with the first row of photos.
+    if (y + 9 + photoRow(photos.slice(0, 2)).h > 280) newPage();
     subhead('PHOTOS — ' + label.toUpperCase());
     photoGrid(photos);
     gap(3);
@@ -14644,7 +14740,7 @@ async function buildReportPdf() {
     // instead of taking a near-empty page of their own.
     if (!photos.length) { pageLabel = 'Photographs'; if (y + 24 > 278) newPage(); else gap(8); _rowShade = false; }
     else startPart('Photographs');
-    sectionTitle('PHOTOGRAPHS', REPORT_PARTS.photos);
+    sectionTitle('PHOTOGRAPHS', REPORT_PARTS.photos, photos.length ? photoRow(photos.slice(0, 2)).h : 30);
     if (!photos.length) {
       doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...C.inkLight);
       doc.text('No general photographs were attached. Photos of each area appear in the section they belong to.', M, y);
@@ -14810,11 +14906,13 @@ async function buildReportPdf() {
 
   // A short paragraph of body text.
   function para(text, size = 8, color = C.inkLight) {
-    const top = atPageTop();
+    const top = atPageTop(), underTitle = y <= titleUntil + 0.5;
+    const page = doc.internal.getNumberOfPages();
     doc.setFont('helvetica','normal'); doc.setFontSize(size);
     flowLines(doc.splitTextToSize(text, CW), M, size * 0.54, color);
     y += 3;
     if (top) pageTopUntil = y;
+    if (underTitle && doc.internal.getNumberOfPages() === page) titleUntil = y;
   }
   const co = getCompanyDetails();
   const clientPhone = reportData.jobClientPhone || document.getElementById('jobClientPhone')?.value?.trim();
@@ -14830,34 +14928,27 @@ async function buildReportPdf() {
   startPart('Client & Inspection Details', true);
   sectionTitle('CLIENT & INSPECTION DETAILS', REPORT_PARTS.client);
   subhead('CLIENT');
-  row('Client Name', client);
-  row('Client Phone', clientPhone);
-  row('Client Email', clientEmail);
+  facts([['Client Name', client], ['Client Phone', clientPhone], ['Client Email', clientEmail]]);
   gap(4);
   subhead('THE INSPECTION');
-  row('Property Inspected', address);
-  row('Inspection Date', inspectionDate);
-  row('Inspection Time', inspectionTime);
-  if (reportData.peoplePresent) row('People Present', reportData.peoplePresent);
-  row('Weather Conditions', reportData.weatherConditions);
-  row('Temperature', reportData.temperature);
-  row('Humidity', reportData.humidity);
-  row('Rain in the Last 24 Hours', reportData.rainLast24h);
-  if (reportData.recentWeather) row('Recent Weather', reportData.recentWeather);
-  row('Inspection Type', inspType);
-  row('Applicable Standard', standardLabel);
-  if (reportData.toolsUsed) row('Tools Used', reportData.toolsUsed);
-  row('Order / Job ID', orderId);
-  row('Report Reference', reportId);
+  facts([
+    ['Property Inspected', address, false, 'wide'],
+    ['Inspection Date', inspectionDate], ['Inspection Time', inspectionTime],
+    ['Inspection Type', inspType], ['People Present', reportData.peoplePresent],
+    ['Weather Conditions', reportData.weatherConditions], ['Temperature', reportData.temperature],
+    ['Humidity', reportData.humidity], ['Rain in the Last 24 Hours', reportData.rainLast24h],
+    ['Recent Weather', reportData.recentWeather], ['Tools Used', reportData.toolsUsed],
+    ['Applicable Standard', standardLabel, false, 'wide'],
+    ['Order / Job ID', orderId], ['Report Reference', reportId],
+  ]);
   gap(4);
   subhead('INSPECTION PROVIDER');
-  row('Inspecting Company', co.name);
-  row('Pest Control Licence', co.licence);
-  row('ABN', co.abn);
-  row('Company Phone', co.phone);
-  row('Company Email', co.email);
-  row('Inspector', inspector);
-  row('Inspector Licence No.', reportData.inspectorLicence);
+  facts([
+    ['Inspecting Company', co.name], ['Pest Control Licence', co.licence],
+    ['ABN', co.abn], ['Company Phone', co.phone],
+    ['Company Email', co.email], ['Inspector', inspector],
+    ['Inspector Licence No.', reportData.inspectorLicence],
+  ]);
   gap(5);
   disclaimer('This report describes the property as it was on the day of the inspection. If it is relied on more than 30 days after that date, the property should be re-inspected first, because timber pest activity can start or spread in that time.');
   gap(1);
@@ -14950,53 +15041,59 @@ async function buildReportPdf() {
     startPart('About the Property', fresh || summaryOnOnePage);
     sectionTitle('ABOUT THE PROPERTY', REPORT_PARTS.property);
     heroPhoto(frontPhoto, 70, 'Front of the property');
-    row('Structure Type', reportData.structureType);
-    row('Height', RENAMED_CHOICES.height[reportData.height] || reportData.height);
-    row('Wall Construction', reportData.wallConstruction);
-    row('Floor Type', reportData.floorType);
+    facts([
+      ['Structure Type', reportData.structureType],
+      ['Height', RENAMED_CHOICES.height[reportData.height] || reportData.height],
+      ['Wall Construction', reportData.wallConstruction],
+      ['Floor Type', reportData.floorType],
+      ['Roof Type', reportData.roofType],
+      ['Orientation', reportData.facadeDirection],
+      ['Year / Period of Construction', reportData.constructionEra],
+      ['Occupancy Status', reportData.occupancyStatus],
+      ['Furnishing', reportData.furnishing],
+      ['Site Slope', reportData.siteSlope],
+      ['Surroundings', reportData.siteSurroundings],
+      ['Known Termite History', reportData.termiteHistory],
+    ]);
+    // What the way it's built and used means for the inspection, as short
+    // notes under the facts rather than between them.
+    const propertyNotes = [];
     if (/slab/i.test(reportData.floorType || '')) {
-      gap(1.5);
-      disclaimer('Termites can enter a slab-on-ground building through cracks, joints and service pipes in the slab, and over its edge, where they cannot be seen. Keep the slab edge exposed and have the building inspected regularly.');
-      resetRowShade();
+      propertyNotes.push('Slab floor: termites can get in unseen through cracks, joints and pipes in the slab, and over its edge. Keep the slab edge exposed and have the building inspected regularly.');
     }
-    row('Roof Type', reportData.roofType);
-    row('Orientation', reportData.facadeDirection);
-    row('Year / Period of Construction', reportData.constructionEra);
     // Asbestos is outside a timber pest inspection, so this is a general note
     // for buildings of the period, not a rating of this property.
     if (['1920s-1940s', '1945-1965', '1965-1985', '1985-2003'].includes(reportData.constructionEra)) {
-      gap(1.5);
-      disclaimer('Buildings from this period may contain asbestos-containing materials. This is not an asbestos inspection: nothing was tested or disturbed, and no opinion is given on whether asbestos is present. Have a licensed asbestos assessor check before any work that disturbs building materials.');
-      resetRowShade();
+      propertyNotes.push('Built in this period: it may contain asbestos. This is not an asbestos inspection, nothing was tested or disturbed, and no opinion is given on it. Have a licensed asbestos assessor check before work that disturbs building materials.');
     }
-    if (reportData.siteSurroundings) row('Surroundings', reportData.siteSurroundings);
-    if (reportData.siteSlope) row('Site Slope', reportData.siteSlope);
-    if (reportData.termiteHistory) row('Known Termite History', reportData.termiteHistory);
-    row('Occupancy Status', reportData.occupancyStatus);
-    if (reportData.furnishing) row('Furnishing', reportData.furnishing);
     // The furniture note follows what was recorded about furniture; without
     // that, an occupied home is taken to be furnished, as before.
     const furnished = reportData.furnishing
       ? !/^unfurnished/i.test(reportData.furnishing)
       : /occupied|tenanted|owner/i.test(reportData.occupancyStatus || '');
     if (furnished) {
-      gap(1.5);
-      disclaimer(`The property was ${/partly/i.test(reportData.furnishing || '') ? 'partly furnished' : (reportData.furnishing ? 'furnished' : 'occupied and furnished')} at the time of inspection. Furniture, stored goods and floor coverings hid parts of the walls and floors, and timber pest activity or damage may be concealed behind them.`);
-      resetRowShade();
+      const how = /partly/i.test(reportData.furnishing || '') ? 'Partly furnished' : (reportData.furnishing ? 'Furnished' : 'Occupied and furnished');
+      propertyNotes.push(`${how}: furniture, stored goods and floor coverings hid parts of the walls and floors, where timber pest activity or damage may be concealed.`);
     }
+    if (propertyNotes.length) { gap(2); noteList(propertyNotes); resetRowShade(); }
 
     // The termite management system, and whether it can still be inspected.
     keepGroup(() => {
       subhead('TERMITE MANAGEMENT SYSTEM');
-      row('Existing System', RENAMED_CHOICES.existingSystem[reportData.existingSystem] || reportData.existingSystem || 'None recorded');
-      if (reportData.existingSystemOther) row('Specific System Name', reportData.existingSystemOther);
-      row('Durable Notice Present (Meter Box)', reportData.durableNoticePresent, true);
-      if (hasIdentifiedSystem(reportData.existingSystem)) {
-        row('Hard Landscaping Adjacent', reportData.hardLandscaping, 'plain');
-        row('25mm Inspection Zone Visible', reportData.zone25mmVisible, true);
-        row('Soft Landscaping Adjacent', reportData.softLandscaping, 'plain');
-        row('75mm Inspection Zone Visible', reportData.zone75mmVisible, true);
-        row('Ant Cap / Strip Shield Joins Soldered', reportData.antCapSoldered, true);
+      const identified = hasIdentifiedSystem(reportData.existingSystem);
+      facts([
+        ['Existing System', RENAMED_CHOICES.existingSystem[reportData.existingSystem] || reportData.existingSystem || 'None recorded'],
+        ['Specific System Name', reportData.existingSystemOther],
+        ['Durable Notice Present (Meter Box)', reportData.durableNoticePresent, true],
+        ...(identified ? [
+          ['Hard Landscaping Adjacent', reportData.hardLandscaping, 'plain'],
+          ['25mm Inspection Zone Visible', reportData.zone25mmVisible, true],
+          ['Soft Landscaping Adjacent', reportData.softLandscaping, 'plain'],
+          ['75mm Inspection Zone Visible', reportData.zone75mmVisible, true],
+          ['Ant Cap / Strip Shield Joins Soldered', reportData.antCapSoldered, true],
+        ] : []),
+      ]);
+      if (identified) {
         const concerns = [];
         if (reportData.durableNoticePresent === 'NO') concerns.push('Durable notice sticker not found in meter box');
         if (reportData.hardLandscaping === 'YES' && reportData.zone25mmVisible === 'NO') concerns.push('25mm inspection zone not visible against hard landscaping');
@@ -15055,41 +15152,34 @@ async function buildReportPdf() {
     const acc = accessLimits();
     const noLimits = !areasNotFullyInspected().length;
 
-    keepGroup(() => {
-      subhead('OBSTRUCTIONS: TEMPORARY, AT THE TIME OF INSPECTION');
-      acc.hindered.forEach(([label, text]) => row(label, text));
-      if (!acc.hindered.length) noneRow(hinderedAnswer() === 'NO' || (acc.allMarked && noLimits));
-      gap(3);
-    });
-
-    keepGroup(() => {
-      subhead('RESTRICTED ACCESS: PERMANENT RESTRICTION OR LOCKED ENTRY');
-      acc.restricted.forEach(([label, text]) => row(label, text));
-      if (!acc.restricted.length) noneRow(acc.allMarked);
-      gap(3);
-    });
-
-    keepGroup(() => {
-      subhead('HIGH RISK AREAS TO WHICH ACCESS SHOULD BE GAINED, OR FULLY GAINED');
-      if (acc.highRisk) {
-        row('Access should be gained to', acc.highRisk);
+    // Each of the four is a heading over what was recorded under it. One
+    // with nothing to list is a single line instead, its heading as the
+    // label, so a clear property doesn't spend a page saying so.
+    let afterRow = false;  // a one-line group just above: leave a gap under it
+    function accessGroup(title, entries, complete, after) {
+      if (!entries.length && !after) { row(title, complete ? 'None' : 'Not recorded'); afterRow = true; return; }
+      resetRowShade();
+      const spaced = afterRow;
+      afterRow = false;
+      keepGroup(() => {
+        if (spaced && !atPageTop()) gap(5);
+        subhead(title);
+        entries.forEach(([label, text]) => row(label, text));
+        if (!entries.length) noneRow(complete);
+        if (after) after();
         gap(3);
-        disclaimer('These areas may show evidence of timber pest activity or damage. Access should be gained, or fully gained, and a further inspection carried out. Until then it must be assumed that timber pest activity or damage may exist in them.');
-      } else {
-        noneRow(acc.allMarked);
-      }
-      gap(3);
-    });
-
-    keepGroup(() => {
-      subhead('INVASIVE INSPECTION');
+      });
+    }
+    accessGroup('OBSTRUCTIONS: TEMPORARY, AT THE TIME OF INSPECTION', acc.hindered, hinderedAnswer() === 'NO' || (acc.allMarked && noLimits));
+    accessGroup('RESTRICTED ACCESS: PERMANENT RESTRICTION OR LOCKED ENTRY', acc.restricted, acc.allMarked);
+    accessGroup('HIGH RISK AREAS TO WHICH ACCESS SHOULD BE GAINED, OR FULLY GAINED', acc.highRisk ? [['Access should be gained to', acc.highRisk]] : [], acc.allMarked,
+      acc.highRisk && (() => { gap(3); disclaimer('These areas may show evidence of timber pest activity or damage. Access should be gained, or fully gained, and a further inspection carried out. Until then it must be assumed that timber pest activity or damage may exist in them.'); }));
+    if (reportData.invasiveInspectionDetails || reportData.invasiveInspection === 'YES') {
+      accessGroup('INVASIVE INSPECTION', [['Invasive Inspection Recommended', reportData.invasiveInspection || 'Not recorded'], ['Where, Why and When', reportData.invasiveInspectionDetails]].filter(([, v]) => v), false,
+        reportData.invasiveInspection === 'YES' && (() => { gap(3); disclaimer('An invasive inspection may involve cutting, drilling or removing linings, floor coverings or timbers to see inside them. It needs the owner\'s written permission and a separate agreement.'); }));
+    } else {
       row('Invasive Inspection Recommended', reportData.invasiveInspection || 'Not recorded');
-      if (reportData.invasiveInspectionDetails) row('Where, Why and When', reportData.invasiveInspectionDetails);
-      if (reportData.invasiveInspection === 'YES') {
-        gap(3);
-        disclaimer('An invasive inspection may involve cutting, drilling or removing linings, floor coverings or timbers to see inside them. It needs the owner\'s written permission and a separate agreement.');
-      }
-    });
+    }
     notesBlock('restrictions');
     renderSectionPhotosInPDF(null, 'Obstructions and restricted access', accessSpotPhotos());
     renderSectionPhotosInPDF('restrictions', 'Areas Unable to Be Inspected');
@@ -15145,16 +15235,30 @@ async function buildReportPdf() {
           y += 17;
         }
 
-        // The facts, each a small label over its value. A coloured value is a
-        // short answer (YES / NO), set in bold.
-        fields.forEach(([label, value, colour]) => {
-          if (y > 268) newPage();
-          doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
-          doc.text(label.toUpperCase(), bodyX, y); y += 4.5;
-          doc.setFont('helvetica', colour ? 'bold' : 'normal'); doc.setFontSize(8.5); doc.setTextColor(...(colour || C.ink));
-          const w = doc.splitTextToSize(String(value), bodyW);
-          if (y + w.length * 4.5 > 278) newPage();
-          doc.text(w, bodyX, y); y += w.length * 4.5 + 3.5;
+        // The facts, each a small label over its value, two to a line where
+        // both are short and across the card where one is long. A coloured
+        // value is a short answer (YES / NO), set in bold.
+        const halfW = (bodyW - 8) / 2;
+        const valueLines = (v, w) => { doc.setFont('helvetica','normal'); doc.setFontSize(8.5); return doc.splitTextToSize(String(v), w); };
+        const factRows = [];
+        for (let i = 0; i < fields.length; i++) {
+          const a = fields[i], b = fields[i + 1];
+          if (b && valueLines(a[1], halfW).length <= 2 && valueLines(b[1], halfW).length <= 2) { factRows.push([a, b]); i++; }
+          else factRows.push([a]);
+        }
+        factRows.forEach(cells => {
+          const w = cells.length === 2 ? halfW : bodyW;
+          const lines = cells.map(([, v]) => valueLines(v, w));
+          const h = 4.2 + Math.max(...lines.map(l => l.length)) * 3.9 + 3.2;
+          if (y + h > 280) newPage();
+          cells.forEach(([label, , colour], k) => {
+            const x = bodyX + k * (halfW + 8);
+            doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
+            doc.text(label.toUpperCase(), x, y);
+            doc.setFont('helvetica', colour ? 'bold' : 'normal'); doc.setFontSize(8.5); doc.setTextColor(...(colour || C.ink));
+            doc.text(lines[k], x, y + 4.2, { lineHeightFactor: 1.3 });
+          });
+          y += h;
         });
 
         // Builder / engineer referral
@@ -15166,8 +15270,7 @@ async function buildReportPdf() {
         const fPhotos = card.photosId ? ((reportData.photosBySection || {})[findingPhotoSection(card.photosId)] || []) : [];
         if (fPhotos.length) {
           // The label goes over with the first row of photos, never alone.
-          const firstRowH = ((bodyW - 5) / 2) * 0.72 + 12;
-          if (y + 3 + firstRowH > 280) newPage();
+          if (y + 3 + photoRow(fPhotos.slice(0, 2), bodyW).h > 280) newPage();
           doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
           doc.text('PHOTOS', bodyX, y); y += 3;
           photoGrid(fPhotos, bodyX, bodyW);
@@ -15368,28 +15471,57 @@ async function buildReportPdf() {
   // ─────────────────────────────────────────────────────────────────────
   // 10. SCOPE, LIMITATIONS, DEFINITIONS & TERMS
   // ─────────────────────────────────────────────────────────────────────
-  startPart('Scope, Limitations, Definitions & Terms', true);
+  // Straight on from the part before when half a page or more is left: the
+  // columns start there and run on over the page.
+  startPart('Scope, Limitations, Definitions & Terms', y > 150);
   sectionTitle('SCOPE, LIMITATIONS, DEFINITIONS & TERMS', REPORT_PARTS.terms);
 
+  // ── TWO COLUMNS ── the scope, definitions and terms are fine print, set
+  // in two columns: the text runs down the left column, then the right,
+  // then on to the next page. Same words as before, in half the pages.
+  const COL_GAP = 8, COL_W = (CW - COL_GAP) / 2, COL_BOTTOM = 280;
+  let colIdx = 0, colTop = y, colLeftEnd = y;
+  const colX = () => M + colIdx * (COL_W + COL_GAP);
+  function nextColumn() {
+    const font = doc.getFont(), size = doc.getFontSize();
+    if (colIdx === 0) { colLeftEnd = y; colIdx = 1; y = colTop; }
+    else { newPage(); colIdx = 0; colTop = colLeftEnd = y; }
+    doc.setFont(font.fontName, font.fontStyle); doc.setFontSize(size);
+  }
+  // Moves on a column when less than h is left in this one.
+  function colRoom(h) { if (y + h > COL_BOTTOM) nextColumn(); }
+  function colLines(text, dx, size, leading, color, style = 'normal') {
+    doc.setFont('helvetica', style); doc.setFontSize(size);
+    doc.splitTextToSize(text, COL_W - dx).forEach(line => {
+      if (y + leading > COL_BOTTOM) nextColumn();
+      doc.setTextColor(...color);
+      doc.text(line, colX() + dx, y); y += leading;
+    });
+  }
+  // Back to the full width, under whichever column ran longer.
+  function endColumns() {
+    if (colIdx === 1) y = Math.max(y, colLeftEnd);
+    colIdx = 0;
+  }
+
   function infoPara(text) {
-    doc.setFont('helvetica','normal'); doc.setFontSize(8);
-    flowLines(doc.splitTextToSize(text, CW), M, 4.3, C.inkLight);
-    y += 4;
+    colLines(text, 0, 7.6, 3.5, C.inkLight);
+    y += 2.4;
   }
   function infoHeading(text) {
-    if (y > 262) newPage();
-    gap(3);
-    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...C.ink);
-    doc.text(text, M, y); y += 6;
+    colRoom(14);
+    gap(1.5);
+    colLines(text, 0, 8, 3.7, C.ink, 'bold');
+    y += 0.6;
   }
   // A heading for each of the three parts of this section.
   function partHeading(text) {
-    if (y > 250) newPage();
-    gap(2);
-    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(...C.accentDark);
-    doc.text(text.toUpperCase(), M, y);
-    doc.setFillColor(...C.ruleLight); doc.rect(M, y + 2.2, CW, 0.4, 'F');
-    y += 9;
+    colRoom(22);
+    if (y > colTop + 1) gap(3);
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...C.accentDark);
+    doc.text(text.toUpperCase(), colX(), y + 1);
+    doc.setFillColor(...C.ruleLight); doc.rect(colX(), y + 3, COL_W, 0.4, 'F');
+    y += 8;
   }
 
   partHeading('Scope and limitations');
@@ -15428,45 +15560,46 @@ async function buildReportPdf() {
   ];
 
   defs.forEach(([term, def]) => {
-    if (y + 14 > 278) newPage();
-    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...C.ink);
-    doc.text(term + ':', M, y); y += 4.5;
-    const wrapped = doc.splitTextToSize(def, CW - 4);
-    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...C.inkLight);
-    doc.text(wrapped, M + 3, y); y += wrapped.length * 4 + 5;
+    colRoom(11);
+    colLines(term + ':', 0, 7.6, 3.5, C.ink, 'bold');
+    colLines(def, 2.5, 7.3, 3.3, C.inkLight);
+    y += 2.2;
   });
 
-  gap(4);
+  gap(3);
 
   // ── IMPORTANT NOTICE ─────────────────────────────────────────────────────
-  if (y + 28 > 278) newPage();
-  doc.setFillColor(...C.accentLight); doc.roundedRect(M, y, CW, 28, 2, 2, 'F');
-  doc.setFillColor(...C.accent); doc.roundedRect(M, y, 3, 28, 2, 2, 'F'); doc.rect(M+1.5, y, 1.5, 28, 'F');
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.3);
+  const noticeLines = doc.splitTextToSize('This inspection fee covers the cost of the inspection and report only. Treatment of any timber pest activity or damage identified, and any remedial work required, is not included in this fee and is the responsibility of the property owner. Standard home and contents insurance policies generally do not cover termite damage. If you have concerns about your coverage, contact your insurer directly.', COL_W - 10);
+  const noticeH = 12 + noticeLines.length * 3.3;
+  colRoom(noticeH + 2);
+  doc.setFillColor(...C.accentLight); doc.roundedRect(colX(), y, COL_W, noticeH, 2, 2, 'F');
+  doc.setFillColor(...C.accent); doc.roundedRect(colX(), y, 3, noticeH, 2, 2, 'F'); doc.rect(colX()+1.5, y, 1.5, noticeH, 'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...C.accentDark);
-  doc.text('IMPORTANT NOTICE', M+7, y+7);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...C.ink);
-  const noticeLines = doc.splitTextToSize('This inspection fee covers the cost of the inspection and report only. Treatment of any timber pest activity or damage identified, and any remedial work required, is not included in this fee and is the responsibility of the property owner. Standard home and contents insurance policies generally do not cover termite damage. If you have concerns about your coverage, contact your insurer directly.', CW - 14);
-  doc.text(noticeLines, M+7, y+13);
-  y += 34;
+  doc.text('IMPORTANT NOTICE', colX()+7, y+6);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.3); doc.setTextColor(...C.ink);
+  doc.text(noticeLines, colX()+7, y+11, { lineHeightFactor: 1.28 });
+  y += noticeH + 4;
 
+  // Pages from here on are headed with the terms.
   pageLabel = 'Terms & Conditions of Inspection';
-  newPage();
   partHeading('Terms and conditions of inspection');
 
-  const TC = { font:'helvetica', size:8, color:[50,44,38], leading:4.4 };
-
+  const TC_COLOR = [50,44,38];
   function tcHeading(text) {
-    if (y > 262) newPage();
-    gap(4);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8);
+    const lines = doc.splitTextToSize(text, COL_W - 5);
+    colRoom(lines.length * 3.7 + 12);
+    if (y > colTop + 1) gap(2);
     // Subtle blue left bar for each clause heading
-    doc.setFillColor(...C.accent); doc.rect(M, y-1, 2, 8, 'F');
-    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...C.ink);
-    doc.text(text, M+6, y+5); y += 11;
+    doc.setFillColor(...C.accent); doc.rect(colX(), y - 3, 1.6, lines.length * 3.7 + 1.4, 'F');
+    doc.setTextColor(...C.ink);
+    doc.text(lines, colX() + 4.5, y, { lineHeightFactor: 1.3 });
+    y += lines.length * 3.7 + 1.4;
   }
   function tcPara(text) {
-    doc.setFont(TC.font,'normal'); doc.setFontSize(TC.size);
-    flowLines(doc.splitTextToSize(text, CW-6), M+6, TC.leading, TC.color);
-    y += 4;
+    colLines(text, 0, 7.6, 3.5, TC_COLOR);
+    y += 2.4;
   }
 
   tcHeading('1. Purpose and Nature of This Inspection');
@@ -15503,15 +15636,23 @@ async function buildReportPdf() {
   tcHeading('10. Applicable Standards and Legislation');
   tcPara(`This inspection and report have been prepared with reference to ${standard} and, where applicable, the AEPMA (Australian Environmental Pest Managers Association) Code of Practice for Timber Pest Inspections. Termite management recommendations refer to AS 3660.2-2017 (Termite Management — In and Around Existing Buildings and Structures). Where the property is newly constructed or has been subject to recent building work, the termite management provisions of the National Construction Code (NCC) and AS 3660.1-2014 (Termite Management — New Building Work) may also apply. State and Territory legislation may impose requirements additional to those set out in this Standard. This report is not a safety inspection, does not constitute advice regarding compliance with any building code or regulation, and is not a certificate of compliance under any legislation.`);
 
-  gap(6);
-  if (y + 12 > 278) newPage();
-  doc.setFillColor(...C.accentLight);
-  doc.setDrawColor(...C.accent);
-  doc.setLineWidth(0.7);
-  doc.roundedRect(M, y, CW, 12, 2, 2, 'FD');
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...C.accentDark);
-  doc.text('This report must be read in its entirety, including these Terms and Conditions, before any reliance is placed upon its contents.', M + CW/2, y + 7.5, { align:'center', maxWidth: CW - 8 });
-  y += 18;
+  // The closing note sits in the column, so it never ends up alone on a page.
+  {
+    y += 2;
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5);
+    const readAll = doc.splitTextToSize('This report must be read in its entirety, including these Terms and Conditions, before any reliance is placed upon its contents.', COL_W - 8);
+    const boxH = readAll.length * 3.4 + 6;
+    colRoom(boxH);
+    doc.setFillColor(...C.accentLight);
+    doc.setDrawColor(...C.accent);
+    doc.setLineWidth(0.7);
+    doc.roundedRect(colX(), y, COL_W, boxH, 2, 2, 'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...C.accentDark);
+    doc.text(readAll, colX() + COL_W/2, y + 5.4, { align:'center', lineHeightFactor: 1.2 });
+    y += boxH + 4;
+  }
+  endColumns();
+  gap(4);
 
   // ─────────────────────────────────────────────────────────────────────
   // 11. INSPECTOR DETAILS and 12. CLIENT ACKNOWLEDGEMENT, kept together.

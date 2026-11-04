@@ -182,7 +182,14 @@ function renderJobPdfButtons(busy) {
 
 // The job page's section: what goes in, and the buttons.
 function jobPdfSectionHTML() {
-  if (!jobReportReady()) return '';
+  if (!getFullAddress()) return '';
+  // Until the report is finished the section says so, rather than hiding.
+  if (!jobReportReady()) return `<div class="job-section-head">Job PDF</div>
+    <section class="job-pdf">
+      <p class="job-pdf-lede">Everything from this job in one PDF, with a contents page: the agreement, report, quote, certificates and bait visits.</p>
+      <p class="job-pdf-note">Finish the report first (${calculateCompletion()}% filled in). The job PDF starts from it.</p>
+      <div class="dash-detail-links"><button type="button" class="job-pdf-btn" disabled>Save PDF</button></div>
+    </section>`;
   const parts = jobPdfParts();
   const who = ((document.getElementById('jobClient') || {}).value || '').trim().split(/\s+/)[0];
   const email = jobClientEmailOf();

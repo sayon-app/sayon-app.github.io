@@ -3723,6 +3723,26 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 }
 .dash-detail-links:empty { display: none; }
 
+/* Re-inspections due (js/reinspection.js): a calendar badge in the ring's place. */
+.reinspect-badge {
+  width: 36px; height: 36px; border-radius: 99px; display: flex; align-items: center; justify-content: center;
+  background: rgba(255,182,72,0.16); color: var(--yellow-text);
+}
+.reinspect-row.overdue .reinspect-badge { background: rgba(192,57,43,0.12); color: var(--risk); }
+.reinspect-row.reminded .reinspect-badge { background: rgba(var(--accent-rgb), 0.12); color: var(--accent2); }
+.reinspect-row .dash-row-status { color: var(--yellow-text); }
+.reinspect-row.overdue .dash-row-status { color: var(--risk); }
+.reinspect-row.reminded .dash-row-status { color: var(--accent2); }
+.reinspect-row .dash-row-total { font-size: 13.5px; }
+.dash-detail-chip.overdue { background: rgba(192,57,43,0.12); color: var(--risk); }
+.dash-next .dash-detail-links { margin-top: 10px; }
+.reinspect-note { margin: 12px 2px 0; font-size: 13px; line-height: 1.5; color: var(--text3); }
+.reinspect-form { display: grid; gap: 6px; margin-top: 16px; }
+.reinspect-form .send-review-label { margin-top: 8px; }
+.reinspect-form .job-input { width: 100%; box-sizing: border-box; }
+.reinspect-body { min-height: 240px; font: inherit; font-size: 14.5px; line-height: 1.5; resize: vertical; }
+.reinspect-form + .reinspect-note + .dash-detail-actions { margin-top: 16px; }
+
 /* A step's preview inside the sheet. */
 .dash-peek-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -4px 0 12px; }
 .dash-peek-back, .dash-peek-full {

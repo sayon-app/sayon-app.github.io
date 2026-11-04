@@ -12596,7 +12596,8 @@ function closeDashboard() {
 // (THIS JOB).
 let dashboardTab = 'todo';
 let dashboardJobs = [];
-const DASHBOARD_TABS = [['todo', 'To do'], ['waiting', 'Waiting'], ['done', 'Done']];
+// 'due' lists properties due for their next inspection (js/reinspection.js).
+const DASHBOARD_TABS = [['todo', 'To do'], ['waiting', 'Waiting'], ['done', 'Done'], ['due', 'Due']];
 
 // Job details sit on the job's page. Before a page redraws, the panel goes
 // back to its holder, so its fields survive the redraw.
@@ -12808,6 +12809,7 @@ function renderDashboardJobs(fade) {
   parkJobPanel();
   const counts = { current: '', todo: 0, waiting: 0, done: 0, all: dashboardJobs.length };
   dashboardJobs.forEach(j => counts[j.group]++);
+  counts.due = typeof reinspectionsDue === 'function' ? reinspectionsDue().length : 0;
   const searchEl = document.getElementById('dashboardSearch');
   const query = searchEl ? searchEl.value.trim().toLowerCase() : '';
   const shown = dashboardJobs.filter(j => query
@@ -12835,6 +12837,7 @@ function renderDashboardJobs(fade) {
   const empty = query ? `No jobs match "${escapeHtml(searchEl.value.trim())}".`
     : !dashboardJobs.length ? 'Your jobs will show up here once you save a report.'
     : { todo: 'Nothing to do right now.', waiting: 'Nothing is waiting on a client.', done: 'No finished jobs yet.' }[dashboardTab];
+  if (dashboardTab === 'due' && !query && typeof renderReinspectionList === 'function') { wrap.innerHTML = renderReinspectionList(fade); return; }
   wrap.innerHTML = shown.length ? `
     <div class="dash-list${fade ? ' fade-in' : ''}">
       ${shown.map(j => `
@@ -13710,9 +13713,13 @@ function clientMessage({ client, address, docs, signOff, link }) {
 // false. Checked when the app opens, so the first tap already knows.
 let directEmail = null;
 let directEmailSending = false;
+// Whether the Worker also sends an email with no PDFs (the re-inspection
+// reminder, js/reinspection.js). Older Workers need a PDF on every email.
+let directEmailText = false;
 
 async function checkDirectEmail() {
   directEmail = null;
+  directEmailText = false;
   if (!authUser) return;
   const forUser = authUser.id;
   try {
@@ -13722,7 +13729,7 @@ async function checkDirectEmail() {
       body: JSON.stringify({ check: true }),
     });
     const data = res.ok ? await res.json() : {};
-    if (authUser && authUser.id === forUser) directEmail = !!data.configured;
+    if (authUser && authUser.id === forUser) { directEmail = !!data.configured; directEmailText = !!data.configured && !!data.textOnly; }
   } catch (e) {
     directEmail = false;
   }
@@ -13757,11 +13764,11 @@ async function sendPdfsToClient({ files, to, subject, body }) {
   return askDidItSend(many);
 }
 
-// "Did that send?" Yes / Not yet. Resolves true on Yes.
+// "Did that send?" Yes / Not yet. Resolves true on Yes. text: other wording.
 let didItSendResolve = null;
-function askDidItSend(many) {
+function askDidItSend(many, text) {
   if (didItSendResolve) didItSendResolve(false);
-  document.getElementById('didItSendText').textContent = many
+  document.getElementById('didItSendText').textContent = text ? text : many
     ? 'Tap Yes once the email with the PDFs has gone to the client. If it hasn\'t, tap Not yet and send again.'
     : 'Tap Yes once the email with the PDF has gone to the client. If it hasn\'t, tap Not yet and send again.';
   document.getElementById('didItSendOverlay').classList.add('open');

@@ -181,12 +181,12 @@ function chemicalCardHtml(p, canEdit) {
         <div class="job-field"><div class="job-field-label">Surface or situation</div>
           <input class="job-input" data-u="surface" value="${esc(u.surface || '')}" placeholder="e.g. Perimeter, beside the slab"${dis} onchange="onChemicalEdit(this)"></div>
         <div class="job-row">
-          <div class="job-field"><div class="job-field-label">Mix rate (label)</div>
+          <div class="job-field"><div class="job-field-label">Application rate (label)</div>
             <input class="job-input" data-u="rate" value="${esc(u.rate || '')}" placeholder="e.g. mL per 10 L water"${dis} onchange="onChemicalEdit(this)"></div>
-          <div class="job-field"><div class="job-field-label">Amount to apply (label)</div>
+          <div class="job-field"><div class="job-field-label">Quantity to apply (label)</div>
             <input class="job-input" data-u="volume" value="${esc(u.volume || '')}" placeholder="e.g. L of mix per linear metre"${dis} onchange="onChemicalEdit(this)"></div>
         </div>
-        <div class="job-field"><div class="job-field-label">Life (label)</div>
+        <div class="job-field"><div class="job-field-label">Life expectancy (label)</div>
           <input class="job-input" data-u="life" value="${esc(u.life || '')}" placeholder="e.g. Up to 8 years"${dis} onchange="onChemicalEdit(this)"></div>
         ${canEdit ? `<button type="button" class="quote-link-btn" onclick="removeChemicalUse('${esc(p.id)}', '${esc(u.id)}')">Remove this use</button>` : ''}
       </div>`).join('');

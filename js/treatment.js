@@ -47,6 +47,7 @@ const TREATMENT_PRODUCTS = {
   'Premise Foam': 'imidacloprid',
   'Altriset': 'chlorantraniliprole',
   'Biflex': 'bifenthrin',
+  'Maxxthor 100': 'bifenthrin',
   'Exterra': 'chlorfluazuron',
   'Exterra Focus': 'chlorfluazuron',
   'Requiem': 'chlorfluazuron',

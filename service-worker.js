@@ -15,6 +15,7 @@
 // drop the old cache and install() to pre-cache the new files, so a redeploy
 // takes effect on the very next load instead of needing an extra refresh.
 const CACHE_VERSION = 'korva-v238';
+const CACHE_VERSION = 'korva-v237';
 
 
 const APP_SHELL = [
@@ -29,6 +30,8 @@ const APP_SHELL = [
   './js/treatment-plan.js',
   './js/treatment.js',
   './js/bait.js',
+  './js/job-pack.js',
+  './js/vendor/pdf-lib-1.17.1.min.js',
   './js/site-plan.js',
   './js/business-sync.js',
   './js/telemetry.js',

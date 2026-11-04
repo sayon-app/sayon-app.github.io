@@ -4,7 +4,12 @@
  * The API keys are stored as Cloudflare secrets and never exposed to the
  * browser or public repo. See worker/README.md for setup and deploy steps.
  *
- * CHANGES FROM v9.7 -> v9.8:
+ * CHANGES FROM v9.8 -> v9.9:
+ * - /send-email also sends an email with no PDFs, as long as it has a
+ *   message: the app's re-inspection reminder. { check: true } answers
+ *   textOnly: true so the app knows. Nothing else changes.
+ *
+ * CHANGES FROM v9.7 -> v9.8 (also in this version):
  * - A daily scheduled run deletes the report and quote PDFs behind client
  *   links 30 days after the link's 14 days end (the privacy policy promises
  *   this), then empties the link's file list so the page stops offering
@@ -1237,7 +1242,9 @@ async function handleSendEmail(request, user, env, origin) {
   try { body = await request.json(); } catch { return reply(400, { message: 'Invalid JSON' }); }
 
   const configured = !!(env.RESEND_API_KEY && env.MAIL_FROM);
-  if (body && body.check) return reply(200, { configured });
+  // textOnly: this Worker also sends an email with no PDFs (the app's
+  // re-inspection reminder). Older Workers needed a PDF on every email.
+  if (body && body.check) return reply(200, { configured, textOnly: true });
   if (!configured) return reply(501, { message: 'Email sending is not set up yet' });
 
   let emailSlot = null;
@@ -1257,9 +1264,11 @@ async function handleSendEmail(request, user, env, origin) {
     const text = typeof body.text === 'string' ? body.text.slice(0, MAX_EMAIL_TEXT_CHARS) : '';
 
     // PDFs only: every attachment must be named .pdf and its content must
-    // start with the PDF signature ("%PDF" is "JVBER" in base64).
+    // start with the PDF signature ("%PDF" is "JVBER" in base64). An email
+    // with no PDFs (a re-inspection reminder) must have a message.
     const files = Array.isArray(body.attachments) ? body.attachments : [];
-    if (!files.length || files.length > MAX_EMAIL_ATTACHMENTS) return reply(400, { message: 'Attach between 1 and 4 PDFs' });
+    if (files.length > MAX_EMAIL_ATTACHMENTS) return reply(400, { message: 'Attach up to 4 PDFs' });
+    if (!files.length && !text.trim()) return reply(400, { message: 'The email needs a message' });
     let totalChars = 0;
     const attachments = [];
     for (const f of files) {
@@ -1292,7 +1301,7 @@ async function handleSendEmail(request, user, env, origin) {
         ...(replyTo ? { reply_to: replyTo } : {}),
         subject,
         text,
-        attachments,
+        ...(attachments.length ? { attachments } : {}),
       }),
     });
     const data = await res.json().catch(() => ({}));

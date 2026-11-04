@@ -14,9 +14,9 @@
 
 const PRICE_BOOK_GROUPS = [
   { title: 'Termite management systems', keys: ['barrier_lm', 'barrier_job', 'bait_install', 'bait_monitor', 'retic_lm', 'physical_lm', 'system_topup', 'treatment'] },
-  { title: 'Live termites', keys: ['direct', 'nest'] },
+  { title: 'Termite treatment', keys: ['direct', 'nest'] },
   { title: 'Borers', keys: ['borer'] },
-  { title: 'Fixing what draws termites in', keys: ['timber_soil', 'weep_holes', 'slab_edge'] },
+  { title: 'Conducive conditions', keys: ['timber_soil', 'weep_holes', 'slab_edge'] },
   { title: 'Inspections', keys: ['followup', 'invasive'] },
 ];
 

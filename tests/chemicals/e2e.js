@@ -1,6 +1,6 @@
 // The chemical register, end to end (no real network calls):
 //   1. Menu › Chemical register lists SAYON's starting products with no
-//      rates, and with no label link saved points to the APVMA register;
+//      rates, and no label link until one is saved (never a search page);
 //   2. the owner types a rate for a use, adds a product of their own with
 //      a label link, and it syncs to businesses.settings.chemicals;
 //   3. on a treatment record, picking the product asks what it's for and
@@ -45,8 +45,8 @@ const patches = [];
   await p.screenshot({ path: `${OUT}/1-register.png` });
   const termidor = p.locator('#chemList .chem-card', { has: p.locator('.chem-card-name', { hasText: /^Termidor$/ }) });
   await termidor.locator('summary').click(); await p.waitForTimeout(200);
-  check((await termidor.locator('.chem-links a').first().getAttribute('href')) === 'https://portal.apvma.gov.au/pubcris', 'with no label link, it points to the APVMA register');
-  check(!(await p.content()).includes('google.com/search'), 'no web search links');
+  check(await termidor.locator('.chem-links a').count() === 0 && /No label or SDS link yet/.test(await termidor.locator('.chem-links').innerText()), 'with no link saved, no Label button');
+  check(!/google\.com\/search|pubcris/.test(await p.content()), 'no web search links');
   const perimeter = termidor.locator('.chem-use').first();
   await perimeter.locator('[data-u="rate"]').fill('Test mix rate A'); await perimeter.locator('[data-u="rate"]').dispatchEvent('change');
   await perimeter.locator('[data-u="volume"]').fill('Test amount A'); await perimeter.locator('[data-u="volume"]').dispatchEvent('change');

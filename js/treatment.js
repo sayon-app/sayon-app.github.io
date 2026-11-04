@@ -51,7 +51,7 @@ const TREATMENT_PRODUCTS = {
   'Exterra': 'chlorfluazuron',
   'Exterra Focus': 'chlorfluazuron',
   'Requiem': 'chlorfluazuron',
-  'Sentricon': 'noviflumuron',
+  'Sentricon': 'hexaflumuron',
   'Trelona': 'novaluron',
   'Kordon': 'physical barrier with deltamethrin',
 };

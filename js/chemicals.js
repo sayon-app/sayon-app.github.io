@@ -64,13 +64,36 @@ const CHEMICAL_STARTER_FORMS = {
   'Sentricon': 'bait', 'Trelona': 'bait', 'Kordon': 'other',
 };
 
+// Who holds each starting product's registration, and its APVMA product
+// number, from the APVMA's register (PubCRIS, checked 4 Nov 2026). Termidor
+// Dry (60654) and Premise Foam (59345) are no longer registered there.
+// Label and SDS links and label rates are added here only once the PDF has
+// been opened and checked.
+const CHEMICAL_STARTER_DETAILS = {
+  'Termidor': { maker: 'BASF', apvma: '54624' },
+  'Termidor HE': { maker: 'BASF', apvma: '80820' },
+  'Termidor Foam': { maker: 'BASF', apvma: '70346' },
+  'Termidor Dry': { maker: 'BASF', apvma: '60654' },
+  'Premise': { maker: 'Envu', apvma: '49098' },
+  'Premise Foam': { maker: 'Envu', apvma: '59345' },
+  'Altriset': { maker: 'Syngenta', apvma: '64594' },
+  'Biflex': { maker: 'Envu' },
+  'Maxxthor 100': { maker: 'Ensystex', apvma: '60113' },
+  'Exterra': { maker: 'Ensystex' },
+  'Exterra Focus': { maker: 'Ensystex' },
+  'Requiem': { maker: 'Ensystex', apvma: '56580' },
+  'Sentricon': { maker: 'Corteva', apvma: '57843 (AG bait), 80120 (IG rod)' },
+  'Trelona': { maker: 'BASF', apvma: '86731' },
+  'Kordon': { maker: 'Envu', apvma: '60759' },
+};
+
 const chemId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 function chemicalStarterProducts() {
   return Object.entries(CHEMICAL_STARTER_FORMS).map(([name, form], i) => ({
     id: 'start' + i,
     name, maker: '', active: TREATMENT_PRODUCTS[name] || '', apvma: '', form,
-    labelUrl: '', sdsUrl: '',
+    labelUrl: '', sdsUrl: '', ...(CHEMICAL_STARTER_DETAILS[name] || {}),
     uses: CHEMICAL_STARTER_USES[form].map((u, j) => ({ id: `start${i}u${j}`, ...u, rate: '', volume: '', life: '' })),
   }));
 }

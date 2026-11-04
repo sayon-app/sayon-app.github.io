@@ -1022,7 +1022,7 @@ function renderSitePlanSelBar() {
   const row = document.getElementById('spSelSizeRow');
   row.hidden = !units;
   if (units) {
-    document.getElementById('spSelSizeLabel').textContent = sym.kind === 'rect' && planRectDims(sel) ? 'Real width' : sym.kind === 'line' ? 'Real length' : 'Real length of the walls, all round';
+    document.getElementById('spSelSizeLabel').textContent = sym.kind === 'rect' && planRectDims(sel) ? 'Actual width' : sym.kind === 'line' ? 'Actual length' : 'Wall length, all round';
     const m = document.getElementById('spSelMetres');
     if (document.activeElement !== m) m.value = E.plan.mpu ? m1(units * E.plan.mpu) : '';
   }

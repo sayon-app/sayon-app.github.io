@@ -690,7 +690,7 @@ function renderQuotePlan() {
   subEl.classList.toggle('warn', warn);
   const p = q.plan;
   if (!p) {
-    body.innerHTML = `<div class="quote-hint" style="margin-top:0">Set out how the job will go: what you'll do, what the owner should do, how long it takes and the free service period. It starts from the report.</div>
+    body.innerHTML = `<div class="quote-hint" style="margin-top:0">Set out how the job will go: what you'll do, what the owner should do, how long it takes and the service period. It starts from the report.</div>
       <button class="quote-btn" style="margin-top:10px" onclick="addQuotePlan()">Add a plan from the report</button>`;
     return;
   }
@@ -705,10 +705,10 @@ function renderQuotePlan() {
     <textarea class="quote-input quote-textarea" id="qPlanOwner" rows="3" data-qlist="Nothing asked of the owner yet. Tap to add." aria-label="What we ask the owner to do, one per line" placeholder="e.g. Keep garden beds below the weep holes" oninput="fitQuoteText(this); onQuotePlanInput()">${escapeHtml(p.owner || '')}</textarea>
     <div class="fsub">Timing</div>
     <div class="q-line">
-      <div class="quote-field"><span>On the day: time on site</span><div class="qp-chips">${quotePlanChipsHTML('time', QUOTE_PLAN_TIMES, p.time)}</div></div>
-      <div class="quote-field"><span>After: free service period</span><div class="qp-chips">${quotePlanChipsHTML('service', QUOTE_PLAN_SERVICE, p.service)}</div>
+      <div class="quote-field"><span>Time on site</span><div class="qp-chips">${quotePlanChipsHTML('time', QUOTE_PLAN_TIMES, p.time)}</div></div>
+      <div class="quote-field"><span>Service period</span><div class="qp-chips">${quotePlanChipsHTML('service', QUOTE_PLAN_SERVICE, p.service)}</div>
         ${p.service && p.service !== 'None' ? '<div class="quote-hint">The quote says it only holds while the recommended inspections are kept up and the owner does their part.</div>' : ''}</div>
-      <label class="quote-field"><span>Then: timber pest inspections</span>
+      <label class="quote-field"><span>Re-inspections</span>
         <input class="quote-input" id="qPlanInspections" placeholder="e.g. Every 12 months" value="${escapeHtml(p.inspections || '')}" oninput="onQuotePlanInput()">
       </label>
     </div>
@@ -796,7 +796,7 @@ function setQuotePlanChoice(field, value) {
 function typeQuotePlanChoice(field) {
   const p = quoteState && quoteState.plan;
   if (!p) return;
-  const typed = prompt(field === 'time' ? 'How long will the job take on site?' : 'How long is the free service period?', p[field] || '');
+  const typed = prompt(field === 'time' ? 'How long will the job take on site?' : 'How long is the service period?', p[field] || '');
   if (typed === null) return;
   p[field] = typed.trim();
   renderQuotePlan();
@@ -1198,7 +1198,7 @@ function quoteItemHTML(it) {
       <svg class="icon qi-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
     </button>
     <div class="qi-edit">
-      <label class="quote-field"><span>What</span><textarea class="quote-input quote-item-desc" rows="1" placeholder="e.g. Chemical soil treatment"
+      <label class="quote-field"><span>Description</span><textarea class="quote-input quote-item-desc" rows="1" placeholder="e.g. Chemical soil treatment"
         oninput="fitQuoteText(this); updateQuoteItem('${id}','desc',this.value)">${escapeHtml(it.desc)}</textarea></label>
       <label class="quote-field"><span>Details (optional)</span><textarea class="quote-input quote-item-detail" rows="1" placeholder="e.g. Front porch post, left side"
         oninput="fitQuoteText(this); updateQuoteItem('${id}','detail',this.value)">${escapeHtml(it.detail)}</textarea></label>
@@ -1207,7 +1207,7 @@ function quoteItemHTML(it) {
           oninput="updateQuoteItem('${id}','qty',this.value)"></label>
         <label class="quote-field"><span>Unit</span><input class="quote-input" value="${escapeHtml(it.unit)}"
           oninput="updateQuoteItem('${id}','unit',this.value)"></label>
-        <label class="quote-field"><span>Price each, ex GST</span><input class="quote-input" type="number" min="0" step="any" inputmode="decimal" value="${escapeHtml(String(it.price))}"
+        <label class="quote-field"><span>Unit price, ex GST</span><input class="quote-input" type="number" min="0" step="any" inputmode="decimal" value="${escapeHtml(String(it.price))}"
           oninput="markQuotePriceSet('${id}'); updateQuoteItem('${id}','price',this.value)" onchange="rememberQuotePrice('${it.key}', parseFloat(this.value))"></label>
       </div>
       ${it.source ? `<div class="quote-item-source">${/^SAYON plan/.test(it.source) ? escapeHtml(it.source.replace(/^SAYON plan(: [^(]*)?/, "From the SAYON recommendation").trim()) : 'From the report: ' + escapeHtml(it.source)}</div>` : ''}

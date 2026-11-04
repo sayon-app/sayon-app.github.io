@@ -107,19 +107,24 @@ function findChemical(name) {
   return getChemicalRegister().products.find(p => p.name.trim().toLowerCase() === n) || null;
 }
 
-// A web search for the label when the business hasn't saved its link.
-const chemicalSearchUrl = (p, what) =>
-  'https://www.google.com/search?q=' + encodeURIComponent(`${p.name} ${what} Australia${p.apvma ? ' ' + p.apvma : ''}`);
+// Label and SDS links come only from a legitimate source: the maker's or
+// its Australian distributor's own site, or the APVMA register. SAYON
+// ships none it hasn't checked. With no link saved, the product points to
+// the APVMA's public register (PubCRIS), where the approved label is.
+const APVMA_REGISTER_URL = 'https://portal.apvma.gov.au/pubcris';
 
-const safeUrl = u => /^https?:\/\//i.test(String(u || '').trim()) ? String(u).trim() : '';
+const safeUrl = u => /^https:\/\//i.test(String(u || '').trim()) ? String(u).trim() : '';
 
 // Label · SDS links for a product, shared by the register and the treatment record.
 function chemicalLinksHtml(p) {
   const esc = escapeHtml;
   const label = safeUrl(p.labelUrl), sds = safeUrl(p.sdsUrl);
+  if (!label && !sds) {
+    return `<span class="chem-links"><a href="${APVMA_REGISTER_URL}" target="_blank" rel="noopener">Look up the label on the APVMA register</a></span>`;
+  }
   return `<span class="chem-links">
-      <a href="${esc(label || chemicalSearchUrl(p, 'label APVMA'))}" target="_blank" rel="noopener">${label ? 'Label' : 'Find the label'}</a>
-      <a href="${esc(sds || chemicalSearchUrl(p, 'SDS'))}" target="_blank" rel="noopener">${sds ? 'SDS' : 'Find the SDS'}</a>
+      ${label ? `<a href="${esc(label)}" target="_blank" rel="noopener">Label</a>` : `<a href="${APVMA_REGISTER_URL}" target="_blank" rel="noopener">Label on the APVMA register</a>`}
+      ${sds ? `<a href="${esc(sds)}" target="_blank" rel="noopener">SDS</a>` : '<span class="chem-nolink">No SDS link yet</span>'}
     </span>`;
 }
 
@@ -212,6 +217,7 @@ function chemicalCardHtml(p, canEdit) {
         </div>
         ${field('labelUrl', 'Link to the label', 'https://…', ' type="url" inputmode="url" autocomplete="off"')}
         ${field('sdsUrl', 'Link to the SDS', 'https://…', ' type="url" inputmode="url" autocomplete="off"')}
+        <div class="settings-row-desc">Copy the links from the maker's or supplier's own website, or the APVMA register, so they open the current label and SDS.</div>
         <div class="settings-group-title">What it's used for</div>
         <div class="settings-row-desc">Each use on the label, with its rate. A treatment record asks which one, then fills the rate.</div>
         ${uses || '<div class="settings-row-desc">No uses yet.</div>'}
@@ -230,7 +236,7 @@ function onChemicalEdit(el) {
   if (!p) return;
   if (el.dataset.f) {
     let v = el.value.trim();
-    if ((el.dataset.f === 'labelUrl' || el.dataset.f === 'sdsUrl') && v && !/^https?:\/\//i.test(v)) v = 'https://' + v;
+    if ((el.dataset.f === 'labelUrl' || el.dataset.f === 'sdsUrl') && v) v = 'https://' + v.replace(/^https?:\/\//i, '');
     p[el.dataset.f] = v;
     el.value = v;
   } else if (el.dataset.u) {

@@ -8873,6 +8873,7 @@ function showMenuPage(panelId) {
   if (panelId === 'billingPanel') loadBillingStatus();
   if (panelId === 'teamPanel') loadTeam();
   if (panelId === 'pricesPanel') renderPriceBook();
+  if (panelId === 'chemicalsPanel') renderChemicalRegister();
   if (panelId === 'settingsPanel') { restoreTestModeSetting(); renderLearnedList(); }
   if (panel) track('screen_viewed', { screen: 'menu_' + panelId });
 }

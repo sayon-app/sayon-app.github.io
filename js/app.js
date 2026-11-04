@@ -101,9 +101,9 @@ function shouldShowOnboarding() {
 function showOnboarding() {
   document.getElementById('authScreen').style.display   = 'none';
   document.getElementById('onboardScreen').style.display = 'flex';
-  // A technician gets the owner's business details, so starts at the voice demo
+  // A technician gets the owner's business details and prices, so starts at the voice demo
   if (canEditBusiness()) { fillBusinessForm(); obShowPanel(0); }
-  else obShowPanel(1);
+  else obShowPanel(2);
 }
 
 // ── YOUR BUSINESS ─────────────────────────────────────────────────────────
@@ -195,8 +195,10 @@ function saveBusinessForm() {
   return true;
 }
 
+// 0 business, 1 prices, 2 voice demo, 3 ready
 function obShowPanel(idx) {
-  [0,1,2].forEach(i => {
+  if (idx === 1) renderOnboardPrices();
+  [0,1,2,3].forEach(i => {
     document.getElementById(`ob-panel-${i}`).style.display = i === idx ? 'flex' : 'none';
     const step = document.getElementById(`ob-step-${i}`);
     step.classList.remove('active','done');
@@ -224,6 +226,7 @@ function obNext(currentStep) {
       if (licEl) { licEl.value = licence; reportData.inspectorLicence = licence; }
     }
   }
+  if (currentStep === 1 && !saveOnboardPrices()) return;
   obShowPanel(currentStep + 1);
 }
 
@@ -8869,6 +8872,7 @@ function showMenuPage(panelId) {
   // always shows it fresh.
   if (panelId === 'billingPanel') loadBillingStatus();
   if (panelId === 'teamPanel') loadTeam();
+  if (panelId === 'pricesPanel') renderPriceBook();
   if (panelId === 'settingsPanel') { restoreTestModeSetting(); renderLearnedList(); }
   if (panel) track('screen_viewed', { screen: 'menu_' + panelId });
 }

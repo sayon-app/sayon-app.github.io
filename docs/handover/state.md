@@ -90,7 +90,7 @@ As of 2026-10-05, about 10:50 UTC, with the job-chain table and the Supabase row
 - 2026-10-04, **done = walked end to end and tried by baz**, not merely live. Reason: the promise is a closed loop from technician to delivery.
 - 2026-10-04, **nothing locks on signing**; only Complete job locks, and Amend with a reason reopens. Reason: not recorded.
 - 2026-10-04, **sign-out backs up, then clears client data from the phone**. Reason: not recorded.
-- 2026-10-04, **no quote price list** (PR #56): each line starts at the last quoted rate. Reason: not recorded; the 2026-10-05 review also listed price lists as not needed.
+- 2026-10-04, **no quote price list** (PR #56): each line starts at the last quoted rate. Reversed 2026-11-03: baz asked for businesses to enter their own prices once, so Menu › Your prices and an onboarding step came back (js/price-book.js), on the same store the quote remembers typed prices in.
 - 2026-10-05, **the cut** (PR #64, live #65): removed invoices, dashboard follow-ups, job assigning and scheduling, treatment booking, the label calculator. Reason: ServiceM8, Tradify, Xero and similar do these better; SAYON's value is voice → an AS 4349.3 report plus a matching quote, finished on site.
 - 2026-10-05, **work alongside field-service apps, don't replace them**: later, one generic "job in (ID and details) → report, quote and certificate out" interface, no per-vendor integrations. Build it after the test run, starting with the first real customer's system.
 - 2026-10-05, **business details captured at sign-up, edited in Your business** (PR #68, live #69): Company details page, Team, invites and the agreement wording editor removed (saved custom wording still prints). Reason: account setup is where other trade apps put it.

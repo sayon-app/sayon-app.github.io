@@ -205,10 +205,10 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     check(su.body.data.terms_version === 3 && su.body.data.privacy_version === 6 && su.body.data.terms_accepted_at, 'an invited inspector\'s sign-up records the Terms and Privacy versions too');
     const acc = st.calls.find(c => c.path.includes('/rpc/accept_invite'));
     check(acc && acc.body.p_token === TOKEN, 'sign-in sends the secret to accept_invite');
-    const joined = await p.evaluate(() => ({ biz: authBusiness && authBusiness.id, ob: document.getElementById('onboardScreen').style.display, panel1: document.getElementById('ob-panel-1').style.display, kept: localStorage.getItem('korva_pending_invite'), toasts: window.__toasts.slice() }));
+    const joined = await p.evaluate(() => ({ biz: authBusiness && authBusiness.id, ob: document.getElementById('onboardScreen').style.display, panel1: document.getElementById('ob-panel-2').style.display, kept: localStorage.getItem('korva_pending_invite'), toasts: window.__toasts.slice() }));
     check(joined.biz === BIZ_ID && !st.madeBusiness && !joined.kept, 'the new inspector joins Acme, no business of their own is made, the secret is used up');
     check(joined.toasts.some(t => /joined Acme Pest/.test(t)), 'they are told they joined: ' + joined.toasts.join(' | '));
-    check(joined.ob !== 'flex' || joined.panel1 === 'flex', 'they skip the business set-up');
+    check(joined.ob !== 'flex' || joined.panel1 === 'flex', 'they skip the business and price set-up');
     check(!errs.length, 'no page errors ' + errs.join('; '));
     await ctx.close();
   }

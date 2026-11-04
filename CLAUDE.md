@@ -13,6 +13,7 @@ Read only the files your task needs. `js/app.js` is about 9,200 lines, so jump t
 | `index.html` | Every screen and overlay: splash, sign-in, platform menu, report (sections 1–7 + sign-off), drawer menu pages, quote screen and sheets |
 | `js/app.js` | The report app and everything shared (see sections below) |
 | `js/quote.js` | Quote builder, the client's answer and the quote PDF |
+| `js/price-book.js` | Your prices: the business's own price for every quote line, set in onboarding and Menu › Your prices. Same store as the prices remembered from quotes (`quotePriceMemory`) |
 | `js/photo-markup.js` | Mark up a report photo (circle, arrow, draw, label) from the photo viewer |
 | `js/treatment.js` | Treatment record and the one-page certificate PDF |
 | `js/bait.js` | Bait station visits after a baiting system goes in: the visit sheet, the client's visit report PDF, the job's due date |

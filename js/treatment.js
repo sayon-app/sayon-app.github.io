@@ -604,11 +604,11 @@ function renderTreatmentProducts(products) {
       </div>
       <div class="job-row">
         <div class="job-field">
-          <div class="job-field-label">Mix or application rate</div>
+          <div class="job-field-label">Application rate</div>
           <input class="job-input" data-f="rate" value="${esc(p.rate || '')}" placeholder="As on the label">
         </div>
         <div class="job-field">
-          <div class="job-field-label">Amount used</div>
+          <div class="job-field-label">Quantity used</div>
           <input class="job-input" data-f="amount" value="${esc(p.amount || '')}" placeholder="e.g. 640 L of mix">
         </div>
       </div>
@@ -624,11 +624,11 @@ function renderTreatmentProducts(products) {
         ${p.labelPhoto ? `<img class="treat-label-thumb" src="${esc(p.labelPhoto)}" alt="Drum label photo">` : ''}
       </div>
       <div class="job-field">
-        <div class="job-field-label">Life (per label)</div>
+        <div class="job-field-label">Life expectancy</div>
         <input class="job-input" data-f="life" value="${esc(p.life || '')}" placeholder="e.g. Up to 8 years">
       </div>
       <div class="job-field">
-        <div class="job-field-label">Where it was applied</div>
+        <div class="job-field-label">Where applied</div>
         <input class="job-input" data-f="where" value="${esc(p.where || '')}" placeholder="e.g. Trenched and rodded around the perimeter">
       </div>
       ${products.length > 1 ? `<button class="quote-link-btn" onclick="removeTreatmentProduct(${i})">Remove product</button>` : ''}
@@ -866,7 +866,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   // A species qualifier ("not identified, further investigation required")
   // belongs on the inspection report, not on a certificate for work done.
   const pest = (t.pest || '').replace(/\s*\([^)]*(not identified|further investigation)[^)]*\)/gi, '').trim();
-  cellRow([['Pest treated', pest], ['Equipment', t.equipment], ['Weather', t.weather]]);
+  cellRow([['Target pest', pest], ['Equipment', t.equipment], ['Weather', t.weather]]);
   Object.entries(t.methods || {}).forEach(([key, qty]) => {
     const m = TREATMENT_METHODS[key];
     if (!m || (install && !systems.includes(key))) return;
@@ -889,7 +889,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   const site = t.site || {};
   if (site.building || site.floor || site.surrounds || site.existing) {
     section('THE SITE');
-    cellRow([['Building', site.building], ['Floor and footings', site.floor], ['Surrounds', site.surrounds], ['System already there', site.existing]]);
+    cellRow([['Building', site.building], ['Floor and footings', site.floor], ['Surrounds', site.surrounds], ['Existing system', site.existing]]);
   }
 
   // ── PRODUCTS ──
@@ -905,11 +905,11 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     // The product cell carries the active constituent on its second line.
     // Only the columns something was entered in, so there's no row of dashes.
     const optional = [
-      { h: 'RATE', w: 30, f: p => p.rate },
-      { h: 'AMOUNT', w: 24, f: p => p.amount },
+      { h: 'APPLICATION RATE', w: 30, f: p => p.rate },
+      { h: 'QUANTITY', w: 24, f: p => p.amount },
       { h: 'BATCH NO.', w: 24, f: p => p.batch },
-      { h: 'LIFE (LABEL)', w: 24, f: p => p.life },
-      { h: 'WHERE', w: 46, f: p => p.where },
+      { h: 'LIFE EXPECTANCY', w: 30, f: p => p.life },
+      { h: 'WHERE', w: 40, f: p => p.where },
     ].filter(c => products.some(p => String(c.f(p) || '').trim()));
     const cols = [{ h: 'PRODUCT', w: 40, f: p => p.name || p.active }, ...optional];
     // Spread the spare width over the columns in proportion.
@@ -975,7 +975,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   const noticeCells = t.notice === 'none' ? [['Notice', 'No durable notice was placed at this treatment.']] : [
     ['System', methodNames.join('; ')],
     ['Date installed', formatLongDate(t.date)],
-    ['Chemical life (label)', productLife.join('; ')],
+    ['Life expectancy', productLife.join('; ')],
     ['Future inspections', t.nextInspection ? `First by ${formatLongDate(t.nextInspection)}, then ${everyText}` : everyText.charAt(0).toUpperCase() + everyText.slice(1)],
     ['Installed by', installer],
     ['Notice', `${TREATMENT_NOTICE[t.notice]}${t.noticeWhere ? `: ${t.noticeWhere}` : ''}`],

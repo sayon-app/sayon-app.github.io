@@ -1325,6 +1325,27 @@
       <div class="drawer-group-label">App</div>
 
       <!-- Settings: display, voice, your data and the account -->
+      <!-- Chemical register: the products the business carries, their
+           labels and SDS, and each label use with its rate. A treatment
+           record fills the active constituent and rate from it
+           (js/chemicals.js) -->
+      <div class="saved-panel settings-panel" id="chemicalsPanel">
+        <button class="panel-label panel-label-toggle" onclick="openMenuPage('chemicalsPanel')" id="chemicalsPanelToggle">
+          <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"/><path d="M10 3v6L5 19a1 1 0 0 0 1 2h12a1 1 0 0 0 1-2l-5-10V3"/></svg></span>
+          <span class="panel-title">Chemical register</span>
+          <span class="job-panel-summary"></span>
+          <svg class="icon panel-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <div class="job-panel-body">
+          <div class="settings-row-desc pb-intro">The products you carry, with the label and SDS a tap away. On a treatment record, pick the product and what it's used for, and SAYON fills the active constituent, the rate and the life from here. Rates come from the label: type each one from the label in your hands, and check it when a new label comes out.</div>
+          <div class="settings-row-desc pb-status" id="chemStatus" hidden></div>
+          <div class="settings-row-desc pb-owner" id="chemOwnerNote" hidden>Your business owner keeps this register. Tap a product to see its label, SDS and rates.</div>
+          <button type="button" class="job-action-btn settings-primary-btn chem-add" id="chemAdd" onclick="addChemical()">Add a product</button>
+          <div class="chem-list" id="chemList"></div>
+          <button type="button" class="quote-link-btn" id="chemReset" onclick="restoreChemicalStarters()" hidden>Add back SAYON's starting products</button>
+        </div>
+      </div>
+
       <div class="saved-panel settings-panel" id="settingsPanel">
         <button class="panel-label panel-label-toggle" onclick="openMenuPage('settingsPanel')" id="settingsPanelToggle">
           <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>
@@ -2603,6 +2624,7 @@
 <!-- Quote builder: uses js/app.js globals (reportData, getSavedReports, jsPDF…) -->
 <script src="js/quote.js"></script>
 <script src="js/price-book.js"></script>
+<script src="js/chemicals.js"></script>
 <script src="js/treatment-plan.js"></script>
 <script src="js/treatment.js"></script>
 <script src="js/bait.js"></script>

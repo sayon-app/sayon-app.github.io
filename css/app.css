@@ -5738,3 +5738,27 @@ body.dark-screen .pb-start { color: var(--yellow); }
 .ob-gst-row input { width: 20px; height: 20px; flex: none; margin-top: 1px; accent-color: var(--accent); }
 .ob-price-more { font-size: 11.5px; color: var(--text3); line-height: 1.5; margin: 2px 0 10px; text-align: left; width: 100%; }
 .quote-hint-link { background: none; border: none; padding: 0; font: inherit; color: var(--accent2); font-weight: 600; text-decoration: underline; cursor: pointer; }
+
+/* ── CHEMICAL REGISTER (js/chemicals.js) ───────────────────────────────── */
+.chem-add { width: 100%; margin: 6px 0 10px; }
+.chem-add[hidden], #chemReset[hidden] { display: none; }
+.chem-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.chem-card { border: 1px solid var(--border); border-radius: 12px; background: var(--surface2); }
+.chem-card > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 12px; min-height: 44px; cursor: pointer; }
+.chem-card > summary::-webkit-details-marker { display: none; }
+.chem-card[open] > summary .quote-fold-chev { transform: rotate(180deg); }
+.chem-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.chem-card-name { font-size: 14px; font-weight: 650; color: var(--text); }
+.chem-card-sub { font-size: 11.5px; color: var(--text3); line-height: 1.4; }
+.chem-card-body { display: flex; flex-direction: column; gap: 8px; padding: 0 12px 12px; }
+.chem-card-body .quote-link-btn { align-self: flex-start; }
+.chem-use { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.chem-links { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; font-weight: 600; }
+.chem-links a { color: var(--accent2); text-decoration: underline; min-height: 32px; display: inline-flex; align-items: center; }
+.chem-remove { color: var(--red, #b42318); }
+.treat-use .chem-links { margin-top: 4px; }
+.treat-use-pest { font-weight: 500; color: var(--text3); }
+.treat-use-note { font-size: 12px; color: #8a5a00; line-height: 1.4; margin-top: 4px; }
+body.dark-screen .treat-use-note { color: var(--yellow); }
+.treat-use-note[hidden], .treat-keep-rate[hidden] { display: none; }
+.treat-keep-rate { margin-top: 4px; }

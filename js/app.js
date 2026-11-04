@@ -14317,15 +14317,54 @@ async function buildReportPdf() {
   // Every page after the cover carries the header for the part it's in, so a
   // section that runs onto a new page is still labelled.
   let pageLabel = '';
-  function newPage() { doc.addPage(); compactHeader(pageLabel); _rowShade = false; }
+  // Where the page's own content starts: under the running header, and
+  // under a section title, subheading or intro that sits at the top of it.
+  // Anything starting there is at the top of its page, for keep().
+  let pageTopUntil = 0;
+  function newPage() { doc.addPage(); compactHeader(pageLabel); _rowShade = false; pageTopUntil = y; }
+  const atPageTop = () => y <= pageTopUntil + 0.5;
   function gap(n=5) { y += n; }
   // Starts a part of the report: on a fresh page when asked or when little of
-  // the page is left, otherwise straight after what came before.
+  // the page is left, otherwise straight after what came before. false (not
+  // just unset) means the part is drawn through keep(), which moves it to a
+  // fresh page itself if it doesn't fit.
   function startPart(label, freshPage) {
     pageLabel = label;
-    if (freshPage || y > 215) newPage(); else gap(8);
+    if (freshPage || (freshPage !== false && y > 215)) newPage();
+    else if (!atPageTop()) gap(8);
     _rowShade = false;
   }
+
+  // ── KEEPING A PART TOGETHER ───────────────────────────────────────────────
+  // keep(draw) draws a part where it falls, with draw(false). If it runs
+  // over onto another page and didn't start at the top of one, it's taken
+  // off again and drawn from a fresh page, with draw(true). So a part that
+  // fits on a page is never split across two, and a longer one starts at the
+  // top of its own page rather than part way down another. Taking it off
+  // cuts the pages it added and the page's drawing back to where they were.
+  function pdfState() {
+    const n = doc.internal.getNumberOfPages();
+    return { n, len: doc.internal.pages[n].length, y, pageNum, pageLabel, pageTopUntil, shade: _rowShade, photoNo, parts: { ...partPages },
+      font: doc.getFont(), size: doc.getFontSize(), text: doc.getTextColor() };
+  }
+  function restorePdfState(s) {
+    while (doc.internal.getNumberOfPages() > s.n) doc.deletePage(doc.internal.getNumberOfPages());
+    doc.setPage(s.n);
+    doc.internal.pages[s.n].length = s.len;
+    y = s.y; pageNum = s.pageNum; pageLabel = s.pageLabel; pageTopUntil = s.pageTopUntil; _rowShade = s.shade; photoNo = s.photoNo;
+    Object.keys(partPages).forEach(k => delete partPages[k]);
+    Object.assign(partPages, s.parts);
+    doc.setFont(s.font.fontName, s.font.fontStyle); doc.setFontSize(s.size); doc.setTextColor(s.text);
+  }
+  function keep(draw) {
+    const s = pdfState();
+    draw(false);
+    if (doc.internal.getNumberOfPages() === s.n || s.y <= s.pageTopUntil + 4) return;
+    restorePdfState(s);
+    draw(true);
+  }
+  // A subheading and its rows, kept together the same way.
+  function keepGroup(draw) { keep(fresh => { if (fresh) newPage(); draw(); }); }
 
   let pageNum = 1;
 
@@ -14359,6 +14398,7 @@ async function buildReportPdf() {
   function sectionTitle(title, no, keep = 30) {
     const num = no || '';
     if (y + 19 + keep > 277) newPage();
+    const top = atPageTop();
     gap(4);
     // As on the app's section headers: a blue line above, a soft blue wash
     // and a fine line below, all fading out to the right.
@@ -14377,6 +14417,7 @@ async function buildReportPdf() {
     doc.text(title, titleX, y+5.5);
     drawPdfFadeRule(doc, M, y+8.8, CW, 0.3);
     y += 15;
+    if (top) pageTopUntil = y;
   }
 
   // ── DATA ROW ──────────────────────────────────────────────────────────────
@@ -14463,11 +14504,13 @@ async function buildReportPdf() {
   // ── SUBHEADING ── a small label and rule over a group of rows
   function subhead(label) {
     if (y > 250) newPage();
+    const top = atPageTop();
     y += 3;
     doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...C.accentDark);
     doc.text(label, M, y); y += 2.2;
     doc.setFillColor(...C.accentLight); doc.rect(M, y, CW, 0.5, 'F'); y += 1.5;
     _rowShade = false;
+    if (top) pageTopUntil = y;
   }
 
   // Draws wrapped lines, carrying on over the page break where needed, so a
@@ -14771,9 +14814,11 @@ async function buildReportPdf() {
 
   // A short paragraph of body text.
   function para(text, size = 8, color = C.inkLight) {
+    const top = atPageTop();
     doc.setFont('helvetica','normal'); doc.setFontSize(size);
     flowLines(doc.splitTextToSize(text, CW), M, size * 0.54, color);
     y += 3;
+    if (top) pageTopUntil = y;
   }
   const co = getCompanyDetails();
   const clientPhone = reportData.jobClientPhone || document.getElementById('jobClientPhone')?.value?.trim();
@@ -14830,158 +14875,177 @@ async function buildReportPdf() {
   // 2. SUMMARY: the reader's questions in three groups (access, activity,
   // safety & risk), each answer pointing to the section with the detail.
   // ─────────────────────────────────────────────────────────────────────
-  startPart('Summary', true);
-  sectionTitle('SUMMARY', REPORT_PARTS.summary);
-  {
-    const { groups, next } = reportSummary();
+  // The summary is a page of its own. If it runs over, it's drawn again a
+  // little tighter, which brings all but the longest back onto one page.
+  // One that still runs over is followed straight on by the next part,
+  // rather than leaving its last few lines alone on a page.
+  const { groups: summaryGroups, next: summaryNext } = reportSummary();
+  function drawSummary(tight) {
+    startPart('Summary', true);
+    sectionTitle('SUMMARY', REPORT_PARTS.summary);
+    const groups = summaryGroups, next = summaryNext;
+    const T = tight ? { row: 7.6, line: 3.1, head: 6.2, groupGap: 2.5, item: 4, itemGap: 0.9, after: 2 }
+      : { row: 9, line: 3.4, head: 7, groupGap: 5, item: 4.3, itemGap: 1.8, after: 4 };
     const TONE = { bad: [C.danger, [253,242,240]], warn: [C.warn, [253,247,234]], good: [C.safe, [233,248,238]], none: [C.inkMuted, C.rowAlt] };
     const QW = CW - 72, chipW = 34, chipX = W - M - 26 - chipW;
     groups.forEach(g => {
       if (y + 22 > 276) newPage();
-      doc.setFillColor(...C.accentDark); doc.rect(M, y, CW, 7, 'F');
+      doc.setFillColor(...C.accentDark); doc.rect(M, y, CW, T.head, 'F');
       doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...C.white);
-      doc.text(g.title.toUpperCase(), M + 3, y + 4.8);
-      y += 7;
+      doc.text(g.title.toUpperCase(), M + 3, y + T.head - 2.2);
+      y += T.head;
       g.items.forEach(([q, answer, tone, section, detail], i) => {
         doc.setFont('helvetica','normal'); doc.setFontSize(7.2);
         const dl = detail ? doc.splitTextToSize(String(detail), QW).slice(0, 2) : [];
-        const h = 9 + dl.length * 3.4;
+        const h = T.row + dl.length * T.line;
         if (y + h > 278) newPage();
         if (i % 2 === 1) { doc.setFillColor(...C.rowAlt); doc.rect(M, y, CW, h, 'F'); }
         doc.setDrawColor(...C.ruleLight); doc.setLineWidth(0.25); doc.line(M, y + h, M + CW, y + h);
         doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...C.ink);
-        doc.text(q, M + 3, y + 5.6);
+        doc.text(q, M + 3, y + T.row - 3.4);
         if (dl.length) {
           doc.setFont('helvetica','normal'); doc.setFontSize(7.2); doc.setTextColor(...C.inkLight);
-          doc.text(dl, M + 3, y + 9.4, { lineHeightFactor: 1.25 });
+          doc.text(dl, M + 3, y + T.row + 0.4, { lineHeightFactor: tight ? 1.15 : 1.25 });
         }
         const [col, bg] = TONE[tone] || TONE.none;
-        doc.setFillColor(...bg); doc.roundedRect(chipX, y + 1.8, chipW, 5.6, 1, 1, 'F');
-        doc.setFillColor(...col); doc.rect(chipX, y + 1.8, 1.2, 5.6, 'F');
+        const chipY = y + T.row / 2 - 2.7;
+        doc.setFillColor(...bg); doc.roundedRect(chipX, chipY, chipW, 5.6, 1, 1, 'F');
+        doc.setFillColor(...col); doc.rect(chipX, chipY, 1.2, 5.6, 'F');
         doc.setFont('helvetica','bold'); doc.setTextColor(...col);
         doc.setFontSize(7.5);
         if (doc.getTextWidth(answer) > chipW - 3) doc.setFontSize(7.5 * (chipW - 3) / doc.getTextWidth(answer));
-        doc.text(answer, chipX + chipW / 2 + 0.6, y + 5.6, { align: 'center' });
+        doc.text(answer, chipX + chipW / 2 + 0.6, chipY + 3.8, { align: 'center' });
         doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);
-        doc.text(`See Section ${section}`, W - M - 2, y + 5.6, { align: 'right' });
+        doc.text(`See Section ${section}`, W - M - 2, y + T.row - 3.4, { align: 'right' });
         y += h;
       });
-      y += 5;
+      y += T.groupGap;
     });
 
     if (next.length) {
+      if (tight) y += 2.5;
       if (y + 14 > 270) newPage();
       doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...C.accentDark);
       doc.text('WHAT TO DO NEXT', M, y); y += 2.2;
       doc.setFillColor(...C.accentLight); doc.rect(M, y, CW, 0.5, 'F'); y += 5;
       next.forEach((item, i) => {
         const lines = doc.splitTextToSize(item, CW - 8);
-        if (y + lines.length * 4.3 > 276) newPage();
+        if (y + lines.length * T.item > 276) newPage();
         doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...C.accentDark);
         doc.text(`${i + 1}.`, M, y);
         doc.setFont('helvetica','normal'); doc.setTextColor(...C.ink);
         doc.text(lines, M + 6, y);
-        y += lines.length * 4.3 + 1.8;
+        y += lines.length * T.item + T.itemGap;
       });
-      y += 4;
+      y += T.after;
     }
     disclaimer('This summary gives the main results only. Read the full report, including the areas that could not be inspected, the limitations and the terms, before relying on it.');
   }
+  const summaryState = pdfState();
+  drawSummary(false);
+  if (doc.internal.getNumberOfPages() > summaryState.n + 1) { restorePdfState(summaryState); drawSummary(true); }
+  const summaryOnOnePage = doc.internal.getNumberOfPages() === summaryState.n + 1;
 
   // ─────────────────────────────────────────────────────────────────────
   // 3. ABOUT THE PROPERTY, with the limits that come with how it's built
   // and used printed beside the rows they belong to.
   // ─────────────────────────────────────────────────────────────────────
-  startPart('About the Property', true);
-  sectionTitle('ABOUT THE PROPERTY', REPORT_PARTS.property);
-  heroPhoto(frontPhoto, 70, 'Front of the property');
-  row('Structure Type', reportData.structureType);
-  row('Height', RENAMED_CHOICES.height[reportData.height] || reportData.height);
-  row('Wall Construction', reportData.wallConstruction);
-  row('Floor Type', reportData.floorType);
-  if (/slab/i.test(reportData.floorType || '')) {
-    gap(1.5);
-    disclaimer('Termites can enter a slab-on-ground building through cracks, joints and service pipes in the slab, and over its edge, where they cannot be seen. Keep the slab edge exposed and have the building inspected regularly.');
-    resetRowShade();
-  }
-  row('Roof Type', reportData.roofType);
-  row('Orientation', reportData.facadeDirection);
-  row('Year / Period of Construction', reportData.constructionEra);
-  // Asbestos is outside a timber pest inspection, so this is a general note
-  // for buildings of the period, not a rating of this property.
-  if (['1920s-1940s', '1945-1965', '1965-1985', '1985-2003'].includes(reportData.constructionEra)) {
-    gap(1.5);
-    disclaimer('Buildings from this period may contain asbestos-containing materials. This is not an asbestos inspection: nothing was tested or disturbed, and no opinion is given on whether asbestos is present. Have a licensed asbestos assessor check before any work that disturbs building materials.');
-    resetRowShade();
-  }
-  if (reportData.siteSurroundings) row('Surroundings', reportData.siteSurroundings);
-  if (reportData.siteSlope) row('Site Slope', reportData.siteSlope);
-  if (reportData.termiteHistory) row('Known Termite History', reportData.termiteHistory);
-  row('Occupancy Status', reportData.occupancyStatus);
-  if (reportData.furnishing) row('Furnishing', reportData.furnishing);
-  // The furniture note follows what was recorded about furniture; without
-  // that, an occupied home is taken to be furnished, as before.
-  const furnished = reportData.furnishing
-    ? !/^unfurnished/i.test(reportData.furnishing)
-    : /occupied|tenanted|owner/i.test(reportData.occupancyStatus || '');
-  if (furnished) {
-    gap(1.5);
-    disclaimer(`The property was ${/partly/i.test(reportData.furnishing || '') ? 'partly furnished' : (reportData.furnishing ? 'furnished' : 'occupied and furnished')} at the time of inspection. Furniture, stored goods and floor coverings hid parts of the walls and floors, and timber pest activity or damage may be concealed behind them.`);
-    resetRowShade();
-  }
-
-  // The termite management system, and whether it can still be inspected.
-  subhead('TERMITE MANAGEMENT SYSTEM');
-  row('Existing System', RENAMED_CHOICES.existingSystem[reportData.existingSystem] || reportData.existingSystem || 'None recorded');
-  if (reportData.existingSystemOther) row('Specific System Name', reportData.existingSystemOther);
-  row('Durable Notice Present (Meter Box)', reportData.durableNoticePresent, true);
-  if (hasIdentifiedSystem(reportData.existingSystem)) {
-    row('Hard Landscaping Adjacent', reportData.hardLandscaping, 'plain');
-    row('25mm Inspection Zone Visible', reportData.zone25mmVisible, true);
-    row('Soft Landscaping Adjacent', reportData.softLandscaping, 'plain');
-    row('75mm Inspection Zone Visible', reportData.zone75mmVisible, true);
-    row('Ant Cap / Strip Shield Joins Soldered', reportData.antCapSoldered, true);
-    const concerns = [];
-    if (reportData.durableNoticePresent === 'NO') concerns.push('Durable notice sticker not found in meter box');
-    if (reportData.hardLandscaping === 'YES' && reportData.zone25mmVisible === 'NO') concerns.push('25mm inspection zone not visible against hard landscaping');
-    if (reportData.softLandscaping === 'YES' && reportData.zone75mmVisible === 'NO') concerns.push('75mm inspection zone not visible against soft landscaping');
-    if (reportData.antCapSoldered === 'NO') concerns.push('Ant cap / strip shield joins not soldered');
-    if (concerns.length > 0) {
-      gap(3);
-      callout('System verification concern', concerns.join('. ') + '. These checks confirm the system can still be inspected, not that it works. Rectification and re-inspection are recommended.', 'bad');
+  keep(fresh => {
+    startPart('About the Property', fresh || summaryOnOnePage);
+    sectionTitle('ABOUT THE PROPERTY', REPORT_PARTS.property);
+    heroPhoto(frontPhoto, 70, 'Front of the property');
+    row('Structure Type', reportData.structureType);
+    row('Height', RENAMED_CHOICES.height[reportData.height] || reportData.height);
+    row('Wall Construction', reportData.wallConstruction);
+    row('Floor Type', reportData.floorType);
+    if (/slab/i.test(reportData.floorType || '')) {
+      gap(1.5);
+      disclaimer('Termites can enter a slab-on-ground building through cracks, joints and service pipes in the slab, and over its edge, where they cannot be seen. Keep the slab edge exposed and have the building inspected regularly.');
+      resetRowShade();
     }
-  }
-  renderSectionPhotosInPDF('durable', 'Durable Notice');
-  notesBlock('property');
-  // Older reports could hold more than one front photo: the rest print here.
-  renderSectionPhotosInPDF(null, 'Property', ((reportData.photosBySection || {}).general || []).filter(p => p !== frontPhoto));
+    row('Roof Type', reportData.roofType);
+    row('Orientation', reportData.facadeDirection);
+    row('Year / Period of Construction', reportData.constructionEra);
+    // Asbestos is outside a timber pest inspection, so this is a general note
+    // for buildings of the period, not a rating of this property.
+    if (['1920s-1940s', '1945-1965', '1965-1985', '1985-2003'].includes(reportData.constructionEra)) {
+      gap(1.5);
+      disclaimer('Buildings from this period may contain asbestos-containing materials. This is not an asbestos inspection: nothing was tested or disturbed, and no opinion is given on whether asbestos is present. Have a licensed asbestos assessor check before any work that disturbs building materials.');
+      resetRowShade();
+    }
+    if (reportData.siteSurroundings) row('Surroundings', reportData.siteSurroundings);
+    if (reportData.siteSlope) row('Site Slope', reportData.siteSlope);
+    if (reportData.termiteHistory) row('Known Termite History', reportData.termiteHistory);
+    row('Occupancy Status', reportData.occupancyStatus);
+    if (reportData.furnishing) row('Furnishing', reportData.furnishing);
+    // The furniture note follows what was recorded about furniture; without
+    // that, an occupied home is taken to be furnished, as before.
+    const furnished = reportData.furnishing
+      ? !/^unfurnished/i.test(reportData.furnishing)
+      : /occupied|tenanted|owner/i.test(reportData.occupancyStatus || '');
+    if (furnished) {
+      gap(1.5);
+      disclaimer(`The property was ${/partly/i.test(reportData.furnishing || '') ? 'partly furnished' : (reportData.furnishing ? 'furnished' : 'occupied and furnished')} at the time of inspection. Furniture, stored goods and floor coverings hid parts of the walls and floors, and timber pest activity or damage may be concealed behind them.`);
+      resetRowShade();
+    }
+
+    // The termite management system, and whether it can still be inspected.
+    keepGroup(() => {
+      subhead('TERMITE MANAGEMENT SYSTEM');
+      row('Existing System', RENAMED_CHOICES.existingSystem[reportData.existingSystem] || reportData.existingSystem || 'None recorded');
+      if (reportData.existingSystemOther) row('Specific System Name', reportData.existingSystemOther);
+      row('Durable Notice Present (Meter Box)', reportData.durableNoticePresent, true);
+      if (hasIdentifiedSystem(reportData.existingSystem)) {
+        row('Hard Landscaping Adjacent', reportData.hardLandscaping, 'plain');
+        row('25mm Inspection Zone Visible', reportData.zone25mmVisible, true);
+        row('Soft Landscaping Adjacent', reportData.softLandscaping, 'plain');
+        row('75mm Inspection Zone Visible', reportData.zone75mmVisible, true);
+        row('Ant Cap / Strip Shield Joins Soldered', reportData.antCapSoldered, true);
+        const concerns = [];
+        if (reportData.durableNoticePresent === 'NO') concerns.push('Durable notice sticker not found in meter box');
+        if (reportData.hardLandscaping === 'YES' && reportData.zone25mmVisible === 'NO') concerns.push('25mm inspection zone not visible against hard landscaping');
+        if (reportData.softLandscaping === 'YES' && reportData.zone75mmVisible === 'NO') concerns.push('75mm inspection zone not visible against soft landscaping');
+        if (reportData.antCapSoldered === 'NO') concerns.push('Ant cap / strip shield joins not soldered');
+        if (concerns.length > 0) {
+          gap(3);
+          callout('System verification concern', concerns.join('. ') + '. These checks confirm the system can still be inspected, not that it works. Rectification and re-inspection are recommended.', 'bad');
+        }
+      }
+    });
+    renderSectionPhotosInPDF('durable', 'Durable Notice');
+    notesBlock('property');
+    // Older reports could hold more than one front photo: the rest print here.
+    renderSectionPhotosInPDF(null, 'Property', ((reportData.photosBySection || {}).general || []).filter(p => p !== frontPhoto));
+  });
 
   // ─────────────────────────────────────────────────────────────────────
   // 4. AREAS INSPECTED: every area, how much of it was inspected, and
   // what was found there.
   // ─────────────────────────────────────────────────────────────────────
-  startPart('Areas Inspected');
-  sectionTitle('AREAS INSPECTED', REPORT_PARTS.areas);
-  resetRowShade();
   const AREA_STATUS_TEXT = { INSPECTED:'Inspected', PARTIAL:`Inspected with limits (see Section ${REPORT_PARTS.access})`, NOT:'NOT INSPECTED' };
   const anyStatus = Object.keys(OBS_ZONES).some(z => areaStatusOf(z));
   const noneRow = complete => row('Result', complete ? 'None' : 'Not recorded');
-  para(`Each area of the property, how much of it could be inspected, and whether timber pest evidence was found there. Why an area could not be fully inspected is set out in Section ${REPORT_PARTS.access}.`);
-  Object.entries(OBS_ZONES).forEach(([zoneId, zone]) => {
-    const st = areaStatusOf(zoneId);
-    // An area the property doesn't have isn't listed.
-    if (!st || st === 'NA') return;
-    const result = areaResultOf(zoneId);
-    // With no result marked, evidence recorded elsewhere that names the area
-    // still prints, rather than "not recorded" over a finding in it.
-    const ev = result === 'FOUND' || !result ? areaEvidence(zoneId) : [];
-    const resultText = !result && !ev.length ? 'Result not recorded'
-      : ev.length ? `Timber pest evidence found, see ${ev.join('; ')}` : AREA_RESULT_TEXT[result];
-    row(zone.label, AREA_STATUS_TEXT[st] + (areaWasEntered(zoneId) ? `. ${resultText}.` : ''));
+  keep(fresh => {
+    startPart('Areas Inspected', fresh);
+    sectionTitle('AREAS INSPECTED', REPORT_PARTS.areas);
+    resetRowShade();
+    para(`Each area of the property, how much of it could be inspected, and whether timber pest evidence was found there. Why an area could not be fully inspected is set out in Section ${REPORT_PARTS.access}.`);
+    Object.entries(OBS_ZONES).forEach(([zoneId, zone]) => {
+      const st = areaStatusOf(zoneId);
+      // An area the property doesn't have isn't listed.
+      if (!st || st === 'NA') return;
+      const result = areaResultOf(zoneId);
+      // With no result marked, evidence recorded elsewhere that names the area
+      // still prints, rather than "not recorded" over a finding in it.
+      const ev = result === 'FOUND' || !result ? areaEvidence(zoneId) : [];
+      const resultText = !result && !ev.length ? 'Result not recorded'
+        : ev.length ? `Timber pest evidence found, see ${ev.join('; ')}` : AREA_RESULT_TEXT[result];
+      row(zone.label, AREA_STATUS_TEXT[st] + (areaWasEntered(zoneId) ? `. ${resultText}.` : ''));
+    });
+    if (!anyStatus) noneRow(false);
+    notesBlock('obstructions');
+    renderSectionPhotosInPDF('obstructions', 'Areas Inspected');
   });
-  if (!anyStatus) noneRow(false);
-  notesBlock('obstructions');
-  renderSectionPhotosInPDF('obstructions', 'Areas Inspected');
 
   // ─────────────────────────────────────────────────────────────────────
   // 5. AREAS UNABLE TO BE INSPECTED, AND WHY: hindered access (temporary
@@ -14989,294 +15053,318 @@ async function buildReportPdf() {
   // areas to which access should be gained, and whether an invasive
   // inspection is recommended because of them. See accessLimits().
   // ─────────────────────────────────────────────────────────────────────
-  startPart('Areas Unable to Be Inspected');
-  sectionTitle('AREAS UNABLE TO BE INSPECTED, AND WHY', REPORT_PARTS.access);
-  const acc = accessLimits();
-  const noLimits = !areasNotFullyInspected().length;
+  keep(fresh => {
+    startPart('Areas Unable to Be Inspected', fresh);
+    sectionTitle('AREAS UNABLE TO BE INSPECTED, AND WHY', REPORT_PARTS.access);
+    const acc = accessLimits();
+    const noLimits = !areasNotFullyInspected().length;
 
-  subhead('OBSTRUCTIONS: TEMPORARY, AT THE TIME OF INSPECTION');
-  acc.hindered.forEach(([label, text]) => row(label, text));
-  if (!acc.hindered.length) noneRow(hinderedAnswer() === 'NO' || (acc.allMarked && noLimits));
-  gap(3);
+    keepGroup(() => {
+      subhead('OBSTRUCTIONS: TEMPORARY, AT THE TIME OF INSPECTION');
+      acc.hindered.forEach(([label, text]) => row(label, text));
+      if (!acc.hindered.length) noneRow(hinderedAnswer() === 'NO' || (acc.allMarked && noLimits));
+      gap(3);
+    });
 
-  subhead('RESTRICTED ACCESS: PERMANENT RESTRICTION OR LOCKED ENTRY');
-  acc.restricted.forEach(([label, text]) => row(label, text));
-  if (!acc.restricted.length) noneRow(acc.allMarked);
-  gap(3);
+    keepGroup(() => {
+      subhead('RESTRICTED ACCESS: PERMANENT RESTRICTION OR LOCKED ENTRY');
+      acc.restricted.forEach(([label, text]) => row(label, text));
+      if (!acc.restricted.length) noneRow(acc.allMarked);
+      gap(3);
+    });
 
-  subhead('HIGH RISK AREAS TO WHICH ACCESS SHOULD BE GAINED, OR FULLY GAINED');
-  if (acc.highRisk) {
-    row('Access should be gained to', acc.highRisk);
-    gap(3);
-    disclaimer('These areas may show evidence of timber pest activity or damage. Access should be gained, or fully gained, and a further inspection carried out. Until then it must be assumed that timber pest activity or damage may exist in them.');
-  } else {
-    noneRow(acc.allMarked);
-  }
-  gap(3);
+    keepGroup(() => {
+      subhead('HIGH RISK AREAS TO WHICH ACCESS SHOULD BE GAINED, OR FULLY GAINED');
+      if (acc.highRisk) {
+        row('Access should be gained to', acc.highRisk);
+        gap(3);
+        disclaimer('These areas may show evidence of timber pest activity or damage. Access should be gained, or fully gained, and a further inspection carried out. Until then it must be assumed that timber pest activity or damage may exist in them.');
+      } else {
+        noneRow(acc.allMarked);
+      }
+      gap(3);
+    });
 
-  subhead('INVASIVE INSPECTION');
-  row('Invasive Inspection Recommended', reportData.invasiveInspection || 'Not recorded');
-  if (reportData.invasiveInspectionDetails) row('Where, Why and When', reportData.invasiveInspectionDetails);
-  if (reportData.invasiveInspection === 'YES') {
-    gap(3);
-    disclaimer('An invasive inspection may involve cutting, drilling or removing linings, floor coverings or timbers to see inside them. It needs the owner\'s written permission and a separate agreement.');
-  }
-  notesBlock('restrictions');
-  renderSectionPhotosInPDF(null, 'Obstructions and restricted access', accessSpotPhotos());
-  renderSectionPhotosInPDF('restrictions', 'Areas Unable to Be Inspected');
+    keepGroup(() => {
+      subhead('INVASIVE INSPECTION');
+      row('Invasive Inspection Recommended', reportData.invasiveInspection || 'Not recorded');
+      if (reportData.invasiveInspectionDetails) row('Where, Why and When', reportData.invasiveInspectionDetails);
+      if (reportData.invasiveInspection === 'YES') {
+        gap(3);
+        disclaimer('An invasive inspection may involve cutting, drilling or removing linings, floor coverings or timbers to see inside them. It needs the owner\'s written permission and a separate agreement.');
+      }
+    });
+    notesBlock('restrictions');
+    renderSectionPhotosInPDF(null, 'Obstructions and restricted access', accessSpotPhotos());
+    renderSectionPhotosInPDF('restrictions', 'Areas Unable to Be Inspected');
+  });
 
   // ─────────────────────────────────────────────────────────────────────
   // 6. FINDINGS
   // ─────────────────────────────────────────────────────────────────────
-  startPart('Findings');
-  sectionTitle('FINDINGS', REPORT_PARTS.findings, 85);
+  keep(fresh => {
+    startPart('Findings', fresh);
+    sectionTitle('FINDINGS', REPORT_PARTS.findings, 85);
 
-  const findings = (reportData.findings && reportData.findings.length > 0)
-    ? reportData.findings
-    : [{ termiteActivity: reportData.termiteActivity, species: reportData.species, damageDescription: reportData.damageDescription, activityLocation: reportData.activityLocation, nestLocated: reportData.nestLocated, structuralConcern: reportData.structuralConcern }];
+    const findings = (reportData.findings && reportData.findings.length > 0)
+      ? reportData.findings
+      : [{ termiteActivity: reportData.termiteActivity, species: reportData.species, damageDescription: reportData.damageDescription, activityLocation: reportData.activityLocation, nestLocated: reportData.nestLocated, structuralConcern: reportData.structuralConcern }];
 
-  // ── Finding card renderer ────────────────────────────────────────────
-  // One card per termite or borer finding: a coloured header with the
-  // status, then the labelled facts, the builder referral and the photos.
-  // card: { heading, status, tone (bad | warn | none), species, fields:
-  // [[label, value, colour?]], referral, photosId }
-  function pestCard(card) {
-    const actCol = card.tone === 'bad' ? C.danger : card.tone === 'warn' ? C.warn : C.inkMuted;
-    const actBg  = card.tone === 'bad' ? [253,242,240] : card.tone === 'warn' ? [253,247,234] : [248,246,243];
-    const fields = card.fields.filter(([, v]) => v && String(v).trim());
-    const lines  = fields.reduce((n, [, v]) => n + doc.splitTextToSize(String(v), CW - 12).length, 0);
-    const cardEstH = 18 + (card.species ? 17 : 0) + fields.length * 9.5 + lines * 4.5 + (card.referral ? 20 : 0) + 8;
+    // ── Finding card renderer ────────────────────────────────────────────
+    // One card per termite or borer finding: a coloured header with the
+    // status, then the labelled facts, the builder referral and the photos.
+    // card: { heading, status, tone (bad | warn | none), species, fields:
+    // [[label, value, colour?]], referral, photosId }
+    // A card is kept whole on one page (see keep()); one too long for a
+    // page starts at the top of one.
+    function pestCard(card) {
+      const actCol = card.tone === 'bad' ? C.danger : card.tone === 'warn' ? C.warn : C.inkMuted;
+      const actBg  = card.tone === 'bad' ? [253,242,240] : card.tone === 'warn' ? [253,247,234] : [248,246,243];
+      const fields = card.fields.filter(([, v]) => v && String(v).trim());
+      keep(fresh => {
+        if (fresh) newPage();
+        const cardStartY = y, cardStartPage = doc.internal.getNumberOfPages();
+        const bodyPad = 6;
+        const bodyX   = M + bodyPad;
+        const bodyW   = CW - bodyPad * 2;
 
-    if (y + Math.min(cardEstH, 60) > 275) newPage();
+        // Header
+        const headerH = 13;
+        doc.setFillColor(...actBg); doc.rect(M, y, CW, headerH, 'F');
+        doc.setFillColor(...actCol); doc.rect(M, y, 1.5, headerH, 'F');
+        doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);
+        doc.text(card.heading, M+8, y+5.5);
+        doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...actCol);
+        doc.text(card.status, M+8, y+10.5);
+        y += headerH + 5;
 
-    const cardStartY = y, cardStartPage = doc.internal.getNumberOfPages();
-    const bodyPad = 6;
-    const bodyX   = M + bodyPad;
-    const bodyW   = CW - bodyPad * 2;
+        // Species
+        if (card.species) {
+          doc.setFillColor(245,243,240); doc.roundedRect(bodyX, y, bodyW, 10, 1, 1, 'F');
+          doc.setDrawColor(...C.rule); doc.setLineWidth(0.3); doc.roundedRect(bodyX, y, bodyW, 10, 1, 1, 'D');
+          doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);
+          doc.text('SPECIES / GENUS', bodyX+4, y+4.5);
+          doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...C.ink);
+          doc.text(card.species, bodyX+4, y+8.5);
+          y += 17;
+        }
 
-    // Header
-    const headerH = 13;
-    doc.setFillColor(...actBg); doc.rect(M, y, CW, headerH, 'F');
-    doc.setFillColor(...actCol); doc.rect(M, y, 1.5, headerH, 'F');
-    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);
-    doc.text(card.heading, M+8, y+5.5);
-    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...actCol);
-    doc.text(card.status, M+8, y+10.5);
-    y += headerH + 5;
+        // The facts, each a small label over its value. A coloured value is a
+        // short answer (YES / NO), set in bold.
+        fields.forEach(([label, value, colour]) => {
+          if (y > 268) newPage();
+          doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
+          doc.text(label.toUpperCase(), bodyX, y); y += 4.5;
+          doc.setFont('helvetica', colour ? 'bold' : 'normal'); doc.setFontSize(8.5); doc.setTextColor(...(colour || C.ink));
+          const w = doc.splitTextToSize(String(value), bodyW);
+          if (y + w.length * 4.5 > 278) newPage();
+          doc.text(w, bodyX, y); y += w.length * 4.5 + 3.5;
+        });
 
-    // Species
-    if (card.species) {
-      doc.setFillColor(245,243,240); doc.roundedRect(bodyX, y, bodyW, 10, 1, 1, 'F');
-      doc.setDrawColor(...C.rule); doc.setLineWidth(0.3); doc.roundedRect(bodyX, y, bodyW, 10, 1, 1, 'D');
-      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);
-      doc.text('SPECIES / GENUS', bodyX+4, y+4.5);
-      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...C.ink);
-      doc.text(card.species, bodyX+4, y+8.5);
-      y += 17;
+        // Builder / engineer referral
+        if (card.referral) {
+          callout('Builder or engineer referral', 'The inspector recommends a licensed builder or structural engineer assess this damage, and any effect on the structure, before work proceeds.', 'bad', bodyX, bodyW);
+        }
+
+        // This finding's own photos, inside its card.
+        const fPhotos = card.photosId ? ((reportData.photosBySection || {})[findingPhotoSection(card.photosId)] || []) : [];
+        if (fPhotos.length) {
+          // The label goes over with the first row of photos, never alone.
+          const firstRowH = ((bodyW - 5) / 2) * 0.72 + 12;
+          if (y + 3 + firstRowH > 280) newPage();
+          doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
+          doc.text('PHOTOS', bodyX, y); y += 3;
+          photoGrid(fPhotos, bodyX, bodyW);
+        }
+
+        // A card that ends on a line of text needs less room below it.
+        y += card.referral || fPhotos.length ? 3 : 0;
+        // The outline only fits a card that stayed on one page.
+        if (doc.internal.getNumberOfPages() === cardStartPage) {
+          doc.setDrawColor(...C.rule); doc.setLineWidth(0.4);
+          doc.rect(M, cardStartY, CW, y - cardStartY, 'D');
+        }
+        y += 8;
+      });
     }
 
-    // The facts, each a small label over its value. A coloured value is a
-    // short answer (YES / NO), set in bold.
-    fields.forEach(([label, value, colour]) => {
-      if (y > 268) newPage();
-      doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
-      doc.text(label.toUpperCase(), bodyX, y); y += 4.5;
-      doc.setFont('helvetica', colour ? 'bold' : 'normal'); doc.setFontSize(8.5); doc.setTextColor(...(colour || C.ink));
-      const w = doc.splitTextToSize(String(value), bodyW);
-      if (y + w.length * 4.5 > 278) newPage();
-      doc.text(w, bodyX, y); y += w.length * 4.5 + 3.5;
+    function findingCard(f, idx) {
+      const activity = (f.termiteActivity || '').toUpperCase();
+      const nest = f.nestLocated === 'YES' ? ['YES', C.danger] : f.nestLocated ? ['NO', C.safe] : ['NOT RECORDED', C.inkMuted];
+      pestCard({
+        heading: `TERMITE FINDING ${idx + 1}`,
+        status: activity === 'ACTIVE' ? 'LIVE TERMITES PRESENT' : activity === 'INACTIVE' ? 'EVIDENCE ONLY — NO LIVE TERMITES' : activity ? 'NO ACTIVITY FOUND' : 'NOT RECORDED',
+        tone: activity === 'ACTIVE' ? 'bad' : activity === 'INACTIVE' ? 'warn' : 'none',
+        species: f.species && f.species.trim(),
+        fields: [
+          ['Location of activity', f.activityLocation],
+          ['Timber affected', f.timberAffected],
+          ['Damage / workings description', f.damageDescription],
+          ['Termite nest found?', nest[0], nest[1]],
+        ],
+        referral: f.structuralConcern === 'YES',
+        photosId: f.id,
+      });
+    }
+
+    function borerCard(b, idx) {
+      pestCard({
+        heading: `BORER FINDING ${idx + 1}`,
+        status: b.borerActivity === 'ACTIVE' ? 'ACTIVE BORERS — FRESH FRASS OR HOLES' : 'OLD BORER DAMAGE — NOTHING FRESH',
+        tone: b.borerActivity === 'ACTIVE' ? 'bad' : 'warn',
+        fields: [
+          ['Location', b.location],
+          ['Timber affected', b.timberAffected],
+          ['Borer type', b.borerType],
+          ['What was seen', b.description],
+        ],
+        referral: b.structuralConcern === 'YES',
+        photosId: b.id,
+      });
+    }
+
+    subhead('TERMITES');
+    // A report with nothing recorded about termites says so in a row, rather
+    // than printing an empty "Not recorded" finding card.
+    const findingRecorded = f => ['termiteActivity','species','activityLocation','timberAffected','damageDescription','nestLocated','structuralConcern']
+      .some(k => f[k] && String(f[k]).trim()) || ((reportData.photosBySection || {})[findingPhotoSection(f.id)] || []).length;
+    if (findings.some(findingRecorded)) findings.forEach((f, idx) => findingCard(f, idx));
+    else { row('Termite Activity', 'Not recorded'); gap(4); }
+
+    // Borers, decay and delignification: the other timber pests AS 4349.3
+    // covers. Always printed, so an unanswered field reads "Not recorded"
+    // rather than silently implying "none found" (row() drops empty values).
+    keepGroup(() => {
+      subhead('BORERS, WOOD DECAY & CHEMICAL DELIGNIFICATION');
+      row('Borers of Seasoned Timber', reportData.borerActivity || 'Not recorded');
+      const borerCards = shownBorerFindings();
+      if (borerCards.length) { gap(4); borerCards.forEach(borerCard); }
+      row('Wood Decay Fungi (Rot)', reportData.decayFound || 'Not recorded');
+      if (reportData.decayDetails) row('Wood Decay: What Was Seen', reportData.decayDetails);
+      if (reportData.decayWhere) row('Wood Decay: Where', reportData.decayWhere);
+      row('Chemical Delignification', reportData.delignification || 'Not recorded');
+      if (reportData.delignificationDetails) row('Delignification: What Was Seen', reportData.delignificationDetails);
+      if (reportData.delignificationWhere) row('Delignification: Where', reportData.delignificationWhere);
+      gap(3);
     });
 
-    // Builder / engineer referral
-    if (card.referral) {
-      callout('Builder or engineer referral', 'The inspector recommends a licensed builder or structural engineer assess this damage, and any effect on the structure, before work proceeds.', 'bad', bodyX, bodyW);
-    }
+    keepGroup(() => {
+      subhead('PREVIOUS TERMITE TREATMENT');
+      row('Evidence of Previous Treatment', reportData.previousTreatment || 'Not recorded');
+      if (reportData.previousTreatmentDetails) row('What Was Seen', reportData.previousTreatmentDetails);
+      if (reportData.previousTreatmentWhere) row('Where', reportData.previousTreatmentWhere);
+      gap(5);
 
-    // This finding's own photos, inside its card.
-    const fPhotos = card.photosId ? ((reportData.photosBySection || {})[findingPhotoSection(card.photosId)] || []) : [];
-    if (fPhotos.length) {
-      // The label goes over with the first row of photos, never alone.
-      const firstRowH = ((bodyW - 5) / 2) * 0.72 + 12;
-      if (y + 3 + firstRowH > 280) newPage();
-      doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
-      doc.text('PHOTOS', bodyX, y); y += 3;
-      photoGrid(fPhotos, bodyX, bodyW);
-    }
-
-    // A card that ends on a line of text needs less room below it.
-    y += card.referral || fPhotos.length ? 3 : 0;
-    // The outline only fits a card that stayed on one page.
-    if (doc.internal.getNumberOfPages() === cardStartPage) {
-      doc.setDrawColor(...C.rule); doc.setLineWidth(0.4);
-      doc.rect(M, cardStartY, CW, y - cardStartY, 'D');
-    }
-    y += 8;
-  }
-
-  function findingCard(f, idx) {
-    const activity = (f.termiteActivity || '').toUpperCase();
-    const nest = f.nestLocated === 'YES' ? ['YES', C.danger] : f.nestLocated ? ['NO', C.safe] : ['NOT RECORDED', C.inkMuted];
-    pestCard({
-      heading: `TERMITE FINDING ${idx + 1}`,
-      status: activity === 'ACTIVE' ? 'LIVE TERMITES PRESENT' : activity === 'INACTIVE' ? 'EVIDENCE ONLY — NO LIVE TERMITES' : activity ? 'NO ACTIVITY FOUND' : 'NOT RECORDED',
-      tone: activity === 'ACTIVE' ? 'bad' : activity === 'INACTIVE' ? 'warn' : 'none',
-      species: f.species && f.species.trim(),
-      fields: [
-        ['Location of activity', f.activityLocation],
-        ['Timber affected', f.timberAffected],
-        ['Damage / workings description', f.damageDescription],
-        ['Termite nest found?', nest[0], nest[1]],
-      ],
-      referral: f.structuralConcern === 'YES',
-      photosId: f.id,
+      disclaimer('This inspection describes the location and visible extent of timber pest activity only. It does not assess structural damage severity — a licensed builder or structural engineer must be engaged for that purpose. Where live termites are found, concealed activity must be assumed in all areas not inspected.');
     });
-  }
-
-  function borerCard(b, idx) {
-    pestCard({
-      heading: `BORER FINDING ${idx + 1}`,
-      status: b.borerActivity === 'ACTIVE' ? 'ACTIVE BORERS — FRESH FRASS OR HOLES' : 'OLD BORER DAMAGE — NOTHING FRESH',
-      tone: b.borerActivity === 'ACTIVE' ? 'bad' : 'warn',
-      fields: [
-        ['Location', b.location],
-        ['Timber affected', b.timberAffected],
-        ['Borer type', b.borerType],
-        ['What was seen', b.description],
-      ],
-      referral: b.structuralConcern === 'YES',
-      photosId: b.id,
-    });
-  }
-
-  subhead('TERMITES');
-  // A report with nothing recorded about termites says so in a row, rather
-  // than printing an empty "Not recorded" finding card.
-  const findingRecorded = f => ['termiteActivity','species','activityLocation','timberAffected','damageDescription','nestLocated','structuralConcern']
-    .some(k => f[k] && String(f[k]).trim()) || ((reportData.photosBySection || {})[findingPhotoSection(f.id)] || []).length;
-  if (findings.some(findingRecorded)) findings.forEach((f, idx) => findingCard(f, idx));
-  else { row('Termite Activity', 'Not recorded'); gap(4); }
-
-  // Borers, decay and delignification: the other timber pests AS 4349.3
-  // covers. Always printed, so an unanswered field reads "Not recorded"
-  // rather than silently implying "none found" (row() drops empty values).
-  subhead('BORERS, WOOD DECAY & CHEMICAL DELIGNIFICATION');
-  row('Borers of Seasoned Timber', reportData.borerActivity || 'Not recorded');
-  const borerCards = shownBorerFindings();
-  if (borerCards.length) { gap(4); borerCards.forEach(borerCard); }
-  row('Wood Decay Fungi (Rot)', reportData.decayFound || 'Not recorded');
-  if (reportData.decayDetails) row('Wood Decay: What Was Seen', reportData.decayDetails);
-  if (reportData.decayWhere) row('Wood Decay: Where', reportData.decayWhere);
-  row('Chemical Delignification', reportData.delignification || 'Not recorded');
-  if (reportData.delignificationDetails) row('Delignification: What Was Seen', reportData.delignificationDetails);
-  if (reportData.delignificationWhere) row('Delignification: Where', reportData.delignificationWhere);
-  gap(3);
-
-  subhead('PREVIOUS TERMITE TREATMENT');
-  row('Evidence of Previous Treatment', reportData.previousTreatment || 'Not recorded');
-  if (reportData.previousTreatmentDetails) row('What Was Seen', reportData.previousTreatmentDetails);
-  if (reportData.previousTreatmentWhere) row('Where', reportData.previousTreatmentWhere);
-  gap(5);
-
-  disclaimer('This inspection describes the location and visible extent of timber pest activity only. It does not assess structural damage severity — a licensed builder or structural engineer must be engaged for that purpose. Where live termites are found, concealed activity must be assumed in all areas not inspected.');
-  notesBlock('findings');
-  gap(4);
-  renderSectionPhotosInPDF('findings', 'Findings');
+    notesBlock('findings');
+    gap(4);
+    renderSectionPhotosInPDF('findings', 'Findings');
+  });
 
   // ─────────────────────────────────────────────────────────────────────
   // 7. CONDUCIVE CONDITIONS. A condition that was found carries a line on
   // why it matters.
   // ─────────────────────────────────────────────────────────────────────
-  startPart('Conducive Conditions');
-  sectionTitle('CONDUCIVE CONDITIONS', REPORT_PARTS.conducive);
-  resetRowShade();
-  para('Conditions that make timber pest attack more likely. Each one found is explained, and should be fixed.');
-  const WHY_IT_MATTERS = {
-    waterLeaks: 'Leaking water keeps timber and soil damp, which attracts termites and lets wood decay start.',
-    moistureReadings: 'Damp timber and building elements attract termites and let wood decay start.',
-    siteDrainage: 'Water lying around the building keeps the soil damp, which attracts termites.',
-    subfloorDrainage: 'Water lying in the subfloor keeps it damp, which attracts termites and lets wood decay start.',
-    subfloorVentilation: 'A poorly ventilated subfloor stays damp, which attracts termites and lets wood decay start.',
-    timberSoil: 'Timber touching the soil gives termites a hidden way into the timber, and from there into the building.',
-    slabEdge: 'A covered slab edge lets termites enter the building out of sight. Keep the slab edge exposed so it can be inspected.',
-    weepHoles: 'Weep holes covered by soil, paving or garden beds give termites a hidden way into the wall cavity.',
-    antCapping: 'Ant caps do not stop termites, but make them build their mud leads in the open where they can be seen. Gaps or missing caps let them pass unseen.',
-    nonDurableTimber: 'Untreated or non-durable timber in damp areas is readily attacked by termites and wood decay.',
-    mouldSeen: 'Mould is a sign of damp conditions, which attract termites and let wood decay start. This is not a mould inspection, and no opinion is given on the mould itself.',
-  };
-  const ADVERSE = { waterLeaks: ['YES'], moistureReadings: ['YES'], siteDrainage: ['POOR'], subfloorDrainage: ['POOR'], subfloorVentilation: ['POOR'], mouldSeen: ['YES'],
-    timberSoil: ['YES'], slabEdge: ['OBSTRUCTED'], weepHoles: ['BRIDGED'], antCapping: ['GAPS', 'NONE'], nonDurableTimber: ['YES'] };
-  function condRow(label, key, shown) {
-    const v = reportData[key];
-    row(label, shown || v, v && (ADVERSE[key] || []).includes(v) ? 'bad' : undefined);
-    if (v && (ADVERSE[key] || []).includes(v) && WHY_IT_MATTERS[key]) {
-      doc.setFont('helvetica','italic'); doc.setFontSize(7.3);
-      const lines = doc.splitTextToSize(WHY_IT_MATTERS[key], CW - 8);
-      if (y + lines.length * 3.6 + 3 > 280) newPage();
-      doc.setTextColor(...C.inkLight);
-      doc.text(lines, M + 3, y + 3.6); y += lines.length * 3.6 + 2.5;
-      doc.setFont('helvetica','normal');
-      resetRowShade();
+  keep(fresh => {
+    startPart('Conducive Conditions', fresh);
+    sectionTitle('CONDUCIVE CONDITIONS', REPORT_PARTS.conducive);
+    resetRowShade();
+    para('Conditions that make timber pest attack more likely. Each one found is explained, and should be fixed.');
+    const WHY_IT_MATTERS = {
+      waterLeaks: 'Leaking water keeps timber and soil damp, which attracts termites and lets wood decay start.',
+      moistureReadings: 'Damp timber and building elements attract termites and let wood decay start.',
+      siteDrainage: 'Water lying around the building keeps the soil damp, which attracts termites.',
+      subfloorDrainage: 'Water lying in the subfloor keeps it damp, which attracts termites and lets wood decay start.',
+      subfloorVentilation: 'A poorly ventilated subfloor stays damp, which attracts termites and lets wood decay start.',
+      timberSoil: 'Timber touching the soil gives termites a hidden way into the timber, and from there into the building.',
+      slabEdge: 'A covered slab edge lets termites enter the building out of sight. Keep the slab edge exposed so it can be inspected.',
+      weepHoles: 'Weep holes covered by soil, paving or garden beds give termites a hidden way into the wall cavity.',
+      antCapping: 'Ant caps do not stop termites, but make them build their mud leads in the open where they can be seen. Gaps or missing caps let them pass unseen.',
+      nonDurableTimber: 'Untreated or non-durable timber in damp areas is readily attacked by termites and wood decay.',
+      mouldSeen: 'Mould is a sign of damp conditions, which attract termites and let wood decay start. This is not a mould inspection, and no opinion is given on the mould itself.',
+    };
+    const ADVERSE = { waterLeaks: ['YES'], moistureReadings: ['YES'], siteDrainage: ['POOR'], subfloorDrainage: ['POOR'], subfloorVentilation: ['POOR'], mouldSeen: ['YES'],
+      timberSoil: ['YES'], slabEdge: ['OBSTRUCTED'], weepHoles: ['BRIDGED'], antCapping: ['GAPS', 'NONE'], nonDurableTimber: ['YES'] };
+    function condRow(label, key, shown) {
+      const v = reportData[key];
+      row(label, shown || v, v && (ADVERSE[key] || []).includes(v) ? 'bad' : undefined);
+      if (v && (ADVERSE[key] || []).includes(v) && WHY_IT_MATTERS[key]) {
+        doc.setFont('helvetica','italic'); doc.setFontSize(7.3);
+        const lines = doc.splitTextToSize(WHY_IT_MATTERS[key], CW - 8);
+        if (y + lines.length * 3.6 + 3 > 280) newPage();
+        doc.setTextColor(...C.inkLight);
+        doc.text(lines, M + 3, y + 3.6); y += lines.length * 3.6 + 2.5;
+        doc.setFont('helvetica','normal');
+        resetRowShade();
+      }
     }
-  }
 
-  // ── Moisture group ─────────────────────────────────────────────────────
-  const meterReadings = (reportData.moistureTable || []).filter(r => r.location || r.reading);
-  subhead('MOISTURE, DRAINAGE & VENTILATION');
-  condRow('Water Leaks', 'waterLeaks');
-  if (reportData.waterLeaks === 'YES' || reportData.leakLocation) {
-    row('Location of Moisture Ingress', reportData.leakLocation);
-    if (isAboveGroundLeak(reportData.leakLocation)) {
-      gap(2);
-      callout('Above-ground leak', 'Subterranean termites can establish a secondary moisture-dependent colony in roof voids and wall cavities with no soil contact. Timbers next to this leak should be checked specifically.', 'warn');
-    }
-  }
-  condRow('Moisture Detected', 'moistureReadings');
-  meterReadings.forEach(r => row('Moisture Meter Reading', [r.reading, r.location].filter(Boolean).join(' — ')));
-  condRow('Site Drainage', 'siteDrainage');
-  condRow('Subfloor Drainage', 'subfloorDrainage');
-  condRow('Subfloor Ventilation', 'subfloorVentilation');
-  if (reportData.mouldSeen) condRow('Mould Seen', 'mouldSeen');
-  if (reportData.mouldWhere) row('Mould: Where', reportData.mouldWhere);
-  gap(4);
+    // ── Moisture group ─────────────────────────────────────────────────────
+    const meterReadings = (reportData.moistureTable || []).filter(r => r.location || r.reading);
+    keepGroup(() => {
+      subhead('MOISTURE, DRAINAGE & VENTILATION');
+      condRow('Water Leaks', 'waterLeaks');
+      if (reportData.waterLeaks === 'YES' || reportData.leakLocation) {
+        row('Location of Moisture Ingress', reportData.leakLocation);
+        if (isAboveGroundLeak(reportData.leakLocation)) {
+          gap(2);
+          callout('Above-ground leak', 'Subterranean termites can establish a secondary moisture-dependent colony in roof voids and wall cavities with no soil contact. Timbers next to this leak should be checked specifically.', 'warn');
+        }
+      }
+      condRow('Moisture Detected', 'moistureReadings');
+      meterReadings.forEach(r => row('Moisture Meter Reading', [r.reading, r.location].filter(Boolean).join(' — ')));
+      condRow('Site Drainage', 'siteDrainage');
+      condRow('Subfloor Drainage', 'subfloorDrainage');
+      condRow('Subfloor Ventilation', 'subfloorVentilation');
+      if (reportData.mouldSeen) condRow('Mould Seen', 'mouldSeen');
+      if (reportData.mouldWhere) row('Mould: Where', reportData.mouldWhere);
+      gap(4);
+    });
 
-  // ── Construction group ─────────────────────────────────────────────────
-  subhead('CONSTRUCTION & PHYSICAL BARRIERS');
-  condRow('Timber-to-Soil Contact', 'timberSoil');
-  if (reportData.timberSoilDetails) row('Timber-to-Soil: Where and What', reportData.timberSoilDetails);
-  condRow('Slab Edge Concealed', 'slabEdge');
-  condRow('Weep Holes', 'weepHoles', reportData.weepHoles === 'NONE' ? 'None located' : '');
-  condRow('Ant Capping', 'antCapping');
-  if (reportData.antCappingDetails) row('Ant Capping: Where and What', reportData.antCappingDetails);
-  condRow('Non-durable Timber in Damp Areas', 'nonDurableTimber');
-  if (reportData.nonDurableTimberDetails) row('Non-durable Timber: What', reportData.nonDurableTimberDetails);
-  if (reportData.nonDurableTimberWhere) row('Non-durable Timber: Where', reportData.nonDurableTimberWhere);
-  gap(4);
+    // ── Construction group ─────────────────────────────────────────────────
+    keepGroup(() => {
+      subhead('CONSTRUCTION & PHYSICAL BARRIERS');
+      condRow('Timber-to-Soil Contact', 'timberSoil');
+      if (reportData.timberSoilDetails) row('Timber-to-Soil: Where and What', reportData.timberSoilDetails);
+      condRow('Slab Edge Concealed', 'slabEdge');
+      condRow('Weep Holes', 'weepHoles', reportData.weepHoles === 'NONE' ? 'None located' : '');
+      condRow('Ant Capping', 'antCapping');
+      if (reportData.antCappingDetails) row('Ant Capping: Where and What', reportData.antCappingDetails);
+      condRow('Non-durable Timber in Damp Areas', 'nonDurableTimber');
+      if (reportData.nonDurableTimberDetails) row('Non-durable Timber: What', reportData.nonDurableTimberDetails);
+      if (reportData.nonDurableTimberWhere) row('Non-durable Timber: Where', reportData.nonDurableTimberWhere);
+      gap(4);
+    });
 
-  notesBlock('conducive');
-  gap(4);
-  renderSectionPhotosInPDF('conducive', 'Conducive Conditions');
+    notesBlock('conducive');
+    gap(4);
+    renderSectionPhotosInPDF('conducive', 'Conducive Conditions');
+  });
 
   // ─────────────────────────────────────────────────────────────────────
   // 8. RECOMMENDATIONS & RISK: the one risk opinion, and what to do.
   // ─────────────────────────────────────────────────────────────────────
-  startPart('Recommendations & Risk');
-  sectionTitle('RECOMMENDATIONS & RISK', REPORT_PARTS.recommendations);
-  resetRowShade();
-  if (reportData.riskLevel) { riskBanner(reportData.riskLevel); y -= 2; }
-  disclaimer('The risk of termite attack is the inspector\'s opinion of how susceptible the property is to termite attack, from what was found, the conducive conditions and the areas that could not be inspected. It is not a rating of any termites found.');
-  gap(2);
-  if (!reportData.riskLevel) row('Risk of Termite Attack', 'Not recorded');
-  row('Treatment Recommended', reportData.treatmentRecommended);
-  row('Treatment Type', reportData.treatmentType);
-  row('Re-inspection Interval', reportData.inspectionFrequency);
-  if (reportData.invasiveInspection === 'YES') row('Invasive Inspection', `Recommended, see Section ${REPORT_PARTS.access}`);
-  if (reportData.otherRecommendations) row('Other Recommendations', reportData.otherRecommendations);
-  if (getRecLines().length) row('Also Recommended', getRecLines().map(l => `•  ${l.text}`).join('\n'));
-  notesBlock('recommendations');
-  renderSectionPhotosInPDF('recommendations', 'Recommendations');
-  gap(4);
-  disclaimer('Note: standard home and contents insurance policies in Australia typically do not cover damage caused by termites or other timber pests. Treatment and any resulting repairs are generally the responsibility of the property owner.');
-  gap(8);
+  keep(fresh => {
+    startPart('Recommendations & Risk', fresh);
+    sectionTitle('RECOMMENDATIONS & RISK', REPORT_PARTS.recommendations);
+    resetRowShade();
+    if (reportData.riskLevel) { riskBanner(reportData.riskLevel); y -= 2; }
+    disclaimer('The risk of termite attack is the inspector\'s opinion of how susceptible the property is to termite attack, from what was found, the conducive conditions and the areas that could not be inspected. It is not a rating of any termites found.');
+    gap(2);
+    if (!reportData.riskLevel) row('Risk of Termite Attack', 'Not recorded');
+    row('Treatment Recommended', reportData.treatmentRecommended);
+    row('Treatment Type', reportData.treatmentType);
+    row('Re-inspection Interval', reportData.inspectionFrequency);
+    if (reportData.invasiveInspection === 'YES') row('Invasive Inspection', `Recommended, see Section ${REPORT_PARTS.access}`);
+    if (reportData.otherRecommendations) row('Other Recommendations', reportData.otherRecommendations);
+    if (getRecLines().length) row('Also Recommended', getRecLines().map(l => `•  ${l.text}`).join('\n'));
+    notesBlock('recommendations');
+    renderSectionPhotosInPDF('recommendations', 'Recommendations');
+    gap(4);
+    disclaimer('Note: standard home and contents insurance policies in Australia typically do not cover damage caused by termites or other timber pests. Treatment and any resulting repairs are generally the responsibility of the property owner.');
+    gap(8);
+  });
 
   // 9. PHOTOGRAPHS
   photoGallery();

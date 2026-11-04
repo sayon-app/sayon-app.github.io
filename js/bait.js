@@ -272,7 +272,7 @@ function baitStationHTML(s, i) {
         ${Object.entries(BAIT_STATUSES).map(([k, st]) => `<button type="button" role="radio" aria-checked="${s.status === k}" class="qp-chip bait-chip ${k}${s.status === k ? ' on' : ''}" onclick="setBaitStation(${i}, '${k}')">${st.label}</button>`).join('')}
       </div>
       ${feeding || (s.bait || '').trim() ? `<label class="bait-station-extra"><span>Bait added</span><input class="job-input" value="${esc(s.bait || '')}" placeholder="e.g. 2 cartridges, blank if none" oninput="baitDraft.stations[${i}].bait = this.value"></label>` : ''}
-      ${problem || (s.note || '').trim() ? `<label class="bait-station-extra"><span>What you did</span><input class="job-input" value="${esc(s.note || '')}" placeholder="e.g. Lid replaced" oninput="baitDraft.stations[${i}].note = this.value"></label>` : ''}
+      ${problem || (s.note || '').trim() ? `<label class="bait-station-extra"><span>Action taken</span><input class="job-input" value="${esc(s.note || '')}" placeholder="e.g. Lid replaced" oninput="baitDraft.stations[${i}].note = this.value"></label>` : ''}
     </div>`;
 }
 
@@ -635,7 +635,7 @@ function buildBaitVisitPDF(q, v) {
     ['Stations checked', String(stations.length)],
     ['Termites feeding', `${feeding} of ${stations.length}`],
     ['Next visit', v.finished ? 'None, baiting finished' : v.nextVisit ? formatLongDate(v.nextVisit) : ''],
-    ['Bait used', [bait, p.batch ? `batch ${p.batch}` : ''].filter(Boolean).join(', ')],
+    ['Bait product', [bait, p.batch ? `batch ${p.batch}` : ''].filter(Boolean).join(', ')],
   ]);
 
   // ── STATIONS ── Only the columns something was entered in.

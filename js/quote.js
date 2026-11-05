@@ -545,9 +545,20 @@ function quoteProblem(q) {
   return buildQuoteProblem(rd);
 }
 
+// A report detail set in brackets mid-sentence: "Fungal decay (wet rot)."
+// reads as " (fungal decay, wet rot)". An acronym or name in capitals keeps
+// its first letter.
+function quoteDetailInBrackets(text) {
+  let t = String(text || '').trim().replace(/[.;,\s]+$/, '').replace(/\s*\(([^()]*)\)/g, ', $1').replace(/[()]/g, '');
+  if (!t) return '';
+  if (!/^[A-Z]{2}/.test(t)) t = t.charAt(0).toLowerCase() + t.slice(1);
+  return ` (${t})`;
+}
+
 function buildQuoteExclusions(rd) {
   rd = rd || {};
   const out = [];
+  const detail = quoteDetailInBrackets;
   const findings = Array.isArray(rd.findings) ? rd.findings : [];
   if (findings.some(f => f && f.structuralConcern === 'YES')) {
     out.push('Assessment of termite damage by a licensed builder or structural engineer, and repair of damaged timbers.');
@@ -558,16 +569,16 @@ function buildQuoteExclusions(rd) {
     out.push('Repair or replacement of borer-damaged timbers.');
   }
   if (rd.decayFound === 'YES') {
-    out.push(`Repair or replacement of decayed timbers${rd.decayDetails ? ` (${rd.decayDetails})` : ''} by a licensed builder, and fixing the moisture that caused it.`);
+    out.push(`Repair or replacement of decayed timbers${detail(rd.decayDetails)} by a licensed builder, and fixing the moisture that caused it.`);
   }
   if (rd.waterLeaks === 'YES') {
-    out.push(`Repair of the moisture source${rd.leakLocation ? ` (${rd.leakLocation})` : ''} by a licensed plumber or builder.`);
+    out.push(`Repair of the moisture source${detail(rd.leakLocation)} by a licensed plumber or builder.`);
   }
   if (rd.antCapping === 'GAPS' || rd.antCapping === 'NONE') {
-    out.push(`Repair or installation of ant caps${rd.antCappingDetails ? ` (${rd.antCappingDetails})` : ''} by a builder.`);
+    out.push(`Repair or installation of ant caps${detail(rd.antCappingDetails)} by a builder.`);
   }
   if (rd.highRiskAreas) {
-    out.push(`Areas not accessible at inspection (${rd.highRiskAreas}) unless access is provided.`);
+    out.push(`Areas not accessible at inspection${detail(rd.highRiskAreas)} unless access is provided.`);
   }
   return out;
 }
@@ -1096,8 +1107,8 @@ function renderQuoteCompanyGaps() {
   const el = document.getElementById('quoteCompanyGaps');
   el.style.display = gaps.length ? '' : 'none';
   el.innerHTML = gaps.length
-    ? `<div>Your quote won't show your ${escapeHtml(joinWithAnd(gaps))}. Clients and insurers look for these.</div>` +
-      (canEditBusiness() ? '<button class="quote-link-btn" onclick="openBusinessForm(renderQuoteCompanyGaps)">Add them</button>' : '')
+    ? `<div>Your quote won't show your ${escapeHtml(joinWithAnd(gaps))}. Clients and insurers look for ${gaps.length === 1 ? 'it' : 'these'}.</div>` +
+      (canEditBusiness() ? `<button class="quote-link-btn" onclick="openBusinessForm(renderQuoteCompanyGaps)">Add ${gaps.length === 1 ? 'it' : 'them'}</button>` : '')
     : '';
 }
 

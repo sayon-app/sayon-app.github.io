@@ -387,7 +387,10 @@ function chemicalApvmaHtml(p) {
     return `<div class="chem-apvma gone">APVMA No. ${esc(no)} is not on the APVMA's list of registered products (${when}). Check the number on the label. If it's right, the product's registration has been cancelled or has lapsed: check with the maker or the APVMA before using it.</div>`;
   }
   // The list has most names in capitals: "TERMIDOR RESIDUAL TERMITICIDE".
-  const name = live.name === live.name.toUpperCase() ? live.name.toLowerCase().replace(/\b[a-z]/g, ch => ch.toUpperCase()) : live.name;
+  // Small joining words stay lower case: "Termiticide and Insecticide".
+  const name = live.name === live.name.toUpperCase()
+    ? live.name.toLowerCase().replace(/\b[a-z]/g, ch => ch.toUpperCase()).replace(/(?!^)\b(And|Or|Of|For|The|With|In|On|To)\b/g, w => w.toLowerCase())
+    : live.name;
   return `<div class="chem-apvma">Registered with the APVMA as ${esc(name)} (No. ${esc(no)}), ${esc(when)}.</div>`;
 }
 

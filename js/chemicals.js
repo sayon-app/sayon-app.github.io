@@ -18,8 +18,12 @@
 // (js/business-sync.js). Only the owner changes it; a technician reads it.
 //
 // register = { products: [{ id, name, maker, active, apvma, form, labelUrl,
-//   sdsUrl, uses: [{ id, pest, method, surface, rate, volume, life }] }],
-//   updatedAt }
+//   sdsUrl, sdsExpires (YYYY-MM-DD), declUrl (manufacturer's declaration),
+//   uses: [{ id, pest, method, surface, rate, volume, life }] }], updatedAt }
+//
+// The page works like a supplier's chemical register: search by name, tap a
+// product, and its documents (SDS with its expiry date, label,
+// manufacturer's declaration) are one tap from opening, or sending on.
 // ══════════════════════════════════════════════════════════════════════════
 
 const CHEMICAL_FORMS = {
@@ -56,7 +60,7 @@ const CHEMICAL_STARTER_USES = {
 const CHEMICAL_STARTER_FORMS = {
   'Termidor': 'liquid', 'Termidor HE': 'liquid', 'Termidor Foam': 'foam', 'Termidor Dry': 'dust',
   'Termidust': 'dust', 'Premise': 'liquid', 'Premise Foam': 'foam', 'Altriset': 'liquid',
-  'Biflex': 'liquid', 'Exterra': 'bait', 'Exterra Focus': 'bait', 'Requiem': 'bait',
+  'Biflex': 'liquid', 'Maxxthor 100': 'liquid', 'Exterra': 'bait', 'Exterra Focus': 'bait', 'Requiem': 'bait',
   'Sentricon': 'bait', 'Trelona': 'bait', 'Kordon': 'other',
 };
 
@@ -107,25 +111,106 @@ function findChemical(name) {
   return getChemicalRegister().products.find(p => p.name.trim().toLowerCase() === n) || null;
 }
 
-// Label and SDS links come only from a legitimate source: the maker's or
-// its Australian distributor's own site, or the APVMA register. SAYON
-// ships none it hasn't checked. With no link saved, the product points to
-// the APVMA's public register (PubCRIS), where the approved label is.
-const APVMA_REGISTER_URL = 'https://portal.apvma.gov.au/pubcris';
-
+// Label and SDS links go straight to the document: the maker's or its
+// Australian distributor's own copy, or the APVMA's. SAYON ships none it
+// hasn't opened and checked, and never links a search page: with no link
+// saved, the product says so.
 const safeUrl = u => /^https:\/\//i.test(String(u || '').trim()) ? String(u).trim() : '';
 
 // Label · SDS links for a product, shared by the register and the treatment record.
 function chemicalLinksHtml(p) {
   const esc = escapeHtml;
   const label = safeUrl(p.labelUrl), sds = safeUrl(p.sdsUrl);
-  if (!label && !sds) {
-    return `<span class="chem-links"><a href="${APVMA_REGISTER_URL}" target="_blank" rel="noopener">Look up the label on the APVMA register</a></span>`;
-  }
+  if (!label && !sds) return '<span class="chem-links"><span class="chem-nolink">No label or SDS link yet</span></span>';
   return `<span class="chem-links">
-      ${label ? `<a href="${esc(label)}" target="_blank" rel="noopener">Label</a>` : `<a href="${APVMA_REGISTER_URL}" target="_blank" rel="noopener">Label on the APVMA register</a>`}
+      ${label ? `<a href="${esc(label)}" target="_blank" rel="noopener">Label</a>` : '<span class="chem-nolink">No label link yet</span>'}
       ${sds ? `<a href="${esc(sds)}" target="_blank" rel="noopener">SDS</a>` : '<span class="chem-nolink">No SDS link yet</span>'}
     </span>`;
+}
+
+// The file a link opens, as the supplier named it: "Maxxthor_100_Leaflet.pdf".
+function chemicalDocName(url) {
+  try {
+    const u = new URL(url);
+    const last = decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() || '');
+    return last || u.hostname;
+  } catch (e) { return url; }
+}
+
+const chemPdfIcon = '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 18h4"/></svg>';
+const chemSendIcon = '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>';
+
+// "28/02/2030", and whether it has passed or is within three months.
+function chemicalSdsExpiry(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+  if (!m) return null;
+  const when = new Date(+m[1], +m[2] - 1, +m[3]);
+  const days = Math.floor((when - new Date(new Date().toDateString())) / 86400000);
+  return { text: `${m[3]}/${m[2]}/${m[1]}`, expired: days < 0, soon: days >= 0 && days <= 90 };
+}
+
+function chemicalDocRow(p, kind) {
+  const esc = escapeHtml;
+  const docs = {
+    sds: { title: 'SDS', url: p.sdsUrl },
+    label: { title: 'Label', url: p.labelUrl },
+    decl: { title: "Manufacturer's declaration", url: p.declUrl },
+  };
+  const d = docs[kind];
+  const url = safeUrl(d.url);
+  let head = d.title;
+  if (kind === 'sds') {
+    const exp = chemicalSdsExpiry(p.sdsExpires);
+    if (exp) head += ` <span class="chem-doc-exp${exp.expired ? ' expired' : exp.soon ? ' soon' : ''}">· ${exp.expired ? 'Expired' : 'Expires'} ${exp.text}</span>`;
+  }
+  return `<div class="chem-doc">
+      <div class="chem-doc-title">${head}</div>
+      ${url ? `<div class="chem-doc-row">
+        <a class="chem-doc-link" href="${esc(url)}" target="_blank" rel="noopener">${chemPdfIcon}<span>${esc(chemicalDocName(url))}</span></a>
+        <button type="button" class="chem-doc-send" data-url="${esc(url)}" data-title="${esc(`${p.name} ${d.title}`)}" onclick="sendChemicalDoc(this)" aria-label="Send the ${esc(d.title)}">${chemSendIcon}</button>
+      </div>` : '<div class="chem-doc-none">No link yet</div>'}
+    </div>`;
+}
+
+function chemicalDocsHtml(p) {
+  return `<div class="chem-docs">${chemicalDocRow(p, 'sds')}${chemicalDocRow(p, 'label')}${safeUrl(p.declUrl) ? chemicalDocRow(p, 'decl') : ''}</div>`;
+}
+
+// The label's rates, to read: the edit form holds the same in boxes.
+function chemicalRatesHtml(p) {
+  const esc = escapeHtml;
+  const uses = p.uses || [];
+  if (!uses.length) return '<div class="chem-rates"></div>';
+  return `<div class="chem-rates">
+      <div class="chem-doc-title">Label rates</div>
+      ${uses.map(u => `<div class="chem-rate">
+        <div class="chem-rate-use">${esc([u.pest, chemicalUseLabel(u)].filter(Boolean).join(' · '))}</div>
+        <div class="chem-rate-val${chemicalUseRate(u) ? '' : ' none'}">${esc(chemicalUseRate(u) || 'No rate yet')}${u.life ? ` · ${esc(u.life)}` : ''}</div>
+      </div>`).join('')}
+    </div>`;
+}
+
+// Sends a document on: the phone's share sheet where it has one, otherwise
+// an email with the link.
+async function sendChemicalDoc(btn) {
+  const url = btn.dataset.url, title = btn.dataset.title;
+  if (navigator.share) {
+    try { await navigator.share({ title, url }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  window.location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`;
+}
+
+function onChemicalSearch(input) {
+  const q = input.value.trim().toLowerCase();
+  let shown = 0;
+  document.querySelectorAll('#chemList .chem-card').forEach(card => {
+    const hit = !q || card.dataset.find.includes(q);
+    card.hidden = !hit;
+    if (hit) shown++;
+  });
+  const none = document.getElementById('chemNoMatch');
+  if (none) none.hidden = shown > 0;
 }
 
 // ── MENU › CHEMICAL REGISTER ────────────────────────────────────────────────
@@ -143,6 +228,8 @@ function renderChemicalRegister() {
   if (owner) owner.hidden = canEdit;
   const reset = document.getElementById('chemReset');
   if (reset) reset.hidden = !canEdit || !storedChemicalRegister();
+  const search = document.getElementById('chemSearch');
+  if (search) onChemicalSearch(search);
   renderChemicalSummary();
 }
 
@@ -191,7 +278,8 @@ function chemicalCardHtml(p, canEdit) {
         ${canEdit ? `<button type="button" class="quote-link-btn" onclick="removeChemicalUse('${esc(p.id)}', '${esc(u.id)}')">Remove this use</button>` : ''}
       </div>`).join('');
   const missing = (p.uses || []).filter(u => !u.rate).length;
-  return `<details class="chem-card" data-id="${esc(p.id)}">
+  const find = [p.name, p.active, p.maker, p.apvma].filter(Boolean).join(' ').toLowerCase();
+  return `<details class="chem-card" data-id="${esc(p.id)}" data-find="${esc(find)}">
       <summary>
         <span class="chem-card-text">
           <span class="chem-card-name">${esc(p.name || 'New product')}</span>
@@ -200,7 +288,11 @@ function chemicalCardHtml(p, canEdit) {
         <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
       </summary>
       <div class="chem-card-body">
-        ${chemicalLinksHtml(p)}
+        ${chemicalDocsHtml(p)}
+        ${chemicalRatesHtml(p)}
+        ${canEdit ? `<details class="sheet-more chem-edit">
+          <summary>Edit the product, its documents and rates</summary>
+          <div class="chem-edit-body">
         <div class="job-row">
           ${field('name', 'Product', 'e.g. Termidor')}
           ${field('active', 'Active constituent', 'e.g. 100 g/L fipronil')}
@@ -211,18 +303,24 @@ function chemicalCardHtml(p, canEdit) {
         </div>
         <div class="job-field">
           <div class="job-field-label">Kind</div>
-          <select class="job-input" data-f="form"${dis} onchange="onChemicalEdit(this)">
+          <select class="job-input" data-f="form" onchange="onChemicalEdit(this)">
             ${Object.entries(CHEMICAL_FORMS).map(([k, v]) => `<option value="${k}"${p.form === k ? ' selected' : ''}>${v}</option>`).join('')}
           </select>
         </div>
+        <div class="settings-row-desc">Paste the link to each PDF itself, from the maker's or supplier's own website, so one tap opens it.</div>
         ${field('labelUrl', 'Link to the label', 'https://…', ' type="url" inputmode="url" autocomplete="off"')}
-        ${field('sdsUrl', 'Link to the SDS', 'https://…', ' type="url" inputmode="url" autocomplete="off"')}
-        <div class="settings-row-desc">Copy the links from the maker's or supplier's own website, or the APVMA register, so they open the current label and SDS.</div>
+        <div class="job-row">
+          ${field('sdsUrl', 'Link to the SDS', 'https://…', ' type="url" inputmode="url" autocomplete="off"')}
+          ${field('sdsExpires', 'SDS expires', '', ' type="date"')}
+        </div>
+        ${field('declUrl', "Link to the manufacturer's declaration (if any)", 'https://…', ' type="url" inputmode="url" autocomplete="off"')}
         <div class="settings-group-title">What it's used for</div>
         <div class="settings-row-desc">Each use on the label, with its rate. A treatment record asks which one, then fills the rate.</div>
         ${uses || '<div class="settings-row-desc">No uses yet.</div>'}
-        ${canEdit ? `<button type="button" class="quote-link-btn" onclick="addChemicalUse('${esc(p.id)}')">Add a use</button>
-        <button type="button" class="quote-link-btn chem-remove" onclick="removeChemical('${esc(p.id)}')">Remove ${esc(p.name || 'this product')} from the register</button>` : ''}
+        <button type="button" class="quote-link-btn" onclick="addChemicalUse('${esc(p.id)}')">Add a use</button>
+        <button type="button" class="quote-link-btn chem-remove" onclick="removeChemical('${esc(p.id)}')">Remove ${esc(p.name || 'this product')} from the register</button>
+          </div>
+        </details>` : ''}
       </div>
     </details>`;
 }
@@ -236,7 +334,7 @@ function onChemicalEdit(el) {
   if (!p) return;
   if (el.dataset.f) {
     let v = el.value.trim();
-    if ((el.dataset.f === 'labelUrl' || el.dataset.f === 'sdsUrl') && v) v = 'https://' + v.replace(/^https?:\/\//i, '');
+    if (['labelUrl', 'sdsUrl', 'declUrl'].includes(el.dataset.f) && v) v = 'https://' + v.replace(/^https?:\/\//i, '');
     p[el.dataset.f] = v;
     el.value = v;
   } else if (el.dataset.u) {
@@ -244,14 +342,12 @@ function onChemicalEdit(el) {
     if (u) u[el.dataset.u] = el.value.trim();
   }
   storeChemicalRegister(reg);
-  // The heading and links follow the name, kind and links; the rest stays put.
-  if (['name', 'active', 'form', 'labelUrl', 'sdsUrl', 'apvma'].includes(el.dataset.f) || el.dataset.u === 'rate') {
-    const fresh = document.createElement('div');
-    fresh.innerHTML = chemicalCardHtml(p, true);
-    const next = fresh.firstElementChild;
-    card.querySelector('summary').replaceWith(next.querySelector('summary'));
-    card.querySelector('.chem-links').replaceWith(next.querySelector('.chem-links'));
-  }
+  // The heading, documents and rates follow the edit; the form stays put.
+  const fresh = document.createElement('div');
+  fresh.innerHTML = chemicalCardHtml(p, true);
+  const next = fresh.firstElementChild;
+  card.dataset.find = next.dataset.find;
+  ['summary', '.chem-docs', '.chem-rates'].forEach(sel => card.querySelector(sel).replaceWith(next.querySelector(sel)));
   renderChemicalSummary();
   const reset = document.getElementById('chemReset');
   if (reset) reset.hidden = false;
@@ -260,14 +356,18 @@ function onChemicalEdit(el) {
 function rerenderChemicalCard(id, open = true) {
   renderChemicalRegister();
   const card = document.querySelector(`#chemList .chem-card[data-id="${id}"]`);
-  if (card && open) card.open = true;
+  if (card && open) {
+    card.open = true;
+    const edit = card.querySelector('.chem-edit');
+    if (edit) edit.open = true;
+  }
   return card;
 }
 
 function addChemical() {
   if (!canEditBusiness()) return;
   const reg = getChemicalRegister();
-  const p = { id: chemId(), name: '', maker: '', active: '', apvma: '', form: 'liquid', labelUrl: '', sdsUrl: '', uses: [] };
+  const p = { id: chemId(), name: '', maker: '', active: '', apvma: '', form: 'liquid', labelUrl: '', sdsUrl: '', sdsExpires: '', declUrl: '', uses: [] };
   p.uses = [{ id: chemId(), pest: 'Subterranean termites', method: '', surface: '', rate: '', volume: '', life: '' }];
   reg.products.unshift(p);
   storeChemicalRegister(reg);

@@ -174,7 +174,7 @@ function openReinspectDetail(id) {
 function reinspectEmailText(it) {
   const company = getCompanyDetails();
   const r = it.r;
-  const first = (r.client || '').trim().split(/\s+/)[0];
+  const first = greetingName(r.client);
   const me = typeof lastInspectorDetails === 'function' ? lastInspectorDetails().name : '';
   const address = r.address || 'your property';
   const whenLine = it.overdue

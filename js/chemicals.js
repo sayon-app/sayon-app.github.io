@@ -57,9 +57,11 @@ const CHEMICAL_STARTER_USES = {
 
 // The starting list: the products the treatment record already knows
 // (TREATMENT_PRODUCTS in js/treatment.js), with their kind.
+// Only products the APVMA's register lists as registered go in: that
+// register is the rule for what SAYON offers.
 const CHEMICAL_STARTER_FORMS = {
-  'Termidor': 'liquid', 'Termidor HE': 'liquid', 'Termidor Foam': 'foam', 'Termidor Dry': 'dust',
-  'Termidust': 'dust', 'Premise': 'liquid', 'Premise Foam': 'foam', 'Altriset': 'liquid',
+  'Termidor': 'liquid', 'Termidor HE': 'liquid', 'Termidor Foam': 'foam',
+  'Premise': 'liquid', 'Altriset': 'liquid',
   'Biflex Ultra': 'liquid', 'Maxxthor 100': 'liquid', 'Exterra': 'bait', 'Exterra Focus': 'other', 'Requiem': 'bait',
   'Sentricon': 'bait', 'Trelona': 'bait', 'Kordon': 'other', 'Sentricon AG': 'bait',
 };
@@ -67,8 +69,7 @@ const CHEMICAL_STARTER_FORMS = {
 // What SAYON knows about each starting product, all of it checked against
 // the documents themselves (4-5 Nov 2026):
 // - maker and APVMA product number from the APVMA's register (PubCRIS).
-//   Termidor Dry (60654) and Premise Foam (59345) are no longer registered,
-//   and the register has no product called Termidust.
+//   Products it no longer registers are in CHEMICAL_NOT_REGISTERED instead.
 // - labelUrl: the APVMA's own copy of the current approved label
 //   (elabels.apvma.gov.au/<product number>ELBL.pdf), opened and matched to
 //   the register's latest label number. Makers' sites can lag behind it.
@@ -139,7 +140,6 @@ const CHEMICAL_STARTER_DETAILS = {
     uses: [{ pest: 'Subterranean and drywood termites', method: 'Foam', surface: 'Into termite workings, nests, wall cavities and voids',
       rate: 'Ready to use, no mixing (30 g makes about 1 L of foam)', volume: '10-30 seconds per injection point, or until foam flows back', life: '' }],
   },
-  'Termidor Dry': { maker: 'BASF', apvma: '60654' },
   'Premise': {
     maker: 'Envu', apvma: '49098', labelUrl: ELABEL(49098),
     sdsUrl: ENVU_FILES + 'product-sds-and-labels/premise-200sc-termiticide-sds.ashx', sdsExpires: '2028-11-03',
@@ -162,7 +162,6 @@ const CHEMICAL_STARTER_DETAILS = {
         rate: '250 mL per 100 L water (500 mL for Mastotermes)', volume: 'At least 20 L of mix into the nest through drill holes', life: '' },
     ],
   },
-  'Premise Foam': { maker: 'Envu', apvma: '59345' },
   'Altriset': {
     maker: 'Syngenta', apvma: '64594', labelUrl: ELABEL(64594),
     uses: [
@@ -242,15 +241,35 @@ const CHEMICAL_STARTER_DETAILS = {
 
 const chemId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
+// Products the APVMA's register (PubCRIS) no longer lists as registered,
+// by APVMA product number, or by name where it never had one. They are not
+// offered, and a register or treatment record that still has one says so.
+const CHEMICAL_NOT_REGISTERED = {
+  apvma: { '60654': 'Termidor Dry (lapsed 30 June 2025)', '59345': 'Premise Foam (lapsed 30 June 2022)' },
+  name: { 'termidor dry': 'Termidor Dry (lapsed 30 June 2025)', 'premise foam': 'Premise Foam (lapsed 30 June 2022)', 'termidust': 'Termidust (no product by that name)' },
+};
+// "No longer registered with the APVMA", or '' for a product that is.
+function chemicalNotRegistered(p) {
+  if (!p) return '';
+  const no = String(p.apvma || '').match(/\d{4,6}/);
+  const hit = (no && CHEMICAL_NOT_REGISTERED.apvma[no[0]]) || CHEMICAL_NOT_REGISTERED.name[String(p.name || '').trim().toLowerCase()];
+  return hit ? 'Not registered with the APVMA' : '';
+}
+
+// A starting product's id comes from its name, so taking one off the list
+// never changes another's (treatment records keep the use they picked).
+const chemStarterId = name => 'start-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
 function chemicalStarterProducts() {
-  return Object.entries(CHEMICAL_STARTER_FORMS).map(([name, form], i) => {
+  return Object.entries(CHEMICAL_STARTER_FORMS).map(([name, form]) => {
     const { uses, ...known } = CHEMICAL_STARTER_DETAILS[name] || {};
+    const id = chemStarterId(name);
     return {
-      id: 'start' + i,
+      id,
       name, maker: '', active: TREATMENT_PRODUCTS[name] || '', apvma: '', form,
       labelUrl: '', sdsUrl: '', sdsExpires: '', declUrl: '', ...known,
       uses: (uses || CHEMICAL_STARTER_USES[form].map(u => ({ ...u, rate: '', volume: '', life: '' })))
-        .map((u, j) => ({ id: `start${i}u${j}`, ...u })),
+        .map((u, j) => ({ id: `${id}-u${j}`, ...u })),
     };
   });
 }
@@ -289,7 +308,7 @@ function withStarterDetails(reg) {
     // is hexaflumuron, and Exterra Focus is an attractant with none.
     if (STARTER_ACTIVE_FIXED[p.name.trim()] === p.active) p.active = s.active;
     ['maker', 'active', 'apvma', 'labelUrl', 'sdsUrl', 'sdsExpires'].forEach(f => { if (!p[f] && s[f]) p[f] = s[f]; });
-    const untouched = (p.uses || []).every(u => /^start\d+u\d+$/.test(u.id || '') && !u.rate && !u.volume && !u.life);
+    const untouched = (p.uses || []).every(u => /^start/.test(u.id || '') && !u.rate && !u.volume && !u.life);
     if (untouched && s.uses.some(u => u.rate)) p.uses = s.uses.map(u => ({ ...u }));
   });
   return reg;
@@ -322,8 +341,9 @@ const safeUrl = u => /^https:\/\//i.test(String(u || '').trim()) ? String(u).tri
 function chemicalLinksHtml(p) {
   const esc = escapeHtml;
   const label = safeUrl(p.labelUrl), sds = safeUrl(p.sdsUrl);
-  if (!label && !sds) return '<span class="chem-links"><span class="chem-nolink">No label or SDS link yet</span></span>';
-  return `<span class="chem-links">
+  const unreg = chemicalNotRegistered(p) ? `<span class="chem-unreg">${esc(chemicalNotRegistered(p))}</span>` : '';
+  if (!label && !sds) return `<span class="chem-links">${unreg}<span class="chem-nolink">No label or SDS link yet</span></span>`;
+  return `<span class="chem-links">${unreg}
       ${label ? `<a href="${esc(label)}" target="_blank" rel="noopener">Label</a>` : '<span class="chem-nolink">No label link yet</span>'}
       ${sds ? `<a href="${esc(sds)}" target="_blank" rel="noopener">SDS</a>` : '<span class="chem-nolink">No SDS link yet</span>'}
     </span>`;
@@ -484,7 +504,7 @@ function chemicalCardHtml(p, canEdit) {
       <summary>
         <span class="chem-card-text">
           <span class="chem-card-name">${esc(p.name || 'New product')}</span>
-          <span class="chem-card-sub">${esc([p.active, CHEMICAL_FORMS[p.form] || ''].filter(Boolean).join(' · '))}${missing ? ` · <span class="pb-start">${missing === 1 ? '1 rate' : missing + ' rates'} to add</span>` : ''}</span>
+          <span class="chem-card-sub">${chemicalNotRegistered(p) ? `<span class="chem-unreg">${esc(chemicalNotRegistered(p))}</span> · ` : ''}${esc([p.active, CHEMICAL_FORMS[p.form] || ''].filter(Boolean).join(' · '))}${missing ? ` · <span class="pb-start">${missing === 1 ? '1 rate' : missing + ' rates'} to add</span>` : ''}</span>
         </span>
         <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
       </summary>

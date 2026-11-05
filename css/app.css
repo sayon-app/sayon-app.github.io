@@ -5783,6 +5783,7 @@ body.dark-screen .treat-use-note { color: var(--yellow); }
 .treat-use-note[hidden], .treat-keep-rate[hidden] { display: none; }
 .treat-keep-rate { margin-top: 4px; }
 .chem-nolink { color: var(--text3); font-weight: 500; }
+.chem-unreg { color: var(--risk, #b42318); font-weight: 700; }
 .chem-search { position: relative; margin-bottom: 10px; }
 .chem-search .icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text3); pointer-events: none; }
 .chem-search .job-input { width: 100%; padding-left: 36px; min-height: 44px; box-sizing: border-box; }

@@ -10310,9 +10310,9 @@ async function openCheckout(plan, seats) {
     // 400, 402 and 409 carry a reason worth reading: the number of
     // inspectors, a declined card, or a team too big for the plan.
     showToast(status === 403
-      ? 'Only the business owner can change the plan.'
-      : (status === 400 || status === 402 || status === 409) && e.message ? e.message
-      : 'Couldn\'t open checkout. Check your signal and try again.', 'error');
+      ? 'Only the business owner can change the plan'
+      : (status === 400 || status === 402 || status === 409) && e.message ? e.message.replace(/\.$/, '')
+      : 'Could not open checkout. Check your signal and try again', 'error');
     console.warn('openCheckout failed:', e.message);
   } finally {
     // Leaving for Stripe keeps the lock on, so a tap during the redirect
@@ -11724,7 +11724,7 @@ async function keepBothCopies(local) {
   if (currentReportId === local.id) loadReport(local.id, true);
   renderSavedList();
   showToast(copy
-    ? "This report was changed on another device. That version is open now; this phone's version is saved beside it as a copy."
+    ? "This report was changed on another device, so that version is open now. This phone's version is saved beside it as a copy"
     : 'Updated this report with the newer copy from your other device', 'info');
   return copy ? supabaseSave(copy, true) : true;
 }
@@ -13980,15 +13980,24 @@ async function sendPdfsDirect({ files, to, subject, body }) {
     // The phone's mail app from here on, this session. It needs a fresh
     // tap to open, so the inspector taps again.
     directEmail = false;
-    if (!(e instanceof TypeError)) reportError(e, 'send_email');
-    // The Worker's reason without its own advice ("Try again, or send it
-    // from your mail app"): the next tap opens the mail app.
-    const why = e instanceof TypeError ? 'Could not reach SAYON to send it' : String(e.message).split('. ')[0].replace(/\.$/, '');
-    showToast(`${why}. Tap again to send it from your email app`, 'error');
+    if (!sendFailedForSignal(e)) reportError(e, 'send_email');
+    showToast(`${sendFailureReason(e)}. Tap again to send it from your email app`, 'error');
     return false;
   } finally {
     directEmailSending = false;
   }
+}
+
+// Why an email through SAYON didn't go, for the toast. No signal, or no
+// answer in time (90 seconds on a weak one), is "Could not reach SAYON".
+// Otherwise it's the Worker's reason without its own advice ("Try again,
+// or send it from your mail app"), as the next tap opens the mail app.
+function sendFailedForSignal(e) {
+  return e instanceof TypeError || !!(e && e.name === 'AbortError');
+}
+function sendFailureReason(e) {
+  if (sendFailedForSignal(e)) return 'Could not reach SAYON to send it';
+  return String((e && e.message) || 'Could not send from SAYON').split('. ')[0].replace(/\.$/, '');
 }
 
 // ── CHECK BEFORE SENDING ────────────────────────────────────────────────

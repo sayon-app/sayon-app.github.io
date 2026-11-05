@@ -22,6 +22,7 @@ Read only the files your task needs. `js/app.js` is about 9,200 lines, so jump t
 | `js/chemicals.js` | Chemical register (Menu › Chemical register): products, label and SDS links, each label use with its rate. The treatment record's product picker fills the active, rate and life from it. Once a week each APVMA No. is checked against the APVMA's list of registered products on data.gov.au, and a product that has dropped off is flagged |
 | `js/job-pack.js` | The job PDF: every document from the job joined behind a contents page, and the job page's Finalise step. Joins pages with pdf-lib (`js/vendor`) |
 | `js/business-sync.js` | Syncs company details and quote prices to Supabase `businesses.settings` |
+| `js/sample-job.js` | The sample job: a finished, made-up job (agreement to certificate) offered at the end of sign-up, on an empty Jobs list and in the menu. Built on the phone at the business's own prices; id `sample_job` (`isSampleJob` in `js/app.js`) keeps it out of the account, Due list, backups and last visits, sends its emails to the business, and `stampSamplePdf` marks its PDFs SAMPLE |
 | `css/app.css`, `css/quote.css` | Styles |
 | `service-worker.js` | Offline cache. **Bump `CACHE_VERSION` (korva-vNN) whenever cached files change** |
 | `worker/worker.js` | Cloudflare Worker `korva`: AI proxy, `/transcribe`, Stripe, `/send-email`. Pasted into Cloudflare by hand |

@@ -248,12 +248,147 @@ const CHEMICAL_NOT_REGISTERED = {
   apvma: { '60654': 'Termidor Dry (lapsed 30 June 2025)', '59345': 'Premise Foam (lapsed 30 June 2022)' },
   name: { 'termidor dry': 'Termidor Dry (lapsed 30 June 2025)', 'premise foam': 'Premise Foam (lapsed 30 June 2022)', 'termidust': 'Termidust (no product by that name)' },
 };
-// "No longer registered with the APVMA", or '' for a product that is.
+// "No longer registered with the APVMA", or '' for a product that is. The
+// APVMA's own list decides, as the weekly check last found it (below); a
+// number the phone hasn't checked yet, or a product with no number, goes
+// by the list above.
 function chemicalNotRegistered(p) {
   if (!p) return '';
-  const no = String(p.apvma || '').match(/\d{4,6}/);
-  const hit = (no && CHEMICAL_NOT_REGISTERED.apvma[no[0]]) || CHEMICAL_NOT_REGISTERED.name[String(p.name || '').trim().toLowerCase()];
+  const live = apvmaListing(p);
+  const hit = live !== undefined ? live === null
+    : !!(CHEMICAL_NOT_REGISTERED.apvma[apvmaNo(p)] || CHEMICAL_NOT_REGISTERED.name[String(p.name || '').trim().toLowerCase()]);
   return hit ? 'Not registered with the APVMA' : '';
+}
+
+// ── THE WEEKLY APVMA CHECK ──────────────────────────────────────────────────
+// Once a week the phone looks up every APVMA No. in the register on the
+// APVMA's own list of registered products. The APVMA publishes that list on
+// data.gov.au and reloads it every week (PubCRIS, product.csv). A number
+// that has dropped off it is a product whose registration was cancelled,
+// lapsed or wasn't renewed, and the register and the treatment record say
+// so. The list has no recalls: the APVMA posts those on its own website.
+// A product's number is checked as soon as it's typed, too.
+//
+// Kept on this phone under korva_apvma_check: { checkedAt (ms), total (rows
+// in the APVMA's list then), listId, numbers: { '54624': { name, holder,
+// expires (YYYY-MM-DD) }, '60654': null } }, null being a number not on the
+// list.
+const APVMA_API = 'https://data.gov.au/data/api/3/action/';
+const APVMA_DATASET = '0de37904-43e0-4814-b21b-5b64fafefe6f';
+const APVMA_PRODUCT_LIST = 'b4bb5394-b60b-4602-8bde-2e206ffc498f';
+const APVMA_CHECK_KEY = 'korva_apvma_check';
+const APVMA_CHECK_EVERY = 7 * 86400000;
+
+// The product number: the first part of "54624/138127", without leading zeros.
+const apvmaNo = p => { const m = String((p && p.apvma) || '').match(/\d{4,6}/); return m ? String(parseInt(m[0], 10)) : ''; };
+
+function apvmaCheck() {
+  try {
+    const c = JSON.parse(localStorage.getItem(APVMA_CHECK_KEY) || 'null');
+    return c && c.numbers ? c : null;
+  } catch (e) { return null; }
+}
+
+// What the last check found for a product's number: its listing, null when
+// it wasn't on the list, undefined when it hasn't been checked.
+function apvmaListing(p) {
+  const no = apvmaNo(p), c = apvmaCheck();
+  return no && c && Object.prototype.hasOwnProperty.call(c.numbers, no) ? c.numbers[no] : undefined;
+}
+
+// "30/06/2027 12:00:00 AM" → "2027-06-30"
+const apvmaIsoDate = s => {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(s || ''));
+  return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : '';
+};
+const apvmaDayText = ms => new Date(ms).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+
+async function apvmaGet(action, params) {
+  const r = await fetch(`${APVMA_API}${action}?${new URLSearchParams(params)}`);
+  const d = await r.json().catch(() => null);
+  if (!d || !d.success || !d.result) throw new Error(`APVMA list (${r.status})`);
+  return d.result;
+}
+
+// If the APVMA ever replaces the list's file on data.gov.au, the new one is
+// found by its name in the APVMA's dataset.
+async function apvmaFindList() {
+  const set = await apvmaGet('package_show', { id: APVMA_DATASET });
+  const file = (set.resources || []).find(r => r.name === 'product.csv' && r.datastore_active);
+  if (!file) throw new Error('APVMA list not found');
+  return file.id;
+}
+
+let apvmaChecking = null, apvmaTriedAt = 0, apvmaAgain = false;
+// Checks when a week has passed or a number is new, and quietly does
+// nothing offline or when the list can't be read (the last check stands).
+function checkApvmaList() {
+  // A number typed while a check is under way is looked up straight after.
+  if (apvmaChecking) { apvmaAgain = true; return apvmaChecking; }
+  const products = getChemicalRegister().products;
+  const numbers = [...new Set(products.map(apvmaNo).filter(Boolean))];
+  const last = apvmaCheck();
+  const fresh = numbers.filter(n => !last || !Object.prototype.hasOwnProperty.call(last.numbers, n));
+  const due = !last || Date.now() - last.checkedAt > APVMA_CHECK_EVERY || fresh.length > 0;
+  // A failed try waits a minute before the next.
+  if (!numbers.length || !due || navigator.onLine === false || Date.now() - apvmaTriedAt < 60000) return Promise.resolve(null);
+  apvmaTriedAt = Date.now();
+  const lookUp = listId => Promise.all([
+    apvmaGet('datastore_search', { resource_id: listId, limit: '0' }),
+    apvmaGet('datastore_search', { resource_id: listId, filters: JSON.stringify({ pcode: numbers }), fields: 'pcode,fpname,sname,expdate', limit: '1000' }),
+  ]).then(([all, found]) => ({ all, found, listId }));
+  const listId = (last && last.listId) || APVMA_PRODUCT_LIST;
+  apvmaChecking = lookUp(listId).catch(e => apvmaFindList().then(id => {
+    if (id === listId) throw e;
+    return lookUp(id);
+  })).then(({ all, found, listId }) => {
+    // The APVMA reloads the list every week. Caught half-loaded, it would
+    // make every product look cancelled, so a list much shorter than last
+    // time's (it holds about 19,000 products and actives) isn't used.
+    if (!(all.total >= Math.max(10000, ((last && last.total) || 0) * 0.8))) throw new Error('APVMA list part-loaded');
+    const listed = {};
+    numbers.forEach(n => { listed[n] = null; });
+    (found.records || []).forEach(r => {
+      const n = String(parseInt(r.pcode, 10));
+      if (n in listed) listed[n] = { name: r.fpname || '', holder: r.sname || '', expires: apvmaIsoDate(r.expdate) };
+    });
+    const check = { checkedAt: Date.now(), total: all.total, listId, numbers: listed };
+    try { localStorage.setItem(APVMA_CHECK_KEY, JSON.stringify(check)); } catch (e) { return null; }
+    apvmaTriedAt = 0;
+    // A product that has just dropped off the list (or was off it when
+    // first checked) gets a heads-up, once.
+    const gone = products.filter(p => listed[apvmaNo(p)] === null && !(last && last.numbers[apvmaNo(p)] === null));
+    if (gone.length && typeof showToast === 'function') {
+      const names = [...new Set(gone.map(p => p.name || `APVMA No. ${apvmaNo(p)}`))];
+      showToast(`${names.join(', ')} ${names.length === 1 ? "isn't" : "aren't"} registered with the APVMA any more`, 'info',
+        { label: 'See', run: () => openMenuPage('chemicalsPanel') });
+    }
+    refreshChemicalCards();
+    return check;
+  }).catch(() => null).finally(() => {
+    apvmaChecking = null;
+    if (apvmaAgain) { apvmaAgain = false; checkApvmaList(); }
+  });
+  return apvmaChecking;
+}
+
+// The phone stays open for days, so the check also runs on coming back to it.
+window.addEventListener('load', () => setTimeout(checkApvmaList, 15000));
+window.addEventListener('online', () => checkApvmaList());
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkApvmaList(); });
+
+// What the APVMA's list says about the product, on its card.
+function chemicalApvmaHtml(p) {
+  const esc = escapeHtml;
+  const no = apvmaNo(p), live = apvmaListing(p), c = apvmaCheck();
+  if (!no || live === undefined) return '';
+  const when = `checked ${apvmaDayText(c.checkedAt)}`;
+  if (live === null) {
+    return `<div class="chem-apvma gone">APVMA No. ${esc(no)} is not on the APVMA's list of registered products (${when}). Check the number on the label. If it's right, the product's registration has been cancelled or has lapsed: check with the maker or the APVMA before using it.</div>`;
+  }
+  // The list has most names in capitals: "TERMIDOR RESIDUAL TERMITICIDE".
+  const name = live.name === live.name.toUpperCase() ? live.name.toLowerCase().replace(/\b[a-z]/g, ch => ch.toUpperCase()) : live.name;
+  return `<div class="chem-apvma">Registered with the APVMA as ${esc(name)} (No. ${esc(no)}), ${esc(when)}.</div>`;
 }
 
 // A starting product's id comes from its name, so taking one off the list
@@ -394,7 +529,7 @@ function chemicalDocRow(p, kind) {
 }
 
 function chemicalDocsHtml(p) {
-  return `<div class="chem-docs">${chemicalDocRow(p, 'sds')}${chemicalDocRow(p, 'label')}${safeUrl(p.declUrl) ? chemicalDocRow(p, 'decl') : ''}</div>`;
+  return `<div class="chem-docs">${chemicalApvmaHtml(p)}${chemicalDocRow(p, 'sds')}${chemicalDocRow(p, 'label')}${safeUrl(p.declUrl) ? chemicalDocRow(p, 'decl') : ''}</div>`;
 }
 
 // The label's rates, to read: the edit form holds the same in boxes.
@@ -452,6 +587,28 @@ function renderChemicalRegister() {
   const search = document.getElementById('chemSearch');
   if (search) onChemicalSearch(search);
   renderChemicalSummary();
+  checkApvmaList();
+}
+
+// After a check: each card's heading and documents follow it, and an open
+// card or edit form stays as it is.
+function refreshChemicalCards() {
+  const list = document.getElementById('chemList');
+  if (!list || !list.children.length) return;
+  const reg = getChemicalRegister();
+  list.querySelectorAll('.chem-card').forEach(card => {
+    const p = reg.products.find(x => x.id === card.dataset.id);
+    if (p) refreshChemicalCard(card, p);
+  });
+  renderChemicalSummary();
+}
+
+function refreshChemicalCard(card, p) {
+  const fresh = document.createElement('div');
+  fresh.innerHTML = chemicalCardHtml(p, canEditBusiness());
+  const next = fresh.firstElementChild;
+  card.dataset.find = next.dataset.find;
+  ['summary', '.chem-docs', '.chem-rates'].forEach(sel => card.querySelector(sel).replaceWith(next.querySelector(sel)));
 }
 
 function renderChemicalSummary() {
@@ -460,14 +617,24 @@ function renderChemicalSummary() {
   const noRate = uses.filter(u => !u.rate).length;
   const sum = document.querySelector('#chemicalsPanel .job-panel-summary');
   if (sum) sum.textContent = reg.products.length ? `${reg.products.length} products` : '';
+  const gone = [...new Set(reg.products.filter(chemicalNotRegistered).map(p => p.name || 'A product'))];
   const status = document.getElementById('chemStatus');
   if (status) {
-    status.textContent = !uses.length ? ''
-      : noRate
-        ? `${noRate} of ${uses.length} uses have no rate yet. Type each one from the label once, and treatment records fill it from then on.`
-        : 'Every use has its label rate.';
-    status.classList.toggle('warn', noRate > 0);
-    status.hidden = !uses.length;
+    status.textContent = [
+      gone.length ? `${gone.join(', ')} ${gone.length === 1 ? "isn't" : "aren't"} registered with the APVMA any more.` : '',
+      !uses.length ? ''
+        : noRate
+          ? `${noRate} of ${uses.length} uses have no rate yet. Type each one from the label once, and treatment records fill it from then on.`
+          : 'Every use has its label rate.',
+    ].filter(Boolean).join(' ');
+    status.classList.toggle('warn', noRate > 0 || gone.length > 0);
+    status.hidden = !status.textContent;
+  }
+  const note = document.getElementById('chemApvmaNote');
+  const c = apvmaCheck();
+  if (note) {
+    note.textContent = c ? `SAYON checks each APVMA No. against the APVMA's list of registered products once a week. Last checked ${apvmaDayText(c.checkedAt)}.` : '';
+    note.hidden = !c;
   }
 }
 
@@ -564,12 +731,10 @@ function onChemicalEdit(el) {
   }
   storeChemicalRegister(reg);
   // The heading, documents and rates follow the edit; the form stays put.
-  const fresh = document.createElement('div');
-  fresh.innerHTML = chemicalCardHtml(p, true);
-  const next = fresh.firstElementChild;
-  card.dataset.find = next.dataset.find;
-  ['summary', '.chem-docs', '.chem-rates'].forEach(sel => card.querySelector(sel).replaceWith(next.querySelector(sel)));
+  refreshChemicalCard(card, p);
   renderChemicalSummary();
+  // A new APVMA No. is looked up on the APVMA's list straight away.
+  if (el.dataset.f === 'apvma') checkApvmaList();
   const reset = document.getElementById('chemReset');
   if (reset) reset.hidden = false;
 }

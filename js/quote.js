@@ -159,6 +159,7 @@ function rememberQuoteGst(on) {
 
 function rememberQuotePrice(key, price) {
   if (!key || key === 'custom' || !isFinite(price)) return;
+  if (quoteState && isSampleJob(quoteState.reportKey)) return; // a price typed on the sample
   const mem = quotePriceMemory();
   if (mem[key] === price) return;
   mem[key] = price;
@@ -1387,7 +1388,7 @@ function onQuoteFieldInput() {
   if (problem !== quoteProblem(q)) q.problem = problem;
   if (q.gst !== document.getElementById('qGst').checked) {
     q.gst = document.getElementById('qGst').checked;
-    rememberQuoteGst(q.gst);
+    if (!isSampleJob(q.reportKey)) rememberQuoteGst(q.gst);
   }
   q.exclusions = document.getElementById('qExclusions').value;
   q.paymentTerms = document.getElementById('qPaymentTerms').value;
@@ -1718,6 +1719,8 @@ function exportQuotePDF() {
 // Remember every line's price, not just ones edited this session, so a quote
 // that goes to a client becomes the business's price list for next time.
 function rememberQuotePrices(q) {
+  // The sample's prices only show the list; they never change it.
+  if (isSampleJob(q.reportKey)) return;
   q.items.forEach(it => rememberQuotePrice(it.key, parseFloat(it.price)));
   if (q.paymentTerms !== undefined) rememberPaymentTerms(q.paymentTerms.trim());
 }
@@ -1831,7 +1834,7 @@ function emailQuoteToClient() {
     // The link the client accepts from goes in the message. Making it needs
     // signal and a moment; without either the quote still goes as before.
     let link = null;
-    if (authSession && navigator.onLine && !quoteLinkCurrent(q)) {
+    if (authSession && navigator.onLine && !quoteLinkCurrent(q) && !isSampleJob(q.reportKey)) {
       btn.disabled = true;
       document.getElementById('quoteSendLabel').textContent = 'Making the link…';
       const files = { quote: buildQuotePDF(q) };

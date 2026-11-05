@@ -14,7 +14,9 @@
 
 const SAMPLE_JOB = {
   street: '14 Example Street', suburb: 'Epping', state: 'NSW', postcode: '2121',
-  client: 'Jordan Sample', phone: '0400 000 001', email: 'jordan@example.com', fee: '330',
+  // The phone number is one the ACMA keeps for made-up uses, so it never
+  // rings a real person; example.com never delivers mail.
+  client: 'Jordan Sample', phone: '0491 570 156', email: 'jordan@example.com', fee: '330',
 };
 
 // Days before today each step happened, so the job always reads as recent.
@@ -31,6 +33,10 @@ function sampleTime(daysAgo, hhmm) {
   d.setDate(d.getDate() - daysAgo);
   d.setHours(h, m, 0, 0);
   return d.getTime();
+}
+// Four digits for a report or quote number, like the app's own (1000-9999).
+function sampleDigits() {
+  return String(Math.floor(Math.random() * 9000 + 1000));
 }
 
 // A signature drawn as a person would, from a few loops and a tail. seed
@@ -58,6 +64,8 @@ function sampleSignature(seed) {
 function sampleReportData(inspector) {
   const inspected = sampleIsoDate(SAMPLE_DAYS.inspected);
   return {
+    // Numbered on the day it was inspected and sent, as a real one would be.
+    reportNumber: `SY-${inspected.replace(/-/g, '')}-${sampleDigits()}`,
     standard: 'AS 3660.2-2017',
     jobInspectionType: 'Annual — Existing Building',
     jobInspectionDate: inspected,
@@ -66,15 +74,24 @@ function sampleReportData(inspector) {
     jobClientPhone: SAMPLE_JOB.phone,
     jobClientEmail: SAMPLE_JOB.email,
     jobOrderId: '', jobNotes: '',
-    structureType: 'Single storey house',
+    // The choices a spoken note fills these with (startEdit's lists).
+    structureType: 'Detached house',
+    height: 'Single storey',
     wallConstruction: 'Brick veneer',
-    floorType: 'Slab on ground',
-    roofType: 'Concrete tile, timber framed',
+    floorType: 'Concrete slab on ground',
+    roofType: 'Tiled — concrete',
     constructionEra: '1985-2003',
-    occupancyStatus: 'Occupied and furnished',
+    occupancyStatus: 'Owner occupied',
+    furnishing: 'Fully furnished',
+    peoplePresent: 'Client',
     weatherConditions: 'Fine and dry',
+    toolsUsed: 'Moisture meter and sounding tool',
     facadeDirection: 'North',
+    siteSurroundings: 'Suburban, few trees',
+    siteSlope: 'Flat',
+    termiteHistory: 'None known',
     existingSystem: 'No system found',
+    previousTreatment: 'NO',
     durableNoticePresent: 'NO',
     softLandscaping: 'YES',
     areaStatus: { interior: 'INSPECTED', exterior: 'INSPECTED', subfloor: 'NA', roofvoid: 'PARTIAL', outbuildings: 'NA', site: 'INSPECTED', fences: 'INSPECTED', retainingwalls: 'NA', landscapingtimbers: 'NA' },
@@ -89,7 +106,7 @@ function sampleReportData(inspector) {
         damageDescription: 'Live termites when the skirting was sounded and probed; mud leading up from the slab edge on the outside wall; timber hollow behind the paint along about 1 m of skirting. Refer to a builder to repair the frame and skirting once treated.',
         nestLocated: 'NO', structuralConcern: 'NO' },
       { id: 'f_sample_2', termiteActivity: 'INACTIVE', species: null,
-        activityLocation: 'Stump of a felled tree in the backyard, about 7 m from the house',
+        activityLocation: 'Stump of a felled tree in the backyard, about 6 m from the house',
         timberAffected: 'Tree stump',
         damageDescription: 'Old workings in the stump; no live termites found when probed',
         nestLocated: 'NO', structuralConcern: 'NO' },
@@ -97,6 +114,7 @@ function sampleReportData(inspector) {
     borerActivity: 'NONE',
     decayFound: 'NO',
     delignification: 'NO',
+    invasiveInspection: 'NO',
     waterLeaks: 'YES',
     leakLocation: 'Garden tap outside the laundry, dripping onto the slab edge',
     moistureReadings: 'YES',
@@ -122,19 +140,21 @@ function sampleReportData(inspector) {
 // The drawn site plan on the treatment record: the house, the barrier all
 // round it, the laundry where the termites were and the old stump. North is
 // up and the street is at the top. 400 plan units across the house is 16 m.
+// The laundry's marks sit on the east wall so their labels fall outside the
+// house, clear of its walls, and the back fence clears the scale bar.
 function sampleSitePlan() {
   return { v: 1, north: 0, mpu: 0.04, items: [
     { id: 'ps_street', k: 'text', x: 500, y: 70, label: 'Example Street' },
     { id: 'ps_drive', k: 'driveway', x: 160, y: 120, w: 100, h: 330, label: 'Driveway' },
     { id: 'ps_house', k: 'house', x: 300, y: 200, w: 400, h: 275, label: 'House' },
     { id: 'ps_barrier', k: 'barrier', pts: [[290, 190], [710, 190], [710, 485], [290, 485]], loop: true, label: 'Trenched and rodded' },
-    { id: 'ps_garden', k: 'garden', x: 728, y: 205, w: 45, h: 130, label: 'Garden bed' },
+    { id: 'ps_garden', k: 'garden', x: 728, y: 205, w: 45, h: 130, label: '' },
     { id: 'ps_found', k: 'activity', x: 688, y: 395, label: 'Laundry' },
-    { id: 'ps_foam', k: 'treated', x: 650, y: 430, label: 'Foamed' },
-    { id: 'ps_tap', k: 'tap', x: 735, y: 470, label: 'Dripping' },
+    { id: 'ps_foam', k: 'treated', x: 688, y: 440, label: 'Foamed' },
+    { id: 'ps_tap', k: 'tap', x: 740, y: 490, label: 'Dripping' },
     { id: 'ps_meter', k: 'notice', x: 310, y: 240, label: 'Meter box' },
-    { id: 'ps_stump', k: 'tree', x: 470, y: 650, label: 'Old stump' },
-    { id: 'ps_fence', k: 'fence', pts: [[60, 715], [940, 715]], label: 'Back fence' },
+    { id: 'ps_stump', k: 'tree', x: 470, y: 625, label: 'Old stump' },
+    { id: 'ps_fence', k: 'fence', pts: [[60, 675], [940, 675]], label: 'Back fence' },
   ] };
 }
 
@@ -144,10 +164,13 @@ function sampleQuote(id, address, inspector, clientSignature) {
   const barrier = newQuoteItem('barrier_lm', { qty: 57, detail: 'Trench and rod around the whole house', source: 'Recommendation: install a chemical soil barrier around the whole house' });
   const weep = newQuoteItem('weep_holes', { source: 'Conducive condition: weep holes bridged' });
   const followup = newQuoteItem('followup', { detail: 'Re-inspect 6 weeks after treatment', source: 'Recommendation: inspection frequency' });
+  // Sent and accepted, so its prices count as checked. The sample never
+  // teaches the business's price list (rememberQuotePrices).
+  [direct, barrier, weep, followup].forEach(it => { it.priceSet = true; });
   const sentAt = sampleTime(SAMPLE_DAYS.inspected, '15:25');
   const q = {
     reportKey: id,
-    number: `Q-${sampleIsoDate(SAMPLE_DAYS.inspected).replace(/-/g, '')}-0001`,
+    number: `Q-${sampleIsoDate(SAMPLE_DAYS.inspected).replace(/-/g, '')}-${sampleDigits()}`,
     createdAt: sentAt - 5 * 60e3,
     updatedAt: sentAt,
     client: SAMPLE_JOB.client, clientPhone: SAMPLE_JOB.phone, clientEmail: SAMPLE_JOB.email,
@@ -164,7 +187,7 @@ function sampleQuote(id, address, inspector, clientSignature) {
     plan: {
       we: 'Treat the live termites in the laundry door frame and skirting to control the colony.\nTreat the soil around the house to form a continuous treated zone.\nClear the bridged weep holes.\nFit a durable notice in the meter box showing what was used and when.',
       owner: 'Fix the dripping garden tap outside the laundry.\nKeep garden beds, mulch and paving below the weep holes.\nLeave the treated areas undisturbed, and tell us before any building or landscaping work near them.',
-      time: 'Half a day', service: '', inspections: 'Re-inspect 6 weeks after treatment, then every 12 months',
+      time: 'Half a day', service: '12 months', inspections: 'Re-inspect 6 weeks after treatment, then every 12 months',
     },
     paymentTerms: defaultPaymentTerms(),
     notes: QUOTE_DEFAULT_NOTES,
@@ -190,12 +213,12 @@ function sampleQuote(id, address, inspector, clientSignature) {
     ],
     areas: 'Laundry, the door frame and skirting on the eastern wall; the soil around the whole house',
     notTreated: '',
-    site: { building: 'Single storey house, brick veneer, concrete tile roof', floor: 'Slab on ground', surrounds: 'Garden bed on the eastern side; concrete driveway on the western side', existing: 'None found' },
+    site: { building: 'Single storey house, brick veneer, concrete tile roof', floor: 'Concrete slab on ground', surrounds: 'Garden bed on the eastern side; concrete driveway on the western side', existing: 'None found' },
     plan: sampleSitePlan(),
     notice: 'new', noticeWhere: 'Meter box',
     cautions: typeof TREATMENT_DEFAULT_CAUTIONS === 'string' ? TREATMENT_DEFAULT_CAUTIONS : '',
     nextInspection: `${nextInspection.getFullYear()}-${String(nextInspection.getMonth() + 1).padStart(2, '0')}-${String(nextInspection.getDate()).padStart(2, '0')}`,
-    warranty: '', notes: '',
+    warranty: typeof treatmentWarrantyFromQuote === 'function' ? treatmentWarrantyFromQuote(q) : '', notes: '',
     signature: inspector.signature,
     at: sampleTime(SAMPLE_DAYS.treated, '11:50'),
   };
@@ -246,8 +269,9 @@ function finishSampleJob() {
   ensureReportNumber();
   reportData.sent = { at: sampleTime(SAMPLE_DAYS.inspected, '15:20'), fingerprint: reportFingerprint(), version: 1 };
   saveCurrentReport(true);
-  renderReportWidgets();
-  if (typeof renderIssueState === 'function') renderIssueState();
+  // Opened again, so every banner and badge reads the finished job (the
+  // agreement banner was drawn before the agreement was there).
+  loadReport(SAMPLE_JOB_ID, true);
 }
 
 // Opens the sample job's page, putting the job on the phone first if it
@@ -255,7 +279,7 @@ function finishSampleJob() {
 function openSampleJob(from) {
   saveOpenReportNow();
   const fresh = !getSavedReports().some(r => r.id === SAMPLE_JOB_ID);
-  if (fresh && !addSampleJob()) return;
+  if (fresh && !addSampleJob()) return; // setSavedReports said why
   if (document.getElementById('dashboardOverlay').classList.contains('open')) closeDashboard();
   if (document.getElementById('sidebarPanel').classList.contains('open')) toggleDrawer();
   if (document.getElementById('app').style.display !== 'flex') openApp('inspect');

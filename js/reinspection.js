@@ -78,6 +78,7 @@ function reinspectWhen(item) {
   const n = Math.abs(item.days);
   const span = n >= 60 ? `${Math.round(n / 30.4)} months` : n >= 14 ? `${Math.round(n / 7)} weeks` : `${n} day${n === 1 ? '' : 's'}`;
   if (item.days === 0) return 'Due today';
+  if (item.days === 1) return 'Due tomorrow';
   return item.overdue ? `Overdue by ${span}` : `Due in ${span}`;
 }
 

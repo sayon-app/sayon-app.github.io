@@ -49,7 +49,7 @@ function jobPdfParts() {
   }
   if (q && q.treatment) {
     const t = q.treatment;
-    parts.push({ title: 'Treatment certificate', note: `Done ${formatAnswerDate(t.date)}${t.technician ? ' by ' + t.technician : ''}`, build: () => buildTreatmentCertificatePDF(q) });
+    parts.push({ title: 'Treatment certificate', note: `Treated ${formatAnswerDate(t.date)}${t.technician ? ' by ' + t.technician : ''}`, build: () => buildTreatmentCertificatePDF(q) });
     if (installedSystems(t).length) parts.push({ title: 'Certificate of installation', note: installedSystems(t).map(k => (TREATMENT_METHODS[k] || {}).label || k).join(', '), build: () => buildTreatmentCertificatePDF(q, { install: true }) });
   }
   if (q && typeof baitVisitsOf === 'function') baitVisitsOf(q).forEach(v => {

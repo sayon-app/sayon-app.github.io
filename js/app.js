@@ -2134,7 +2134,7 @@ window.addEventListener('load', () => {
   const statusEl = document.getElementById('splashStatus');
   const messages = [
     'Initialising vocabulary…',
-    'Loading NSW species reference…',
+    'Loading the termite species reference…',
     'Preparing report template…',
   ];
   let msgIndex = 0;

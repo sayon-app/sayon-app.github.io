@@ -18,7 +18,8 @@
     --line: #dde3e9; --accent: #1D4ED8; --accent-light: #EEF3FF; --error: #b42318;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.55; font-size: 16px; }
+  body { background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.55; font-size: 16px; text-wrap: pretty; }
+  h1 { text-wrap: balance; }
   .wrap { max-width: 680px; margin: 0 auto; padding: 24px 16px 64px; }
   .head { margin-bottom: 18px; }
   .company { font-size: 14px; font-weight: 700; color: var(--accent); letter-spacing: 0.02em; }
@@ -32,7 +33,7 @@
   .clause h2 { font-size: 16px; margin-bottom: 4px; }
   .clause p, .intro { color: var(--ink2); font-size: 15px; margin-bottom: 6px; }
   .close { font-weight: 600; background: var(--accent-light); border-left: 3px solid var(--accent); padding: 12px 14px; border-radius: 8px; margin-top: 8px; }
-  label.field { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .field { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
   input[type=text] { width: 100%; font: inherit; padding: 12px; min-height: 48px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 16px; }
   .check { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 16px; font-size: 15px; color: var(--ink2); }
   .check input { width: 22px; height: 22px; margin-top: 1px; flex: none; }
@@ -43,6 +44,7 @@
   .btn { width: 100%; min-height: 52px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font: inherit; font-weight: 700; font-size: 17px; cursor: pointer; margin-top: 4px; }
   .btn:disabled { opacity: 0.45; cursor: default; }
   .err { color: var(--error); font-size: 14px; margin-top: 10px; min-height: 1em; }
+  .need { color: var(--ink3); font-size: 14px; margin-top: 10px; text-align: center; }
   .state { text-align: center; padding: 40px 20px; }
   .state h1 { margin-bottom: 8px; }
   .state p { color: var(--ink2); }
@@ -113,6 +115,16 @@ function showState(title, text, done, more) {
   app.appendChild(c);
 }
 
+// A business name can end in its own full stop ("Pty. Ltd."), so a
+// sentence that ends on one doesn't get a second.
+function sentence(s) {
+  return /[.!?…]$/.test(s) ? s : s + '.';
+}
+
+function joinAnd(list) {
+  return list.length < 2 ? list.join('') : list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
+}
+
 function formatAUD(n) {
   const v = isFinite(n) ? +n : 0;
   return v.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' });
@@ -145,14 +157,16 @@ function renderText(parent, text) {
 
 function makePad(canvas, hint, onChange) {
   const ctx = canvas.getContext('2d');
-  let drawing = false, last = null, ink = 0;
+  let drawing = false, last = null, ink = 0, s = 1;
   function size() {
-    const r = canvas.getBoundingClientRect(), s = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    s = window.devicePixelRatio || 1;
     canvas.width = r.width * s; canvas.height = r.height * s;
-    ctx.setTransform(s, 0, 0, s, 0, 0);
-    ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0c121c';
+    ctx.lineWidth = 2.5 * s; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0c121c';
   }
-  const pos = e => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  // Bitmap pixels, scaled from the box as it is now: a phone turned after
+  // the pad was sized still draws under the finger.
+  const pos = e => { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height }; };
   canvas.addEventListener('pointerdown', e => { drawing = true; last = pos(e); canvas.setPointerCapture(e.pointerId); });
   canvas.addEventListener('pointermove', e => {
     if (!drawing) return;
@@ -164,10 +178,15 @@ function makePad(canvas, hint, onChange) {
   const end = () => { if (drawing) { drawing = false; onChange(); } };
   canvas.addEventListener('pointerup', end);
   canvas.addEventListener('pointercancel', end);
+  canvas.setAttribute('role', 'img');
+  canvas.setAttribute('aria-label', 'Signature box');
   size();
+  // Turned before signing: the empty pad takes the box's new shape, so the
+  // signature isn't squeezed into the old one.
+  window.addEventListener('resize', () => { if (!ink && !drawing) size(); });
   return {
     // A tap or a dot doesn't count as a signature.
-    signed: () => ink >= 24,
+    signed: () => ink >= 24 * s,
     clear: () => { ctx.clearRect(0, 0, canvas.width, canvas.height); ink = 0; hint.style.display = ''; onChange(); },
     png: () => canvas.toDataURL('image/png'),
   };
@@ -178,7 +197,7 @@ function makePad(canvas, hint, onChange) {
 function fromLine(doc) {
   const p = el('p', 'from');
   const who = [doc.inspector, doc.company].filter(Boolean).join(', ');
-  p.appendChild(document.createTextNode(who ? `Sent by ${who}. ` : ''));
+  p.appendChild(document.createTextNode(who ? `${sentence(`Sent by ${who}`)} ` : ''));
   const ways = [];
   if (doc.phone) { const a = el('a', null, doc.phone); a.href = 'tel:' + String(doc.phone).replace(/[^\d+]/g, ''); ways.push(a); }
   if (doc.email) { const a = el('a', null, doc.email); a.href = 'mailto:' + doc.email; ways.push(a); }
@@ -214,21 +233,28 @@ function renderForm(doc) {
   const agree = el('input'); agree.type = 'checkbox';
   check.append(agree, el('span', null, 'I have read this agreement and agree to it.'));
   const padLabel = el('div', 'field', 'Sign here');
-  padLabel.style.cssText = 'font-size:14px;font-weight:600;margin-bottom:6px';
   const padWrap = el('div', 'pad');
   const canvas = el('canvas'); const hint = el('span', null, 'Sign with your finger');
   padWrap.append(canvas, hint);
   const clear = el('button', 'clear', 'Clear signature'); clear.type = 'button';
   const btn = el('button', 'btn', 'Sign agreement'); btn.type = 'button'; btn.disabled = true;
-  const err = el('p', 'err');
-  form.append(nameLabel, name, check, padLabel, padWrap, clear, btn, err);
+  const need = el('p', 'need');
+  const err = el('p', 'err'); err.setAttribute('aria-live', 'polite');
+  form.append(nameLabel, name, check, padLabel, padWrap, clear, btn, need, err);
   app.appendChild(form);
 
-  const update = () => { btn.disabled = !(name.value.trim() && agree.checked && pad.signed()); };
+  // The button stays off until all three are done; the line under it says
+  // which are left.
+  const update = () => {
+    const left = [!name.value.trim() && 'enter your name', !agree.checked && 'tick that you agree', !pad.signed() && 'draw your signature above'].filter(Boolean);
+    btn.disabled = left.length > 0;
+    need.textContent = left.length ? `To sign, ${joinAnd(left)}.` : '';
+  };
   const pad = makePad(canvas, hint, update);
   name.addEventListener('input', update);
   agree.addEventListener('change', update);
   clear.addEventListener('click', () => pad.clear());
+  update();
 
   btn.addEventListener('click', async () => {
     btn.disabled = true; btn.textContent = 'Signing…'; err.textContent = '';
@@ -240,7 +266,7 @@ function renderForm(doc) {
       } else if (res === 'expired') {
         showState('This link has expired', `Please ask ${doc.company || 'your inspector'} to send a new one.`);
       } else if (res === 'cancelled') {
-        showState('This agreement was withdrawn', `Please contact ${doc.company || 'your inspector'}.`);
+        showState('This agreement was withdrawn', sentence(`Please contact ${doc.company || 'your inspector'}`));
       } else {
         throw new Error(res);
       }
@@ -334,7 +360,7 @@ function renderQuote(doc) {
 
   // Accept, or decline.
   const form = card('Your answer');
-  const acceptText = doc.acceptText || `I accept this quote of ${formatAUD(doc.total)}${doc.gst !== false ? ' (inc GST)' : ''} and authorise the work described above.`;
+  const acceptText = doc.acceptText || `I accept this quote of ${formatAUD(doc.total)}${doc.gst !== false ? ' (inc\u00a0GST)' : ''} and authorise the work described above.`;
   const nameLabel = el('label', 'field', 'Your full name'); nameLabel.htmlFor = 'name';
   const name = el('input'); name.type = 'text'; name.id = 'name'; name.autocomplete = 'name'; name.value = doc.client || '';
   const check = el('label', 'check');
@@ -346,24 +372,30 @@ function renderQuote(doc) {
   padWrap.append(canvas, hint);
   const clear = el('button', 'clear', 'Clear signature'); clear.type = 'button';
   const btn = el('button', 'btn', 'Accept quote'); btn.type = 'button'; btn.disabled = true;
-  const err = el('p', 'err');
+  const need = el('p', 'need');
+  const err = el('p', 'err'); err.setAttribute('aria-live', 'polite');
   const declineBtn = el('button', 'btn secondary', 'I don’t want to go ahead'); declineBtn.type = 'button';
-  form.append(nameLabel, name, check, padLabel, padWrap, clear, btn, err, declineBtn);
+  form.append(nameLabel, name, check, padLabel, padWrap, clear, btn, need, err, declineBtn);
 
   const decline = el('div', 'decline'); decline.hidden = true;
   decline.appendChild(el('p', null, `Let ${doc.company || 'your inspector'} know you’re not going ahead. A reason helps, but isn’t needed.`));
   const noteLabel = el('label', 'field', 'Reason (optional)'); noteLabel.htmlFor = 'declineNote';
   const note = el('textarea'); note.id = 'declineNote'; note.placeholder = 'e.g. Going with another company';
   const sendDecline = el('button', 'btn danger', 'Decline quote'); sendDecline.type = 'button';
-  const derr = el('p', 'err');
+  const derr = el('p', 'err'); derr.setAttribute('aria-live', 'polite');
   decline.append(noteLabel, note, sendDecline, derr);
   form.appendChild(decline);
 
-  const update = () => { btn.disabled = !(name.value.trim() && agree.checked && pad.signed()); };
+  const update = () => {
+    const left = [!name.value.trim() && 'enter your name', !agree.checked && 'tick the box', !pad.signed() && 'draw your signature above'].filter(Boolean);
+    btn.disabled = left.length > 0;
+    need.textContent = left.length ? `To accept, ${joinAnd(left)}.` : '';
+  };
   const pad = makePad(canvas, hint, update);
   name.addEventListener('input', update);
   agree.addEventListener('change', update);
   clear.addEventListener('click', () => pad.clear());
+  update();
   declineBtn.addEventListener('click', () => { decline.hidden = !decline.hidden; if (!decline.hidden) note.focus(); });
   const meta_ = () => ({ userAgent: navigator.userAgent.slice(0, 300), tz: Intl.DateTimeFormat().resolvedOptions().timeZone || '' });
   const who = doc.company || 'Your inspector';
@@ -375,7 +407,7 @@ function renderQuote(doc) {
       if (res === 'signed' || res === 'already_signed') {
         showState('Quote accepted, thank you', `${who} has your acceptance and will be in touch to arrange the work. You can close this page.`, true);
       } else if (res === 'expired') showState('This link has expired', `Please ask ${who} to send a new one.`);
-      else if (res === 'cancelled') showState('This quote was withdrawn', `Please contact ${who}.`);
+      else if (res === 'cancelled') showState('This quote was withdrawn', sentence(`Please contact ${who}`));
       else throw new Error(res);
     } catch (e) {
       err.textContent = 'That didn’t go through. Check your connection and try again.';
@@ -390,7 +422,7 @@ function renderQuote(doc) {
       if (res === 'declined') showState('Thanks for letting us know', `${who} has your answer. You can close this page.`, true);
       else if (res === 'already_signed') showState('Already accepted', 'This quote was already accepted from this link.', true);
       else if (res === 'expired') showState('This link has expired', `Please ask ${who} to send a new one.`);
-      else if (res === 'cancelled') showState('This quote was withdrawn', `Please contact ${who}.`);
+      else if (res === 'cancelled') showState('This quote was withdrawn', sentence(`Please contact ${who}`));
       else throw new Error(res);
     } catch (e) {
       derr.textContent = 'That didn’t go through. Check your connection and try again.';
@@ -411,7 +443,7 @@ function renderQuote(doc) {
     else if (r.status === 'signed') showState(quote ? 'Quote accepted' : 'Already signed', `${quote ? 'Accepted' : 'Signed'} by ${r.signer_name} on ${formatDate(r.signed_at)}. There’s nothing more to do.`, true);
     else if (r.status === 'declined') showState('Quote declined', `You let ${who} know on ${formatDate(r.signed_at)} that you’re not going ahead.`, false, r.note ? `Your note: ${r.note}` : '');
     else if (r.status === 'expired') showState('This link has expired', `Please ask ${who} to send a new one.`);
-    else if (r.status === 'cancelled') showState(`This ${thing} was withdrawn`, `Please contact ${who}.`);
+    else if (r.status === 'cancelled') showState(`This ${thing} was withdrawn`, sentence(`Please contact ${who}`));
     else if (quote) renderQuote(doc);
     else renderForm(doc);
   } catch (e) {

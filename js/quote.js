@@ -1835,7 +1835,7 @@ function quoteLinkDoc(q, files) {
       we: lines(plan.we), owner: lines(plan.owner) },
     exclusions: lines(q.exclusions), notes: lines(q.notes), paymentTerms: (q.paymentTerms || '').trim(),
     files: files || {},
-    acceptText: `I accept quote ${q.number || ''} for ${formatAUD(totals.total)}${q.gst !== false ? ' (inc GST)' : ''} and authorise the work described in it.`,
+    acceptText: `I accept ${q.number ? `quote ${q.number}` : 'this quote'} for ${formatAUD(totals.total)}${q.gst !== false ? ' (inc\u00a0GST)' : ''} and authorise the work described in it.`,
   };
 }
 

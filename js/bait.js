@@ -188,8 +188,13 @@ function openBaitVisit(id) {
   if (!q || !baitInstalled(q)) return;
   const visits = baitVisitsOf(q);
   const existing = id ? visits.find(v => v.id === id) : null;
-  const v = existing ? JSON.parse(JSON.stringify(existing)) : draftBaitVisit(q, visits[visits.length - 1]);
-  baitDraft = { id: existing ? existing.id : null, stations: v.stations || [], nextTouched: !!existing };
+  // What was on the sheet when the app closed comes back, unless the visit
+  // has been saved since (UNSAVED SHEETS in js/quote.js).
+  const sheetKey = `bait|${q.reportKey}|${existing ? existing.id : 'new'}`;
+  const copy = unsavedSheetCopy(sheetKey);
+  const restored = !!copy && copy.at > ((existing && existing.at) || 0);
+  const v = restored ? copy.data : existing ? JSON.parse(JSON.stringify(existing)) : draftBaitVisit(q, visits[visits.length - 1]);
+  baitDraft = { id: existing ? existing.id : null, stations: v.stations || [], nextTouched: restored ? !!v.nextTouched : !!existing };
   track('screen_viewed', { screen: 'bait_visit' });
   document.getElementById('baitTitle').textContent = existing ? 'Edit the bait station visit' : 'Bait station visit';
   document.getElementById('bvDate').value = v.date || todayIsoDate();
@@ -206,15 +211,17 @@ function openBaitVisit(id) {
   cancelSheetVoice('bait');
   document.getElementById('baitOverlay').classList.add('open');
   document.querySelector('#baitOverlay .page-sheet-body').scrollTop = 0;
-  if (!baitPad) baitPad = createSignaturePad(document.getElementById('bvSigCanvas'), document.getElementById('bvSigPlaceholder'), updateBaitSaveBtn);
+  if (!baitPad) baitPad = createSignaturePad(document.getElementById('bvSigCanvas'), document.getElementById('bvSigPlaceholder'), () => { updateBaitSaveBtn(); unsavedSheetChanged(); });
   baitPad.show(v.signature || '');
   updateBaitSaveBtn();
   renderBaitFolds(true);
   const sheet = document.getElementById('baitOverlay');
   if (!sheet.dataset.folds) {
     sheet.dataset.folds = '1';
-    ['input', 'change'].forEach(ev => sheet.addEventListener(ev, () => renderBaitFolds()));
+    ['input', 'change'].forEach(ev => sheet.addEventListener(ev, () => { renderBaitFolds(); unsavedSheetChanged(); }));
   }
+  watchUnsavedSheet(sheetKey, () => Object.assign(readBaitForm(), { nextTouched: baitDraft.nextTouched }));
+  if (restored) showToast('Picked up where you left off. Save the visit when you\'re done', 'info');
 }
 
 // ── THE FOLDS ── As on the treatment record: each part folds to its title,
@@ -244,6 +251,7 @@ function renderBaitFolds(reset) {
 }
 
 function closeBaitVisit() {
+  dropUnsavedSheet();
   cancelSheetVoice('bait');
   document.getElementById('baitOverlay').classList.remove('open');
 }
@@ -366,6 +374,7 @@ function onBaitProductName(inp) {
 }
 
 function updateBaitSummary() {
+  unsavedSheetChanged();
   const s = baitDraft.stations;
   const el = document.getElementById('bvSummary');
   if (!s.length) { el.textContent = ''; return; }
@@ -400,15 +409,12 @@ function updateBaitSaveBtn() {
   renderBaitFolds();
 }
 
-function saveBaitVisit() {
-  const q = quoteState;
-  if (!q || !baitDraft) return;
-  const need = baitSaveNeed();
-  if (need) { showToast(need, 'error'); return; }
+// The visit as the sheet has it now: what Save keeps, and the copy kept
+// while it's being filled in.
+function readBaitForm() {
   const v = id => document.getElementById(id).value.trim();
   const finished = document.getElementById('bvFinished').checked;
-  const visit = {
-    id: baitDraft.id || 'bv' + Date.now().toString(36),
+  return {
     date: v('bvDate') || todayIsoDate(),
     technician: v('bvTech'),
     licence: v('bvLicence'),
@@ -417,9 +423,17 @@ function saveBaitVisit() {
     nextVisit: finished ? '' : v('bvNext'),
     finished,
     notes: v('bvNotes'),
-    signature: baitPad.canvas.toDataURL('image/png'),
+    signature: baitPad && !baitPad.empty ? baitPad.canvas.toDataURL('image/png') : '',
     at: Date.now(),
   };
+}
+
+function saveBaitVisit() {
+  const q = quoteState;
+  if (!q || !baitDraft) return;
+  const need = baitSaveNeed();
+  if (need) { showToast(need, 'error'); return; }
+  const visit = Object.assign({ id: baitDraft.id || 'bv' + Date.now().toString(36) }, readBaitForm());
   const old = (q.baitVisits || []).find(x => x.id === visit.id);
   // An edit that changes what the client was told needs sending again.
   const said = x => JSON.stringify([x.date, x.stations, x.product, x.nextVisit, x.finished, x.notes, x.technician, x.licence]);
@@ -432,7 +446,7 @@ function saveBaitVisit() {
   renderQuoteAnswer();
   if (typeof renderSavedList === 'function') renderSavedList();
   showToast(visit.sentAt ? 'Visit saved' : 'Visit saved. Email the client their visit report', 'success');
-  track('bait_visit_recorded', { stations: visit.stations.length, active: visit.stations.filter(s => BAIT_FEEDING.includes(s.status)).length, finished });
+  track('bait_visit_recorded', { stations: visit.stations.length, active: visit.stations.filter(s => BAIT_FEEDING.includes(s.status)).length, finished: visit.finished });
   // The report to email is the next tap.
   setTimeout(() => { const card = document.getElementById('qpBait'); if (card) card.scrollIntoView({ block: 'center' }); }, 60);
 }

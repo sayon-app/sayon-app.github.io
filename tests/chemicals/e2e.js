@@ -1,6 +1,8 @@
 // The chemical register, end to end (no real network calls):
-//   1. Menu › Chemical register lists SAYON's starting products with no
-//      rates, and no label link until one is saved (never a search page);
+//   1. Menu › Chemical register lists SAYON's starting products with the
+//      label (the APVMA's copy), SDS and label rates checked for them, no
+//      link where none was checked (never a search page), and fills a
+//      register saved earlier without replacing anything typed;
 //   2. the owner types a rate for a use, adds a product of their own with
 //      a label link, and it syncs to businesses.settings.chemicals;
 //   3. on a treatment record, picking the product asks what it's for and
@@ -43,6 +45,12 @@ const patches = [];
   check(names.includes('Termidor') && names.includes('Exterra') && names.length >= 10, `starting products listed (${names.length})`);
   check(/uses have no rate yet/.test(await p.locator('#chemStatus').innerText()), 'the status says the rates are still to add');
   check(names.includes('Maxxthor 100'), 'Maxxthor 100 is in the starting list');
+  const old = await p.evaluate(() => withStarterDetails({ products: [
+    { id: 'start13', name: 'Sentricon', active: 'noviflumuron', labelUrl: '', uses: [{ id: 'start13u0', pest: 'x', method: 'Bait', surface: 'In-ground station', rate: '', volume: '', life: '' }] },
+    { id: 'start0', name: 'Termidor', active: 'fipronil', labelUrl: 'https://example.com/own.pdf', uses: [{ id: 'start0u0', method: 'Soil treatment', rate: 'own rate', volume: '', life: '' }] },
+  ] }).products);
+  check(old[0].active === 'hexaflumuron' && old[0].labelUrl === 'https://elabels.apvma.gov.au/80120ELBL.pdf' && /Sentricon rod/.test(old[0].uses[0].rate), 'a register saved earlier gets the links and rates it has none of');
+  check(old[1].labelUrl === 'https://example.com/own.pdf' && old[1].uses.length === 1 && old[1].uses[0].rate === 'own rate' && /basf/.test(old[1].sdsUrl), 'but keeps everything the business typed');
   await p.screenshot({ path: `${OUT}/1-register.png` });
   await p.fill('#chemSearch', 'maxx');
   const visible = await p.locator('#chemList .chem-card:not([hidden]) .chem-card-name').allInnerTexts();
@@ -52,18 +60,24 @@ const patches = [];
   await p.fill('#chemSearch', 'zzzz');
   check(await p.locator('#chemNoMatch').isVisible(), 'no match says so');
   await p.fill('#chemSearch', '');
+  const exterra = p.locator('#chemList .chem-card', { has: p.locator('.chem-card-name', { hasText: /^Exterra$/ }) });
+  await exterra.locator('summary').first().click(); await p.waitForTimeout(200);
+  check(/SDS/.test(await exterra.locator('.chem-docs').innerText()) && /No link yet/.test(await exterra.locator('.chem-docs').innerText()), 'a product opens to its documents');
+  check(await exterra.locator('.chem-docs a').count() === 0, 'with no link saved, no document link');
+  await exterra.locator('summary').first().click();
   const termidor = p.locator('#chemList .chem-card', { has: p.locator('.chem-card-name', { hasText: /^Termidor$/ }) });
   await termidor.locator('summary').first().click(); await p.waitForTimeout(200);
-  check(/SDS/.test(await termidor.locator('.chem-docs').innerText()) && /No link yet/.test(await termidor.locator('.chem-docs').innerText()), 'a product opens to its documents');
+  const starterHrefs = await termidor.locator('.chem-docs a.chem-doc-link').evaluateAll(as => as.map(a => a.href));
+  check(starterHrefs.includes('https://elabels.apvma.gov.au/54624ELBL.pdf') && starterHrefs.some(h => h.startsWith('https://pest-control.basf.com.au/')), 'Termidor starts with the APVMA label and BASF SDS');
+  check(/600 mL per 100 L water/.test(await termidor.locator('.chem-rates').innerText()) && /8 years/.test(await termidor.locator('.chem-rates').innerText()), 'Termidor starts with its label rates');
   await termidor.locator('.chem-edit > summary').click(); await p.waitForTimeout(100);
-  check(await termidor.locator('.chem-docs a').count() === 0, 'with no link saved, no document link');
   check(!/google\.com\/search|pubcris/.test(await p.content()), 'no web search links');
   const perimeter = termidor.locator('.chem-use').first();
   await perimeter.locator('[data-u="rate"]').fill('Test mix rate A'); await perimeter.locator('[data-u="rate"]').dispatchEvent('change');
   await perimeter.locator('[data-u="volume"]').fill('Test amount A'); await perimeter.locator('[data-u="volume"]').dispatchEvent('change');
   await perimeter.locator('[data-u="life"]').fill('Test life A'); await perimeter.locator('[data-u="life"]').dispatchEvent('change');
   await termidor.locator('[data-f="labelUrl"]').fill('example.com/termidor-label.pdf'); await termidor.locator('[data-f="labelUrl"]').dispatchEvent('change');
-  const labelLink = termidor.locator('.chem-docs a.chem-doc-link');
+  const labelLink = termidor.locator('.chem-docs a.chem-doc-link[href*="example.com"]');
   check((await labelLink.getAttribute('href')) === 'https://example.com/termidor-label.pdf' && (await labelLink.innerText()).trim() === 'termidor-label.pdf', 'a typed label link opens the PDF, named by its file');
   await termidor.locator('[data-f="sdsUrl"]').fill('https://example.com/docs/Termidor%20SDS.pdf'); await termidor.locator('[data-f="sdsUrl"]').dispatchEvent('change');
   await termidor.locator('[data-f="sdsExpires"]').fill('2030-02-28'); await termidor.locator('[data-f="sdsExpires"]').dispatchEvent('change');
@@ -92,6 +106,8 @@ const patches = [];
   const last = patches[patches.length - 1];
   check(!!last && last.settings.chemicals && last.settings.chemicals.products.some(x => x.name === 'Test Foam X'), 'the register syncs to the business settings');
   await p.evaluate(() => toggleDrawer());
+  // A use with no rate, to test what the record does with one.
+  await p.evaluate(() => { const reg = getChemicalRegister(); const u = reg.products.find(x => x.name === 'Termidor').uses[1]; u.rate = u.volume = u.life = ''; storeChemicalRegister(reg); });
 
   // 3. The treatment record.
   await p.evaluate(async ({ sc }) => {

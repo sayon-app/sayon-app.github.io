@@ -357,47 +357,30 @@ function openTreatmentRecord() {
   document.querySelector('#treatmentOverlay .page-sheet-body').scrollTop = 0;
 }
 
-// ── THE FOLDS ── Each part of the record folds to one line saying what it
-// holds, amber when something the certificate needs is missing. On opening
-// (and after a voice fill) the parts with a gap open and the rest fold.
+// ── THE FOLDS ── Each part of the record folds to its title, with a tick
+// once it's done, or a short amber note saying what the certificate still
+// needs. On opening (and after a voice fill) the parts with a gap open and
+// the rest fold.
 function treatmentFoldLines() {
   const v = id => document.getElementById(id).value.trim();
-  const tech = v('trTech'), lic = v('trLicence');
-  const times = [v('trStart'), v('trFinish')].filter(Boolean).map(formatClockTime).join('–');
-  const when = [v('trDate') ? formatAnswerDate(v('trDate')) : '', times].filter(Boolean).join(', ');
-  const ticked = [...document.querySelectorAll('#trMethods input[type=checkbox]:checked')].map(box => {
-    const m = TREATMENT_METHODS[box.dataset.key] || {};
-    const qty = document.querySelector(`#trMethods [data-qty="${box.dataset.key}"]`);
-    const n = qty && qty.value.trim();
-    return (m.short || m.label || box.dataset.key) + (n ? ` (${n} ${m.qty === 'stations' ? 'stations' : 'm'})` : '');
-  });
+  const ticked = document.querySelectorAll('#trMethods input[type=checkbox]:checked').length;
   const products = readTreatmentProducts().map(p => p.name).filter(Boolean);
-  const areas = v('trAreas');
-  const plan = sitePlanHasContent(treatmentPlanDraft) ? 'site plan drawn' : treatmentSketch && !treatmentSketch.empty ? 'sketch drawn' : '';
   const notice = v('trNotice');
-  const noticeText = notice === 'none' ? 'No notice placed' : `${notice === 'updated' ? 'Notice updated' : 'New notice'}${v('trNoticeWhere') ? ', ' + v('trNoticeWhere') : ''}`;
-  const next = v('trNext');
+  const need = text => ({ warn: true, text });
   return [
-    !tech ? { warn: true, text: `${when ? when + '. ' : ''}Technician not filled in` }
-      : !lic ? { warn: true, text: `${tech}, licence no. missing` }
-      : { text: [when, `${tech}, ${lic}`].filter(Boolean).join(' · ') },
-    !ticked.length ? { warn: true, text: 'Nothing ticked yet' }
-      : !products.length ? { warn: true, text: `${ticked.join(', ')} · no product named` }
-      : { text: `${ticked.join(', ')} · ${products.join(', ')}` },
-    !areas ? { warn: true, text: `Areas treated not filled in${plan ? ' · ' + plan : ''}` }
-      : { text: [areas.split(/\n/)[0], plan || 'no site plan'].join(' · ') },
-    notice !== 'none' && !v('trNoticeWhere') ? { warn: true, text: 'Say where the notice went' }
-      : { warn: !next, text: [noticeText, next ? 'next inspection ' + formatAnswerDate(next) : 'next inspection date missing'].join(' · ') },
+    !v('trTech') ? need('Add the technician') : !v('trLicence') ? need('Add the licence no.') : {},
+    !ticked ? need('Tick what was done') : !products.length ? need('Name the product used') : {},
+    !v('trAreas') ? need('Add the areas treated') : {},
+    notice !== 'none' && !v('trNoticeWhere') ? need('Say where the notice went') : !v('trNext') ? need('Add the next inspection date') : {},
   ];
 }
 
 function renderTreatmentFolds(reset) {
   if (!document.getElementById('trFold1')) return;
   treatmentFoldLines().forEach((line, i) => {
-    const sub = document.getElementById('trSub' + (i + 1));
-    sub.textContent = line.text;
-    sub.classList.toggle('warn', !!line.warn);
-    if (reset) document.getElementById('trFold' + (i + 1)).open = !!line.warn;
+    const fold = document.getElementById('trFold' + (i + 1));
+    setFoldNote(fold, document.getElementById('trSub' + (i + 1)), line.text);
+    if (reset) fold.open = !!line.warn;
   });
 }
 
@@ -599,9 +582,10 @@ function renderTreatmentProducts(products) {
   }
   document.getElementById('trProducts').innerHTML = products.map((p, i) => `
     <div class="treat-product" data-i="${i}">
+      <div class="treat-product-head">Product ${i + 1}</div>
       <div class="job-row">
         <div class="job-field">
-          <div class="job-field-label">Product</div>
+          <div class="job-field-label">Name</div>
           <input class="job-input" data-f="name" list="trProductList" value="${esc(p.name || '')}" placeholder="e.g. Termidor" oninput="onTreatmentProductName(this)">
         </div>
         <div class="job-field">

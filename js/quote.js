@@ -1856,7 +1856,7 @@ async function uploadClientDocs(folder, files) {
 // Resolves to the request, or null when it can't be made (signed out, no
 // signal, or the table isn't set up yet), so sending carries on without it.
 async function ensureQuoteLink(q, files) {
-  if (!authSession || !authUser || !navigator.onLine || !quoteHasItems(q)) return null;
+  if (!authSession || !authUser || !navigator.onLine || !quoteHasItems(q) || isSampleJob(q.reportKey)) return null;
   const current = quoteLinkCurrent(q);
   if (current) return current;
   stampQuoteIssued(q);
@@ -2094,7 +2094,10 @@ function drawPdfTotalsBox(doc, y, rows, [finalLabel, finalValue]) {
   doc.text(formatAUD(finalValue), bx + boxW - 4, ty + 3.4, { align: 'right' });
 }
 
-function drawPdfDocFooters(doc, label) {
+// key: the job the PDF is for (the open job when left out), so the sample
+// job's PDFs are stamped SAMPLE.
+function drawPdfDocFooters(doc, label, key) {
+  stampSamplePdf(doc, key);
   const C = PDF_COLORS;
   const W = 210, M = 15, CW = W - M * 2;
   const pages = doc.internal.getNumberOfPages();
@@ -2311,7 +2314,7 @@ function buildQuotePDF(q) {
   drawPdfSignature(doc, { x: M + (colW + 8) * 2, y, w: colW, caption: 'Date' });
   y += 8;
 
-  drawPdfDocFooters(doc, `Quote ${q.number || ''}${company.name ? `  ·  ${company.name}` : ''}`);
+  drawPdfDocFooters(doc, `Quote ${q.number || ''}${company.name ? `  ·  ${company.name}` : ''}`, q.reportKey);
 
   const safe = fileNamePart(q.address) || 'Property';
   return { blob: doc.output('blob'), fname: `SAYON_Quote_${(q.number || '').replace(/[^\w-]+/g, '')}_${safe}.pdf` };

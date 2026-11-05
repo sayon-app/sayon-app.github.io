@@ -725,7 +725,7 @@ function buildBaitVisitPDF(q, v) {
     y += drawSitePlanLegendPdf(doc, t.plan, { x: M, y, w: CW, statuses: baitStatusesOf(v) }) + 4;
   }
 
-  drawPdfDocFooters(doc, `Bait station visit ${number}${company.name ? `  ·  ${company.name}` : ''}`);
+  drawPdfDocFooters(doc, `Bait station visit ${number}${company.name ? `  ·  ${company.name}` : ''}`, q.reportKey);
   const safe = fileNamePart(q.address) || 'Property';
   return { blob: doc.output('blob'), fname: `SAYON_Bait_Visit_${number.replace(/[^\w-]+/g, '')}_${safe}.pdf` };
 }

@@ -1,7 +1,8 @@
 // Opening the app on a weak signal, where every call to the account takes
 // 15 seconds. The splash stays up (the screen is never blank), a phone that
-// has kept the business opens within a few seconds with it, and the
-// account's copy is taken in when it lands. A phone without it (a new one)
+// has kept the business and finished setting it up opens within a few
+// seconds with it, and the account's copy is taken in when it lands. Any
+// other phone (a new one, or one where setting up was left unfinished)
 // waits for the account, so it never offers to set the business up again.
 // node e2e.js <outDir>  (server on :8765; see tests/visual/README.md)
 const { chromium } = require('playwright'); const fs = require('fs');
@@ -11,9 +12,10 @@ const user = { id: uid, email: 'office@example.com', user_metadata: { name: 'Ale
 const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fails.push(what); };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
-// One phone: whether it kept the business and finished setting up, and
-// whether its sign-in has run out (so it's refreshed first).
-async function open(b, { kept, expired }) {
+// One phone: whether it kept the business and finished setting up (kept),
+// kept it but left setting up unfinished (unfinished), and whether its
+// sign-in has run out (so it's refreshed first).
+async function open(b, { kept, unfinished, expired, limit = 30 }) {
   const ctx = await b.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
   await require('../visual/fonts-route.js')(ctx);
   await ctx.route(/sentry|posthog|maps\.googleapis|cdnjs/, r => r.fulfill({ status: 200, body: '' }));
@@ -29,15 +31,15 @@ async function open(b, { kept, expired }) {
     if (u.includes('team_members?business_id')) { landed.team = true; return r.fulfill({ json: [{ id: 't1' }] }).catch(() => {}); }
     r.fulfill({ json: [] }).catch(() => {});
   });
-  await ctx.addInitScript(({ user, kept, expired }) => {
+  await ctx.addInitScript(({ user, kept, unfinished, expired }) => {
     if (localStorage.getItem('korva_session')) return;
     localStorage.setItem('korva_session', JSON.stringify({ access_token: 'a.b.c', refresh_token: 'r', expires_at: Math.floor(Date.now() / 1000) + (expired ? -100 : 3600), user }));
+    if (kept || unfinished) localStorage.setItem('korva_business_cache', JSON.stringify({ user_id: user.id, business: { id: 'b1', name: 'Example Pest Co', owner_id: user.id, settings: {} } }));
     if (kept) {
-      localStorage.setItem('korva_business_cache', JSON.stringify({ user_id: user.id, business: { id: 'b1', name: 'Example Pest Co', owner_id: user.id, settings: {} } }));
       localStorage.setItem('korva_onboarded_v1:' + user.id, '1');
       localStorage.setItem('korva_company_b1', JSON.stringify({ name: 'Example Pest Co', updatedAt: 1 }));
     }
-  }, { user, kept, expired });
+  }, { user, kept, unfinished, expired });
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   const t0 = Date.now();
   await p.goto(`http://localhost:${PORT}/`);
@@ -51,7 +53,7 @@ async function open(b, { kept, expired }) {
   // Something is on screen the whole time: the splash, then the app.
   const seen = [];
   let blank = 0;
-  while (at() < 30) {
+  while (at() < limit) {
     const s = await screen(); seen.push([at(), s]);
     if (!s.splash && !s.app && !s.setup && !s.signIn) blank++;
     if (s.app && (!kept || s.phone)) break;
@@ -89,15 +91,22 @@ async function open(b, { kept, expired }) {
   check(!r.errs.length, 'no page errors' + (r.errs.length ? ': ' + r.errs.join(' | ') : ''));
   await r.ctx.close();
 
-  // 3. A new phone: nothing kept, so it waits for the account.
-  r = await open(b, { kept: false });
-  const at9 = r.seen.filter(([t]) => t > 8 && t < 12);
-  check(!r.blank, 'a new phone: the screen is never blank while it waits');
-  check(at9.length && at9.every(([, s]) => s.splash && !s.setup), 'it waits on the splash for the account rather than opening without the business');
-  const after = r.seen[r.seen.length - 1][1];
-  check(after.business === 'b1' && !after.setup, 'and opens with the business once it lands, without "Set up your business"');
-  check(!r.errs.length, 'no page errors' + (r.errs.length ? ': ' + r.errs.join(' | ') : ''));
-  await r.ctx.close();
+  // 3. A new phone: nothing kept, so it waits for the account. 4. A phone
+  // that kept the business, but setting up was left unfinished on it and
+  // done on another phone: it waits for the account too.
+  // Each call to the account in turn (the business, then the owner's place
+  // on its team) takes the 15 seconds, so it opens after about 35.
+  for (const [who, setup] of [['a new phone', { kept: false }], ['setting up left unfinished on this phone', { unfinished: true }]]) {
+    r = await open(b, Object.assign({ limit: 60 }, setup));
+    const at9 = r.seen.filter(([t]) => t > 8 && t < 12);
+    check(!r.blank, `${who}: the screen is never blank while it waits`);
+    check(at9.length && at9.every(([, s]) => s.splash && !s.setup), 'it waits on the splash for the account rather than opening without the business');
+    const after = r.seen[r.seen.length - 1][1];
+    const opened = r.seen.find(([, s]) => s.app);
+    check(after.business === 'b1' && after.app && !after.setup, `and opens with the business once it lands, without "Set up your business" (${opened ? opened[0].toFixed(1) + ' s' : 'not opened'})`);
+    check(!r.errs.length, 'no page errors' + (r.errs.length ? ': ' + r.errs.join(' | ') : ''));
+    await r.ctx.close();
+  }
 
   await b.close();
   console.log(fails.length ? `\n${fails.length} FAILED` : '\nALL PASSED');

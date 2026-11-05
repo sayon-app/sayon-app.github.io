@@ -95,7 +95,7 @@ const OB_KEY = 'korva_onboarded_v1';
 // Per account, and decided from the data too: a new person on a phone that
 // was used before still sets up their business, and an existing customer on
 // a new phone (whose details come down with the account) doesn't repeat it.
-function obKey() { return authUser && authUser.id ? `${OB_KEY}:${authUser.id}` : OB_KEY; }
+function obKey(userId = authUser && authUser.id) { return userId ? `${OB_KEY}:${userId}` : OB_KEY; }
 function shouldShowOnboarding() {
   return !localStorage.getItem(obKey()) && !getCompanyDetails().updatedAt;
 }
@@ -9801,8 +9801,8 @@ function clearJobInfo() {
 // name/licence/phone/ABN/logo into another business's reports.
 const COMPANY_KEY = 'korva_company'; // legacy flat key, pre-multi-tenant - kept only for one-time migration below
 
-function companyStorageKey() {
-  return (authBusiness && authBusiness.id) ? `korva_company_${authBusiness.id}` : COMPANY_KEY;
+function companyStorageKey(business = authBusiness) {
+  return (business && business.id) ? `korva_company_${business.id}` : COMPANY_KEY;
 }
 
 // One-time migration for accounts that already had data under the old flat
@@ -11475,22 +11475,28 @@ function toggleAuthReveal(btn) {
 }
 
 // ── SESSION RESTORE ON LOAD ──────────────────────────────────────────────
-// On a phone that has kept the account's business, opening the app waits
-// this long at most for the account (the sign-in and the business
-// together). On a weak signal a call can hang for minutes, so after this
-// the app opens with what the phone has kept and takes in the account's
-// copy when it lands. A phone without it (a new one) waits for the account
-// as before, or it would offer to set up the business again.
+// On a phone that has kept the account's business and finished setting it
+// up, opening the app waits this long at most for the account (the sign-in
+// and the business together). On a weak signal a call can hang for
+// minutes, so after this the app opens with what the phone has kept and
+// takes in the account's copy when it lands. Any other phone (a new one,
+// or one where setting up was left unfinished and done on another phone)
+// waits for the account as before, or it would offer to set up the
+// business again.
 const START_NETWORK_WAIT_MS = 6000;
 let startDeadline = 0;
 function startWait(promise, userId) {
   if (!businessKeptFor(userId)) return promise;
   return Promise.race([promise, new Promise(done => setTimeout(() => done('slow'), Math.max(0, startDeadline - Date.now())))]);
 }
+// Set up on this phone: what shouldShowOnboarding() reads.
 function businessKeptFor(userId) {
   try {
     const cached = JSON.parse(localStorage.getItem(BUSINESS_CACHE_KEY) || 'null');
-    return !!(cached && userId && cached.user_id === userId && cached.business);
+    if (!(cached && userId && cached.user_id === userId && cached.business)) return false;
+    if (localStorage.getItem(obKey(userId))) return true;
+    const company = JSON.parse(localStorage.getItem(companyStorageKey(cached.business)) || 'null');
+    return !!(company && company.updatedAt);
   } catch (e) { return false; }
 }
 

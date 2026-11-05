@@ -1337,11 +1337,16 @@
           <svg class="icon panel-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
         </button>
         <div class="job-panel-body">
-          <div class="settings-row-desc pb-intro">The products you carry, with the label and SDS a tap away. On a treatment record, pick the product and what it's used for, and SAYON fills the active constituent, application rate and life expectancy from here. Rates come from the label: type each one from the label in your hands, and check it when a new label comes out.</div>
+          <div class="settings-row-desc pb-intro">The products you carry. Search for one and tap it: its SDS, label and manufacturer's declaration open with one tap, or send them on. On a treatment record, pick the product and what it's used for, and SAYON fills the active constituent, application rate and life expectancy from the label rates here.</div>
           <div class="settings-row-desc pb-status" id="chemStatus" hidden></div>
           <div class="settings-row-desc pb-owner" id="chemOwnerNote" hidden>Your business owner keeps this register. Tap a product to see its label, SDS and rates.</div>
-          <button type="button" class="job-action-btn settings-primary-btn chem-add" id="chemAdd" onclick="addChemical()">Add a product</button>
+          <div class="chem-search">
+            <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input class="job-input" id="chemSearch" type="search" placeholder="Search for a product" autocomplete="off" aria-label="Search the chemical register" oninput="onChemicalSearch(this)">
+          </div>
           <div class="chem-list" id="chemList"></div>
+          <div class="settings-row-desc" id="chemNoMatch" hidden>No product by that name. Add it with "Add a product".</div>
+          <button type="button" class="job-action-btn settings-primary-btn chem-add" id="chemAdd" onclick="addChemical()">Add a product</button>
           <button type="button" class="quote-link-btn" id="chemReset" onclick="restoreChemicalStarters()" hidden>Add back SAYON's starting products</button>
         </div>
       </div>

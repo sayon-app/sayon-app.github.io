@@ -33,7 +33,7 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 
 ## Sample job
 
-`tests/sample-job/e2e.js <outDir>` signs up a new business, opens the sample from the end of sign-up and checks it: finished and 100% filled in, at the business's own prices, SAMPLE on every page of every PDF, its job file emailed to the business, nothing sent to the account, off the Due list, removed and brought back from the empty Jobs list and the menu. It saves the PDFs to `<outDir>`.
+`tests/sample-job/e2e.js <outDir>` signs up a new business, opens the sample from the end of sign-up and checks it: finished and 100% filled in, at the business's own prices, SAMPLE on every page of every PDF, its job file emailed to the business, nothing sent to the account, off the Due list, removed and brought back from the empty Jobs list and the menu. It also checks that the first open already shows the agreement signed and the save line says the sample stays on the phone, that the report number carries the inspection date, and that saving or sending the sample's quote leaves the business's price list alone. It saves the PDFs to `<outDir>`.
 
 ## Last visit
 

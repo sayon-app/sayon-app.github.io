@@ -52,6 +52,8 @@ let shotN = 0;
   await p.fill('#obPriceList .pb-row[data-key="barrier_lm"] .pb-input', '32');
   await p.evaluate(() => obNext(1)); await p.waitForTimeout(300);
   await p.evaluate(() => obShowPanel(3)); await shot('ready-panel');
+  const priceList = () => p.evaluate(() => { const m = Object.assign({}, quotePriceMemory()); delete m.__updatedAt; return JSON.stringify(m); });
+  const pricesBefore = await priceList();
   await tap(p.getByRole('button', { name: /See a finished sample job first/i }), 'See a finished sample job first');
   await p.waitForTimeout(1800); await shot('sample-job-page');
 
@@ -66,6 +68,14 @@ let shotN = 0;
   console.log('quote:', JSON.stringify(q));
   check(q.barrier && q.barrier.price === 32 && q.barrier.qty === 57, 'the quote uses the business\'s own prices');
   check(q.plan && q.inspector === 'NSW 123456' && q.tech === 'Alex Example', 'the treatment has a site plan, and the inspector is the account\'s own name and licence');
+  // Opened for the first time, every banner already reads the finished job.
+  const looks = await p.evaluate(() => ({ banner: document.getElementById('agreementBannerText').textContent, sync: document.getElementById('syncStatusText').textContent,
+    number: reportData.reportNumber, inspected: reportData.jobInspectionDate, phone: reportData.jobClientPhone }));
+  console.log('looks:', JSON.stringify(looks));
+  check(/^Agreement signed by Jordan Sample/.test(looks.banner), 'the report screen shows the agreement signed, first time open');
+  check(/Sample job: kept on this phone only/.test(looks.sync), 'the save line says the sample stays on this phone, not that it syncs');
+  check(looks.number.startsWith('SY-' + looks.inspected.replace(/-/g, '')), 'the report number carries the inspection date');
+  check(looks.phone === '0491 570 156', 'the client\'s phone number is one kept for made-up use');
 
   // 2. Each document opens, and every PDF says SAMPLE.
   const report = await pdf(`const r = await buildReportPdf(); return toB64(r.blob);`, 'report');
@@ -77,6 +87,10 @@ let shotN = 0;
     check(pages > 0 && stamps === pages, `${n} PDF: SAMPLE on all ${pages} pages (${stamps})`);
   });
   await tap(p.locator('#jobOverlay .dash-timeline-btn', { hasText: 'Quote' }), 'Quote step'); await p.waitForTimeout(1200); await shot('quote');
+  const guide = await p.evaluate(() => document.getElementById('quoteScreen').innerText);
+  check(!/Check \d+ prices?|Set the service period/.test(guide), 'the sent quote asks for nothing more: no prices to check, a service period set');
+  await tap(p.locator('#quotePdfBtn'), 'quote PDF'); await p.waitForTimeout(2500);
+  check(await priceList() === pricesBefore, 'saving the sample\'s quote PDF leaves the price list alone');
   await tap(p.locator('#quoteScreen .doc-chip', { hasText: 'Treatment' }), 'Treatment chip'); await p.waitForTimeout(1200); await shot('treatment');
   await p.evaluate(() => { if (document.getElementById('treatmentOverlay')?.classList.contains('open')) closeTreatmentRecord(); jobGo('job'); }); await p.waitForTimeout(800);
 
@@ -85,6 +99,15 @@ let shotN = 0;
   console.log('emails:', emails.map(e => `${e.subject} -> ${e.to} [${(e.attachments || []).map(a => a.filename)}]`));
   check(emails.length === 1 && emails[0].to === 'owner@example.com' && /^Sample: /.test(emails[0].subject), 'the sample\'s email goes to the business, marked Sample');
   if (emails[0]) { const s = Buffer.from(emails[0].attachments[0].content, 'base64'); fs.writeFileSync(`${OUT}/job-file.pdf`, s); check((s.toString('latin1').match(/\(SAMPLE\) Tj/g) || []).length >= 1, 'the job file carries SAMPLE'); }
+  // Sending the quote again also goes to the business, with no client link,
+  // and still leaves the price list alone.
+  await p.evaluate(() => { closeJobPage(); jobGo('quote'); }); await p.waitForTimeout(1200);
+  await tap(p.locator('#quoteEmailBtn'), 'Send again'); await p.waitForTimeout(5000);
+  const qmail = emails[1] || {};
+  check(emails.length === 2 && qmail.to === 'owner@example.com' && /^Sample: Quote /.test(qmail.subject || ''), 'the sample\'s quote goes to the business: ' + (qmail.subject || 'none'));
+  check(!/sign\.html|\?r=/.test(qmail.text || ''), 'the sample\'s quote email has no link for a client to accept');
+  check(await priceList() === pricesBefore, 'sending the sample\'s quote leaves the price list alone');
+  await p.evaluate(() => { closeQuote(); jobGo('job'); }); await p.waitForTimeout(800);
   // The send sheet names the business, not the client.
   await p.evaluate(() => { closeJobPage(); openSendReview(); }); await p.waitForTimeout(1500); await shot('send-review');
   const to = await p.evaluate(() => document.getElementById('sendReviewTo').innerText);
@@ -99,6 +122,7 @@ let shotN = 0;
   check(!elsewhere.due, 'the sample is not on the Due list');
   await p.evaluate(() => { openDashboard(); }); await p.waitForTimeout(800); await shot('jobs-with-sample');
   check(/Sample/.test(await p.evaluate(() => document.getElementById('dashboardJobs').innerText)), 'the Jobs row is tagged Sample');
+  check(/Your jobs will show up here/.test(await p.evaluate(() => document.querySelector('.dash-hero-title').textContent)), 'with only the sample, Jobs still says your jobs will show up here');
 
   // 5. Reload keeps it; remove it; the empty list and the menu bring it back.
   await p.reload(); await p.waitForTimeout(3000);
@@ -117,6 +141,8 @@ let shotN = 0;
   await p.evaluate(() => { toggleDrawer(); newReport(); }); await p.waitForTimeout(600);
   const fresh = await p.evaluate(() => ({ id: currentReportId, addr: document.getElementById('jobAddress').value, insp: document.getElementById('jobInspector').value }));
   check(!fresh.id && !fresh.addr, 'a new job after the sample starts blank: ' + JSON.stringify(fresh));
+  await p.evaluate(() => { document.getElementById('jobAddress').value = '9 Real Road'; updateJob(); saveDraft(); flushDraftSave(); }); await p.waitForTimeout(800);
+  check(!/Sample job/.test(await p.evaluate(() => document.getElementById('syncStatusText').textContent)), 'a real job\'s save line no longer talks about the sample');
 
   check(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await b.close();

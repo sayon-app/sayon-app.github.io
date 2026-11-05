@@ -2155,32 +2155,38 @@ window.addEventListener('load', () => {
 
   setTimeout(async () => {
     const splash = document.getElementById('splash');
-    splash.style.opacity = '0';
-    setTimeout(async () => {
-      splash.style.display = 'none';
+    const hideSplash = () => new Promise(done => {
+      splash.style.opacity = '0';
+      setTimeout(() => { splash.style.display = 'none'; done(); }, 600);
+    });
 
-      // If we arrived here via a "reset your password" email link, Supabase
-      // redirects back with the recovery tokens in the URL hash. Handle that
-      // before anything else — it takes priority over any existing session.
-      const recovery = parseRecoveryHash();
-      if (recovery) {
-        pendingRecoverySession = recovery;
-        // Strip the tokens out of the visible URL/history now that we've read them.
-        history.replaceState(null, '', window.location.pathname + window.location.search);
-        document.getElementById('authScreen').style.display = 'flex';
-        showAuth('authResetPassword');
-        return;
-      }
+    // If we arrived here via a "reset your password" email link, Supabase
+    // redirects back with the recovery tokens in the URL hash. Handle that
+    // before anything else — it takes priority over any existing session.
+    const recovery = parseRecoveryHash();
+    if (recovery) {
+      await hideSplash();
+      pendingRecoverySession = recovery;
+      // Strip the tokens out of the visible URL/history now that we've read them.
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+      document.getElementById('authScreen').style.display = 'flex';
+      showAuth('authResetPassword');
+      return;
+    }
 
-      const hasSession = await restoreAuthSession();
-      if (hasSession) { enterApp(); noticeInviteWhileSignedIn(); }
-      else {
-        document.getElementById('authScreen').style.display = 'flex';
-        // The website's "Start your free trial" lands on the sign-up card.
-        showAuth(new URLSearchParams(window.location.search).get('signup') ? 'authSignUp' : 'authSignIn');
-        applyInviteToSignUp();
-      }
-    }, 600);
+    // The splash stays up while the sign-in and the business load, so the
+    // screen is never blank on a weak signal (see START_NETWORK_WAIT_MS).
+    const slow = setTimeout(() => { if (statusEl) statusEl.textContent = 'Signing in…'; }, 1000);
+    const hasSession = await restoreAuthSession();
+    clearTimeout(slow);
+    await hideSplash();
+    if (hasSession) { enterApp(); noticeInviteWhileSignedIn(); }
+    else {
+      document.getElementById('authScreen').style.display = 'flex';
+      // The website's "Start your free trial" lands on the sign-up card.
+      showAuth(new URLSearchParams(window.location.search).get('signup') ? 'authSignUp' : 'authSignIn');
+      applyInviteToSignUp();
+    }
   }, 2200);
 });
 
@@ -11180,11 +11186,30 @@ function rememberBusiness() {
   } catch (e) {}
 }
 
+// The business as kept on this phone, when the account couldn't be read
+// (no signal) or hadn't answered yet (a weak one). Its settings can be
+// older than the account's, so the account's copy is read again before
+// anything is written to it (pushBusinessSettings).
+let businessFromCache = null;
 function restoreCachedBusiness() {
   try {
     const cached = JSON.parse(localStorage.getItem(BUSINESS_CACHE_KEY) || 'null');
-    if (cached && authUser && cached.user_id === authUser.id && cached.business) authBusiness = cached.business;
+    if (cached && authUser && cached.user_id === authUser.id && cached.business) authBusiness = businessFromCache = cached.business;
   } catch (e) {}
+}
+function businessIsFromCache() {
+  return !!authBusiness && authBusiness === businessFromCache;
+}
+// The account's copy of the business, read again. True once it's in.
+async function readBusinessFromAccount() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/businesses?id=eq.${authBusiness.id}&limit=1`, { headers: getAuthHeaders() });
+    const rows = res.ok ? await res.json() : [];
+    if (!rows.length) return false;
+    authBusiness = rows[0];
+    rememberBusiness();
+    return true;
+  } catch (e) { return false; }
 }
 
 async function _loadBusinessImpl() {
@@ -11450,9 +11475,42 @@ function toggleAuthReveal(btn) {
 }
 
 // ── SESSION RESTORE ON LOAD ──────────────────────────────────────────────
+// On a phone that has kept the account's business, opening the app waits
+// this long at most for the account (the sign-in and the business
+// together). On a weak signal a call can hang for minutes, so after this
+// the app opens with what the phone has kept and takes in the account's
+// copy when it lands. A phone without it (a new one) waits for the account
+// as before, or it would offer to set up the business again.
+const START_NETWORK_WAIT_MS = 6000;
+let startDeadline = 0;
+function startWait(promise, userId) {
+  if (!businessKeptFor(userId)) return promise;
+  return Promise.race([promise, new Promise(done => setTimeout(() => done('slow'), Math.max(0, startDeadline - Date.now())))]);
+}
+function businessKeptFor(userId) {
+  try {
+    const cached = JSON.parse(localStorage.getItem(BUSINESS_CACHE_KEY) || 'null');
+    return !!(cached && userId && cached.user_id === userId && cached.business);
+  } catch (e) { return false; }
+}
+
+async function loadBusinessForStart() {
+  const loading = loadBusiness();
+  if (await startWait(loading.then(() => 'done'), authUser && authUser.id) !== 'slow') return;
+  if (!authBusiness) restoreCachedBusiness();
+  // The account's copy, once it lands, as enterApp() takes it in.
+  loading.then(() => {
+    if (!authBusiness || businessIsFromCache()) return;
+    migrateLegacyCompanyDetails();
+    applyCloudBusinessSettings();
+    renderProfileMenu();
+  });
+}
+
 async function restoreAuthSession() {
   const stored = loadSession();
   if (!stored?.access_token) return false;
+  startDeadline = Date.now() + START_NETWORK_WAIT_MS;
 
   // Check if token is still valid (exp is in seconds)
   const exp = stored.expires_at || 0;
@@ -11469,27 +11527,31 @@ async function restoreAuthSession() {
       localStorage.removeItem(UNSAVED_SHEETS_KEY);
     }
     if (stored.user?.id) localStorage.setItem('korva_last_user_id', stored.user.id);
-    await loadBusiness();
+    await loadBusinessForStart();
     startAuthAutoRefresh();
     return true;
   }
 
-  // Try to refresh
+  // Try to refresh. A refresh still on its way when the app opens is the
+  // one any other call waits for (authRefreshInFlight), so the same token
+  // is never sent twice.
   if (stored.refresh_token) {
-    const ok = await refreshSession(stored.refresh_token);
-    if (ok) {
+    authRefreshInFlight = refreshSession(stored.refresh_token).finally(() => { authRefreshInFlight = null; });
+    const ok = await startWait(authRefreshInFlight, stored.user && stored.user.id);
+    if (ok === true) {
       authUser = authSession.user;
-      await loadBusiness();
+      await loadBusinessForStart();
       startAuthAutoRefresh();
       return true;
     }
-    // No signal (in a subfloor, out of range): keep the saved sign-in and
-    // open the app so the inspector can keep working. The token is refreshed
-    // once the signal is back; only a refusal from Supabase signs them out.
-    if (lastRefreshWasOffline || !navigator.onLine) {
+    // No signal (in a subfloor, out of range), or too weak to answer in
+    // time: keep the saved sign-in and open the app so the inspector can
+    // keep working. The token is refreshed once the signal is back; only a
+    // refusal from Supabase signs them out.
+    if (ok === 'slow' || lastRefreshWasOffline || !navigator.onLine) {
       authSession = stored;
       authUser    = stored.user;
-      await loadBusiness();
+      await loadBusinessForStart();
       startAuthAutoRefresh();
       return true;
     }

@@ -284,7 +284,12 @@ let treatmentSketch = null;
 function openTreatmentRecord() {
   const q = quoteState;
   if (!q) return;
-  const t = q.treatment || draftTreatment(q);
+  // What was on the record when the app closed comes back, unless the
+  // record has been saved since (UNSAVED SHEETS in js/quote.js).
+  const sheetKey = 'treatment|' + q.reportKey;
+  const copy = unsavedSheetCopy(sheetKey);
+  const restored = !!copy && copy.at > ((q.treatment && q.treatment.at) || 0);
+  const t = restored ? copy.data : q.treatment || draftTreatment(q);
   track('screen_viewed', { screen: 'treatment_record' });
   document.getElementById('trDate').value = t.date || todayIsoDate();
   document.getElementById('trTech').value = t.technician || '';
@@ -333,11 +338,11 @@ function openTreatmentRecord() {
   cancelSheetVoice('treatment');
   document.getElementById('treatmentOverlay').classList.add('open');
   if (!treatmentPad) {
-    treatmentPad = createSignaturePad(document.getElementById('trSigCanvas'), document.getElementById('trSigPlaceholder'), updateTreatmentSaveBtn);
+    treatmentPad = createSignaturePad(document.getElementById('trSigCanvas'), document.getElementById('trSigPlaceholder'), () => { updateTreatmentSaveBtn(); unsavedSheetChanged(); });
   }
   treatmentPad.show(t.signature || '');
   if (!treatmentSketch) {
-    treatmentSketch = createSignaturePad(document.getElementById('trSketchCanvas'), document.getElementById('trSketchPlaceholder'));
+    treatmentSketch = createSignaturePad(document.getElementById('trSketchCanvas'), document.getElementById('trSketchPlaceholder'), unsavedSheetChanged);
   }
   treatmentSketch.ctx.strokeStyle = SIGNATURE_INK;
   treatmentSketch.show(t.sketch || '');
@@ -347,9 +352,11 @@ function openTreatmentRecord() {
   const sheet = document.getElementById('treatmentOverlay');
   if (!sheet.dataset.folds) {
     sheet.dataset.folds = '1';
-    ['input', 'change'].forEach(ev => sheet.addEventListener(ev, () => renderTreatmentFolds()));
+    ['input', 'change'].forEach(ev => sheet.addEventListener(ev, () => { renderTreatmentFolds(); unsavedSheetChanged(); }));
   }
   document.querySelector('#treatmentOverlay .page-sheet-body').scrollTop = 0;
+  watchUnsavedSheet(sheetKey, readTreatmentForm);
+  if (restored) showToast('Picked up where you left off. Save the record when you\'re done', 'info');
 }
 
 // ── THE FOLDS ── Each part of the record folds to its title, with a tick
@@ -429,6 +436,7 @@ function openTreatmentSitePlan(layer) {
   openSitePlan(treatmentPlanDraft, plan => {
     treatmentPlanDraft = sitePlanHasContent(plan) ? plan : null;
     renderTreatmentPlan();
+    unsavedSheetChanged();
     // The stations drawn fill an empty station count, and tick baiting.
     const n = sitePlanStations(plan).filter(s => s.k !== 'monitor').length;
     const box = document.querySelector('#trMethods input[data-key="bait"]');
@@ -485,6 +493,7 @@ function treatmentSketchImage() {
 }
 
 function closeTreatmentRecord() {
+  dropUnsavedSheet();
   cancelSheetVoice('treatment');
   document.getElementById('treatmentOverlay').classList.remove('open');
 }
@@ -552,6 +561,7 @@ function applyTreatmentVoice(f) {
   }
   updateTreatmentSaveBtn();
   renderTreatmentFolds(true);
+  if (n) unsavedSheetChanged();
   return n;
 }
 
@@ -648,6 +658,7 @@ async function loadTreatmentLabelPhoto(input, i) {
     if (!products[i]) return;
     products[i].labelPhoto = url;
     renderTreatmentProducts(products);
+    unsavedSheetChanged();
     const batch = document.querySelector(`#trProducts .treat-product[data-i="${i}"] [data-f="batch"]`);
     if (batch && !batch.value) { batch.placeholder = 'Type the batch number from the photo'; batch.focus(); }
   } catch (e) {
@@ -767,18 +778,16 @@ function updateTreatmentSaveBtn() {
   if (by) by.textContent = document.getElementById('trTech').value.trim() || 'the technician';
 }
 
-function saveTreatmentRecord() {
-  const q = quoteState;
-  if (!q) return;
+// The record as the sheet has it now: what Save keeps, and the copy kept
+// while it's being filled in.
+function readTreatmentForm() {
   const methods = {};
   document.querySelectorAll('#trMethods input[type=checkbox]:checked').forEach(box => {
     const qty = document.querySelector(`#trMethods [data-qty="${box.dataset.key}"]`);
     methods[box.dataset.key] = qty ? qty.value.trim() : '';
   });
-  if (!Object.keys(methods).length) { showToast('Tick what was done', 'error'); return; }
-  if (!treatmentPad || treatmentPad.empty) { showToast('Sign the record first', 'error'); return; }
   const v = id => document.getElementById(id).value.trim();
-  q.treatment = {
+  return {
     date: v('trDate') || todayIsoDate(),
     technician: v('trTech'),
     licence: v('trLicence'),
@@ -803,9 +812,18 @@ function saveTreatmentRecord() {
     nextInspection: v('trNext'),
     warranty: v('trWarranty'),
     notes: v('trNotes'),
-    signature: treatmentPad.canvas.toDataURL('image/png'),
+    signature: treatmentPad && !treatmentPad.empty ? treatmentPad.canvas.toDataURL('image/png') : '',
     at: Date.now(),
   };
+}
+
+function saveTreatmentRecord() {
+  const q = quoteState;
+  if (!q) return;
+  const t = readTreatmentForm();
+  if (!Object.keys(t.methods).length) { showToast('Tick what was done', 'error'); return; }
+  if (!treatmentPad || treatmentPad.empty) { showToast('Sign the record first', 'error'); return; }
+  q.treatment = t;
   clearTimeout(quoteSaveTimer);
   persistQuote();
   storeQuoteOnReport(q, true);
@@ -816,7 +834,7 @@ function saveTreatmentRecord() {
   // On to the certificate, with the bait station visits under it.
   setTimeout(() => { const st = document.getElementById('qgStep4'); if (st) st.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 60);
   showToast(typeof baitInstalled === 'function' && baitInstalled(q) ? 'Treatment recorded. Send the certificate, and record bait visits just under it' : 'Treatment recorded. The certificate is ready to send', 'success');
-  track('treatment_recorded', { methods: Object.keys(methods).length });
+  track('treatment_recorded', { methods: Object.keys(t.methods).length });
 }
 
 // ── CERTIFICATE PDF ──

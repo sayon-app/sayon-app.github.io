@@ -2032,13 +2032,24 @@ let updateReloadPending = false;
 
 function appIsBusy() {
   const el = document.activeElement;
-  return isRecording || document.body.classList.contains('ai-busy')
+  return isRecording || document.body.classList.contains('ai-busy') || formSheetOpen()
     || !!(el && el.matches('input, textarea, select, [contenteditable="true"]'));
+}
+
+// A sheet with a form of its own is open (the treatment record, a bait
+// visit, the client's answer, the site plan, the agreement, an email being
+// checked, a photo being marked up). What's on it isn't saved until its
+// button is tapped, so an update waits until it's closed.
+const FORM_SHEETS = ['treatmentOverlay', 'baitOverlay', 'quoteAnswerOverlay', 'sitePlanOverlay', 'agreementOverlay', 'sendReviewOverlay'];
+function formSheetOpen() {
+  const markup = document.getElementById('photoMarkup');
+  return FORM_SHEETS.some(id => { const el = document.getElementById(id); return !!el && el.classList.contains('open'); })
+    || !!(markup && !markup.hidden);
 }
 
 function reloadForUpdate() {
   if (appIsBusy()) { updateReloadPending = true; return; }
-  flushDraftSave();
+  saveBeforeLeaving();
   location.reload();
 }
 
@@ -10602,6 +10613,7 @@ async function signIn() {
     const prevUserId = localStorage.getItem('korva_last_user_id');
     if (prevUserId && prevUserId !== data.user.id) {
       localStorage.removeItem(DRAFT_KEY);
+      localStorage.removeItem(UNSAVED_SHEETS_KEY);
     }
     localStorage.setItem('korva_last_user_id', data.user.id);
 
@@ -10697,7 +10709,7 @@ async function endSessionOnDevice() {
   clearSession();
   localStorage.removeItem('korva_last_user_id');
   localStorage.removeItem(BUSINESS_CACHE_KEY);
-  [reportsKey, quotesKey, DRAFT_KEY].forEach(k => localStorage.removeItem(k));
+  [reportsKey, quotesKey, DRAFT_KEY, UNSAVED_SHEETS_KEY].forEach(k => localStorage.removeItem(k));
   try { await photoStoreRequest('readwrite', st => st.clear()); } catch (e) {}
   currentReportId = null;
   if (appInitialised) {
@@ -11454,6 +11466,7 @@ async function restoreAuthSession() {
     const prevUserId = localStorage.getItem('korva_last_user_id');
     if (prevUserId && prevUserId !== stored.user?.id) {
       localStorage.removeItem(DRAFT_KEY);
+      localStorage.removeItem(UNSAVED_SHEETS_KEY);
     }
     if (stored.user?.id) localStorage.setItem('korva_last_user_id', stored.user.id);
     await loadBusiness();
@@ -11873,8 +11886,8 @@ window.addEventListener('offline', () => updateSyncStatus());
 // slept, so refresh it before anything talks to the server.
 document.addEventListener('visibilitychange', async () => {
   if (document.hidden) {
-    flushDraftSave();
-    if (updateReloadPending && !isRecording && !document.body.classList.contains('ai-busy')) location.reload();
+    saveBeforeLeaving();
+    if (updateReloadPending && !isRecording && !document.body.classList.contains('ai-busy') && !formSheetOpen()) location.reload();
     return;
   }
   // An app left open for days never navigates, so ask for a new version here.
@@ -11884,8 +11897,19 @@ document.addEventListener('visibilitychange', async () => {
   pushUnsyncedReports();
   checkAddressMove();
 });
-window.addEventListener('pagehide', flushDraftSave);
-window.addEventListener('beforeunload', flushDraftSave);
+window.addEventListener('pagehide', saveBeforeLeaving);
+window.addEventListener('beforeunload', saveBeforeLeaving);
+
+// The app is being put away, closed or reloaded: everything still waiting
+// to be saved is saved now. A box being typed in is let go first, so the
+// ones that save when you leave them (Your prices, say) save too.
+function saveBeforeLeaving() {
+  const el = document.activeElement;
+  if (el && el.matches('input, textarea')) el.blur();
+  flushDraftSave();
+  if (typeof flushQuoteSave === 'function') flushQuoteSave();
+  if (typeof keepUnsavedSheet === 'function') keepUnsavedSheet();
+}
 
 function loadDraft() {
   try {

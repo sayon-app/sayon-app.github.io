@@ -193,6 +193,64 @@ function scheduleQuoteSave() {
   clearTimeout(quoteSaveTimer);
   quoteSaveTimer = setTimeout(persistQuote, 400);
 }
+// The app is being put away or closed: a change still waiting on the timer
+// is saved now (saveBeforeLeaving in js/app.js).
+function flushQuoteSave() {
+  if (!quoteSaveTimer) return;
+  clearTimeout(quoteSaveTimer);
+  quoteSaveTimer = null;
+  persistQuote();
+}
+
+// ── UNSAVED SHEETS ──
+// The treatment record and a bait station visit are filled in on a sheet
+// and join the quote only when saved. While one is open, a copy of what's
+// on it is kept on the phone as it changes, so if the phone closes the app
+// or an update reloads it, opening the same sheet for the same job brings
+// it all back. Saving or closing the sheet drops the copy.
+const UNSAVED_SHEETS_KEY = 'korva_unsaved_sheets';
+let unsavedSheet = null; // the open sheet: { key, read, changed }
+let unsavedSheetTimer = null;
+
+// The copy kept for a sheet ('treatment|<job>'), or null.
+function unsavedSheetCopy(key) {
+  return readJSON(UNSAVED_SHEETS_KEY, {})[key] || null;
+}
+// Called once the sheet is filled in: read() gives what's on it now.
+function watchUnsavedSheet(key, read) {
+  clearTimeout(unsavedSheetTimer);
+  unsavedSheet = { key, read, changed: false };
+}
+function unsavedSheetChanged() {
+  if (!unsavedSheet) return;
+  unsavedSheet.changed = true;
+  clearTimeout(unsavedSheetTimer);
+  unsavedSheetTimer = setTimeout(keepUnsavedSheet, 600);
+}
+function keepUnsavedSheet() {
+  clearTimeout(unsavedSheetTimer);
+  unsavedSheetTimer = null;
+  if (!unsavedSheet || !unsavedSheet.changed) return;
+  const all = readJSON(UNSAVED_SHEETS_KEY, {});
+  // A copy nobody came back for goes after two weeks.
+  Object.keys(all).forEach(k => { if (Date.now() - (all[k].at || 0) > 14 * 864e5) delete all[k]; });
+  try {
+    all[unsavedSheet.key] = { at: Date.now(), data: unsavedSheet.read() };
+    localStorage.setItem(UNSAVED_SHEETS_KEY, JSON.stringify(all));
+  } catch (e) { /* storage full: the sheet still saves as usual */ }
+}
+// Saved or closed: the copy goes.
+function dropUnsavedSheet() {
+  clearTimeout(unsavedSheetTimer);
+  unsavedSheetTimer = null;
+  if (!unsavedSheet) return;
+  const key = unsavedSheet.key;
+  unsavedSheet = null;
+  const all = readJSON(UNSAVED_SHEETS_KEY, {});
+  if (!(key in all)) return;
+  delete all[key];
+  try { localStorage.setItem(UNSAVED_SHEETS_KEY, JSON.stringify(all)); } catch (e) {}
+}
 function setQuoteSaveState(text) {
   const el = document.getElementById('quoteSaveState');
   if (el) el.textContent = text;

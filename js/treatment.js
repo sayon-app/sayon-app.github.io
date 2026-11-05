@@ -1186,7 +1186,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     drawSitePlanLegendPdf(doc, t.plan, { x: M, y, w: CW, layer: 'sub' });
   }
 
-  drawPdfDocFooters(doc, `${install ? 'Installation certificate' : 'Certificate'} ${number}${company.name ? `  ·  ${company.name}` : ''}`);
+  drawPdfDocFooters(doc, `${install ? 'Installation certificate' : 'Certificate'} ${number}${company.name ? `  ·  ${company.name}` : ''}`, q.reportKey);
   const safe = fileNamePart(q.address) || 'Property';
   return { blob: doc.output('blob'), fname: `SAYON_${install ? 'Installation' : 'Treatment'}_Certificate_${number.replace(/[^\w-]+/g, '')}_${safe}.pdf` };
 }

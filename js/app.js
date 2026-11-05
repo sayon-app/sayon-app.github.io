@@ -12547,10 +12547,13 @@ function toggleA11y(className, btnId, storageKey) {
   try { localStorage.setItem(storageKey, on ? '1' : '0'); } catch (e) {}
 }
 
+// Red-green colour blindness (protanopia, deuteranopia): SAYON's own blue
+// already stays apart from the red, amber and green, so those keep it (the
+// lighter blue they used to set put white text on buttons at 2.4:1).
+// Blue-yellow (tritanopia): magenta instead, each shade as dark as the blue
+// it stands in for, so white text on it reads as well.
 const COLOUR_VISION_ACCENTS = {
-  protanopia:    { accent: '#4d8aff', accent2: '#7aa8ff', accent3: '#2f5fd6', rgb: '77,138,255' }, // blue — stays distinct from lime/amber for red-green deficiency
-  deuteranopia:  { accent: '#4d8aff', accent2: '#7aa8ff', accent3: '#2f5fd6', rgb: '77,138,255' }, // blue — same reasoning, most common type
-  tritanopia:    { accent: '#ff4dc4', accent2: '#ff7dd6', accent3: '#d62fa0', rgb: '255,77,196' }, // magenta — stays distinct from red/green for blue-yellow deficiency
+  tritanopia: { accent: '#DB0093', accent2: '#AD0074', accent3: '#7A0052', rgb: '219,0,147' },
 };
 
 function setColourVisionMode(mode) {

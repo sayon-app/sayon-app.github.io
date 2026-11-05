@@ -73,12 +73,13 @@ const CHEMICAL_STARTER_FORMS = {
 //   (elabels.apvma.gov.au/<product number>ELBL.pdf), opened and matched to
 //   the register's latest label number. Makers' sites can lag behind it.
 //   Exterra Focus is not a registered chemical, so its label is Ensystex's.
-// - sdsUrl and sdsExpires: the maker's own SDS PDF; an SDS is reviewed every
+// - sdsUrl and sdsExpires: the maker's own SDS PDF (BASF, Envu, Ensystex); an SDS is reviewed every
 //   5 years, so it expires 5 years after the issue date printed on it.
 // - uses: each label's own rates for termite work, in its words. A product
 //   with no uses here keeps the usual ones for its kind, with no rates.
 const ELABEL = n => `https://elabels.apvma.gov.au/${n}ELBL.pdf`;
 const BASF_FILES = 'https://pest-control.basf.com.au/sites/basf.com.au/files/';
+const ENVU_FILES = 'https://www.assets.envu.com/-/media/prfaustralia/';
 const ENSYSTEX_FILES = 'https://cdn.shopify.com/s/files/1/0561/5720/8620/files/';
 const SOUTH = 'south of the Tropic of Capricorn';
 const TERMITES = 'Subterranean termites';
@@ -141,6 +142,7 @@ const CHEMICAL_STARTER_DETAILS = {
   'Termidor Dry': { maker: 'BASF', apvma: '60654' },
   'Premise': {
     maker: 'Envu', apvma: '49098', labelUrl: ELABEL(49098),
+    sdsUrl: ENVU_FILES + 'product-sds-and-labels/premise-200sc-termiticide-sds.ashx', sdsExpires: '2028-11-03',
     uses: [
       { pest: TERMITES, method: 'Soil treatment', surface: 'Perimeter, beside the slab or footings (trench and rod)',
         rate: '250 mL per 100 L water (500 mL for Mastotermes)', volume: 'At least 100 L of mix per m³ (at least 5 L per metre), to 100 mm below the top of the footing',
@@ -182,6 +184,7 @@ const CHEMICAL_STARTER_DETAILS = {
   },
   'Biflex Ultra': {
     maker: 'Envu', apvma: '59269', labelUrl: ELABEL(59269), uses: bifenthrinUses(),
+    sdsUrl: ENVU_FILES + 'gss-web-downloads/biflex-ultra-lo-odour/biflex-ultra-sds-50001561_ext_sds_au_6n.ashx', sdsExpires: '2028-05-25',
   },
   'Maxxthor 100': {
     maker: 'Ensystex', apvma: '60113', labelUrl: ELABEL(60113),
@@ -227,6 +230,7 @@ const CHEMICAL_STARTER_DETAILS = {
   },
   'Kordon': {
     maker: 'Envu', apvma: '60759', labelUrl: ELABEL(60759),
+    sdsUrl: ENVU_FILES + 'product-sds-and-labels/kordon-termite-system-sds-ghs.ashx', sdsExpires: '2029-09-06',
     uses: [
       { pest: TERMITES, method: 'Physical barrier', surface: 'Full under-slab sheet (also the vapour barrier)',
         rate: 'Sheet, no mixing (2 g deltamethrin per m²)', volume: 'Laid on the bedding sand, joins taped with overlaps of at least 200 mm', life: 'At least 20 years' },

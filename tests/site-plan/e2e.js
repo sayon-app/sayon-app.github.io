@@ -173,7 +173,7 @@ let shotN = 0;
   await tool('Findings', 'Ant cap problem'); await tapPlan(400, 300);
   const sub1 = await p.evaluate(() => ({ summary: document.getElementById('spSummary').textContent, legend: [...document.querySelectorAll('#spLegend li')].map(li => li.textContent), siteHit: sitePlanHit([700, 600]) }));
   console.log('subfloor drawn:', JSON.stringify(sub1));
-  check(/1[0-9] piers or stumps, 1 dwarf wall, 2 vents, 1 access point, 1 low clearance area, 1 place timber damage was found and 1 ant cap problem/.test(sub1.summary), 'the subfloor is summed up: ' + sub1.summary);
+  check(/1[0-9] piers or stumps, 1 dwarf wall, 2 vents, 1 access point, 1 low clearance area, 1 place where timber damage was found and 1 ant cap problem/.test(sub1.summary), 'the subfloor is summed up: ' + sub1.summary);
   check(sub1.legend.includes('Subfloor (suspended floor)') && sub1.legend.includes('Pier or stump') && sub1.legend.includes('Low clearance (restricted access)') && !sub1.legend.some(l => /bait station/.test(l)), 'the subfloor has its own legend, without the site plan symbols');
   check(!sub1.siteHit, 'site plan symbols can\'t be picked up from the subfloor view');
   await p.evaluate(() => { sitePlanEditor.sel = null; renderSitePlanEditor(); document.querySelector('#sitePlanOverlay .page-sheet-body').scrollTop = 0; });

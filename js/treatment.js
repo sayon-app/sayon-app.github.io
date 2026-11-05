@@ -96,14 +96,9 @@ function installedSystemAreas(t, rd) {
     const words = part.toLowerCase().split(/[^a-z0-9]+/).filter(w => w && !SMALL.test(w));
     return words.length && spots.some(s => words.every(w => s.includes(' ' + w + ' ')));
   };
-  return String(t.areas || '').split(';').map(seg => seg.split(',').map(x => x.trim()).filter(x => x && !isSpot(x)).join(', '))
+  const left = String(t.areas || '').split(';').map(seg => seg.split(',').map(x => x.trim()).filter(x => x && !isSpot(x)).join(', '))
     .filter(Boolean).join('; ');
-}
-
-function formatClockTime(t) {
-  const [h, m] = String(t).split(':').map(Number);
-  if (!isFinite(h)) return t;
-  return `${h % 12 === 0 ? 12 : h % 12}:${String(m || 0).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+  return left.charAt(0).toUpperCase() + left.slice(1);
 }
 
 function formatLongDate(iso) {
@@ -199,7 +194,7 @@ function draftTreatment(q) {
     equipment: '',
     methods,
     products: [{ name: name || '', active: name ? TREATMENT_PRODUCTS[name] : '', batch: '', rate: '', amount: '', life: '', where: '' }],
-    areas: places.join('; '),
+    areas: joinPlaces(places),
     notTreated: '',
     site: treatmentSiteFromReport(rd),
     plan: null,
@@ -948,7 +943,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     const m = TREATMENT_METHODS[key];
     if (!m || (install && !systems.includes(key))) return;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-    const text = m.label + (m.qty && qty ? ` (${qty} ${m.qty})` : '');
+    const text = m.label + (m.qty && qty ? `, ${qty} ${m.qty}` : '');
     const lines = doc.splitTextToSize(text, CW - 6);
     ensure(lines.length * 4.4 + 2);
     doc.setFillColor(...C.accent); doc.circle(M + 1.6, y - 1.1, 0.8, 'F');
@@ -1048,14 +1043,14 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   const everyText = `at least every ${every} month${every === 1 ? '' : 's'}`;
   // A trainee's work carries the licensed supervisor's name on the notice too.
   const installer = [company.name, [t.technician, t.licence ? `licence ${t.licence}` : ''].filter(Boolean).join(', '),
-    t.supervisor ? `Supervised by ${t.supervisor}${t.supervisorLicence ? `, licence ${t.supervisorLicence}` : ''}` : ''].filter(Boolean).join('. ');
+    t.supervisor ? `Supervised by ${t.supervisor}${t.supervisorLicence ? `, licence ${t.supervisorLicence}` : ''}` : ''].filter(Boolean).join('\n');
   const noticeCells = t.notice === 'none' ? [['Notice', 'No durable notice was placed at this treatment.']] : [
     ['System', methodNames.join('; ')],
     ['Date installed', formatLongDate(t.date)],
     ['Life expectancy', productLife.join('; ')],
     ['Future inspections', t.nextInspection ? `First by ${formatLongDate(t.nextInspection)}, then ${everyText}` : everyText.charAt(0).toUpperCase() + everyText.slice(1)],
     ['Installed by', installer],
-    ['Notice', `${TREATMENT_NOTICE[t.notice]}${t.noticeWhere ? `: ${t.noticeWhere}` : ''}`],
+    ['Notice', `${TREATMENT_NOTICE[t.notice]}${t.noticeWhere ? `: ${lowerFirst(t.noticeWhere)}` : ''}`],
   ].filter(([, v]) => v);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
   const noticeLines = noticeCells.map(([, v]) => doc.splitTextToSize(v, cellW));
@@ -1092,7 +1087,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     if (systems.includes('bait')) steps.push('The bait stations need checking as often as the manufacturer directs. Do not move, cover or remove them.');
     if (systems.includes('retic')) steps.push('The reticulation system needs recharging when the label\'s life runs out. Keep its filling points clear and don\'t cut or dig through the pipes.');
     if (systems.includes('physical')) steps.push('The physical barrier only works while it stays whole and visible. Do not cover, cut or build over it.');
-  } else if (t.cautions) steps.push(`Safety and re-entry: ${t.cautions}`);
+  } else if (t.cautions) steps.push(`Safety and re-entry: ${String(t.cautions).trim().replace(/[.;,\s]*$/, '.')}`);
   if (t.nextInspection) steps.push(`Book your next timber pest inspection by ${formatLongDate(t.nextInspection)}. AS 3660.2 recommends one at least every 12 months.`);
   // Three short points, so the signature stays on page 1.
   steps.push((!install && ['barrier', 'retic'].some(k => (t.methods || {})[k] !== undefined) ? 'Do not dig or build against the treated soil without asking us. ' : '') +

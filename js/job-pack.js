@@ -39,12 +39,12 @@ function jobPdfParts() {
     build: () => buildAgreementPdf(a) });
   if (jobReportReady()) {
     const sent = reportData.sent ? `sent ${formatIssueDate(reportData.sent.at)}` : 'not sent yet';
-    parts.push({ title: reportKindTitle(), note: `Report ${ensureReportNumber()}, version ${reportVersion()}, ${sent}`, report: true, build: () => buildReportPdf() });
+    parts.push({ title: reportKindTitle().replace(/ \w/g, w => w.toLowerCase()), note: `Report ${ensureReportNumber()}, version ${reportVersion()}, ${sent}`, report: true, build: () => buildReportPdf() });
   }
   if (quoteHasItems(q)) {
     const ans = quoteAnswerState(q);
     const how = !ans ? (q.sentAt ? `sent ${formatIssueDate(q.sentAt)}, no answer yet` : 'not sent yet')
-      : ans.status === 'accepted' ? `accepted${ans.by ? ' by ' + ans.by : ''} ${formatAnswerDate(ans.date)}` : `declined ${formatAnswerDate(ans.date)}`;
+      : ans.status === 'accepted' ? `accepted ${formatAnswerDate(ans.date)}${ans.by ? ' by ' + ans.by : ''}` : `declined ${formatAnswerDate(ans.date)}`;
     parts.push({ title: `Quote ${q.number || ''}`.trim(), note: `${formatAUD(quoteTotals(q).total)}, ${how}`, build: () => buildQuotePDF(q) });
   }
   if (q && q.treatment) {

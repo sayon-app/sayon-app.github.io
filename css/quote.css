@@ -208,9 +208,11 @@ select.quote-input { cursor: pointer; }
 .treat-method-qty { width: 92px; flex-shrink: 0; }
 .treat-product { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; }
 .treat-product .quote-link-btn, .treat-add-product { align-self: flex-start; }
-.treat-method { min-height: 50px; padding: 10px 12px; border-radius: 12px; font-size: 14px; transition: background 0.2s, border-color 0.2s; }
+.treat-method { min-height: 50px; padding: 10px 12px; border-radius: 12px; font-size: 14px; border-color: var(--border2); transition: background 0.2s, border-color 0.2s; }
 .treat-method:has(input[type=checkbox]:checked) { border-color: rgba(var(--accent-rgb), 0.55); background: rgba(var(--accent-rgb), 0.07); }
-.treat-product { padding: 12px; border-radius: 12px; background: var(--surface2); }
+.treat-product { padding: 12px 12px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border2); border-left: 4px solid var(--accent); }
+.treat-product-head { margin-bottom: 4px; font: 700 15px 'Space Grotesk', sans-serif; letter-spacing: -0.2px; color: var(--text); }
+body.dark-screen .treat-product { background: var(--surface2); border-color: var(--border2); border-left-color: var(--accent-hi); }
 
 /* Bait station visits (js/bait.js): a card under the certificate, and the
    visit sheet's station list, one row per station with its finding as chips. */
@@ -245,7 +247,7 @@ select.quote-input { cursor: pointer; }
 .bait-need { margin: 0; font-size: 13px; color: var(--yellow-text); font-weight: 600; }
 .treat-batch { display: flex; gap: 8px; align-items: center; }
 .treat-batch .job-input { flex: 1; min-width: 0; }
-.treat-batch .treat-label-btn { align-self: center; white-space: nowrap; cursor: pointer; }
+.treat-batch .treat-label-btn { align-self: stretch; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; cursor: pointer; }
 .treat-label-thumb { display: block; max-width: 160px; max-height: 120px; margin-top: 6px; border-radius: 6px; border: 1px solid var(--border); }
 .treat-sketch-wrap {
   height: auto; aspect-ratio: 4 / 3;
@@ -526,6 +528,23 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 .quote-guide .qp-folds .quote-fold[open] > summary { padding-bottom: 12px; margin-bottom: 12px; }
 .quote-guide .qp-folds .quote-fold > :not(summary) { margin-left: 12px; margin-right: 12px; }
 .quote-guide .qp-folds .quote-fold > .quote-add-btn { width: calc(100% - 24px); }
+/* The boxes sit flush with the fold's sides, not past them. */
+.quote-guide .qp-folds .quote-fold > .quote-input { width: calc(100% - 24px); box-sizing: border-box; }
+/* On the white quote guide, as on the treatment record: plain white folds
+   with a clear edge instead of a blue-grey tint, white fields with a firm
+   border, and dark labels, so nothing reads as grey on grey. */
+body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { background: var(--surface); border-color: var(--border2); }
+body:not(.dark-screen) .quote-guide .qp-folds .quote-fold > summary { background: none; }
+body:not(.dark-screen) .quote-guide .qp-folds .quote-fold[open] { border-color: rgba(var(--accent-rgb),0.45); box-shadow: 0 2px 10px rgba(13,40,60,0.10); }
+body:not(.dark-screen) .quote-guide .qp-folds .quote-fold[open] > summary { border-bottom-color: var(--border2); }
+.quote-guide .qp-folds .quote-fold .fgroup-icon { background: var(--accent-wash); color: var(--accent2); }
+body.dark-screen .quote-guide .qp-folds .quote-fold .fgroup-icon { background: rgba(var(--accent-rgb),0.18); color: var(--accent-glow); }
+.quote-guide .qp-folds .quote-field > span { font-size: 13px; font-weight: 600; color: var(--text); }
+body:not(.dark-screen) .quote-guide .qp-folds .quote-input { background: var(--surface); border: 1.5px solid var(--border2); border-radius: 10px; }
+body.dark-screen .quote-guide .qp-folds .quote-input { background: var(--bg); }
+.quote-guide .qp-folds .quote-input::placeholder { color: #6B7C8E; }
+body:not(.dark-screen) .quote-guide .qp-folds .qlist { background: var(--surface); border: 1.5px solid var(--border2); }
+body:not(.dark-screen) .quote-guide .qp-folds .quote-system-choice { background: var(--surface); border: 1px solid var(--border2); }
 .quote-guide .qp-folds .fgroup-icon { width: 32px; height: 32px; border-radius: 9px; }
 .quote-guide .qp-folds .quote-card-title { font-size: 15.5px; }
 .quote-guide .qp-folds .quote-work-total { font-size: 15px; }

@@ -202,7 +202,7 @@ function jobPdfSectionHTML() {
       ${made ? `<p class="job-pdf-note">${escapeHtml(made)}</p>` : ''}
       <div class="dash-detail-links">
         <button type="button" class="job-pdf-btn" data-busy="Making it…" onclick="makeJobPdf('save')">Save PDF</button>
-        ${email ? `<button type="button" class="job-pdf-btn" data-busy="Making it…" onclick="makeJobPdf('email')">Email${who ? ' to ' + escapeHtml(who) : ''}</button>` : ''}
+        ${email ? `<button type="button" class="job-pdf-btn" data-busy="Making it…" onclick="makeJobPdf('email')">${isSampleJob(currentReportId) ? 'Email it to me' : `Email${who ? ' to ' + escapeHtml(who) : ''}`}</button>` : ''}
       </div>
     </section>`;
 }

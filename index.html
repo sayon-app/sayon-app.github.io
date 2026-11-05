@@ -237,6 +237,7 @@
       </div>
       <p style="font-size:11px;color:var(--text3);line-height:1.6;margin-top:4px">Tip: Start recording, pop the phone in your pocket and talk room by room. Say <strong style="color:var(--accent2)">"Stop Sayon"</strong> when you're done and it fills the report. Say the quote too, like "48 metres of barrier at $50 a metre, 50% deposit", and it fills the quote.</p>
       <button class="auth-btn" onclick="obFinish()">Start inspecting →</button>
+      <button type="button" class="auth-btn secondary" onclick="obFinish(true)">See a finished sample job first</button>
     </div>
   </div>
 </div>
@@ -324,7 +325,8 @@
                   <details class="quote-card quote-fold" id="quoteDetailsFold" ontoggle="this.querySelectorAll('.quote-textarea').forEach(fitQuoteText)">
                     <summary>
                       <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
-                      <span class="quote-fold-text"><span class="quote-card-title">Client and quote details</span><span class="quote-fold-sub" id="quoteDetailsSub"></span></span>
+                      <span class="quote-fold-text"><span class="quote-card-title">Client details</span><span class="quote-fold-sub" id="quoteDetailsSub"></span><span class="sr-only fold-tick-text">Done</span></span>
+                      <span class="fold-tick" aria-hidden="true"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></span>
                       <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                     </summary>
                     <div class="quote-grid">
@@ -345,8 +347,9 @@
                   <details class="quote-card quote-fold quote-work-fold" id="quoteWorkFold">
                     <summary>
                       <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/></svg></span>
-                      <span class="quote-fold-text"><span class="quote-card-title">Scope of works</span><span class="quote-fold-sub" id="quoteItemCount"></span></span>
+                      <span class="quote-fold-text"><span class="quote-card-title">Scope of works</span><span class="quote-fold-sub" id="quoteItemCount"></span><span class="sr-only fold-tick-text">Done</span></span>
                       <span class="quote-work-total" id="quoteWorkTotal"></span>
+                      <span class="fold-tick" aria-hidden="true"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></span>
                       <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                     </summary>
                     <div id="quoteSystemChoice" class="quote-system-choice" style="display:none"></div>
@@ -369,7 +372,8 @@
                   <details class="quote-card quote-fold" id="quotePlanFold" ontoggle="this.querySelectorAll('.quote-textarea').forEach(fitQuoteText)">
                     <summary>
                       <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg></span>
-                      <span class="quote-fold-text"><span class="quote-card-title">Treatment plan</span><span class="quote-fold-sub" id="quotePlanSub"></span></span>
+                      <span class="quote-fold-text"><span class="quote-card-title">Treatment plan</span><span class="quote-fold-sub" id="quotePlanSub"></span><span class="sr-only fold-tick-text">Done</span></span>
+                      <span class="fold-tick" aria-hidden="true"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></span>
                       <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                     </summary>
                     <div id="quotePlanBody" class="qp-body"></div>
@@ -378,7 +382,8 @@
                   <details class="quote-card quote-fold" id="quoteTermsFold" ontoggle="this.querySelectorAll('.quote-textarea').forEach(fitQuoteText)">
                     <summary>
                       <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span>
-                      <span class="quote-fold-text"><span class="quote-card-title">Terms and exclusions</span><span class="quote-fold-sub" id="quoteTermsSub"></span></span>
+                      <span class="quote-fold-text"><span class="quote-card-title">Terms</span><span class="quote-fold-sub" id="quoteTermsSub"></span><span class="sr-only fold-tick-text">Done</span></span>
+                      <span class="fold-tick" aria-hidden="true"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></span>
                       <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                     </summary>
                     <div class="fsub">Payment</div>
@@ -572,8 +577,9 @@
       <div class="sheet-folds">
       <details class="quote-card quote-fold sheet-fold" id="trFold1">
         <summary>
-          <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-          <span class="quote-fold-text"><span class="quote-card-title">When and who</span><span class="quote-fold-sub" id="trSub1"></span></span>
+          <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg></span>
+          <span class="quote-fold-text"><span class="quote-card-title">Job details</span><span class="quote-fold-sub" id="trSub1"></span><span class="sr-only fold-tick-text">Done</span></span>
+          <span class="fold-tick" aria-hidden="true"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></span>
           <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
         </summary>
         <div class="sheet-fold-body">
@@ -624,8 +630,9 @@
       </details>
       <details class="quote-card quote-fold sheet-fold" id="trFold2">
         <summary>
-          <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"/><path d="M10 3v6L5 19a1 1 0 0 0 1 2h12a1 1 0 0 0 1-2l-5-10V3"/></svg></span>
-          <span class="quote-fold-text"><span class="quote-card-title">What was done</span><span class="quote-fold-sub" id="trSub2"></span></span>
+          <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.7 6.3 9.4a7.5 7.5 0 1 0 11.4 0z"/></svg></span>
+          <span class="quote-fold-text"><span class="quote-card-title">Treatment applied</span><span class="quote-fold-sub" id="trSub2"></span><span class="sr-only fold-tick-text">Done</span></span>
+          <span class="fold-tick" aria-hidden="true"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></span>
           <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
         </summary>
         <div class="sheet-fold-body">
@@ -649,16 +656,17 @@
       <details class="quote-card quote-fold sheet-fold" id="trFold3">
         <summary>
           <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
-          <span class="quote-fold-text"><span class="quote-card-title">Where</span><span class="quote-fold-sub" id="trSub3"></span></span>
+          <span class="quote-fold-text"><span class="quote-card-title">Areas treated</span><span class="quote-fold-sub" id="trSub3"></span><span class="sr-only fold-tick-text">Done</span></span>
+          <span class="fold-tick" aria-hidden="true"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></span>
           <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
         </summary>
         <div class="sheet-fold-body">
       <div class="job-field">
-        <div class="job-field-label">Areas treated</div>
+        <div class="job-field-label">Treated</div>
         <textarea class="job-input" id="trAreas" rows="2" placeholder="e.g. Laundry east wall; perimeter of the building"></textarea>
       </div>
       <div class="job-field">
-        <div class="job-field-label">Areas not treated, and why</div>
+        <div class="job-field-label">Not treated, and why</div>
         <textarea class="job-input" id="trNotTreated" rows="2" placeholder="e.g. Under the rear deck, no access"></textarea>
       </div>
       <div class="job-field">
@@ -702,8 +710,9 @@
       </details>
       <details class="quote-card quote-fold sheet-fold" id="trFold4">
         <summary>
-          <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg></span>
-          <span class="quote-fold-text"><span class="quote-card-title">For the client</span><span class="quote-fold-sub" id="trSub4"></span></span>
+          <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg></span>
+          <span class="quote-fold-text"><span class="quote-card-title">Client handover</span><span class="quote-fold-sub" id="trSub4"></span><span class="sr-only fold-tick-text">Done</span></span>
+          <span class="fold-tick" aria-hidden="true"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></span>
           <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
         </summary>
         <div class="sheet-fold-body">
@@ -1462,6 +1471,13 @@
         </div>
       </div>
 
+
+      <!-- The made-up finished job (js/sample-job.js), to open or bring back. -->
+      <button type="button" class="panel-label drawer-help" onclick="openSampleJob('menu')">
+        <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="m9 15 2 2 4-4"/></svg></span>
+        <span class="panel-title">Sample job</span>
+        <span class="job-panel-summary">See a finished job</span>
+      </button>
 
       <!-- Help: one real address, the same one the legal pages give. -->
       <a class="panel-label drawer-help" href="mailto:sayon.application@gmail.com?subject=SAYON%20help">
@@ -2638,5 +2654,6 @@
 <script src="js/job-pack.js"></script>
 <script src="js/site-plan.js"></script>
 <script src="js/business-sync.js"></script>
+<script src="js/sample-job.js"></script>
 </body>
 </html>

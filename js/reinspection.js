@@ -54,7 +54,7 @@ function reinspectionsDue() {
   const marks = getReinspectMarks();
   const latest = new Map();
   getSavedReports().forEach(r => {
-    if (!r || !r.reportData) return;
+    if (!r || !r.reportData || isSampleJob(r)) return;
     const key = addressKey(r.jobAddress, r.jobSuburb) || String(r.address || '').trim().toLowerCase();
     if (!key) return;
     const prev = latest.get(key);

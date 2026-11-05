@@ -241,7 +241,7 @@ function obRunDemo() {
   btn.textContent = 'Running…';
   demoText.classList.add('active');
 
-  const phrase = 'Detached house, single storey, brick veneer walls, colorbond roof, concrete slab on ground, north facing, fine and dry, owner occupied.';
+  const phrase = 'Detached house, single storey, brick veneer walls, Colorbond roof, concrete slab on ground, north facing, fine and dry, owner occupied.';
   let i = 0;
   demoText.textContent = '';
 
@@ -253,7 +253,7 @@ function obRunDemo() {
       clearInterval(typeInterval);
       // Flash each field as if populating
       setTimeout(() => {
-        demoText.textContent = '✓ Fields extracted — Structure Type, Height, Wall Construction, Roof Type, Floor Type, Orientation, Weather, Occupancy';
+        demoText.textContent = '✓ Filled in: structure type, height, wall construction, roof type, floor type, orientation, weather and occupancy';
         demoText.style.color = 'var(--green)';
         btn.style.display   = 'none';
         nextBtn.textContent  = 'Continue →';
@@ -3326,7 +3326,7 @@ function startRecording() {
   isRecording = true;
   updateVoiceHud();
   document.getElementById('voiceBtn').classList.add('recording');
-  document.getElementById('voiceBtnText').textContent = 'Recording… Tap to Stop';
+  document.getElementById('voiceBtnText').textContent = 'Recording… tap to stop';
   document.getElementById('waveform').classList.add('show');
   driveWave(true);
   document.getElementById('extractBtn').disabled = true;
@@ -3388,7 +3388,7 @@ function stopRecording() {
   isRecording = false;
   updateVoiceHud();
   document.getElementById('voiceBtn').classList.remove('recording');
-  document.getElementById('voiceBtnText').textContent = 'Tap to Speak';
+  document.getElementById('voiceBtnText').textContent = 'Tap to speak';
   document.getElementById('waveform').classList.remove('show');
   driveWave(false);
   if (currentTranscript.trim()) document.getElementById('extractBtn').disabled = false;
@@ -3645,7 +3645,7 @@ function buildSpeciesIntelHTML(data) {
   // On-site field identification — rendered first, most useful in the moment
   if (data.fieldID && data.fieldID.length > 0) {
     html += `<div class="intel-section intel-section-field-id">
-      <div class="intel-section-title">🔍 On Site — What to Look For</div>
+      <div class="intel-section-title">🔍 On site: what to look for</div>
       <div class="intel-list">`;
     data.fieldID.forEach(item => {
       html += `<div class="intel-item intel-field-id-item">${item}</div>`;
@@ -3678,7 +3678,7 @@ function buildSpeciesIntelHTML(data) {
   // Nest locations
   if (data.nestTypes && data.nestTypes.length > 0) {
     html += `<div class="intel-section">
-      <div class="intel-section-title">Nest Locations</div>
+      <div class="intel-section-title">Nest locations</div>
       <div class="intel-list">`;
     data.nestTypes.forEach(item => {
       html += `<div class="intel-item">${item}</div>`;
@@ -3700,7 +3700,7 @@ function buildSpeciesIntelHTML(data) {
   // Treatment options
   if (data.treatmentOptions && data.treatmentOptions.length > 0) {
     html += `<div class="intel-section">
-      <div class="intel-section-title">Treatment Options</div>
+      <div class="intel-section-title">Treatment options</div>
       <div class="intel-treatments">`;
     data.treatmentOptions.forEach(opt => {
       html += `<div class="intel-treatment">
@@ -3718,7 +3718,7 @@ function buildSpeciesIntelHTML(data) {
   // Field note prompts
   if (data.fieldNotePrompts && data.fieldNotePrompts.length > 0) {
     html += `<div class="intel-section">
-      <div class="intel-section-title">Field Note Prompts</div>
+      <div class="intel-section-title">Field note prompts</div>
       <div class="intel-prompts">`;
     data.fieldNotePrompts.forEach(prompt => {
       html += `<div class="intel-prompt-item">${prompt}</div>`;
@@ -4668,8 +4668,8 @@ function goToReportField(target, referral) {
   if (section && section.id.startsWith('section-')) showSection(section.id.slice(8));
   openFieldGroups(el);
   if (referral) {
-    // The "Builder / Engineer Referral" field inside the finding card.
-    const label = [...el.querySelectorAll('.field-label')].find(l => /builder or engineer/i.test(l.textContent));
+    // The "Builder or engineer referral" field inside the finding card.
+    const label = [...el.querySelectorAll('.field-label')].find(l => /builder (or|\/) engineer/i.test(l.textContent));
     if (label && label.nextElementSibling) el = label.nextElementSibling;
   }
   setTimeout(() => {
@@ -5550,20 +5550,20 @@ function findingCardHTML(finding, index, total) {
       </div>
       <div class="finding-card-body">
         <!-- Activity gate: the question every finding must answer -->
-        <div class="findings-gate choice-panel${act ? '' : ' unset'}" role="radiogroup" aria-label="Termite Activity Status">
-          <div class="field-label">Termite Activity Status</div>
+        <div class="findings-gate choice-panel${act ? '' : ' unset'}" role="radiogroup" aria-label="Termite activity status">
+          <div class="field-label">Termite activity status</div>
           ${choiceCardsHTML('activity', 'activity-' + id, act, `data-finding="${id}" data-fkey="termiteActivity"`)}
           ${!act ? `<p class="findings-gate-hint">Pick one to continue.</p>` : ''}
         </div>
         ${showDetails ? `
         <div class="findings-details" style="display:block">
           <div class="section-fields">
-            <div class="field field-wide"><div class="field-label">Location of Activity</div>${pickFieldHTML(id, 'activityLocation', PLACES, finding.activityLocation)}</div>
-            <div class="field field-wide"><div class="field-label">Timber Affected</div>${pickFieldHTML(id, 'timberAffected', TIMBER_PARTS, finding.timberAffected)}</div>
-            <div class="field field-wide"><div class="field-label">Damage Description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${pickFieldHTML(id, 'damageDescription', TERMITE_SIGNS, finding.damageDescription)}</div>
-            <div class="field field-wide"><div class="field-label">Species / Genus</div>${fv('species','specieslist')}</div>
-            <div class="field choice-field"><div class="field-label">Termite Nest Found?</div>${fv('nestLocated','yesno')}</div>
-            <div class="field choice-field"><div class="field-label">Builder / Engineer Referral</div>${fv('structuralConcern','yesno')}</div>
+            <div class="field field-wide"><div class="field-label">Location of activity</div>${pickFieldHTML(id, 'activityLocation', PLACES, finding.activityLocation)}</div>
+            <div class="field field-wide"><div class="field-label">Timber affected</div>${pickFieldHTML(id, 'timberAffected', TIMBER_PARTS, finding.timberAffected)}</div>
+            <div class="field field-wide"><div class="field-label">Damage description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${pickFieldHTML(id, 'damageDescription', TERMITE_SIGNS, finding.damageDescription)}</div>
+            <div class="field field-wide"><div class="field-label">Species / genus</div>${fv('species','specieslist')}</div>
+            <div class="field choice-field"><div class="field-label">Termite nest found?</div>${fv('nestLocated','yesno')}</div>
+            <div class="field choice-field"><div class="field-label">Builder or engineer referral</div>${fv('structuralConcern','yesno')}</div>
             <div class="field field-wide finding-photos"><div class="field-label">Photos of this finding</div>${spotPhotosHTML(findingPhotoSection(id))}</div>
           </div>
           ${act === 'INACTIVE' ? `<div class="inactive-reminder" style="display:flex"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg><span>Inactive workings can mean termites have temporarily abandoned the area, not that the risk is gone. Continued, regular inspections remain essential.</span></div>` : ''}
@@ -5640,7 +5640,7 @@ function startFindingEdit(findingId, key, type) {
   ta.type = 'text';
   ta.style.width = '100%';
   ta.value = cur;
-  ta.placeholder = 'Type value...';
+  ta.placeholder = 'Type a value';
 
   const isThis = () => activeFindingEdit && activeFindingEdit.findingId === findingId && activeFindingEdit.key === key;
   wireInlineTextEdit(ta,
@@ -5904,16 +5904,16 @@ function borerCardHTML(b, index) {
       </div>
       <div class="finding-card-body">
         <div class="findings-gate choice-panel${act ? '' : ' unset'}" role="radiogroup" aria-label="Borer activity here">
-          <div class="field-label">Borer Activity</div>
+          <div class="field-label">Borer activity</div>
           ${choiceCardsHTML('borerCard', 'borer-' + id, act, `data-finding="${id}" data-fkey="borerActivity"`)}
         </div>
         <div class="findings-details" style="display:block">
         <div class="section-fields">
           <div class="field field-wide"><div class="field-label">Location</div>${pickFieldHTML(id, 'location', PLACES, b.location)}</div>
-          <div class="field field-wide"><div class="field-label">Timber Affected</div>${pickFieldHTML(id, 'timberAffected', TIMBER_PARTS, b.timberAffected)}</div>
-          <div class="field field-wide"><div class="field-label">Borer Type</div>${pickFieldHTML(id, 'borerType', BORER_TYPES, b.borerType)}</div>
-          <div class="field field-wide"><div class="field-label">What Was Seen <span class="field-hint">Exit holes, frass, tunnelling. No severity opinion.</span></div>${pickFieldHTML(id, 'description', BORER_SIGNS, b.description)}</div>
-          <div class="field choice-field"><div class="field-label">Builder / Engineer Referral</div><div class="choice-panel${b.structuralConcern ? '' : ' unset'}" role="radiogroup">${choiceCardsHTML('finding', `structuralConcern-${id}`, b.structuralConcern, `data-finding="${id}" data-fkey="structuralConcern"`)}</div></div>
+          <div class="field field-wide"><div class="field-label">Timber affected</div>${pickFieldHTML(id, 'timberAffected', TIMBER_PARTS, b.timberAffected)}</div>
+          <div class="field field-wide"><div class="field-label">Borer type</div>${pickFieldHTML(id, 'borerType', BORER_TYPES, b.borerType)}</div>
+          <div class="field field-wide"><div class="field-label">What was seen <span class="field-hint">Exit holes, frass, tunnelling. No severity opinion.</span></div>${pickFieldHTML(id, 'description', BORER_SIGNS, b.description)}</div>
+          <div class="field choice-field"><div class="field-label">Builder or engineer referral</div><div class="choice-panel${b.structuralConcern ? '' : ' unset'}" role="radiogroup">${choiceCardsHTML('finding', `structuralConcern-${id}`, b.structuralConcern, `data-finding="${id}" data-fkey="structuralConcern"`)}</div></div>
           <div class="field field-wide finding-photos"><div class="field-label">Photos of this finding</div>${spotPhotosHTML(findingPhotoSection(id))}</div>
         </div>
         ${b.structuralConcern === 'YES' ? `<div class="warn-note note-info" style="margin:0 0 10px"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Referral recorded. The PDF recommends a licensed builder or engineer assess this damage.</div>` : ''}
@@ -5936,7 +5936,7 @@ function renderBorerFindings() {
   const add = document.getElementById('addBorerBtn');
   if (add) {
     add.disabled = cards.length >= MAX_BORER_FINDINGS;
-    add.querySelector('span').textContent = cards.length ? 'Add Another Borer Finding' : 'Add Where Borers Were Found';
+    add.querySelector('span').textContent = cards.length ? 'Add another borer finding' : 'Add where borers were found';
   }
 }
 
@@ -6750,7 +6750,7 @@ function startEdit(el, key, type) {
     input = document.createElement('input');
     input.type = 'text';
     input.value = cur;
-    input.placeholder = 'Type value...';
+    input.placeholder = 'Type a value';
     wireInlineTextEdit(input,
       v => { if (el.classList.contains('editing')) commitEdit(el, key, v); },
       () => { if (el.classList.contains('editing')) cancelEdit(el, key); });
@@ -7849,7 +7849,7 @@ function updateAgreementSignButton() {
   const needEl = document.getElementById('agreementSignNeed');
   if (needEl) {
     needEl.hidden = !need.length;
-    needEl.textContent = need.length ? `To sign: ${need.join(', ')}.` : '';
+    needEl.textContent = need.length ? `To sign, ${joinWithAnd(need)}.` : '';
   }
 }
 
@@ -8663,7 +8663,7 @@ function renderSectionPhotoGrid(section) {
   if (!grid) return;
   const photos = getSectionPhotos(section);
   const limit = sectionPhotoLimit(section);
-  if (count) count.textContent = limit === 1 ? '' : `${photos.length}/${limit} photos`;
+  if (count) count.textContent = limit === 1 ? '' : `${photos.length} of ${limit} photos`;
   // Areas and Access take photos per spot now; their old boxes only show
   // for reports that already have photos in them.
   const box = grid.closest('[data-legacy-photos]');
@@ -8816,7 +8816,7 @@ function renderPhotoGrid() {
   if (!grid) return;
 
   const photos = reportData.photos || [];
-  countEl.textContent = `${photos.length} of ${MAX_PHOTOS_PER_REPORT} photos attached`;
+  countEl.textContent = `${photos.length} of ${MAX_PHOTOS_PER_REPORT} photos`;
   countEl.classList.toggle('at-cap', photos.length >= MAX_PHOTOS_PER_REPORT);
   addBtn.disabled = photos.length >= MAX_PHOTOS_PER_REPORT;
 

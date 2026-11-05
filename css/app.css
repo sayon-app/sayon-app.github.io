@@ -2870,13 +2870,14 @@ body:not(.dark-screen) .sheet-secs > .sheet-voice { background: var(--accent-was
 body:not(.dark-screen) .sheet-secs > .sheet-voice .sheet-voice-hint { color: var(--text2); }
 body.dark-screen .sheet-folds .job-input::placeholder { color: #75879A; }
 .sheet-folds .sheet-more { border-color: var(--border2); }
-/* A finished part shows a green tick beside its chevron, and no line under
-   its title; a part that still needs something shows a short amber note. */
-.sheet-folds .quote-fold-sub:empty { display: none; }
-.sheet-fold-done { display: none; flex-shrink: 0; width: 24px; height: 24px; border-radius: 99px; place-items: center; background: var(--green); color: #fff; }
-.sheet-fold.done .sheet-fold-done { display: grid; }
-.sheet-fold:not(.done) .sheet-fold-done-text { display: none; }
-body.dark-screen .sheet-fold-done { color: #000; }
+/* A finished fold (the treatment record's, the quote's) shows a green tick
+   beside its chevron and no line under its title; one that still needs
+   something shows a short amber note (setFoldNote in js/quote.js). */
+.quote-fold-sub:empty { display: none; }
+.fold-tick { display: none; flex-shrink: 0; width: 24px; height: 24px; border-radius: 99px; place-items: center; background: var(--green); color: #fff; }
+.quote-fold.done .fold-tick { display: grid; }
+.quote-fold:not(.done) .fold-tick-text { display: none; }
+body.dark-screen .fold-tick { color: #000; }
 .sheet-folds .sheet-more > summary { color: var(--text); }
 
 /* Check before sending */

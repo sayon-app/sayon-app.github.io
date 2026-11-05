@@ -27,6 +27,7 @@ const patches = [];
   await ctx.route(/cdnjs\.cloudflare\.com\/ajax\/libs\/jspdf/, r => r.fulfill({ body: fs.readFileSync(SP + '/package/dist/jspdf.umd.min.js'), contentType: 'application/javascript' }));
   await require('../visual/fonts-route.js')(ctx);
   await ctx.route(/sentry|posthog|maps\.googleapis/, r => r.fulfill({ status: 200, body: '' }));
+  await require('./apvma-mock.js')(ctx);
   await ctx.route(/workers\.dev/, r => r.fulfill({ json: { plan: 'starter', status: 'active', ai_calls_used_this_period: 1, limit: 150 } }));
   await ctx.route(/supabase\.co/, r => {
     const req = r.request(), u = req.url();

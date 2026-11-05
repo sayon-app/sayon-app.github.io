@@ -19,7 +19,7 @@ Read only the files your task needs. `js/app.js` is about 9,200 lines, so jump t
 | `js/bait.js` | Bait station visits after a baiting system goes in: the visit sheet, the client's visit report PDF, the job's due date |
 | `js/reinspection.js` | Re-inspections due: the Jobs screen's Due tab (each property whose next inspection is coming up or overdue, from the report date plus its interval, or the treatment record's date), the reminder email to the client, starting the new report |
 | `js/site-plan.js` | The drawn site plan on the treatment record: symbols, legend, the editor (drag corners and walls, turn to any angle, pinch to zoom), and the plan page on the certificates and bait visit reports |
-| `js/chemicals.js` | Chemical register (Menu › Chemical register): products, label and SDS links, each label use with its rate. The treatment record's product picker fills the active, rate and life from it |
+| `js/chemicals.js` | Chemical register (Menu › Chemical register): products, label and SDS links, each label use with its rate. The treatment record's product picker fills the active, rate and life from it. Once a week each APVMA No. is checked against the APVMA's list of registered products on data.gov.au, and a product that has dropped off is flagged |
 | `js/job-pack.js` | The job PDF: every document from the job joined behind a contents page, and the job page's Finalise step. Joins pages with pdf-lib (`js/vendor`) |
 | `js/business-sync.js` | Syncs company details and quote prices to Supabase `businesses.settings` |
 | `css/app.css`, `css/quote.css` | Styles |

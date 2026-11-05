@@ -378,11 +378,8 @@ function treatmentFoldLines() {
 function renderTreatmentFolds(reset) {
   if (!document.getElementById('trFold1')) return;
   treatmentFoldLines().forEach((line, i) => {
-    const sub = document.getElementById('trSub' + (i + 1));
-    sub.textContent = line.text || '';
-    sub.classList.toggle('warn', !!line.warn);
     const fold = document.getElementById('trFold' + (i + 1));
-    fold.classList.toggle('done', !line.warn);
+    setFoldNote(fold, document.getElementById('trSub' + (i + 1)), line.text);
     if (reset) fold.open = !!line.warn;
   });
 }

@@ -664,14 +664,19 @@ function quotePlanReport() {
 }
 
 // One line for the folded row: what's set, and what's still to choose.
-function quotePlanSummary(q) {
+// What the plan still needs, as a short note, or '' once it's done.
+function quotePlanNote(q) {
   const p = q && q.plan;
-  if (!p) return ['No plan yet', true];
-  const steps = (p.we || '').split('\n').filter(l => l.trim()).length + (p.owner || '').split('\n').filter(l => l.trim()).length;
-  const bits = [`${steps} step${steps === 1 ? '' : 's'}`];
-  bits.push(p.time ? (QUOTE_PLAN_TIMES.includes(p.time) ? p.time.charAt(0).toLowerCase() + p.time.slice(1) + ' on site' : p.time) : 'job time not set');
-  bits.push(p.service ? (p.service === 'None' ? 'no service period' : `${p.service} service`) : 'service period not set');
-  return [bits.join(', '), !p.time || !p.service];
+  return !p ? 'Add a plan' : !p.time ? 'Set the time on site' : !p.service ? 'Set the service period' : '';
+}
+
+// A fold's status under its title: a short amber note saying what's still
+// needed, or, once there's nothing to say, no line and a green tick.
+function setFoldNote(fold, sub, note) {
+  if (!fold || !sub) return;
+  sub.textContent = note || '';
+  sub.classList.toggle('warn', !!note);
+  fold.classList.toggle('done', !note);
 }
 
 function quotePlanChipsHTML(field, options, value) {
@@ -684,10 +689,7 @@ function renderQuotePlan() {
   const q = quoteState;
   const body = document.getElementById('quotePlanBody');
   if (!q || !body) return;
-  const [sub, warn] = quotePlanSummary(q);
-  const subEl = document.getElementById('quotePlanSub');
-  subEl.textContent = sub;
-  subEl.classList.toggle('warn', warn);
+  setFoldNote(document.getElementById('quotePlanFold'), document.getElementById('quotePlanSub'), quotePlanNote(q));
   const p = q.plan;
   if (!p) {
     body.innerHTML = `<div class="quote-hint" style="margin-top:0">Set out how the job will go: what you'll do, what the owner should do, how long it takes and the service period. It starts from the report.</div>
@@ -778,10 +780,7 @@ function onQuotePlanInput() {
   p.we = document.getElementById('qPlanWe').value;
   p.owner = document.getElementById('qPlanOwner').value;
   p.inspections = document.getElementById('qPlanInspections').value;
-  const [sub, warn] = quotePlanSummary(quoteState);
-  const subEl = document.getElementById('quotePlanSub');
-  subEl.textContent = sub;
-  subEl.classList.toggle('warn', warn);
+  setFoldNote(document.getElementById('quotePlanFold'), document.getElementById('quotePlanSub'), quotePlanNote(quoteState));
   scheduleQuoteSave();
 }
 
@@ -1070,18 +1069,25 @@ function openQuoteDetails(focusId) {
   target.scrollIntoView({ behavior: 'smooth', block: focusId ? 'center' : 'start' });
 }
 
-// The one-line summaries on the folded sections.
+// What each part of Write the quote still needs, as a short note, or ''
+// once it's done.
+function quoteFoldNotes(q) {
+  const n = q.items.length, starting = q.items.filter(isStartingPrice).length;
+  return {
+    details: !(q.client || '').trim() ? "Add the client's name" : !(q.clientEmail || '').trim() ? "Add the client's email" : '',
+    work: !n ? 'Add a line' : starting ? `Check ${starting === 1 ? 'one price' : starting + ' prices'}` : '',
+    plan: quotePlanNote(q),
+    terms: !(q.paymentTerms || '').trim() ? 'Add payment terms' : '',
+  };
+}
+
+// The folded sections: a tick when done, or what's still needed.
 function renderQuoteFolds() {
   const q = quoteState;
   if (!q) return;
-  const email = (q.clientEmail || '').trim();
-  const det = [q.client || 'No client name', email || 'no email yet'];
-  const detSub = document.getElementById('quoteDetailsSub');
-  detSub.textContent = det.join(', ');
-  detSub.classList.toggle('warn', !email);
-  const excl = (q.exclusions || '').split('\n').filter(l => l.trim()).length;
-  document.getElementById('quoteTermsSub').textContent =
-    [(q.paymentTerms || '').trim() ? 'Payment terms set' : 'No payment terms', `${excl} exclusion${excl === 1 ? '' : 's'}`].join(', ');
+  const notes = quoteFoldNotes(q);
+  setFoldNote(document.getElementById('quoteDetailsFold'), document.getElementById('quoteDetailsSub'), notes.details);
+  setFoldNote(document.getElementById('quoteTermsFold'), document.getElementById('quoteTermsSub'), notes.terms);
 }
 
 // What's missing from the business details, which every quote's header shows.
@@ -1244,15 +1250,13 @@ function renderQuoteItems() {
   if (quoteState.aiPlan && quoteState.aiPlan.quoteHash && typeof renderTreatmentPlanCard === 'function') renderTreatmentPlanCard();
 }
 
-// The folded work row: how many lines, any prices still to check, the total.
+// The folded work row: a tick, or a line or prices still to check, and the total.
 function renderQuoteWorkSummary() {
   const q = quoteState;
   const sub = document.getElementById('quoteItemCount');
   if (!q || !sub) return;
   const n = q.items.length;
-  const starting = q.items.filter(isStartingPrice).length;
-  sub.textContent = !n ? 'No lines yet' : `${n} line${n === 1 ? '' : 's'}` + (starting ? `, ${starting} price${starting === 1 ? '' : 's'} to check` : '');
-  sub.classList.toggle('warn', !n || starting > 0);
+  setFoldNote(document.getElementById('quoteWorkFold'), sub, quoteFoldNotes(q).work);
   document.getElementById('quoteWorkTotal').textContent = n ? formatAUD(quoteTotals(q).total) : '';
 }
 
@@ -1440,12 +1444,12 @@ function renderQuoteAnswer() {
   const sentNow = !!q.sentAt && q.sentHash === quoteContentHash(q);
   const answered = a && !a.stale;
   const n = q.items.length;
-  const starting = q.items.filter(isStartingPrice).length;
+  // The parts below say what each needs, so this line only counts them.
+  const left = Object.values(quoteFoldNotes(q)).filter(Boolean).length;
 
   const priced = {
     title: 'Write the quote', state: sentNow || answered ? 'done' : 'now',
-    text: !n ? 'No lines yet. Add the work below.' : `${n} line${n === 1 ? '' : 's'}, ${formatAUD(quoteTotals(q).total)}${q.gst !== false ? ' inc GST' : ''}`
-      + (starting ? `, ${starting} starting price${starting === 1 ? '' : 's'} to check` : ''),
+    text: !n ? 'Add the work below.' : sentNow || answered ? '' : left ? `${left} part${left === 1 ? '' : 's'} below to finish.` : 'Ready to send.',
   };
   const sent = !q.sentAt
     ? { title: 'Sent to the client', state: answered ? 'skip' : 'todo', text: answered ? 'Not needed. They answered before it was sent.' : 'Not sent yet. Send it from the bar below.' }

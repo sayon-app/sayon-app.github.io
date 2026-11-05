@@ -514,7 +514,7 @@ function downloadBaitVisit(id) {
     .then(({ blob, fname }) => { track('bait_visit_pdf_made'); return deliverPdfBlob(blob, fname, {
       title: 'Bait station visit report',
       text: `Bait station visit report — ${q.address || 'Property'}`,
-      readyToast: 'Visit report ready — choose where to save or send it',
+      readyToast: 'Visit report ready. Choose where to save or send it',
     }); })
     .catch(e => {
       console.error('Bait visit PDF failed:', e);

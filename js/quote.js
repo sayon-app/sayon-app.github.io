@@ -185,7 +185,7 @@ function persistQuote() {
     renderQuoteAnswer();
   } catch (e) {
     setQuoteSaveState('Not saved');
-    showToast('Could not save the quote — device storage may be full', 'error');
+    showToast('Could not save the quote. The phone\'s storage may be full', 'error');
   }
 }
 function scheduleQuoteSave() {
@@ -1654,13 +1654,13 @@ function exportQuotePDF() {
         return deliverPdfBlob(blob, fname, {
           title: 'SAYON Quote',
           text: `Treatment quote — ${quoteState.address || 'Property'}`,
-          readyToast: 'Quote ready — choose where to save or send it',
+          readyToast: 'Quote ready. Choose where to save or send it',
         });
       })
       .catch(e => {
         console.error('Quote PDF failed:', e);
         reportError(e, 'quote_pdf');
-        showToast((e && e.message) || 'Could not generate the PDF — check your connection and try again', 'error');
+        showToast((e && e.message) || 'Could not make the PDF. Check your signal and try again', 'error');
       })
       .finally(() => { btn.disabled = false; });
   }, 50);
@@ -1772,7 +1772,7 @@ function emailQuoteToClient() {
   rememberQuotePrices(quoteState);
   if (!jsPDF) {
     ensureJsPDFLoaded()
-      .then(() => showToast('Ready — tap Email to client again', 'info'))
+      .then(() => showToast('Ready. Tap the send button again', 'info'))
       .catch(e => showToast((e && e.message) || 'Could not load the PDF tools', 'error'));
     return;
   }

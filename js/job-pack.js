@@ -15,7 +15,7 @@ function ensurePdfLibLoaded() {
     const s = document.createElement('script');
     s.src = 'js/vendor/pdf-lib-1.17.1.min.js';
     s.onload = () => { jobPdfLib = window.PDFLib || null; jobPdfLib ? resolve(jobPdfLib) : reject(new Error('The PDF joining tools did not load')); };
-    s.onerror = () => { s.remove(); reject(new Error('Could not load the PDF joining tools. Check your connection and try again.')); };
+    s.onerror = () => { s.remove(); reject(new Error('Could not load the PDF joining tools. Check your signal and try again')); };
     document.head.appendChild(s);
   });
 }
@@ -164,7 +164,7 @@ async function makeJobPdf(how) {
         track('job_pdf_sent');
       }
     } else {
-      await deliverPdfBlob(pack.blob, pack.fname, { title: 'Job file', text: `Job file — ${getFullAddress() || 'Property'}`, readyToast: 'Job PDF ready — choose where to save or send it' });
+      await deliverPdfBlob(pack.blob, pack.fname, { title: 'Job file', text: `Job file — ${getFullAddress() || 'Property'}`, readyToast: 'Job PDF ready. Choose where to save or send it' });
       track('job_pdf_made');
     }
   } catch (e) {

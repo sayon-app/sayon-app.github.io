@@ -12742,7 +12742,7 @@ function dashboardJob(r, quotes) {
   let onlyReportUnsent = false;
   if (!reportDone) {
     group = 'todo'; status = 'Finish the report';
-    hint = 'Fill in the rest of the report, then make the PDF from the Sign-Off page.';
+    hint = 'Fill in the rest of the report, then make the PDF from its Finish tab.';
     next = { label: 'Open report', to: 'report' };
   } else if (!hasQuote && needsQuote) {
     group = 'todo'; status = 'Write the quote';
@@ -12784,7 +12784,7 @@ function dashboardJob(r, quotes) {
   if (group === 'done' && reportDone && !reportSent && !reportWentWithQuote) {
     onlyReportUnsent = true;
     group = 'todo'; status = 'Send the report';
-    hint = 'The report is ready but hasn\'t gone to ' + who + '. Send it from the Sign-Off page.';
+    hint = 'The report is ready but hasn\'t gone to ' + who + '. Send it from the report\'s Finish tab.';
     next = { label: 'Open report', to: 'report' };
   }
 

@@ -4319,7 +4319,7 @@ async function runFill({ whileRecording = false } = {}) {
     if (err.tooLong || err.status === 413) {
       setAI('ready', 'AI ready');
       if (!isRecording) document.getElementById('extractBtn').disabled = false;
-      showToast('That note is too long for the AI in one go. Split it into shorter notes and extract each one', 'error');
+      showToast('That note is too long for the AI in one go. Split it into shorter notes and fill each one in', 'error');
       return false;
     }
     // Nothing is guessed from the note: it waits with any others until the
@@ -4851,8 +4851,8 @@ async function analyzeGalleryPhoto(photoId) {
   const mediaType = match[1];
   const base64 = match[2];
 
-  if (btn) { btn.disabled = true; btn.textContent = 'Analyzing…'; }
-  setAI('thinking', 'Analyzing photo...');
+  if (btn) { btn.disabled = true; btn.textContent = 'Analysing…'; }
+  setAI('thinking', 'Analysing the photo…');
 
   try {
     const res = await workerFetch('', {
@@ -4910,7 +4910,7 @@ async function analyzeGalleryPhoto(photoId) {
 
   } catch (err) {
     console.warn('Photo analysis failed:', err);
-    showToast('Could not analyze the photo — check your connection and try again', 'error');
+    showToast('Could not analyse the photo — check your connection and try again', 'error');
     setAI('ready', 'Ready');
   } finally {
     renderPhotoGrid(); // restores the button (re-render clears the disabled/label override above)
@@ -8834,7 +8834,7 @@ function renderPhotoGrid() {
                value="${escapeHtml(p.caption || '')}"
                oninput="updatePhotoCaption('${p.id}', this.value)">
         <div class="photo-card-footer">
-          <button class="photo-analyze-btn" id="analyzeBtn-${p.id}" onclick="analyzeGalleryPhoto('${p.id}')">Analyze</button>
+          <button class="photo-analyze-btn" id="analyzeBtn-${p.id}" onclick="analyzeGalleryPhoto('${p.id}')">Analyse</button>
           <button class="photo-remove-btn" onclick="removePhoto('${p.id}')">Remove</button>
         </div>
       </div>
@@ -13852,7 +13852,7 @@ async function sendPdfsDirect({ files, to, subject, body }) {
     directEmail = false;
     if (!(e instanceof TypeError)) reportError(e, 'send_email');
     const why = e instanceof TypeError ? 'Could not reach SAYON to send it' : e.message;
-    showToast(`${why}. Tap again to send it from your mail app`, 'error');
+    showToast(`${why}. Tap again to send it from your email app`, 'error');
     return false;
   } finally {
     directEmailSending = false;

@@ -57,22 +57,356 @@ const CHEMICAL_STARTER_USES = {
 
 // The starting list: the products the treatment record already knows
 // (TREATMENT_PRODUCTS in js/treatment.js), with their kind.
+// Only products the APVMA's register lists as registered go in: that
+// register is the rule for what SAYON offers.
 const CHEMICAL_STARTER_FORMS = {
-  'Termidor': 'liquid', 'Termidor HE': 'liquid', 'Termidor Foam': 'foam', 'Termidor Dry': 'dust',
-  'Termidust': 'dust', 'Premise': 'liquid', 'Premise Foam': 'foam', 'Altriset': 'liquid',
-  'Biflex': 'liquid', 'Maxxthor 100': 'liquid', 'Exterra': 'bait', 'Exterra Focus': 'bait', 'Requiem': 'bait',
-  'Sentricon': 'bait', 'Trelona': 'bait', 'Kordon': 'other',
+  'Termidor': 'liquid', 'Termidor HE': 'liquid', 'Termidor Foam': 'foam',
+  'Premise': 'liquid', 'Altriset': 'liquid',
+  'Biflex Ultra': 'liquid', 'Maxxthor 100': 'liquid', 'Exterra': 'bait', 'Exterra Focus': 'other', 'Requiem': 'bait',
+  'Sentricon': 'bait', 'Trelona': 'bait', 'Kordon': 'other', 'Sentricon AG': 'bait',
+};
+
+// What SAYON knows about each starting product, all of it checked against
+// the documents themselves (4-5 Nov 2026):
+// - maker and APVMA product number from the APVMA's register (PubCRIS).
+//   Products it no longer registers are in CHEMICAL_NOT_REGISTERED instead.
+// - labelUrl: the APVMA's own copy of the current approved label
+//   (elabels.apvma.gov.au/<product number>ELBL.pdf), opened and matched to
+//   the register's latest label number. Makers' sites can lag behind it.
+//   Exterra Focus is not a registered chemical, so its label is Ensystex's.
+// - sdsUrl and sdsExpires: the maker's own SDS PDF (BASF, Envu, Ensystex); an SDS is reviewed every
+//   5 years, so it expires 5 years after the issue date printed on it.
+// - uses: each label's own rates for termite work, in its words. A product
+//   with no uses here keeps the usual ones for its kind, with no rates.
+const ELABEL = n => `https://elabels.apvma.gov.au/${n}ELBL.pdf`;
+const BASF_FILES = 'https://pest-control.basf.com.au/sites/basf.com.au/files/';
+const ENVU_FILES = 'https://www.assets.envu.com/-/media/prfaustralia/';
+const ENSYSTEX_FILES = 'https://cdn.shopify.com/s/files/1/0561/5720/8620/files/';
+const SOUTH = 'south of the Tropic of Capricorn';
+const TERMITES = 'Subterranean termites';
+
+// Termidor and Termidor HE share the label's soil-treatment layout.
+const termidorUses = (mix, foamMix, underSlab, rodding) => [
+  { pest: TERMITES, method: 'Soil treatment', surface: 'Perimeter, beside the slab or footings (trench and rod)',
+    rate: mix, volume: '100 L of mix per m³ of soil (5.25 L per metre for a trench 150 x 350 mm)', life: '8 years' },
+  { pest: TERMITES, method: 'Soil treatment', surface: 'Under the slab, drilled through the concrete',
+    rate: mix, volume: underSlab, life: '8 years' },
+  { pest: TERMITES, method: 'Soil treatment', surface: 'Under paths beside the wall, rodded through the concrete',
+    rate: mix, volume: rodding, life: '8 years' },
+  { pest: TERMITES, method: 'Soil treatment', surface: 'Subfloor, around piers and walls',
+    rate: mix, volume: '100 L of mix per m³ around each pier and wall; 5 L per m² over the subfloor where clearance is under 400 mm', life: '8 years' },
+  { pest: TERMITES, method: 'Reticulation system', surface: 'Through an approved reticulation system',
+    rate: mix, volume: 'At least 100 L of mix per m³ of soil', life: '8 years' },
+  { pest: TERMITES, method: 'Foam', surface: 'Into termite workings and wall cavities with live termites',
+    rate: foamMix, volume: 'Foam (15:1) into the workings until saturated, then treat the soil', life: '' },
+];
+
+// Maxxthor 100 and Biflex Ultra share the same bifenthrin rate table.
+const bifenthrinUses = () => {
+  // The label's table runs from 250 mL to 1.5 L per 100 L, with a longer
+  // life for a stronger mix north of the Tropic of Capricorn.
+  const rate = '500 mL per 100 L water (label table: 250 mL to 1.5 L)';
+  const life = `10 years ${SOUTH}, 2 years north`;
+  return [
+    { pest: TERMITES, method: 'Soil treatment', surface: 'Perimeter, beside the slab or footings (trench and rod)',
+      rate, volume: 'At least 100 L of mix per m³ of soil (5 L per metre for 300 x 150 mm)', life },
+    { pest: TERMITES, method: 'Soil treatment', surface: 'Under the slab, drilled through the concrete',
+      rate, volume: 'Up to 10 L of mix per metre, holes 150-300 mm apart and within 150 mm of walls and joints', life },
+    { pest: TERMITES, method: 'Soil treatment', surface: 'Subfloor, around piers and walls',
+      rate, volume: '100 L of mix per m³ around each pier and wall; 5 L per m² over the subfloor where clearance is under 400 mm', life },
+    { pest: TERMITES, method: 'Reticulation system', surface: 'Perimeter and service penetrations only',
+      rate, volume: 'At least 100 L of mix per m³ of soil (5 L per metre for 300 x 150 mm)', life },
+  ];
+};
+
+const CHEMICAL_STARTER_DETAILS = {
+  'Termidor': {
+    maker: 'BASF', apvma: '54624', labelUrl: ELABEL(54624),
+    sdsUrl: BASF_FILES + '2024-11/Termidor%C2%AEResidualTerm%20SDS.pdf', sdsExpires: '2029-02-27',
+    uses: termidorUses('600 mL per 100 L water (0.06%)', '6 mL per 1 L water, plus foaming agent',
+      'Up to 10 L of mix per m²: 300 mL per hole at 150 mm (heavy clay), 400 mL at 200 mm (other soils)',
+      '200 L of mix per m³: 1.5 L per hole at 150 mm (heavy clay), 2 L at 200 mm (other soils)'),
+  },
+  'Termidor HE': {
+    maker: 'BASF', apvma: '80820', labelUrl: ELABEL(80820),
+    sdsUrl: BASF_FILES + '2024-11/Termidor%C2%AEHETermiticide%20SDS.pdf', sdsExpires: '2028-09-08',
+    uses: termidorUses('625 mL per 100 L water (0.06%); through the High Pressure Device, also 625 mL per 50 L', '6.25 mL per 1 L water',
+      'Up to 10 L of mix per m²: 1.1 L per hole at 350 mm (clay), 2 L at 450 mm (other soils)',
+      '200 L of mix per m³: 3.5 L per hole at 350 mm (clay), 5 L at 450 mm (other soils)'),
+  },
+  'Termidor Foam': {
+    maker: 'BASF', apvma: '70346', labelUrl: ELABEL(70346),
+    sdsUrl: BASF_FILES + '2024-11/Termidor%C2%AEFoamTerm%20SDS.pdf', sdsExpires: '2028-11-16',
+    uses: [{ pest: 'Subterranean and drywood termites', method: 'Foam', surface: 'Into termite workings, nests, wall cavities and voids',
+      rate: 'Ready to use, no mixing (30 g makes about 1 L of foam)', volume: '10-30 seconds per injection point, or until foam flows back', life: '' }],
+  },
+  'Premise': {
+    maker: 'Envu', apvma: '49098', labelUrl: ELABEL(49098),
+    sdsUrl: ENVU_FILES + 'product-sds-and-labels/premise-200sc-termiticide-sds.ashx', sdsExpires: '2028-11-03',
+    uses: [
+      { pest: TERMITES, method: 'Soil treatment', surface: 'Perimeter, beside the slab or footings (trench and rod)',
+        rate: '250 mL per 100 L water (500 mL for Mastotermes)', volume: 'At least 100 L of mix per m³ (at least 5 L per metre), to 100 mm below the top of the footing',
+        life: `5 years ${SOUTH}, 2 years north; 1 year for Mastotermes` },
+      { pest: TERMITES, method: 'Soil treatment', surface: 'Under the slab, drilled through the concrete',
+        rate: '250 mL per 100 L water (500 mL for Mastotermes)', volume: 'At least 5 L of mix per m², holes 150-300 mm apart (at least 10 L per m² along cracks, joints and walls)',
+        life: `5 years ${SOUTH}, 2 years north; 1 year for Mastotermes` },
+      { pest: TERMITES, method: 'Soil treatment', surface: 'Under paths beside the wall, drilled through the concrete',
+        rate: '250 mL per 100 L water (500 mL for Mastotermes)', volume: '100 L of mix per m³: 1.5 L per hole at 150 mm (heavy clay) up to 3 L at 300 mm (sand)',
+        life: `5 years ${SOUTH}, 2 years north; 1 year for Mastotermes` },
+      { pest: TERMITES, method: 'Soil treatment', surface: 'Subfloor, around piers and walls',
+        rate: '250 mL per 100 L water (500 mL for Mastotermes)', volume: '100 L of mix per m³ around each pier and wall; the whole subfloor where clearance is under 400 mm',
+        life: `5 years ${SOUTH}, 2 years north; 1 year for Mastotermes` },
+      { pest: TERMITES, method: 'Foam', surface: 'Into termite workings and wall cavities (dry foam)',
+        rate: '12.5 mL per 5 L water (0.05%), with a dry foaming agent', volume: 'Foam at 20:1 or drier into the workings; only alongside a soil treatment or baiting', life: '' },
+      { pest: TERMITES, method: 'Nest treatment', surface: 'Nests in trees, stumps, poles and wall cavities',
+        rate: '250 mL per 100 L water (500 mL for Mastotermes)', volume: 'At least 20 L of mix into the nest through drill holes', life: '' },
+    ],
+  },
+  'Altriset': {
+    maker: 'Syngenta', apvma: '64594', labelUrl: ELABEL(64594),
+    uses: [
+      { pest: TERMITES, method: 'Soil treatment', surface: 'Perimeter, beside the slab or footings (trench and rod)',
+        rate: '250 mL per 100 L water (250 mL per m³ of soil)', volume: '100 L of mix per m³ of soil (5.25 L per metre for a trench 150 x 350 mm)',
+        life: `Up to 8 years ${SOUTH}, up to 4 years north` },
+      { pest: TERMITES, method: 'Soil treatment', surface: 'Under the slab, drilled through the concrete',
+        rate: '250 mL per 100 L water (12.5 mL per m²)', volume: 'Up to 10 L of mix per m²: 225 mL per hole at 150 mm (heavy clay) up to 900 mL at 300 mm (sand)',
+        life: `Up to 8 years ${SOUTH}, up to 4 years north` },
+      { pest: TERMITES, method: 'Soil treatment', surface: 'Under paths beside the wall, rodded through the concrete',
+        rate: '250 mL per 100 L water', volume: '200 L of mix per m³: 1.5 L per hole at 150 mm (heavy clay) up to 3 L at 300 mm (sand), 300 mm deep',
+        life: `Up to 8 years ${SOUTH}, up to 4 years north` },
+      { pest: TERMITES, method: 'Soil treatment', surface: 'Subfloor, around piers and walls',
+        rate: '250 mL per 100 L water', volume: '100 L of mix per m³ around each pier and wall; 5 L per m² over the subfloor where clearance is under 400 mm',
+        life: `Up to 8 years ${SOUTH}, up to 4 years north` },
+      { pest: TERMITES, method: 'Foam', surface: 'Into termite workings and wall cavities',
+        rate: '250 mL per 100 L water, with a non-repellent foaming agent (15 mL per L for 20:1)', volume: 'Into the galleries or as foam into infested voids', life: '' },
+    ],
+  },
+  'Biflex Ultra': {
+    maker: 'Envu', apvma: '59269', labelUrl: ELABEL(59269), uses: bifenthrinUses(),
+    sdsUrl: ENVU_FILES + 'gss-web-downloads/biflex-ultra-lo-odour/biflex-ultra-sds-50001561_ext_sds_au_6n.ashx', sdsExpires: '2028-05-25',
+  },
+  'Maxxthor 100': {
+    maker: 'Ensystex', apvma: '60113', labelUrl: ELABEL(60113),
+    sdsUrl: ENSYSTEX_FILES + 'MAXXTHOR_100_Water-based_Termiticide_and_Insecticide_-_SDS_03-30.pdf?v=1743685506', sdsExpires: '2030-03-01',
+    uses: bifenthrinUses(),
+  },
+  'Exterra': { maker: 'Ensystex' },
+  'Exterra Focus': {
+    maker: 'Ensystex', labelUrl: ENSYSTEX_FILES + 'L-AU-ENU110106_4.01_01.24_Exterra_Focus_Termite_1.1_kg_23.5_x_10.5_cm_EAU-v8_pt.pdf?v=1769394951',
+    sdsUrl: ENSYSTEX_FILES + 'FOCUS_-_SDS_03-29.pdf?v=1710442941', sdsExpires: '2030-08-01',
+    uses: [{ pest: TERMITES, method: 'Termite attractant', surface: 'In the hole under each new Exterra station',
+      rate: '3/4 scoop (in-concrete or Ever-Ready EZ station), 1 1/2 scoops (Quarterra in-ground station)', volume: 'Once a year, onto moist soil', life: '' }],
+  },
+  'Requiem': {
+    maker: 'Ensystex', apvma: '56580', labelUrl: ELABEL(56580),
+    sdsUrl: ENSYSTEX_FILES + 'REQUIEM_Termite_Bait_-_SDS_03-29.pdf?v=1714677989', sdsExpires: '2029-03-01',
+    uses: [
+      { pest: TERMITES, method: 'Bait', surface: 'In-ground station',
+        rate: '100 g of bait matrix mixed with 300-400 mL clean water (up to 100 mL more if hot and dry)', volume: 'Up to 500 g of paste per Exterra station; check every 3-8 weeks and top up', life: '' },
+      { pest: TERMITES, method: 'Bait', surface: 'Above-ground station on active workings',
+        rate: '100 g of bait matrix mixed with 300-400 mL clean water', volume: 'Up to 500 g per station or bait bag; check every 3-6 weeks, top up or moisten', life: '' },
+    ],
+  },
+  'Sentricon': {
+    maker: 'Corteva', apvma: '80120', labelUrl: ELABEL(80120),
+    uses: [{ pest: TERMITES, method: 'Bait', surface: 'In-ground station',
+      rate: 'One Sentricon rod in every in-ground station (ready to use)', volume: 'Replace the rod when more than half is eaten', life: '' }],
+  },
+  'Sentricon AG': {
+    maker: 'Corteva', apvma: '57843', labelUrl: ELABEL(57843),
+    uses: [{ pest: TERMITES, method: 'Bait', surface: 'Above-ground station on active workings',
+      rate: 'One AG bait, wetted with 150-200 mL water or 10% sugar water', volume: 'Check every 2-6 weeks; replace when nearly all eaten', life: '' }],
+  },
+  'Trelona': {
+    maker: 'BASF', apvma: '86731', labelUrl: ELABEL(86731),
+    sdsUrl: BASF_FILES + '2024-11/Trelona%C2%AETermiteBait%20SDS.PDF', sdsExpires: '2028-09-08',
+    uses: [
+      { pest: TERMITES, method: 'Bait', surface: 'In-ground station',
+        rate: 'One cartridge per station to monitor, or two for active on application', volume: 'Stations about 3 m apart; replace a cartridge once more than half is eaten', life: '' },
+      { pest: TERMITES, method: 'Bait', surface: 'Above-ground station on active workings',
+        rate: 'Trelona in a compatible above-ground station', volume: 'Check every 3-6 weeks and replenish', life: '' },
+    ],
+  },
+  'Kordon': {
+    maker: 'Envu', apvma: '60759', labelUrl: ELABEL(60759),
+    sdsUrl: ENVU_FILES + 'product-sds-and-labels/kordon-termite-system-sds-ghs.ashx', sdsExpires: '2029-09-06',
+    uses: [
+      { pest: TERMITES, method: 'Physical barrier', surface: 'Full under-slab sheet (also the vapour barrier)',
+        rate: 'Sheet, no mixing (2 g deltamethrin per m²)', volume: 'Laid on the bedding sand, joins taped with overlaps of at least 200 mm', life: 'At least 20 years' },
+      { pest: TERMITES, method: 'Physical barrier', surface: 'Perimeter and service penetrations (collars)',
+        rate: 'Sheet or collar, no mixing', volume: 'Collar pushed down each pipe onto the sheet, two zip ties', life: 'At least 20 years' },
+    ],
+  },
 };
 
 const chemId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
+// Products the APVMA's register (PubCRIS) no longer lists as registered,
+// by APVMA product number, or by name where it never had one. They are not
+// offered, and a register or treatment record that still has one says so.
+const CHEMICAL_NOT_REGISTERED = {
+  apvma: { '60654': 'Termidor Dry (lapsed 30 June 2025)', '59345': 'Premise Foam (lapsed 30 June 2022)' },
+  name: { 'termidor dry': 'Termidor Dry (lapsed 30 June 2025)', 'premise foam': 'Premise Foam (lapsed 30 June 2022)', 'termidust': 'Termidust (no product by that name)' },
+};
+// "No longer registered with the APVMA", or '' for a product that is. The
+// APVMA's own list decides, as the weekly check last found it (below); a
+// number the phone hasn't checked yet, or a product with no number, goes
+// by the list above.
+function chemicalNotRegistered(p) {
+  if (!p) return '';
+  const live = apvmaListing(p);
+  const hit = live !== undefined ? live === null
+    : !!(CHEMICAL_NOT_REGISTERED.apvma[apvmaNo(p)] || CHEMICAL_NOT_REGISTERED.name[String(p.name || '').trim().toLowerCase()]);
+  return hit ? 'Not registered with the APVMA' : '';
+}
+
+// ── THE WEEKLY APVMA CHECK ──────────────────────────────────────────────────
+// Once a week the phone looks up every APVMA No. in the register on the
+// APVMA's own list of registered products. The APVMA publishes that list on
+// data.gov.au and reloads it every week (PubCRIS, product.csv). A number
+// that has dropped off it is a product whose registration was cancelled,
+// lapsed or wasn't renewed, and the register and the treatment record say
+// so. The list has no recalls: the APVMA posts those on its own website.
+// A product's number is checked as soon as it's typed, too.
+//
+// Kept on this phone under korva_apvma_check: { checkedAt (ms), total (rows
+// in the APVMA's list then), listId, numbers: { '54624': { name, holder,
+// expires (YYYY-MM-DD) }, '60654': null } }, null being a number not on the
+// list.
+const APVMA_API = 'https://data.gov.au/data/api/3/action/';
+const APVMA_DATASET = '0de37904-43e0-4814-b21b-5b64fafefe6f';
+const APVMA_PRODUCT_LIST = 'b4bb5394-b60b-4602-8bde-2e206ffc498f';
+const APVMA_CHECK_KEY = 'korva_apvma_check';
+const APVMA_CHECK_EVERY = 7 * 86400000;
+
+// The product number: the first part of "54624/138127", without leading zeros.
+const apvmaNo = p => { const m = String((p && p.apvma) || '').match(/\d{4,6}/); return m ? String(parseInt(m[0], 10)) : ''; };
+
+function apvmaCheck() {
+  try {
+    const c = JSON.parse(localStorage.getItem(APVMA_CHECK_KEY) || 'null');
+    return c && c.numbers ? c : null;
+  } catch (e) { return null; }
+}
+
+// What the last check found for a product's number: its listing, null when
+// it wasn't on the list, undefined when it hasn't been checked.
+function apvmaListing(p) {
+  const no = apvmaNo(p), c = apvmaCheck();
+  return no && c && Object.prototype.hasOwnProperty.call(c.numbers, no) ? c.numbers[no] : undefined;
+}
+
+// "30/06/2027 12:00:00 AM" → "2027-06-30"
+const apvmaIsoDate = s => {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(s || ''));
+  return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : '';
+};
+const apvmaDayText = ms => new Date(ms).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+
+async function apvmaGet(action, params) {
+  const r = await fetch(`${APVMA_API}${action}?${new URLSearchParams(params)}`);
+  const d = await r.json().catch(() => null);
+  if (!d || !d.success || !d.result) throw new Error(`APVMA list (${r.status})`);
+  return d.result;
+}
+
+// If the APVMA ever replaces the list's file on data.gov.au, the new one is
+// found by its name in the APVMA's dataset.
+async function apvmaFindList() {
+  const set = await apvmaGet('package_show', { id: APVMA_DATASET });
+  const file = (set.resources || []).find(r => r.name === 'product.csv' && r.datastore_active);
+  if (!file) throw new Error('APVMA list not found');
+  return file.id;
+}
+
+let apvmaChecking = null, apvmaTriedAt = 0, apvmaAgain = false;
+// Checks when a week has passed or a number is new, and quietly does
+// nothing offline or when the list can't be read (the last check stands).
+function checkApvmaList() {
+  // A number typed while a check is under way is looked up straight after.
+  if (apvmaChecking) { apvmaAgain = true; return apvmaChecking; }
+  const products = getChemicalRegister().products;
+  const numbers = [...new Set(products.map(apvmaNo).filter(Boolean))];
+  const last = apvmaCheck();
+  const fresh = numbers.filter(n => !last || !Object.prototype.hasOwnProperty.call(last.numbers, n));
+  const due = !last || Date.now() - last.checkedAt > APVMA_CHECK_EVERY || fresh.length > 0;
+  // A failed try waits a minute before the next.
+  if (!numbers.length || !due || navigator.onLine === false || Date.now() - apvmaTriedAt < 60000) return Promise.resolve(null);
+  apvmaTriedAt = Date.now();
+  const lookUp = listId => Promise.all([
+    apvmaGet('datastore_search', { resource_id: listId, limit: '0' }),
+    apvmaGet('datastore_search', { resource_id: listId, filters: JSON.stringify({ pcode: numbers }), fields: 'pcode,fpname,sname,expdate', limit: '1000' }),
+  ]).then(([all, found]) => ({ all, found, listId }));
+  const listId = (last && last.listId) || APVMA_PRODUCT_LIST;
+  apvmaChecking = lookUp(listId).catch(e => apvmaFindList().then(id => {
+    if (id === listId) throw e;
+    return lookUp(id);
+  })).then(({ all, found, listId }) => {
+    // The APVMA reloads the list every week. Caught half-loaded, it would
+    // make every product look cancelled, so a list much shorter than last
+    // time's (it holds about 19,000 products and actives) isn't used.
+    if (!(all.total >= Math.max(10000, ((last && last.total) || 0) * 0.8))) throw new Error('APVMA list part-loaded');
+    const listed = {};
+    numbers.forEach(n => { listed[n] = null; });
+    (found.records || []).forEach(r => {
+      const n = String(parseInt(r.pcode, 10));
+      if (n in listed) listed[n] = { name: r.fpname || '', holder: r.sname || '', expires: apvmaIsoDate(r.expdate) };
+    });
+    const check = { checkedAt: Date.now(), total: all.total, listId, numbers: listed };
+    try { localStorage.setItem(APVMA_CHECK_KEY, JSON.stringify(check)); } catch (e) { return null; }
+    apvmaTriedAt = 0;
+    // A product that has just dropped off the list (or was off it when
+    // first checked) gets a heads-up, once.
+    const gone = products.filter(p => listed[apvmaNo(p)] === null && !(last && last.numbers[apvmaNo(p)] === null));
+    if (gone.length && typeof showToast === 'function') {
+      const names = [...new Set(gone.map(p => p.name || `APVMA No. ${apvmaNo(p)}`))];
+      showToast(`${names.join(', ')} ${names.length === 1 ? "isn't" : "aren't"} registered with the APVMA any more`, 'info',
+        { label: 'See', run: () => openMenuPage('chemicalsPanel') });
+    }
+    refreshChemicalCards();
+    return check;
+  }).catch(() => null).finally(() => {
+    apvmaChecking = null;
+    if (apvmaAgain) { apvmaAgain = false; checkApvmaList(); }
+  });
+  return apvmaChecking;
+}
+
+// The phone stays open for days, so the check also runs on coming back to it.
+window.addEventListener('load', () => setTimeout(checkApvmaList, 15000));
+window.addEventListener('online', () => checkApvmaList());
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkApvmaList(); });
+
+// What the APVMA's list says about the product, on its card.
+function chemicalApvmaHtml(p) {
+  const esc = escapeHtml;
+  const no = apvmaNo(p), live = apvmaListing(p), c = apvmaCheck();
+  if (!no || live === undefined) return '';
+  const when = `checked ${apvmaDayText(c.checkedAt)}`;
+  if (live === null) {
+    return `<div class="chem-apvma gone">APVMA No. ${esc(no)} is not on the APVMA's list of registered products (${when}). Check the number on the label. If it's right, the product's registration has been cancelled or has lapsed: check with the maker or the APVMA before using it.</div>`;
+  }
+  // The list has most names in capitals: "TERMIDOR RESIDUAL TERMITICIDE".
+  const name = live.name === live.name.toUpperCase() ? live.name.toLowerCase().replace(/\b[a-z]/g, ch => ch.toUpperCase()) : live.name;
+  return `<div class="chem-apvma">Registered with the APVMA as ${esc(name)} (No. ${esc(no)}), ${esc(when)}.</div>`;
+}
+
+// A starting product's id comes from its name, so taking one off the list
+// never changes another's (treatment records keep the use they picked).
+const chemStarterId = name => 'start-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
 function chemicalStarterProducts() {
-  return Object.entries(CHEMICAL_STARTER_FORMS).map(([name, form], i) => ({
-    id: 'start' + i,
-    name, maker: '', active: TREATMENT_PRODUCTS[name] || '', apvma: '', form,
-    labelUrl: '', sdsUrl: '',
-    uses: CHEMICAL_STARTER_USES[form].map((u, j) => ({ id: `start${i}u${j}`, ...u, rate: '', volume: '', life: '' })),
-  }));
+  return Object.entries(CHEMICAL_STARTER_FORMS).map(([name, form]) => {
+    const { uses, ...known } = CHEMICAL_STARTER_DETAILS[name] || {};
+    const id = chemStarterId(name);
+    return {
+      id,
+      name, maker: '', active: TREATMENT_PRODUCTS[name] || '', apvma: '', form,
+      labelUrl: '', sdsUrl: '', sdsExpires: '', declUrl: '', ...known,
+      uses: (uses || CHEMICAL_STARTER_USES[form].map(u => ({ ...u, rate: '', volume: '', life: '' })))
+        .map((u, j) => ({ id: `${id}-u${j}`, ...u })),
+    };
+  });
 }
 
 function chemicalsStorageKey() {
@@ -91,7 +425,28 @@ function storedChemicalRegister() {
 }
 
 function getChemicalRegister() {
-  return storedChemicalRegister() || { products: chemicalStarterProducts() };
+  const reg = storedChemicalRegister();
+  return reg ? withStarterDetails(reg) : { products: chemicalStarterProducts() };
+}
+
+// A register saved before SAYON knew a starting product's links and label
+// rates gets them where it has nothing of its own: a blank field, or uses
+// that are still the starting ones with no rate typed. Nothing typed is
+// ever replaced.
+const STARTER_ACTIVE_FIXED = { 'Sentricon': 'noviflumuron', 'Exterra Focus': 'chlorfluazuron' };
+function withStarterDetails(reg) {
+  const starters = new Map(chemicalStarterProducts().map(p => [p.name.toLowerCase(), p]));
+  reg.products.forEach(p => {
+    const s = starters.get(String(p.name || '').trim().toLowerCase());
+    if (!s) return;
+    // The first starting list had two actives wrong: Sentricon in Australia
+    // is hexaflumuron, and Exterra Focus is an attractant with none.
+    if (STARTER_ACTIVE_FIXED[p.name.trim()] === p.active) p.active = s.active;
+    ['maker', 'active', 'apvma', 'labelUrl', 'sdsUrl', 'sdsExpires'].forEach(f => { if (!p[f] && s[f]) p[f] = s[f]; });
+    const untouched = (p.uses || []).every(u => /^start/.test(u.id || '') && !u.rate && !u.volume && !u.life);
+    if (untouched && s.uses.some(u => u.rate)) p.uses = s.uses.map(u => ({ ...u }));
+  });
+  return reg;
 }
 
 function storeChemicalRegister(reg, { sync = true } = {}) {
@@ -121,8 +476,9 @@ const safeUrl = u => /^https:\/\//i.test(String(u || '').trim()) ? String(u).tri
 function chemicalLinksHtml(p) {
   const esc = escapeHtml;
   const label = safeUrl(p.labelUrl), sds = safeUrl(p.sdsUrl);
-  if (!label && !sds) return '<span class="chem-links"><span class="chem-nolink">No label or SDS link yet</span></span>';
-  return `<span class="chem-links">
+  const unreg = chemicalNotRegistered(p) ? `<span class="chem-unreg">${esc(chemicalNotRegistered(p))}</span>` : '';
+  if (!label && !sds) return `<span class="chem-links">${unreg}<span class="chem-nolink">No label or SDS link yet</span></span>`;
+  return `<span class="chem-links">${unreg}
       ${label ? `<a href="${esc(label)}" target="_blank" rel="noopener">Label</a>` : '<span class="chem-nolink">No label link yet</span>'}
       ${sds ? `<a href="${esc(sds)}" target="_blank" rel="noopener">SDS</a>` : '<span class="chem-nolink">No SDS link yet</span>'}
     </span>`;
@@ -173,7 +529,7 @@ function chemicalDocRow(p, kind) {
 }
 
 function chemicalDocsHtml(p) {
-  return `<div class="chem-docs">${chemicalDocRow(p, 'sds')}${chemicalDocRow(p, 'label')}${safeUrl(p.declUrl) ? chemicalDocRow(p, 'decl') : ''}</div>`;
+  return `<div class="chem-docs">${chemicalApvmaHtml(p)}${chemicalDocRow(p, 'sds')}${chemicalDocRow(p, 'label')}${safeUrl(p.declUrl) ? chemicalDocRow(p, 'decl') : ''}</div>`;
 }
 
 // The label's rates, to read: the edit form holds the same in boxes.
@@ -231,6 +587,28 @@ function renderChemicalRegister() {
   const search = document.getElementById('chemSearch');
   if (search) onChemicalSearch(search);
   renderChemicalSummary();
+  checkApvmaList();
+}
+
+// After a check: each card's heading and documents follow it, and an open
+// card or edit form stays as it is.
+function refreshChemicalCards() {
+  const list = document.getElementById('chemList');
+  if (!list || !list.children.length) return;
+  const reg = getChemicalRegister();
+  list.querySelectorAll('.chem-card').forEach(card => {
+    const p = reg.products.find(x => x.id === card.dataset.id);
+    if (p) refreshChemicalCard(card, p);
+  });
+  renderChemicalSummary();
+}
+
+function refreshChemicalCard(card, p) {
+  const fresh = document.createElement('div');
+  fresh.innerHTML = chemicalCardHtml(p, canEditBusiness());
+  const next = fresh.firstElementChild;
+  card.dataset.find = next.dataset.find;
+  ['summary', '.chem-docs', '.chem-rates'].forEach(sel => card.querySelector(sel).replaceWith(next.querySelector(sel)));
 }
 
 function renderChemicalSummary() {
@@ -239,14 +617,24 @@ function renderChemicalSummary() {
   const noRate = uses.filter(u => !u.rate).length;
   const sum = document.querySelector('#chemicalsPanel .job-panel-summary');
   if (sum) sum.textContent = reg.products.length ? `${reg.products.length} products` : '';
+  const gone = [...new Set(reg.products.filter(chemicalNotRegistered).map(p => p.name || 'A product'))];
   const status = document.getElementById('chemStatus');
   if (status) {
-    status.textContent = !uses.length ? ''
-      : noRate
-        ? `${noRate} of ${uses.length} uses have no rate yet. Type each one from the label once, and treatment records fill it from then on.`
-        : 'Every use has its label rate.';
-    status.classList.toggle('warn', noRate > 0);
-    status.hidden = !uses.length;
+    status.textContent = [
+      gone.length ? `${gone.join(', ')} ${gone.length === 1 ? "isn't" : "aren't"} registered with the APVMA any more.` : '',
+      !uses.length ? ''
+        : noRate
+          ? `${noRate} of ${uses.length} uses have no rate yet. Type each one from the label once, and treatment records fill it from then on.`
+          : 'Every use has its label rate.',
+    ].filter(Boolean).join(' ');
+    status.classList.toggle('warn', noRate > 0 || gone.length > 0);
+    status.hidden = !status.textContent;
+  }
+  const note = document.getElementById('chemApvmaNote');
+  const c = apvmaCheck();
+  if (note) {
+    note.textContent = c ? `SAYON checks each APVMA No. against the APVMA's list of registered products once a week. Last checked ${apvmaDayText(c.checkedAt)}.` : '';
+    note.hidden = !c;
   }
 }
 
@@ -283,7 +671,7 @@ function chemicalCardHtml(p, canEdit) {
       <summary>
         <span class="chem-card-text">
           <span class="chem-card-name">${esc(p.name || 'New product')}</span>
-          <span class="chem-card-sub">${esc([p.active, CHEMICAL_FORMS[p.form] || ''].filter(Boolean).join(' · '))}${missing ? ` · <span class="pb-start">${missing === 1 ? '1 rate' : missing + ' rates'} to add</span>` : ''}</span>
+          <span class="chem-card-sub">${chemicalNotRegistered(p) ? `<span class="chem-unreg">${esc(chemicalNotRegistered(p))}</span> · ` : ''}${esc([p.active, CHEMICAL_FORMS[p.form] || ''].filter(Boolean).join(' · '))}${missing ? ` · <span class="pb-start">${missing === 1 ? '1 rate' : missing + ' rates'} to add</span>` : ''}</span>
         </span>
         <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
       </summary>
@@ -343,12 +731,10 @@ function onChemicalEdit(el) {
   }
   storeChemicalRegister(reg);
   // The heading, documents and rates follow the edit; the form stays put.
-  const fresh = document.createElement('div');
-  fresh.innerHTML = chemicalCardHtml(p, true);
-  const next = fresh.firstElementChild;
-  card.dataset.find = next.dataset.find;
-  ['summary', '.chem-docs', '.chem-rates'].forEach(sel => card.querySelector(sel).replaceWith(next.querySelector(sel)));
+  refreshChemicalCard(card, p);
   renderChemicalSummary();
+  // A new APVMA No. is looked up on the APVMA's list straight away.
+  if (el.dataset.f === 'apvma') checkApvmaList();
   const reset = document.getElementById('chemReset');
   if (reset) reset.hidden = false;
 }

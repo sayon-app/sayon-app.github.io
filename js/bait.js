@@ -217,40 +217,29 @@ function openBaitVisit(id) {
   }
 }
 
-// ── THE FOLDS ── As on the treatment record: each part folds to a line of
-// what it holds, amber when something's missing, and opening the sheet (or
-// a voice fill) opens only the parts with a gap.
+// ── THE FOLDS ── As on the treatment record: each part folds to its title,
+// with a green tick once it's done or a short amber note saying what's
+// still needed, and opening the sheet (or a voice fill) opens only the
+// parts with a gap.
 function baitFoldLines() {
   const v = id => document.getElementById(id).value.trim();
-  const tech = v('bvTech'), lic = v('bvLicence');
-  const when = v('bvDate') ? formatAnswerDate(v('bvDate')) : '';
   const s = baitDraft ? baitDraft.stations : [];
   const left = s.filter(x => !x.status).length;
-  const summary = (document.getElementById('bvSummary').textContent || '').trim();
   const finished = document.getElementById('bvFinished').checked;
-  const product = [v('bvProduct'), v('bvBatch') ? 'batch ' + v('bvBatch') : ''].filter(Boolean).join(', ');
   const baitAdded = s.some(x => (x.bait || '').trim());
-  const next = finished ? 'Baiting finished' : v('bvNext') ? 'Next visit ' + formatAnswerDate(v('bvNext')) : '';
   return [
-    !tech ? { warn: true, text: `${when ? when + '. ' : ''}Technician not filled in` }
-      : !lic ? { warn: true, text: `${when ? when + ' · ' : ''}${tech}, licence no. missing` }
-      : { text: [when, `${tech}, ${lic}`].filter(Boolean).join(' · ') },
-    !s.length ? { warn: true, text: 'No stations listed yet' }
-      : left ? { warn: true, text: summary || `${left} still to mark` }
-      : { text: summary },
-    !next ? { warn: true, text: [product, 'next visit not set'].filter(Boolean).join(' · ') }
-      : baitAdded && !v('bvProduct') ? { warn: true, text: `Say which bait was added · ${next}` }
-      : { text: [product, next].filter(Boolean).join(' · ') },
+    !v('bvTech') ? 'Add the technician' : !v('bvLicence') ? 'Add the licence no.' : '',
+    !s.length ? 'Add the stations' : left ? `Mark ${left === 1 ? 'one station' : left + ' stations'}` : '',
+    baitAdded && !v('bvProduct') ? 'Name the bait added' : !finished && !v('bvNext') ? 'Set the next visit' : '',
   ];
 }
 
 function renderBaitFolds(reset) {
   if (!document.getElementById('bvFold1') || !baitDraft) return;
-  baitFoldLines().forEach((line, i) => {
-    const sub = document.getElementById('bvSub' + (i + 1));
-    sub.textContent = line.text;
-    sub.classList.toggle('warn', !!line.warn);
-    if (reset) document.getElementById('bvFold' + (i + 1)).open = !!line.warn;
+  baitFoldLines().forEach((note, i) => {
+    const fold = document.getElementById('bvFold' + (i + 1));
+    setFoldNote(fold, document.getElementById('bvSub' + (i + 1)), note);
+    if (reset) fold.open = !!note;
   });
 }
 

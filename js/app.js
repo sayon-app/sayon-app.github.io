@@ -11520,7 +11520,7 @@ async function migrateLocalReportsToCloud() {
   if (localStorage.getItem(MIGRATION_KEY)) return;
 
   try {
-    const local = getSavedReports();
+    const local = getSavedReports().filter(r => !isSampleJob(r));
     if (local.length > 0) {
       for (const entry of local) {
         await supabaseSave(entry);
@@ -11751,6 +11751,12 @@ function updateSyncStatus(state) {
   if (!el || !textEl) return;
   el.classList.remove('saved', 'offline', 'error');
 
+  // The sample never goes to the account, so it never says it's syncing.
+  if (isSampleJob(currentReportId) && state !== 'error') {
+    el.classList.add('saved');
+    textEl.textContent = 'Sample job: kept on this phone only';
+    return;
+  }
   if (!navigator.onLine) {
     el.classList.add('offline');
     textEl.textContent = lastLocalSaveAt
@@ -12793,7 +12799,8 @@ function renderDashboard() {
   dashboardJobs = getSavedReports().map(r => dashboardJob(r, quotes)).sort((a, b) => b.time - a.time);
   const need = dashboardJobs.filter(j => j.group === 'todo').length;
   const today = new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
-  const lead = !dashboardJobs.length ? 'Your jobs will show up here once you save a report.'
+  // The sample alone isn't work done: a new business still has no jobs.
+  const lead = !dashboardJobs.some(j => !isSampleJob(j.r)) ? 'Your jobs will show up here once you save a report.'
     : need ? `<b>${need} job${need === 1 ? '' : 's'}</b> need${need === 1 ? 's' : ''} you today.`
     : 'You\'re all caught up.';
 

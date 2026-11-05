@@ -169,6 +169,8 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   await tap(p.locator('#bvSaveBtn'), 'Save with nothing changed'); await p.waitForTimeout(500);
   check(await p.evaluate(() => !!quoteState.baitVisits.find(v => v.stations[5].status === 'active' && v.notes).sentAt), 'saving it unchanged keeps it marked as sent');
   await tap(p.locator('#qpBait .bait-visit-row').first().locator('button', { hasText: 'Edit' }), 'Edit again'); await p.waitForTimeout(500);
+  // A finished visit opens with every part folded: open The stations first.
+  await p.locator('#bvFold2 > summary').click(); await p.waitForTimeout(200);
   await tap(p.locator('#bvStations .bait-station[data-i="2"] .bait-chip.eaten'), 'station 3 bait eaten'); await p.waitForTimeout(200);
   await tap(p.locator('#bvSaveBtn'), 'Save the change'); await p.waitForTimeout(500);
   check(await p.evaluate(() => !quoteState.baitVisits.find(v => v.stations[2].status === 'eaten').sentAt), 'a change the client would see clears the sent mark');

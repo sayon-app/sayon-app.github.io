@@ -54,10 +54,10 @@ As of 2026-10-05, about 10:50 UTC, with the job-chain table and the Supabase row
 - Live mode is parked until the app passes real jobs. Don't create live-mode products, prices, webhooks or keys, or switch anything to live, without baz's ok on the exact change. Never write Stripe ids or keys into the repo; the Worker reads them from secrets.
 
 **On main but not live, and why**
-- **Terms and Privacy rewrite** (`8b4a13b`, PR #32), plus an e-sign consent sentence in the default agreement wording and a voice-privacy hint under the transcript box. It has placeholders for the business's legal details (search `terms.html` and `privacy.html` for `[`). It stays off live until baz fills them, which is parked with the rest of the business admin. Fill them only with what baz types for that purpose; never take them from transcripts, memory or other files, and never put his details in this doc, commits or PR text. Live terms and privacy are the old drafts with only the name changed.
+- (Resolved, checked 5 Nov 2026.) The Terms and Privacy rewrite (PR #32), its e-sign consent sentence and the voice-privacy hint are live: `terms.html` and `privacy.html` are the same on `live` and `main` (since `abecd2b`, 1 Nov) and have no `[` placeholders. Never put baz's or the business's details in this doc, commits or PR text.
 - `supabase/delete-account.sql` (delete the user's reports first): the file only; the function in Supabase already has the fix.
 - Docs and tooling: `CLAUDE.md`, `docs/`, `tests/`. They never go live (see README section 3).
-- Because main carries the placeholder Terms, build every go-live from `origin/live` plus cherry-picks (section 6). Never open a plain main→live PR.
+- Because main carries docs, tests and work not yet approved, build every go-live from `origin/live` plus cherry-picks (section 6). Never open a plain main→live PR.
 
 ## 2. Decision log
 

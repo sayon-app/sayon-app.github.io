@@ -96,14 +96,9 @@ function installedSystemAreas(t, rd) {
     const words = part.toLowerCase().split(/[^a-z0-9]+/).filter(w => w && !SMALL.test(w));
     return words.length && spots.some(s => words.every(w => s.includes(' ' + w + ' ')));
   };
-  return String(t.areas || '').split(';').map(seg => seg.split(',').map(x => x.trim()).filter(x => x && !isSpot(x)).join(', '))
+  const left = String(t.areas || '').split(';').map(seg => seg.split(',').map(x => x.trim()).filter(x => x && !isSpot(x)).join(', '))
     .filter(Boolean).join('; ');
-}
-
-function formatClockTime(t) {
-  const [h, m] = String(t).split(':').map(Number);
-  if (!isFinite(h)) return t;
-  return `${h % 12 === 0 ? 12 : h % 12}:${String(m || 0).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+  return left.charAt(0).toUpperCase() + left.slice(1);
 }
 
 function formatLongDate(iso) {
@@ -199,7 +194,7 @@ function draftTreatment(q) {
     equipment: '',
     methods,
     products: [{ name: name || '', active: name ? TREATMENT_PRODUCTS[name] : '', batch: '', rate: '', amount: '', life: '', where: '' }],
-    areas: places.join('; '),
+    areas: joinPlaces(places),
     notTreated: '',
     site: treatmentSiteFromReport(rd),
     plan: null,
@@ -289,7 +284,12 @@ let treatmentSketch = null;
 function openTreatmentRecord() {
   const q = quoteState;
   if (!q) return;
-  const t = q.treatment || draftTreatment(q);
+  // What was on the record when the app closed comes back, unless the
+  // record has been saved since (UNSAVED SHEETS in js/quote.js).
+  const sheetKey = 'treatment|' + q.reportKey;
+  const copy = unsavedSheetCopy(sheetKey);
+  const restored = !!copy && copy.at > ((q.treatment && q.treatment.at) || 0);
+  const t = restored ? copy.data : q.treatment || draftTreatment(q);
   track('screen_viewed', { screen: 'treatment_record' });
   document.getElementById('trDate').value = t.date || todayIsoDate();
   document.getElementById('trTech').value = t.technician || '';
@@ -338,11 +338,11 @@ function openTreatmentRecord() {
   cancelSheetVoice('treatment');
   document.getElementById('treatmentOverlay').classList.add('open');
   if (!treatmentPad) {
-    treatmentPad = createSignaturePad(document.getElementById('trSigCanvas'), document.getElementById('trSigPlaceholder'), updateTreatmentSaveBtn);
+    treatmentPad = createSignaturePad(document.getElementById('trSigCanvas'), document.getElementById('trSigPlaceholder'), () => { updateTreatmentSaveBtn(); unsavedSheetChanged(); });
   }
   treatmentPad.show(t.signature || '');
   if (!treatmentSketch) {
-    treatmentSketch = createSignaturePad(document.getElementById('trSketchCanvas'), document.getElementById('trSketchPlaceholder'));
+    treatmentSketch = createSignaturePad(document.getElementById('trSketchCanvas'), document.getElementById('trSketchPlaceholder'), unsavedSheetChanged);
   }
   treatmentSketch.ctx.strokeStyle = SIGNATURE_INK;
   treatmentSketch.show(t.sketch || '');
@@ -352,9 +352,11 @@ function openTreatmentRecord() {
   const sheet = document.getElementById('treatmentOverlay');
   if (!sheet.dataset.folds) {
     sheet.dataset.folds = '1';
-    ['input', 'change'].forEach(ev => sheet.addEventListener(ev, () => renderTreatmentFolds()));
+    ['input', 'change'].forEach(ev => sheet.addEventListener(ev, () => { renderTreatmentFolds(); unsavedSheetChanged(); }));
   }
   document.querySelector('#treatmentOverlay .page-sheet-body').scrollTop = 0;
+  watchUnsavedSheet(sheetKey, readTreatmentForm);
+  if (restored) showToast('Picked up where you left off. Save the record when you\'re done', 'info');
 }
 
 // ── THE FOLDS ── Each part of the record folds to its title, with a tick
@@ -434,6 +436,7 @@ function openTreatmentSitePlan(layer) {
   openSitePlan(treatmentPlanDraft, plan => {
     treatmentPlanDraft = sitePlanHasContent(plan) ? plan : null;
     renderTreatmentPlan();
+    unsavedSheetChanged();
     // The stations drawn fill an empty station count, and tick baiting.
     const n = sitePlanStations(plan).filter(s => s.k !== 'monitor').length;
     const box = document.querySelector('#trMethods input[data-key="bait"]');
@@ -490,6 +493,7 @@ function treatmentSketchImage() {
 }
 
 function closeTreatmentRecord() {
+  dropUnsavedSheet();
   cancelSheetVoice('treatment');
   document.getElementById('treatmentOverlay').classList.remove('open');
 }
@@ -557,6 +561,7 @@ function applyTreatmentVoice(f) {
   }
   updateTreatmentSaveBtn();
   renderTreatmentFolds(true);
+  if (n) unsavedSheetChanged();
   return n;
 }
 
@@ -653,6 +658,7 @@ async function loadTreatmentLabelPhoto(input, i) {
     if (!products[i]) return;
     products[i].labelPhoto = url;
     renderTreatmentProducts(products);
+    unsavedSheetChanged();
     const batch = document.querySelector(`#trProducts .treat-product[data-i="${i}"] [data-f="batch"]`);
     if (batch && !batch.value) { batch.placeholder = 'Type the batch number from the photo'; batch.focus(); }
   } catch (e) {
@@ -772,18 +778,16 @@ function updateTreatmentSaveBtn() {
   if (by) by.textContent = document.getElementById('trTech').value.trim() || 'the technician';
 }
 
-function saveTreatmentRecord() {
-  const q = quoteState;
-  if (!q) return;
+// The record as the sheet has it now: what Save keeps, and the copy kept
+// while it's being filled in.
+function readTreatmentForm() {
   const methods = {};
   document.querySelectorAll('#trMethods input[type=checkbox]:checked').forEach(box => {
     const qty = document.querySelector(`#trMethods [data-qty="${box.dataset.key}"]`);
     methods[box.dataset.key] = qty ? qty.value.trim() : '';
   });
-  if (!Object.keys(methods).length) { showToast('Tick what was done', 'error'); return; }
-  if (!treatmentPad || treatmentPad.empty) { showToast('Sign the record first', 'error'); return; }
   const v = id => document.getElementById(id).value.trim();
-  q.treatment = {
+  return {
     date: v('trDate') || todayIsoDate(),
     technician: v('trTech'),
     licence: v('trLicence'),
@@ -808,9 +812,18 @@ function saveTreatmentRecord() {
     nextInspection: v('trNext'),
     warranty: v('trWarranty'),
     notes: v('trNotes'),
-    signature: treatmentPad.canvas.toDataURL('image/png'),
+    signature: treatmentPad && !treatmentPad.empty ? treatmentPad.canvas.toDataURL('image/png') : '',
     at: Date.now(),
   };
+}
+
+function saveTreatmentRecord() {
+  const q = quoteState;
+  if (!q) return;
+  const t = readTreatmentForm();
+  if (!Object.keys(t.methods).length) { showToast('Tick what was done', 'error'); return; }
+  if (!treatmentPad || treatmentPad.empty) { showToast('Sign the record first', 'error'); return; }
+  q.treatment = t;
   clearTimeout(quoteSaveTimer);
   persistQuote();
   storeQuoteOnReport(q, true);
@@ -821,7 +834,7 @@ function saveTreatmentRecord() {
   // On to the certificate, with the bait station visits under it.
   setTimeout(() => { const st = document.getElementById('qgStep4'); if (st) st.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 60);
   showToast(typeof baitInstalled === 'function' && baitInstalled(q) ? 'Treatment recorded. Send the certificate, and record bait visits just under it' : 'Treatment recorded. The certificate is ready to send', 'success');
-  track('treatment_recorded', { methods: Object.keys(methods).length });
+  track('treatment_recorded', { methods: Object.keys(t.methods).length });
 }
 
 // ── CERTIFICATE PDF ──
@@ -834,12 +847,12 @@ function downloadTreatmentCertificate(install = false) {
     .then(({ blob, fname }) => { track('certificate_pdf_made', { install }); return deliverPdfBlob(blob, fname, {
       title: name,
       text: `${name} — ${q.address || 'Property'}`,
-      readyToast: 'Certificate ready — choose where to save or send it',
+      readyToast: 'Certificate ready. Choose where to save or send it',
     }); })
     .catch(e => {
       console.error('Certificate PDF failed:', e);
       reportError(e, 'certificate_pdf');
-      showToast((e && e.message) || 'Could not make the certificate. Check your connection and try again', 'error');
+      showToast((e && e.message) || 'Could not make the certificate. Check your signal and try again', 'error');
     });
 }
 
@@ -948,7 +961,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     const m = TREATMENT_METHODS[key];
     if (!m || (install && !systems.includes(key))) return;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-    const text = m.label + (m.qty && qty ? ` (${qty} ${m.qty})` : '');
+    const text = m.label + (m.qty && qty ? `, ${qty} ${m.qty}` : '');
     const lines = doc.splitTextToSize(text, CW - 6);
     ensure(lines.length * 4.4 + 2);
     doc.setFillColor(...C.accent); doc.circle(M + 1.6, y - 1.1, 0.8, 'F');
@@ -1001,8 +1014,10 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     };
     ensure(20); y -= 2.5; head();
     products.forEach((p, i) => {
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-      const cells = cols.map(c => doc.splitTextToSize(c.f(p) || '', c.w - 3));
+      // Each cell is measured in the font it's drawn in: the product name is
+      // bold, and a long one measured in normal ran into the next column.
+      doc.setFontSize(8.5);
+      const cells = cols.map((c, ci) => { doc.setFont('helvetica', ci === 0 ? 'bold' : 'normal'); return doc.splitTextToSize(c.f(p) || '', c.w - 3); });
       doc.setFontSize(7.5);
       const active = p.name && p.active ? doc.splitTextToSize(p.active, cols[0].w - 3) : [];
       const rowH = Math.max(cells[0].length * 4 + active.length * 3.4, ...cells.slice(1).map(l => l.length * 4)) + 4;
@@ -1048,14 +1063,14 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   const everyText = `at least every ${every} month${every === 1 ? '' : 's'}`;
   // A trainee's work carries the licensed supervisor's name on the notice too.
   const installer = [company.name, [t.technician, t.licence ? `licence ${t.licence}` : ''].filter(Boolean).join(', '),
-    t.supervisor ? `Supervised by ${t.supervisor}${t.supervisorLicence ? `, licence ${t.supervisorLicence}` : ''}` : ''].filter(Boolean).join('. ');
+    t.supervisor ? `Supervised by ${t.supervisor}${t.supervisorLicence ? `, licence ${t.supervisorLicence}` : ''}` : ''].filter(Boolean).join('\n');
   const noticeCells = t.notice === 'none' ? [['Notice', 'No durable notice was placed at this treatment.']] : [
     ['System', methodNames.join('; ')],
     ['Date installed', formatLongDate(t.date)],
     ['Life expectancy', productLife.join('; ')],
     ['Future inspections', t.nextInspection ? `First by ${formatLongDate(t.nextInspection)}, then ${everyText}` : everyText.charAt(0).toUpperCase() + everyText.slice(1)],
     ['Installed by', installer],
-    ['Notice', `${TREATMENT_NOTICE[t.notice]}${t.noticeWhere ? `: ${t.noticeWhere}` : ''}`],
+    ['Notice', TREATMENT_NOTICE[t.notice] ? `${TREATMENT_NOTICE[t.notice]}${t.noticeWhere ? `: ${lowerFirst(t.noticeWhere)}` : ''}` : t.noticeWhere],
   ].filter(([, v]) => v);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
   const noticeLines = noticeCells.map(([, v]) => doc.splitTextToSize(v, cellW));
@@ -1092,7 +1107,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     if (systems.includes('bait')) steps.push('The bait stations need checking as often as the manufacturer directs. Do not move, cover or remove them.');
     if (systems.includes('retic')) steps.push('The reticulation system needs recharging when the label\'s life runs out. Keep its filling points clear and don\'t cut or dig through the pipes.');
     if (systems.includes('physical')) steps.push('The physical barrier only works while it stays whole and visible. Do not cover, cut or build over it.');
-  } else if (t.cautions) steps.push(`Safety and re-entry: ${t.cautions}`);
+  } else if (t.cautions) steps.push(`Safety and re-entry: ${String(t.cautions).trim().replace(/[.;,\s]*$/, '.')}`);
   if (t.nextInspection) steps.push(`Book your next timber pest inspection by ${formatLongDate(t.nextInspection)}. AS 3660.2 recommends one at least every 12 months.`);
   // Three short points, so the signature stays on page 1.
   steps.push((!install && ['barrier', 'retic'].some(k => (t.methods || {})[k] !== undefined) ? 'Do not dig or build against the treated soil without asking us. ' : '') +

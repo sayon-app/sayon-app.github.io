@@ -185,13 +185,71 @@ function persistQuote() {
     renderQuoteAnswer();
   } catch (e) {
     setQuoteSaveState('Not saved');
-    showToast('Could not save the quote — device storage may be full', 'error');
+    showToast('Could not save the quote. The phone\'s storage may be full', 'error');
   }
 }
 function scheduleQuoteSave() {
   setQuoteSaveState('Saving…');
   clearTimeout(quoteSaveTimer);
   quoteSaveTimer = setTimeout(persistQuote, 400);
+}
+// The app is being put away or closed: a change still waiting on the timer
+// is saved now (saveBeforeLeaving in js/app.js).
+function flushQuoteSave() {
+  if (!quoteSaveTimer) return;
+  clearTimeout(quoteSaveTimer);
+  quoteSaveTimer = null;
+  persistQuote();
+}
+
+// ── UNSAVED SHEETS ──
+// The treatment record and a bait station visit are filled in on a sheet
+// and join the quote only when saved. While one is open, a copy of what's
+// on it is kept on the phone as it changes, so if the phone closes the app
+// or an update reloads it, opening the same sheet for the same job brings
+// it all back. Saving or closing the sheet drops the copy.
+const UNSAVED_SHEETS_KEY = 'korva_unsaved_sheets';
+let unsavedSheet = null; // the open sheet: { key, read, changed }
+let unsavedSheetTimer = null;
+
+// The copy kept for a sheet ('treatment|<job>'), or null.
+function unsavedSheetCopy(key) {
+  return readJSON(UNSAVED_SHEETS_KEY, {})[key] || null;
+}
+// Called once the sheet is filled in: read() gives what's on it now.
+function watchUnsavedSheet(key, read) {
+  clearTimeout(unsavedSheetTimer);
+  unsavedSheet = { key, read, changed: false };
+}
+function unsavedSheetChanged() {
+  if (!unsavedSheet) return;
+  unsavedSheet.changed = true;
+  clearTimeout(unsavedSheetTimer);
+  unsavedSheetTimer = setTimeout(keepUnsavedSheet, 600);
+}
+function keepUnsavedSheet() {
+  clearTimeout(unsavedSheetTimer);
+  unsavedSheetTimer = null;
+  if (!unsavedSheet || !unsavedSheet.changed) return;
+  const all = readJSON(UNSAVED_SHEETS_KEY, {});
+  // A copy nobody came back for goes after two weeks.
+  Object.keys(all).forEach(k => { if (Date.now() - (all[k].at || 0) > 14 * 864e5) delete all[k]; });
+  try {
+    all[unsavedSheet.key] = { at: Date.now(), data: unsavedSheet.read() };
+    localStorage.setItem(UNSAVED_SHEETS_KEY, JSON.stringify(all));
+  } catch (e) { /* storage full: the sheet still saves as usual */ }
+}
+// Saved or closed: the copy goes.
+function dropUnsavedSheet() {
+  clearTimeout(unsavedSheetTimer);
+  unsavedSheetTimer = null;
+  if (!unsavedSheet) return;
+  const key = unsavedSheet.key;
+  unsavedSheet = null;
+  const all = readJSON(UNSAVED_SHEETS_KEY, {});
+  if (!(key in all)) return;
+  delete all[key];
+  try { localStorage.setItem(UNSAVED_SHEETS_KEY, JSON.stringify(all)); } catch (e) {}
 }
 function setQuoteSaveState(text) {
   const el = document.getElementById('quoteSaveState');
@@ -350,7 +408,7 @@ function buildQuoteItemsFromReport(rd, system) {
   if (active.length) {
     items.push(newQuoteItem('direct', {
       qty: active.length,
-      detail: active.map(f => (f.activityLocation || '').trim()).filter(Boolean).join('; '),
+      detail: joinPlaces(active.map(f => f.activityLocation)),
       source: active.map(f => `Finding ${findings.indexOf(f) + 1}`).join(', ') + ': active termites',
     }));
   }
@@ -390,8 +448,8 @@ function buildQuoteItemsFromReport(rd, system) {
   // The detail names the places with live borers, not the old damage.
   if (rd.borerActivity === 'ACTIVE' || borerOnly) {
     const live = (Array.isArray(rd.borerFindings) ? rd.borerFindings : []).filter(b => b && b.borerActivity === 'ACTIVE')
-      .map(b => [b.location, b.timberAffected].filter(Boolean).join(', ')).filter(Boolean);
-    items.push(newQuoteItem('borer', { detail: live.length ? live.join('; ') : (rd.borerDetails || ''), source: 'Finding: active borers' }));
+      .map(b => [(b.location || '').trim(), lowerFirst(b.timberAffected)].filter(Boolean).join(', ')).filter(Boolean);
+    items.push(newQuoteItem('borer', { detail: live.length ? joinPlaces(live) : (rd.borerDetails || ''), source: 'Finding: active borers' }));
   }
 
   if (rd.timberSoil === 'YES') {
@@ -510,7 +568,7 @@ function applySpokenQuote(q, rd) {
 // wrote them. No risk rating and no verdict on the structure.
 function buildQuoteProblem(rd) {
   rd = rd || {};
-  const lc = v => { v = (v || '').trim(); return /^[A-Z][a-z]/.test(v) ? v[0].toLowerCase() + v.slice(1) : v; };
+  const lc = lowerFirst;
   const where = list => list.length ? ` (${list.join('; ')})` : '';
   const findings = (Array.isArray(rd.findings) ? rd.findings : []).filter(f => f && f.termiteActivity);
   const at = status => findings.filter(f => f.termiteActivity === status).map(f => lc(f.activityLocation)).filter(Boolean);
@@ -545,9 +603,12 @@ function quoteProblem(q) {
   return buildQuoteProblem(rd);
 }
 
+// A report detail set in brackets mid-sentence: "Fungal decay (wet rot)."
+// reads as " (fungal decay, wet rot)" (inBrackets, js/app.js).
 function buildQuoteExclusions(rd) {
   rd = rd || {};
   const out = [];
+  const detail = inBrackets;
   const findings = Array.isArray(rd.findings) ? rd.findings : [];
   if (findings.some(f => f && f.structuralConcern === 'YES')) {
     out.push('Assessment of termite damage by a licensed builder or structural engineer, and repair of damaged timbers.');
@@ -558,16 +619,16 @@ function buildQuoteExclusions(rd) {
     out.push('Repair or replacement of borer-damaged timbers.');
   }
   if (rd.decayFound === 'YES') {
-    out.push(`Repair or replacement of decayed timbers${rd.decayDetails ? ` (${rd.decayDetails})` : ''} by a licensed builder, and fixing the moisture that caused it.`);
+    out.push(`Repair or replacement of decayed timbers${detail(rd.decayDetails)} by a licensed builder, and fixing the moisture that caused it.`);
   }
   if (rd.waterLeaks === 'YES') {
-    out.push(`Repair of the moisture source${rd.leakLocation ? ` (${rd.leakLocation})` : ''} by a licensed plumber or builder.`);
+    out.push(`Repair of the moisture source${detail(rd.leakLocation)} by a licensed plumber or builder.`);
   }
   if (rd.antCapping === 'GAPS' || rd.antCapping === 'NONE') {
-    out.push(`Repair or installation of ant caps${rd.antCappingDetails ? ` (${rd.antCappingDetails})` : ''} by a builder.`);
+    out.push(`Repair or installation of ant caps${detail(rd.antCappingDetails)} by a builder.`);
   }
   if (rd.highRiskAreas) {
-    out.push(`Areas not accessible at inspection (${rd.highRiskAreas}) unless access is provided.`);
+    out.push(`Areas not accessible at inspection${detail(rd.highRiskAreas)} unless access is provided.`);
   }
   return out;
 }
@@ -585,7 +646,7 @@ const QUOTE_PLAN_SERVICE = ['None', '12 months', '24 months', '36 months', '60 m
 
 function buildPlanWe(rd, system) {
   rd = rd || {};
-  const lc = v => { v = (v || '').trim(); return /^[A-Z][a-z]/.test(v) ? v[0].toLowerCase() + v.slice(1) : v; };
+  const lc = lowerFirst;
   const findings = (Array.isArray(rd.findings) ? rd.findings : []).filter(f => f && f.termiteActivity === 'ACTIVE');
   const places = findings.map(f => lc(f.activityLocation)).filter(Boolean);
   const type = (rd.treatmentType || '').trim();
@@ -1096,8 +1157,8 @@ function renderQuoteCompanyGaps() {
   const el = document.getElementById('quoteCompanyGaps');
   el.style.display = gaps.length ? '' : 'none';
   el.innerHTML = gaps.length
-    ? `<div>Your quote won't show your ${escapeHtml(joinWithAnd(gaps))}. Clients and insurers look for these.</div>` +
-      (canEditBusiness() ? '<button class="quote-link-btn" onclick="openBusinessForm(renderQuoteCompanyGaps)">Add them</button>' : '')
+    ? `<div>Your quote won't show your ${escapeHtml(joinWithAnd(gaps))}. Clients and insurers look for ${gaps.length === 1 ? 'it' : 'these'}.</div>` +
+      (canEditBusiness() ? `<button class="quote-link-btn" onclick="openBusinessForm(renderQuoteCompanyGaps)">Add ${gaps.length === 1 ? 'it' : 'them'}</button>` : '')
     : '';
 }
 
@@ -1553,8 +1614,7 @@ function openQuoteAnswer(mode) {
   document.getElementById('qaNote').placeholder = accepted ? 'e.g. Wants the treatment done before 12 Oct' : 'e.g. Going with another company';
   document.getElementById('qaMethodWrap').style.display = accepted ? '' : 'none';
   document.getElementById('qaMethod').value = 'signed';
-  document.getElementById('qaAcceptText').textContent =
-    `I accept quote ${quoteState.number || ''} for ${formatAUD(quoteTotals(quoteState).total)}${quoteState.gst !== false ? ' (inc GST)' : ''} and authorise the work described in it.`;
+  document.getElementById('qaAcceptText').textContent = quoteAcceptText(quoteState);
   document.getElementById('quoteAnswerOverlay').classList.add('open');
   if (!quoteAnswerPad) {
     quoteAnswerPad = createSignaturePad(document.getElementById('qaSigCanvas'), document.getElementById('qaSigPlaceholder'), updateQuoteAnswerBtn);
@@ -1643,13 +1703,13 @@ function exportQuotePDF() {
         return deliverPdfBlob(blob, fname, {
           title: 'SAYON Quote',
           text: `Treatment quote — ${quoteState.address || 'Property'}`,
-          readyToast: 'Quote ready — choose where to save or send it',
+          readyToast: 'Quote ready. Choose where to save or send it',
         });
       })
       .catch(e => {
         console.error('Quote PDF failed:', e);
         reportError(e, 'quote_pdf');
-        showToast((e && e.message) || 'Could not generate the PDF — check your connection and try again', 'error');
+        showToast((e && e.message) || 'Could not make the PDF. Check your signal and try again', 'error');
       })
       .finally(() => { btn.disabled = false; });
   }, 50);
@@ -1761,7 +1821,7 @@ function emailQuoteToClient() {
   rememberQuotePrices(quoteState);
   if (!jsPDF) {
     ensureJsPDFLoaded()
-      .then(() => showToast('Ready — tap Email to client again', 'info'))
+      .then(() => showToast('Ready. Tap the send button again', 'info'))
       .catch(e => showToast((e && e.message) || 'Could not load the PDF tools', 'error'));
     return;
   }
@@ -1811,6 +1871,13 @@ function quoteLinkCurrent(q) {
   return r && r.hash === quoteContentHash(q) ? r : null;
 }
 
+// What the client agrees to when they accept, on the link and on the
+// inspector's phone: "I accept quote Q-0012 for $1,254.00 (inc GST) and
+// authorise the work described in it." "(inc GST)" stays on one line.
+function quoteAcceptText(q) {
+  return `I accept ${q.number ? `quote ${q.number}` : 'this quote'} for ${formatAUD(quoteTotals(q).total)}${q.gst !== false ? ' (inc\u00a0GST)' : ''} and authorise the work described in it.`;
+}
+
 // What the client's page shows: everything the quote PDF says.
 function quoteLinkDoc(q, files) {
   const company = getCompanyDetails();
@@ -1832,7 +1899,7 @@ function quoteLinkDoc(q, files) {
       we: lines(plan.we), owner: lines(plan.owner) },
     exclusions: lines(q.exclusions), notes: lines(q.notes), paymentTerms: (q.paymentTerms || '').trim(),
     files: files || {},
-    acceptText: `I accept quote ${q.number || ''} for ${formatAUD(totals.total)}${q.gst !== false ? ' (inc GST)' : ''} and authorise the work described in it.`,
+    acceptText: quoteAcceptText(q),
   };
 }
 
@@ -1896,7 +1963,7 @@ function cancelQuoteLinkRow(id) {
 
 function quoteLinkMessage(q) {
   const company = getCompanyDetails().name || 'your inspector';
-  return `Hi ${(q.client || '').trim().split(/\s+/)[0] || 'there'}, here is the treatment quote from ${company} for ${q.address || 'your property'}. Open it to read it and accept or decline on your phone:`;
+  return `Hi ${greetingName(q.client) || 'there'}, here is the treatment quote from ${company} for ${q.address || 'your property'}. Please read it and accept or decline it on your phone:`;
 }
 
 // The share sheet (text, email, WhatsApp), or the clipboard where there's none.

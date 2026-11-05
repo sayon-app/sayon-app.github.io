@@ -31,8 +31,8 @@
   }
   .logo-dot { fill: var(--pink); stroke: var(--pink); }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Inter', system-ui, sans-serif; color: var(--ink); background: #fff; line-height: 1.55; }
-  h1, h2, h3, .brand { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.01em; }
+  body { font-family: 'Inter', system-ui, sans-serif; color: var(--ink); background: #fff; line-height: 1.55; text-wrap: pretty; }
+  h1, h2, h3, .brand { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.01em; text-wrap: balance; }
   a { color: inherit; }
   .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
 
@@ -75,6 +75,7 @@
   .card p { color: var(--ink2); }
 
   .chain { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .chain .step { display: inline-flex; align-items: center; gap: 10px; }
   .chain .link { background: #fff; border: 1.5px solid rgba(47,107,255,0.45); color: var(--teal-ink); font-weight: 600; padding: 10px 16px; border-radius: 999px; }
   .chain .arrow { color: var(--teal); font-weight: 700; }
 
@@ -133,7 +134,7 @@
       <div>
         <div class="kicker">For Australian timber pest inspectors</div>
         <h1>Talk through the inspection. Leave with the report done.</h1>
-        <p class="lead">SAYON turns what you say on site into a finished AS 4349.3 timber pest report, then carries the job through the quote, the client's signature and the treatment certificate.</p>
+        <p class="lead">SAYON turns what you say on site into a finished AS&nbsp;4349.3 timber pest report, then carries the job through the quote, the client's signature and the treatment certificate.</p>
         <div class="cta-row">
           <a class="btn btn-main" href="https://sayon-app.github.io/?signup=1">Start your free trial</a>
           <a class="btn btn-ghost" href="#how">See how it works</a>
@@ -145,7 +146,7 @@
       <div class="phone" aria-hidden="true">
         <div class="bubble"><small>Voice note · Subfloor</small>"Subfloor, rear under the back deck, low clearance about 300 mil, couldn't get past the bearer. Moisture at the laundry wall 28 percent."</div>
         <div class="field"><span>Subfloor</span><span>Partly inspected</span></div>
-        <div class="field"><span>What obstructed it</span><span>Low clearance, about 300mm</span></div>
+        <div class="field"><span>What obstructed it</span><span>Low clearance, about 300&nbsp;mm</span></div>
         <div class="field"><span>Moisture, laundry wall</span><span>28%</span></div>
         <div class="field"><span>Next inspection</span><span>Within 12 months</span></div>
       </div>
@@ -161,7 +162,7 @@
         <p>No typing at night. You inspect the way you always do, and SAYON keeps up.</p>
       </div>
       <div class="steps">
-        <div class="card"><div class="num">1</div><h3>Talk as you go</h3><p>Record a quick note in each area. SAYON fills in the right part of the report: what you found, where, moisture readings, and anything you couldn't get to.</p></div>
+        <div class="card"><div class="num">1</div><h3>Talk as you go</h3><p>Record a quick note in each area. SAYON fills in the right part of the report: what you found, where, moisture readings and anything you couldn't get to.</p></div>
         <div class="card"><div class="num">2</div><h3>Check it on site</h3><p>Tap any answer to change it. Add photos to each finding. Notes recorded without signal wait and go through when you're back in range.</p></div>
         <div class="card"><div class="num">3</div><h3>Send it before you leave</h3><p>The client gets a clear, professional PDF by email, with your company's details on every page.</p></div>
       </div>
@@ -175,10 +176,10 @@
         <p>From the first booking to the treatment certificate, every step uses the same job, so nothing is typed twice.</p>
       </div>
       <div class="chain">
-        <span class="link">Pre-inspection agreement</span><span class="arrow">→</span>
-        <span class="link">Inspection report</span><span class="arrow">→</span>
-        <span class="link">Quote</span><span class="arrow">→</span>
-        <span class="link">Client's answer and signature</span><span class="arrow">→</span>
+        <span class="step"><span class="link">Pre-inspection agreement</span><span class="arrow">→</span></span>
+        <span class="step"><span class="link">Inspection report</span><span class="arrow">→</span></span>
+        <span class="step"><span class="link">Quote</span><span class="arrow">→</span></span>
+        <span class="step"><span class="link">Client's answer and signature</span><span class="arrow">→</span></span>
         <span class="link">Treatment record and certificate</span>
       </div>
     </div>
@@ -202,7 +203,7 @@
     <div class="wrap">
       <div class="section-head">
         <h2>Simple pricing</h2>
-        <p>Every plan has the whole app. Plans only differ in how many AI fills you get a month: one fill is one job the AI does for you, such as filling in the report and quote from what you said. A typical inspection uses 10 to 20.</p>
+        <p>Every plan has the whole app. The plans differ in how many inspectors they cover, and each inspector gets AI fills for about 40 inspections a month. One fill is one job the AI does for you, such as filling in the report and quote from what you said; a typical inspection uses 10 to 20.</p>
       </div>
       <div class="prices">
         <div class="price price-main">
@@ -249,11 +250,11 @@
       <div class="faq">
         <details><summary>Do I need to download anything?</summary><p>No. SAYON runs in your phone's browser. Add it to your home screen and it opens like any other app.</p></details>
         <details><summary>What if there's no signal under the house?</summary><p>Record your notes anyway. They wait on your phone and go through as soon as you have signal again, in the order you recorded them.</p></details>
-        <details><summary>Which standard do the reports follow?</summary><p>Reports are laid out for timber pest inspections under AS 4349.3, including the areas you couldn't inspect and why.</p></details>
+        <details><summary>Which standard do the reports follow?</summary><p>Reports are laid out for timber pest inspections under AS&nbsp;4349.3, including the areas you couldn't inspect and why.</p></details>
         <details><summary>Does SAYON decide what's wrong with the house?</summary><p>No. You're the inspector. SAYON writes up what you say and you check every answer before it's sent. Anything structural is referred to a builder or engineer.</p></details>
         <details><summary>Can my whole team use it?</summary><p>Yes, on the Team or Business plan. In the app, open Your team and add an inspector's email. SAYON gives you a sign-up link to send them, and they join your business with your company details and prices on every PDF.</p></details>
         <details><summary>Who owns my reports?</summary><p>You do. SAYON stores them so they follow you between phones, and never uses them for anything else. You can download every report and quote from the app at any time.</p></details>
-        <details><summary>Where is my data kept?</summary><p>On your phone, and in your account in a Supabase database. Your voice notes go to Anthropic's AI only to fill in the report, and emails go through Resend. The <a href="../privacy.html">privacy policy</a> names every provider.</p></details>
+        <details><summary>Where is my data kept?</summary><p>On your phone, and in your account in a Supabase database in Sydney. Cloudflare turns your spoken notes into text, and the text goes to Anthropic's AI only to fill in the report. Emails go through Resend. The <a href="../privacy.html">privacy policy</a> names every provider.</p></details>
         <details><summary>How do I cancel?</summary><p>In the app: tap your initials, then Billing, then Manage. Your plan runs to the end of the period you've paid for, and your reports stay in your account afterwards.</p></details>
       </div>
     </div>

@@ -51,7 +51,7 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   check(after.rd.roofType === 'Metal roof', 'a field already filled is kept');
   check(!after.rd.findings || !after.rd.findings.some(f => f && f.termiteActivity), 'no findings copied');
   check(!after.rd.riskLevel && !after.rd.treatmentRecommended && !after.rd.weatherConditions, 'no risk, recommendation or weather copied');
-  check(/^Termites reported before \(our inspection on .*live termites, Gum tree/.test(after.rd.termiteHistory), `termite history written from the last report: ${after.rd.termiteHistory}`);
+  check(/^Termites reported before \(our inspection on .*live termites, gum tree/.test(after.rd.termiteHistory), `termite history written from the last report: ${after.rd.termiteHistory}`);
   check(after.rd.lastVisit && after.rd.lastVisit.copied > 5 && /Started from the/.test(after.banner) && after.btn === 'What changed', 'banner now says started from it');
   await p.screenshot({ path: `${OUT}/2-started.png`, fullPage: false });
   // What changed: this visit found less.

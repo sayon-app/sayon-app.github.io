@@ -116,7 +116,7 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   await p.screenshot({ path: `${OUT}/3-extract-fixes.png` });
   await p.evaluate(() => { closeExtractSummary(); openSendReview(); }); await p.waitForTimeout(2000);
   const sd = await rects('#sendReviewOverlay .send-review-fixes .link-btn');
-  check(sd.length >= 2 && sd.every(r => r[3] <= 34), 'send sheet: fix links are 32px rows, not 44px');
+  check(sd.length >= 2 && sd.every(r => r[3] <= 38), 'send sheet: fix links are 36px pills, not 44px rows');
   await p.screenshot({ path: `${OUT}/4-send-fixes.png` });
   await p.evaluate(() => closeSendReview());
 

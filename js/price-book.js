@@ -39,7 +39,7 @@ function businessPrice(key) {
 function priceBookUnitLine(key) {
   const cat = QUOTE_CATALOGUE[key];
   const unit = escapeHtml(priceBookUnit(cat.unit));
-  return businessPrice(key) == null ? `${unit} · <span class="pb-start">SAYON suggests $${cat.price}</span>` : unit;
+  return businessPrice(key) == null ? `${unit} · <span class="pb-start">SAYON suggests ${formatAUD(cat.price).replace(/\.00$/, '')}</span>` : unit;
 }
 
 function priceBookRow(key, prefix) {

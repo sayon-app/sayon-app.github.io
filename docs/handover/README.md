@@ -53,13 +53,13 @@ For an AI model taking over this repo with no context. Last checked 2026-10-05: 
   1. In your thread, post a deploy request: what changes in plain English, plus the merged main PR's "Files changed" link. Wait for "deploy X".
   2. Your session can push to only one branch, and go-live PRs come from it too. Check no PR from it is open, and park unpushed work on another local branch. Then `git fetch origin && git checkout -B <your-branch> origin/live`.
   3. `git cherry-pick -x <sha>…` with the PR's own commits, never the merge commit. List them with `gh api repos/{owner}/{repo}/pulls/<N>/commits -q '.[].sha'` or `git log --no-merges --oneline <merge>^1..<merge>^2`. Example: #72 merged as `e15f1f0`; its commit `3ce4c6c` went live via #73 as `38d4ff0`.
-  4. Check: `git diff --name-only origin/live...HEAD` lists only the files you meant to change, and `git grep -nE "\[ABN\]|voice-privacy-hint|sign it electronically" HEAD` prints nothing.
-  5. If a cherry-pick conflicts or a check fails: for `CACHE_VERSION` take the higher of live+1 and the commit's number; next to the PR #32 lines keep live's side; if `CLAUDE.md`, `docs/` or `tests/` came along (a grep hit in `docs/` means they did), `git rm -r` them and `git commit --amend`. Keeping docs and tests in separate commits from app changes avoids this.
+  4. Check: `git diff --name-only origin/live...HEAD` lists only the files you meant to change, and `git grep -nF "[ABN]" HEAD -- terms.html privacy.html` prints nothing.
+  5. If a cherry-pick conflicts or a check fails: for `CACHE_VERSION` take the higher of live+1 and the commit's number; if `CLAUDE.md`, `docs/` or `tests/` came along (a grep hit in `docs/` means they did), `git rm -r` them and `git commit --amend`. Keeping docs and tests in separate commits from app changes avoids this.
   6. `git push --force-with-lease origin <your-branch>`, open the PR into `live`, and give baz "GitHub → merge PR #N". Never merge, approve or turn on auto-merge for it yourself.
   7. After he merges, confirm the "pages build and deployment" run on `live` succeeded for the merge commit (section 5). github.io may be unreachable from the sandbox; a failed fetch doesn't mean the deploy failed.
 - While a go-live PR from your branch is open, keep new commits local. Pushing would add them to the go-live.
 - **Never go live by merging `main` into `live`.** `main` carries things that must stay off the site:
-  - PR #32 (commit `8b4a13b`): the Terms and Privacy rewrite, whose `terms.html` and `privacy.html` still have placeholders for business details; the voice privacy hint (`.voice-privacy-hint` in `index.html` and `css/app.css`); and the default agreement sentence "You also agree to sign it electronically and to receive the report by email." in `js/app.js`. If an approved commit touches `terms.html` or `privacy.html`, keep live's text apart from the approved change (go-live #62 carried only the name swap).
+  - (Resolved.) PR #32's Terms and Privacy rewrite, voice privacy hint and e-sign sentence used to be main-only. They are live now: `terms.html` and `privacy.html` have been the same on `live` and `main` since 1 Nov 2026 (`abecd2b`), with no placeholders left, and the e-sign sentence has been live since go-live `d7a8e1c` (7 Oct).
   - `CLAUDE.md`, `docs/` and `tests/`: repo docs and tooling, not the app. They need no go-live; leaving them off keeps each go-live diff to app changes.
 - **Hotfix:** if a go-live breaks the site, fix forward. Branch from `origin/live`, fix, bump `CACHE_VERSION` above live's, open a go-live PR (it still needs baz's "deploy"), then bring the same commit to `main` by PR. Example: the blank page after #65 was fixed by #66 (live) and #67 (main). Never lower `CACHE_VERSION`.
 
@@ -128,7 +128,7 @@ iPhone browser / home-screen PWA
 
 Live versus `main` (after `git fetch origin`):
 - `git show origin/live:service-worker.js | grep "CACHE_VERSION ="` gives the live version (now `korva-v51`, go-live #73).
-- `git diff --stat origin/live origin/main` shows what is only on `main`: the PR #32 items, `CLAUDE.md`, `docs/`, `tests/`, and `supabase/delete-account.sql` (`main` has the PR #53 fix, which is the version applied in Supabase). `worker/worker.js` is the same on both.
+- `git diff --stat origin/live origin/main` shows what is only on `main`: `CLAUDE.md`, `docs/`, `tests/`, and `supabase/delete-account.sql` (`main` has the PR #53 fix, which is the version applied in Supabase). `worker/worker.js` is the same on both.
 - Pages publish: from the clone, `gh run list --branch live -L 3 --json number,headSha,conclusion,name`. Look for "pages build and deployment" with `success` on the merge commit (go-live #73 was run 285).
 - Live Worker: `workers_get_worker_code`, script `korva`; the comment at the top of the file lists its version changes.
 

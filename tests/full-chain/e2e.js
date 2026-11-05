@@ -61,6 +61,7 @@ let shotN = 0;
     await p.fill('#ob-companyName', sc.company.name);
     await p.fill('#ob-phone', '0400000000');
     await tap(p.locator('#obBusinessSave'), 'Continue (business)'); await shot('ob-1');
+    await tap(p.locator('#ob-panel-1 .auth-btn'), 'Continue (your prices)'); await shot('ob-prices');
     await tap(p.locator('#obDemoNext'), 'Continue (demo)'); await shot('ob-2');
     await tap(p.getByRole('button', { name: /Start inspecting/i }), 'Start Inspecting'); await p.waitForTimeout(1200); await shot('after-onboarding');
   }
@@ -107,7 +108,11 @@ let shotN = 0;
   await tap(p.locator('#extractBtn'), 'Fill the report'); await p.waitForTimeout(4000); await shot('after-fill');
   const filled = await p.evaluate(() => ({ type: reportData.inspectionType, findings: (reportData.findings || []).length, risk: reportData.riskLevel, sheet: document.getElementById('extractSummaryOverlay').classList.contains('open') }));
   check(filled.findings === 2 && filled.risk === 'HIGH', 'the note filled the report: ' + JSON.stringify(filled));
-  await tap(p.getByRole('button', { name: 'Mark the rest not applicable' }), 'mark rest n/a'); await p.waitForTimeout(400);
+  // Many unmarked areas share one button; three or fewer get one each.
+  const many = p.getByRole('button', { name: 'Mark the rest not applicable' });
+  if (await many.count()) { await tap(many, 'mark rest n/a'); await p.waitForTimeout(400); }
+  const naBtn = () => p.locator('#extractSummaryGaps').getByRole('button', { name: 'Not applicable', exact: true });
+  for (let i = 0; i < 6 && await naBtn().count(); i++) { await tap(naBtn().first(), 'mark area n/a'); await p.waitForTimeout(400); }
   await tap(p.getByRole('button', { name: 'Mark the rest as nothing found' }), 'mark rest nothing found'); await p.waitForTimeout(400);
   const ar = await p.evaluate(() => ({ subfloor: areaResultOf('subfloor'), site: areaResultOf('site'), interior: areaResultOf('interior') }));
   check(ar.subfloor === 'FOUND' && ar.site === 'FOUND' && ar.interior === 'CLEAR', 'areas a finding names are not marked "nothing found": ' + JSON.stringify(ar));
@@ -165,7 +170,7 @@ let shotN = 0;
   console.log('toasts', await toasts());
 
   // 9. Treatment record.
-  await tap(p.getByRole('button', { name: /Treatment done\? Record it/i }), 'Record treatment'); await p.waitForTimeout(1000); await shot('treatment-open');
+  await tap(p.getByRole('button', { name: /^Record the treatment$/i }), 'Record treatment'); await p.waitForTimeout(1000); await shot('treatment-open');
   const tr0 = await p.evaluate(() => [...document.querySelectorAll('#treatmentOverlay input, #treatmentOverlay textarea, #treatmentOverlay select')].filter(e => e.offsetParent && e.type !== 'radio' && e.type !== 'checkbox').map(e => `${e.id}=${e.value}`).join(' | '));
   console.log('treatment prefill:', tr0);
   const need = await p.evaluate(() => ({ btn: document.getElementById('trSaveBtn').disabled, need: (document.querySelector('#treatmentOverlay .sign-need, #trSaveNeed') || {}).textContent }));

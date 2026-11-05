@@ -72,6 +72,14 @@ body {
   flex-direction: column;
 }
 
+/* Where words sit on a narrow phone: a paragraph, label or button never
+   ends on one lone word, and headings break into even lines. What's typed
+   in a field wraps as it always has (the style only: a select or input
+   keeps its own no-wrap). */
+body { text-wrap: pretty; }
+input, textarea, select, [contenteditable] { text-wrap-style: auto; }
+h1, h2, h3, h4, .auth-title, .section-header h3, .job-hero-addr { text-wrap: balance; }
+
 /* ── ACCESSIBILITY MODES ── */
 
 /* Dark screen: for subfloors, roof voids and night work. Most colours
@@ -480,8 +488,10 @@ body.large-touch .saved-item-delete { width: 44px; height: 44px; }
 .auth-btn:active { transform:scale(0.985); }
 .auth-btn:disabled { opacity:0.45; cursor:not-allowed; box-shadow:none; }
 .auth-btn.secondary { background:#FFFFFF; color:#0D1117; border:1.5px solid #C8D5E3; box-shadow:none; }
-.auth-links { display:flex; justify-content:space-between; gap:8px; margin:-4px -6px 0; }
-.auth-link { background:none; border:none; color:var(--accent2); font-family:'Inter',sans-serif; font-size:14px; font-weight:600; cursor:pointer; padding:0 6px; transition:color 0.15s; min-height:44px; }
+.auth-links { display:flex; flex-wrap:wrap; justify-content:space-between; gap:0 8px; margin:-4px -6px 0; }
+.auth-link { background:none; border:none; color:var(--accent2); font-family:'Inter',sans-serif; font-size:14px; font-weight:600; cursor:pointer; padding:0 6px; transition:color 0.15s; min-height:44px; white-space:nowrap; }
+/* Too narrow for both links on one line: one under the other, centred. */
+@media (max-width: 359px) { .auth-links { flex-direction:column; align-items:center; } }
 .auth-link:hover { color:#065A53; }
 .auth-badge { width:52px; height:52px; margin:0 auto 2px; border-radius:16px; background:rgba(var(--accent-rgb),0.1); color:var(--accent2); display:flex; align-items:center; justify-content:center; }
 .auth-footer { font-size: 12px; color:rgba(232,240,246,0.6); text-align:center; line-height:1.6; margin:0; }
@@ -3039,6 +3049,8 @@ body.dark-screen .fold-tick { color: #000; }
   display: flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
   font-size: 13px;
   font-weight: 600;
   color: #fff;
@@ -3982,6 +3994,7 @@ body.ai-busy:has(#app[style*="flex"]) .ai-busy-bar { display: block; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   padding: 9px 12px;
   background: var(--surface2);
   border-bottom: 1px solid var(--border);
@@ -3990,14 +4003,19 @@ body.ai-busy:has(#app[style*="flex"]) .ai-busy-bar { display: block; }
 }
 .section-photo-header-left {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 7px;
+  gap: 2px 8px;
+  min-width: 0;
   font-size: 12px;
   font-weight: 600;
   color: var(--text2);
 }
-.section-photo-header-left svg { color: var(--accent2); }
+/* The icon stays beside its title; on a narrow phone the count goes under. */
+.section-photo-title { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.section-photo-header-left svg { flex: none; color: var(--accent2); }
 .section-photo-count {
+  white-space: nowrap;
   font-size: 12px;
   font-weight: 500;
   color: var(--text3);
@@ -4006,6 +4024,8 @@ body.ai-busy:has(#app[style*="flex"]) .ai-busy-bar { display: block; }
   display: flex;
   align-items: center;
   gap: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
   padding: 6px 14px;
   background: rgba(var(--accent-rgb),0.1);
   border: 1px solid rgba(var(--accent-rgb),0.3);
@@ -4045,6 +4065,7 @@ body.ai-busy:has(#app[style*="flex"]) .ai-busy-bar { display: block; }
   gap: 4px;
 }
 .section-photo-empty {
+  grid-column: 1 / -1;
   padding: 14px;
   text-align: center;
   font-size: 12px;
@@ -4888,6 +4909,9 @@ body:not(.dark-screen) .choice-card { transition: background-color 0.3s, border-
 #areaChecklist .area-sum-name { font-size: 14.5px; letter-spacing: -0.01em; }
 #areaChecklist .area-status { gap: 5px; padding: 12px 10px; }
 #areaChecklist .area-status-btn { padding: 7px 2px; font-size: 11.5px; letter-spacing: -0.01em; white-space: nowrap; }
+/* Below 340 px the three don't fit on one line, and the last was cut off:
+   the longer two take two lines instead. */
+@media (max-width: 339px) { #areaChecklist .area-status-btn { white-space: normal; } }
 #areaChecklist .area-result-label { padding: 0 12px 8px; }
 #areaChecklist .obs-reasons { margin: 0; padding: 12px 12px 0; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: none; }
 #areaChecklist .obs-reasons .obs-items { padding: 8px 0 12px; }
@@ -5336,7 +5360,7 @@ body:not(.dark-screen) .sidebar:not(.on-page) .drawer-legal a { color: var(--on-
 .menu-account-text { min-width: 0; }
 .menu-account .profile-dropdown-name { font-size: 15px; }
 .menu-account-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
-.menu-account-actions .profile-dropdown-item { width: auto; flex: 1; justify-content: center; min-height: 40px; border: 1px solid var(--border); border-radius: 10px; }
+.menu-account-actions .profile-dropdown-item { width: auto; flex: 1 1 auto; white-space: nowrap; justify-content: center; min-height: 40px; border: 1px solid var(--border); border-radius: 10px; }
 .sidebar.on-page .menu-account { display: none; }
 
 /* Delete sits quietly at the foot of the job sheet. */

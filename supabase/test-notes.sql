@@ -3,6 +3,10 @@
 -- With Menu › Data & backups › Test mode switched on, every voice note the
 -- owner sends to the AI is saved here with what the AI pulled out of it (or
 -- why it failed), so Claude can score a batch on tests/extraction later.
+-- Since 5 Nov 2026 it also saves the rest of the app's AI and voice work
+-- (agreement, treatment, bait, corrections, photo reads, quote plans):
+-- those rows carry extraction.kind (see saveTestEvent in js/app.js). No
+-- change to the table: run nothing new.
 -- Each person sees, adds and deletes only their own rows. Rows go when the
 -- account is deleted (the cascade on user_id).
 

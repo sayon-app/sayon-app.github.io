@@ -271,7 +271,9 @@ async function requestTreatmentPlan(rd, address, extra, techQuote) {
   const out = (data.content || []).map(c => c.text || '').join('');
   let plan;
   try { plan = JSON.parse(out.replace(/```json|```/g, '').trim()); } catch (e) { throw new Error('The answer was not readable'); }
-  return dropOwnerUpkeepLines(cleanTreatmentPlan(plan));
+  const cleaned = dropOwnerUpkeepLines(cleanTreatmentPlan(plan));
+  if (typeof saveTestEvent === 'function') saveTestEvent('treatment-plan', treatmentPlanMessage(input, extra, techQuote), { plan: cleaned });
+  return cleaned;
 }
 
 // Only what the card and the quote can use, in the shapes they expect.

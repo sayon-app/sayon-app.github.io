@@ -10040,7 +10040,11 @@ function loadSession() {
   } catch(e) { return null; }
 }
 
+// Counted so a renewal of the sign-in still on its way when the person
+// signs out isn't kept (refreshSession).
+let sessionsEnded = 0;
 function clearSession() {
+  sessionsEnded++;
   try { localStorage.removeItem('korva_session'); } catch(e) {}
   authSession = null; authUser = null; authBusiness = null;
   resetBillingDisplay();
@@ -10465,9 +10469,12 @@ let lastRefreshWasOffline = false;
 
 async function refreshSession(refreshToken) {
   lastRefreshWasOffline = false;
+  const ended = sessionsEnded;
   try {
     const data = await supabaseAuth('token?grant_type=refresh_token', { refresh_token: refreshToken });
-    if (data.access_token) {
+    // Signed out while it was on its way (on a weak signal it can take a
+    // while): the new sign-in would sign them back in, so it's dropped.
+    if (data.access_token && ended === sessionsEnded) {
       authSession = data;
       saveSession(data);
       return true;
@@ -11504,13 +11511,24 @@ async function loadBusinessForStart() {
   const loading = loadBusiness();
   if (await startWait(loading.then(() => 'done'), authUser && authUser.id) !== 'slow') return;
   if (!authBusiness) restoreCachedBusiness();
-  // The account's copy, once it lands, as enterApp() takes it in.
-  loading.then(() => {
-    if (!authBusiness || businessIsFromCache()) return;
-    migrateLegacyCompanyDetails();
-    applyCloudBusinessSettings();
-    renderProfileMenu();
-  });
+  loading.then(takeInAccountBusiness);
+}
+// The account's copy of the business, landed after the app opened with the
+// phone's: taken in as enterApp() takes it in.
+function takeInAccountBusiness() {
+  if (!authBusiness || businessIsFromCache()) return;
+  migrateLegacyCompanyDetails();
+  applyCloudBusinessSettings();
+  renderProfileMenu();
+}
+// The sign-in renewed after the app opened with the old one: the account
+// refused what was read or sent with that, so the business and the reports
+// are read again now, and reports saved meanwhile go up.
+function afterLateSignIn() {
+  if (!authUser || !authBusiness) return;
+  if (businessIsFromCache()) readBusinessFromAccount().then(read => { if (read) takeInAccountBusiness(); });
+  supabaseSyncOnOpen();
+  pushUnsyncedReports();
 }
 
 async function restoreAuthSession() {
@@ -11555,10 +11573,12 @@ async function restoreAuthSession() {
     // keep working. The token is refreshed once the signal is back; only a
     // refusal from Supabase signs them out.
     if (ok === 'slow' || lastRefreshWasOffline || !navigator.onLine) {
+      const renewing = ok === 'slow' && authRefreshInFlight;
       authSession = stored;
       authUser    = stored.user;
       await loadBusinessForStart();
       startAuthAutoRefresh();
+      if (renewing) renewing.then(renewed => { if (renewed === true) afterLateSignIn(); });
       return true;
     }
     // Refused: say so, or "did I lose my report?" is the first thought.

@@ -208,9 +208,11 @@ select.quote-input { cursor: pointer; }
 .treat-method-qty { width: 92px; flex-shrink: 0; }
 .treat-product { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; }
 .treat-product .quote-link-btn, .treat-add-product { align-self: flex-start; }
-.treat-method { min-height: 50px; padding: 10px 12px; border-radius: 12px; font-size: 14px; transition: background 0.2s, border-color 0.2s; }
+.treat-method { min-height: 50px; padding: 10px 12px; border-radius: 12px; font-size: 14px; border-color: var(--border2); transition: background 0.2s, border-color 0.2s; }
 .treat-method:has(input[type=checkbox]:checked) { border-color: rgba(var(--accent-rgb), 0.55); background: rgba(var(--accent-rgb), 0.07); }
-.treat-product { padding: 12px; border-radius: 12px; background: var(--surface2); }
+.treat-product { padding: 12px 12px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border2); border-left: 4px solid var(--accent); }
+.treat-product-head { margin-bottom: 4px; font: 700 15px 'Space Grotesk', sans-serif; letter-spacing: -0.2px; color: var(--text); }
+body.dark-screen .treat-product { background: var(--surface2); border-color: var(--border2); border-left-color: var(--accent-hi); }
 
 /* Bait station visits (js/bait.js): a card under the certificate, and the
    visit sheet's station list, one row per station with its finding as chips. */
@@ -245,7 +247,7 @@ select.quote-input { cursor: pointer; }
 .bait-need { margin: 0; font-size: 13px; color: var(--yellow-text); font-weight: 600; }
 .treat-batch { display: flex; gap: 8px; align-items: center; }
 .treat-batch .job-input { flex: 1; min-width: 0; }
-.treat-batch .treat-label-btn { align-self: center; white-space: nowrap; cursor: pointer; }
+.treat-batch .treat-label-btn { align-self: stretch; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; cursor: pointer; }
 .treat-label-thumb { display: block; max-width: 160px; max-height: 120px; margin-top: 6px; border-radius: 6px; border: 1px solid var(--border); }
 .treat-sketch-wrap {
   height: auto; aspect-ratio: 4 / 3;

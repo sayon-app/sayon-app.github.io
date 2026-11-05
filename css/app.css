@@ -2848,6 +2848,30 @@ body.report-locked #micDock { opacity: 0.4; }
 .sheet-more[open] > summary::after { transform: rotate(-135deg); margin-top: 3px; }
 .sheet-more > .job-row { padding: 0 14px 14px; }
 
+/* The treatment record and bait visit sheets sit on white, not on the quote's
+   dark backdrop, so their folds drop the quote card's heavy shadow and glow
+   (which read as grey on grey) for a plain white card with a clear edge.
+   Fields are white with a firm border, labels dark, so each one stands out
+   from the card it sits on, in sunlight too. */
+body:not(.dark-screen) .sheet-folds .sheet-fold {
+  background: var(--surface); border: 1px solid var(--border2); box-shadow: 0 1px 3px rgba(13,40,60,0.08);
+}
+body:not(.dark-screen) .sheet-folds .sheet-fold > summary { background: none; }
+body:not(.dark-screen) .sheet-folds .sheet-fold[open] { border-color: rgba(var(--accent-rgb),0.45); box-shadow: 0 2px 10px rgba(13,40,60,0.10); }
+body:not(.dark-screen) .sheet-folds .sheet-fold[open] > summary { border-bottom-color: var(--border2); }
+.sheet-folds .sheet-fold .fgroup-icon { background: var(--accent-wash); color: var(--accent2); }
+body.dark-screen .sheet-folds .sheet-fold .fgroup-icon { background: rgba(var(--accent-rgb),0.18); color: var(--accent-glow); }
+.sheet-folds .job-field-label { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+body:not(.dark-screen) .sheet-folds .job-input { background: var(--surface); border: 1.5px solid var(--border2); border-radius: 10px; }
+body:not(.dark-screen) .sheet-folds .job-input:hover { border-color: #A9BACB; }
+body.dark-screen .sheet-folds .job-input { background: var(--bg); border-color: var(--border2); }
+.sheet-folds .job-input::placeholder { color: #6B7C8E; }
+body:not(.dark-screen) .sheet-secs > .sheet-voice { background: var(--accent-wash); border-color: var(--accent-edge); }
+body:not(.dark-screen) .sheet-secs > .sheet-voice .sheet-voice-hint { color: var(--text2); }
+body.dark-screen .sheet-folds .job-input::placeholder { color: #75879A; }
+.sheet-folds .sheet-more { border-color: var(--border2); }
+.sheet-folds .sheet-more > summary { color: var(--text); }
+
 /* Check before sending */
 .send-review-label {
   margin-top: 6px;

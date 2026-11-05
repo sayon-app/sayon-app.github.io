@@ -996,8 +996,10 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     };
     ensure(20); y -= 2.5; head();
     products.forEach((p, i) => {
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-      const cells = cols.map(c => doc.splitTextToSize(c.f(p) || '', c.w - 3));
+      // Each cell is measured in the font it's drawn in: the product name is
+      // bold, and a long one measured in normal ran into the next column.
+      doc.setFontSize(8.5);
+      const cells = cols.map((c, ci) => { doc.setFont('helvetica', ci === 0 ? 'bold' : 'normal'); return doc.splitTextToSize(c.f(p) || '', c.w - 3); });
       doc.setFontSize(7.5);
       const active = p.name && p.active ? doc.splitTextToSize(p.active, cols[0].w - 3) : [];
       const rowH = Math.max(cells[0].length * 4 + active.length * 3.4, ...cells.slice(1).map(l => l.length * 4)) + 4;
@@ -1050,7 +1052,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     ['Life expectancy', productLife.join('; ')],
     ['Future inspections', t.nextInspection ? `First by ${formatLongDate(t.nextInspection)}, then ${everyText}` : everyText.charAt(0).toUpperCase() + everyText.slice(1)],
     ['Installed by', installer],
-    ['Notice', `${TREATMENT_NOTICE[t.notice]}${t.noticeWhere ? `: ${lowerFirst(t.noticeWhere)}` : ''}`],
+    ['Notice', TREATMENT_NOTICE[t.notice] ? `${TREATMENT_NOTICE[t.notice]}${t.noticeWhere ? `: ${lowerFirst(t.noticeWhere)}` : ''}` : t.noticeWhere],
   ].filter(([, v]) => v);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
   const noticeLines = noticeCells.map(([, v]) => doc.splitTextToSize(v, cellW));

@@ -646,8 +646,11 @@ function buildBaitVisitPDF(q, v) {
   };
   ensure(20); y -= 2.5; head();
   stations.forEach((s, i) => {
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-    const cells = cols.map(c => doc.splitTextToSize(c.f(s) || '', c.w - 3));
+    // Feeding stations stand out in bold, and each cell is measured in the
+    // font it's drawn in, so a bold one stays inside its column.
+    const bold = ci => ci === 0 || (cols[ci].h === 'FINDING' && BAIT_FEEDING.includes(s.status));
+    doc.setFontSize(8.5);
+    const cells = cols.map((c, ci) => { doc.setFont('helvetica', bold(ci) ? 'bold' : 'normal'); return doc.splitTextToSize(c.f(s) || '', c.w - 3); });
     // Short rows: twelve or more stations still leave room for the sign-off.
     const rowH = Math.max(...cells.map(l => l.length * 3.6)) + 1.7;
     if (y + rowH > BOTTOM) { doc.addPage(); y = drawPdfRunningHeader(doc, company, docName, q.address, number); head(); }
@@ -656,8 +659,7 @@ function buildBaitVisitPDF(q, v) {
     let x = M + 3;
     cells.forEach((lines, ci) => {
       const finding = cols[ci].h === 'FINDING';
-      // Feeding stations stand out in bold.
-      doc.setFont('helvetica', ci === 0 || (finding && BAIT_FEEDING.includes(s.status)) ? 'bold' : 'normal');
+      doc.setFont('helvetica', bold(ci) ? 'bold' : 'normal');
       doc.setFontSize(8.5); doc.setTextColor(...(finding && BAIT_FEEDING.includes(s.status) ? C.accentDark : C.ink));
       doc.text(lines, x, y + 3.8);
       x += cols[ci].w;

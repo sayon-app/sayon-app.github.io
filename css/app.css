@@ -175,8 +175,10 @@ body.large-touch .notes-toggle { width: 52px; }
 body.large-touch .section-tab { min-height: 52px; padding: 14px 18px; font-size: 14px; }
 body.large-touch .job-input { min-height: 52px; padding: 14px 13px; font-size: 15px; }
 body.large-touch #jobPanelBody .job-input, body.large-touch #reportBody .job-input { min-height: 56px; font-size: 16px; }
+/* Buttons with words in them get taller, never narrower: a fixed square
+   squeezed "Yes, it's sent" and Upgrade into three lines. */
 body.large-touch .job-action-btn,
-body.large-touch .extract-btn,
+body.large-touch .extract-btn { min-height: 56px; }
 body.large-touch .mic-fab { width: 68px; height: 68px; }
 body.large-touch .toggle-switch { width: 56px; height: 32px; }
 body.large-touch .toggle-switch::after { width: 28px; height: 28px; }

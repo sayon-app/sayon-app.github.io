@@ -599,9 +599,10 @@ function renderTreatmentProducts(products) {
   }
   document.getElementById('trProducts').innerHTML = products.map((p, i) => `
     <div class="treat-product" data-i="${i}">
+      <div class="treat-product-head">Product ${i + 1}</div>
       <div class="job-row">
         <div class="job-field">
-          <div class="job-field-label">Product</div>
+          <div class="job-field-label">Name</div>
           <input class="job-input" data-f="name" list="trProductList" value="${esc(p.name || '')}" placeholder="e.g. Termidor" oninput="onTreatmentProductName(this)">
         </div>
         <div class="job-field">

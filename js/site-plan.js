@@ -174,8 +174,8 @@ function sitePlanSubSummary(plan) {
   if (count('clearance')) bits.push(n(count('clearance'), 'low clearance area', 'low clearance areas'));
   if (count('noaccess')) bits.push(n(count('noaccess'), 'area that could not be reached', 'areas that could not be reached'));
   if (count('subtreated')) bits.push('treated soil');
-  if (count('activity')) bits.push(n(count('activity'), 'place termite activity was found', 'places termite activity was found'));
-  if (count('damage')) bits.push(n(count('damage'), 'place timber damage was found', 'places timber damage was found'));
+  if (count('activity')) bits.push(n(count('activity'), 'place where termite activity was found', 'places where termite activity was found'));
+  if (count('damage')) bits.push(n(count('damage'), 'place where timber damage was found', 'places where timber damage was found'));
   if (count('decay')) bits.push(n(count('decay'), 'place with decay', 'places with decay'));
   if (count('moisture')) bits.push(n(count('moisture'), 'damp or leaking spot', 'damp or leaking spots'));
   if (count('antcap')) bits.push(n(count('antcap'), 'ant cap problem', 'ant cap problems'));
@@ -208,7 +208,7 @@ function sitePlanSummary(plan) {
   if (count('physical')) bits.push(`a physical barrier${physical ? ` (about ${formatPlanMetres(physical)})` : ''}`);
   if (count('treated')) bits.push(`${count('treated')} direct treatment spot${count('treated') === 1 ? '' : 's'}`);
   if (count('untreated') + count('noaccess')) bits.push('areas not treated');
-  if (count('activity')) bits.push(`${count('activity')} place${count('activity') === 1 ? '' : 's'} termite activity or damage was found`);
+  if (count('activity')) bits.push(`${count('activity')} place${count('activity') === 1 ? '' : 's'} where termite activity or damage was found`);
   return bits.length ? joinWithAnd(bits) : '';
 }
 

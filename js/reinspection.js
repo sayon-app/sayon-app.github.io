@@ -78,6 +78,7 @@ function reinspectWhen(item) {
   const n = Math.abs(item.days);
   const span = n >= 60 ? `${Math.round(n / 30.4)} months` : n >= 14 ? `${Math.round(n / 7)} weeks` : `${n} day${n === 1 ? '' : 's'}`;
   if (item.days === 0) return 'Due today';
+  if (item.days === 1) return 'Due tomorrow';
   return item.overdue ? `Overdue by ${span}` : `Due in ${span}`;
 }
 
@@ -173,7 +174,7 @@ function openReinspectDetail(id) {
 function reinspectEmailText(it) {
   const company = getCompanyDetails();
   const r = it.r;
-  const first = (r.client || '').trim().split(/\s+/)[0];
+  const first = greetingName(r.client);
   const me = typeof lastInspectorDetails === 'function' ? lastInspectorDetails().name : '';
   const address = r.address || 'your property';
   const whenLine = it.overdue
@@ -277,9 +278,8 @@ async function sendTextEmailDirect({ to, subject, body }) {
     return true;
   } catch (e) {
     directEmailText = false;
-    if (!(e instanceof TypeError)) reportError(e, 'send_reminder_email');
-    const why = e instanceof TypeError ? 'Could not reach SAYON to send it' : e.message;
-    showToast(`${why}. Tap again to send it from your email app`, 'error');
+    if (!sendFailedForSignal(e)) reportError(e, 'send_reminder_email');
+    showToast(`${sendFailureReason(e)}. Tap again to send it from your email app`, 'error');
     return false;
   } finally {
     directEmailSending = false;

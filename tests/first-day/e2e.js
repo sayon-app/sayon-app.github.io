@@ -72,9 +72,9 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   await p.fill('#suEmail', 'sam@example.com'); await p.fill('#suPassword', 'longenough1'); await p.click('#suBtn'); await p.waitForTimeout(2500);
   check(await p.evaluate(() => document.getElementById('onboardScreen').style.display === 'flex'), 'a new account sees the business set-up');
   const sent = state.signupCalls[state.signupCalls.length - 1].data;
-  check(sent.terms_version === 3 && sent.privacy_version === 6 && !isNaN(Date.parse(sent.terms_accepted_at)), 'the sign-up records which Terms and Privacy versions were agreed to, and when: ' + JSON.stringify(sent));
+  check(sent.terms_version === 3 && sent.privacy_version === 7 && !isNaN(Date.parse(sent.terms_accepted_at)), 'the sign-up records which Terms and Privacy versions were agreed to, and when: ' + JSON.stringify(sent));
   const labels = await p.evaluate(() => [...document.querySelectorAll('#ob-panel-0 .auth-label')].map(l => l.textContent.trim()));
-  check(labels.some(l => /Licence.*can wait/.test(l)) && labels.some(l => /Phone.*can wait/.test(l)), 'licence and phone are marked as able to wait');
+  check(labels.some(l => /licence.*can wait/i.test(l)) && labels.some(l => /phone.*can wait/i.test(l)), 'licence and phone are marked as able to wait');
   await p.evaluate(() => { obNext(0); obNext(1); obFinish(); }); await p.waitForTimeout(1200);
   const landed = await p.evaluate(() => ({ app: document.getElementById('app').style.display, menu: getComputedStyle(document.getElementById('mainMenu')).display, ob: localStorage.getItem('korva_onboarded_v1:u-sam') }));
   check(landed.app === 'flex' && landed.menu === 'none' && landed.ob === '1', 'after set-up the report screen opens and the flag is per account');

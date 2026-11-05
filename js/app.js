@@ -12,6 +12,7 @@
 // entry — only PDF export actually needs jsPDF, so we defer the failure to
 // there instead of crashing everything up front.
 let jsPDF = (window.jspdf && window.jspdf.jsPDF) || null;
+tidyPdfLineBreaks(jsPDF);
 
 // If jsPDF didn't load the first time, retry loading it on demand (e.g. when
 // the technician's connection comes back and they try to generate a PDF)
@@ -26,9 +27,10 @@ function ensureJsPDFLoaded() {
     s.setAttribute('data-jspdf-retry', '1');
     s.onload = () => {
       jsPDF = (window.jspdf && window.jspdf.jsPDF) || null;
+      tidyPdfLineBreaks(jsPDF);
       if (jsPDF) resolve(jsPDF); else reject(new Error('jsPDF script loaded but did not define window.jspdf.jsPDF'));
     };
-    s.onerror = () => reject(new Error('Could not load the PDF library — check your internet connection and try again.'));
+    s.onerror = () => reject(new Error('Could not load the PDF tools. Check your signal and try again'));
     document.head.appendChild(s);
   });
 }
@@ -93,7 +95,7 @@ const OB_KEY = 'korva_onboarded_v1';
 // Per account, and decided from the data too: a new person on a phone that
 // was used before still sets up their business, and an existing customer on
 // a new phone (whose details come down with the account) doesn't repeat it.
-function obKey() { return authUser && authUser.id ? `${OB_KEY}:${authUser.id}` : OB_KEY; }
+function obKey(userId = authUser && authUser.id) { return userId ? `${OB_KEY}:${userId}` : OB_KEY; }
 function shouldShowOnboarding() {
   return !localStorage.getItem(obKey()) && !getCompanyDetails().updatedAt;
 }
@@ -239,7 +241,7 @@ function obRunDemo() {
   btn.textContent = 'Running…';
   demoText.classList.add('active');
 
-  const phrase = 'Detached house, single storey, brick veneer walls, colorbond roof, concrete slab on ground, north facing, fine and dry, owner occupied.';
+  const phrase = 'Detached house, single storey, brick veneer walls, Colorbond roof, concrete slab on ground, north facing, fine and dry, owner occupied.';
   let i = 0;
   demoText.textContent = '';
 
@@ -251,7 +253,7 @@ function obRunDemo() {
       clearInterval(typeInterval);
       // Flash each field as if populating
       setTimeout(() => {
-        demoText.textContent = '✓ Fields extracted — Structure Type, Height, Wall Construction, Roof Type, Floor Type, Orientation, Weather, Occupancy';
+        demoText.textContent = '✓ Filled in: structure type, height, wall construction, roof type, floor type, orientation, weather and occupancy';
         demoText.style.color = 'var(--green)';
         btn.style.display   = 'none';
         nextBtn.textContent  = 'Continue →';
@@ -467,7 +469,11 @@ function textAreas(text) {
 // "Finding 2 (rear left fence post)", "Borers (front bedroom floorboards)".
 function areaEvidence(zoneId) {
   const out = [];
-  const short = t => { const s = String(t || '').trim().replace(/[.;]+$/, ''); return s.length > 60 ? s.slice(0, 57).replace(/\s+\S*$/, '') + '...' : s; };
+  const short = t => {
+    const s = lowerFirst(bracketText(t));
+    return s.length <= 60 ? s : s.slice(0, 57).replace(/\s+\S*$/, '').replace(/[\s,;:–—-]+$/, '')
+      .replace(/\s+(the|a|an|and|or|of|to|in|on|at|by|with|where|from|for)$/i, '') + '…';
+  };
   (reportData.findings || []).forEach((f, i) => {
     if (!f || f.termiteActivity === 'NONE') return;
     if (textAreas([f.activityLocation, f.damageDescription].join(' ')).includes(zoneId)) out.push(`Finding ${i + 1}${f.activityLocation ? ` (${short(f.activityLocation)})` : ''}`);
@@ -475,12 +481,13 @@ function areaEvidence(zoneId) {
   shownBorerFindings().forEach((b, i) => {
     if (textAreas([b.location, b.timberAffected, b.description].join(' ')).includes(zoneId)) out.push(`Borer finding ${i + 1}${b.location ? ` (${short(b.location)})` : ''}`);
   });
+  // Decay and delignification are named by where they are, or else by what.
   const other = [
-    ['Wood decay', reportData.decayFound === 'YES', whatWhere(reportData.decayDetails, reportData.decayWhere)],
-    ['Chemical delignification', reportData.delignification === 'YES', whatWhere(reportData.delignificationDetails, reportData.delignificationWhere)],
+    ['Wood decay', reportData.decayFound === 'YES', reportData.decayDetails, reportData.decayWhere],
+    ['Chemical delignification', reportData.delignification === 'YES', reportData.delignificationDetails, reportData.delignificationWhere],
   ];
-  other.forEach(([label, found, details]) => {
-    if (found && textAreas(details).includes(zoneId)) out.push(`${label} (${short(details)})`);
+  other.forEach(([label, found, what, where]) => {
+    if (found && textAreas([what, where].join(' ')).includes(zoneId)) out.push(`${label} (${short(where || what)})`);
   });
   return out;
 }
@@ -623,7 +630,7 @@ function renderAreaChecklist() {
     return `<div class="area-node${status ? ' area-node-' + status.toLowerCase() : ''}${areaOpen.has(zoneId) ? ' open' : ''}" data-zone-node="${zoneId}">
       <span class="area-node-dot" aria-hidden="true">${dot}</span>
       <details class="obs-zone-panel" data-zone="${zoneId}"${areaOpen.has(zoneId) ? ' open' : ''} ontoggle="onAreaToggle('${zoneId}', this.open)">
-      <summary class="obs-zone-panel-header area-summary">${areaSummary(zoneId, zone.label.replace(/^The /, ''))}</summary>
+      <summary class="obs-zone-panel-header area-summary">${areaSummary(zoneId, zoneName(zoneId))}</summary>
       <div class="area-status">${statusBtns}</div>${result}${reasons}</details></div>`;
   }).join('');
 }
@@ -639,6 +646,19 @@ function onAreaToggle(zoneId, open) {
   if (open) areaOpen.add(zoneId); else areaOpen.delete(zoneId);
   const node = document.querySelector(`[data-zone-node="${zoneId}"]`);
   if (node) node.classList.toggle('open', open);
+}
+
+// An area's name as the app shows it, in sentence case: "Interior", "Roof
+// void". OBS_ZONES labels stay as they are: saved reports are read by them.
+function zoneName(z) {
+  const l = OBS_ZONES[z].label.replace(/^The /, '');
+  return l.charAt(0) + l.slice(1).toLowerCase();
+}
+
+// Areas named in a sentence, from their labels: "The interior, subfloor
+// and roof void".
+function zoneList(labels) {
+  return joinWithAnd(labels.map((l, i) => i ? l.replace(/^The /, '').toLowerCase() : l.charAt(0) + l.slice(1).toLowerCase()));
 }
 
 function areaSummary(zoneId, name) {
@@ -822,11 +842,11 @@ function applyObstructionExtraction(data, transcript) {
     });
     if (matchedAny || changed) {
       changed = true;
-      showToast('Areas updated from voice — check they match what you described', 'info');
+      showToast('Areas updated from your note. Check they match what you said', 'info');
     } else {
       // Nothing in our fixed area list matched — surface it rather than
       // silently losing it, so the technician marks the area manually.
-      showToast(`Obstruction mentioned but not auto-matched: "${combinedText.slice(0, 120)}" — mark the area manually`, 'info');
+      showToast(`Mark the area for this obstruction yourself: "${combinedText.slice(0, 120)}"`, 'info');
     }
   }
   if (changed) syncObstructionData();
@@ -906,7 +926,7 @@ function voiceAccessSpots(kind, zones) {
     const z = zones.find(z => (ZONE_SPOT_ALIASES[z] || []).some(a => low.startsWith(a) && !/[a-z]/.test(low.charAt(a.length))));
     if (!z) { out._other.push(seg); return; }
     const alias = ZONE_SPOT_ALIASES[z].find(a => low.startsWith(a));
-    const rest = seg.slice(alias.length).replace(/^[\s:,–—-]+/, '').replace(/[.;]$/, '').trim();
+    const rest = seg.slice(alias.length).replace(/^[\s:,–—-]+/, '').replace(/[.;]$/, '').trim().replace(/^\(([^()]*)\)$/, '$1');
     (out[z] = out[z] || []).push(rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : seg);
   });
   return out;
@@ -988,7 +1008,7 @@ function renderAccessSummary() {
     const status = areaStatusOf(z) === 'NOT' ? 'Not inspected' : 'Inspected with limits';
     const kind = restricted ? 'restricted' : 'hindered';
     return `<div class="access-item">
-      <span class="access-item-name">${OBS_ZONES[z].label.replace(/^The /, '')}</span>
+      <span class="access-item-name">${zoneName(z)}</span>
       <button type="button" class="access-item-state" onclick="openAreaRow('${z}')" aria-label="${status}. Change in Areas">${status}</button>${why}
       ${spotLine(kind, z)}${spotPhotos(kind, z)}</div>`;
   }).filter(Boolean);
@@ -1054,14 +1074,15 @@ function accessLimits() {
   // 'What hindered it'.
   const areaRows = hindered.length;
   const hOther = accessSpot('hindered', '_other', hZones), rOther = accessSpot('restricted', '_other', rZones);
-  if (hOther) hindered.push([areaRows ? 'Other spots' : 'Where', hOther]);
+  const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+  if (hOther) hindered.push([areaRows ? 'Other spots' : 'Where', cap(hOther)]);
   // The inspector's own words about what was in the way always print, so a
   // dictated reason isn't lost behind the per-area rows.
   if (detail && !hinderedTextIsNil()) hindered.push(['What obstructed it', detail]);
-  if (rOther) restricted.push([restricted.length ? 'Other spots' : 'Where and why', rOther]);
+  if (rOther) restricted.push([restricted.length ? 'Other spots' : 'Where and why', cap(rOther)]);
   const limited = areasNotFullyInspected();
   const highRisk = !isBlankValue(reportData.highRiskAreas) ? reportData.highRiskAreas
-    : [!isBlankValue(reportData.noAccessAreas) ? reportData.noAccessAreas : '', ...limited.map(z => OBS_ZONES[z].label)].filter(Boolean).join('; ');
+    : joinPlaces([!isBlankValue(reportData.noAccessAreas) ? reportData.noAccessAreas : '', zoneList(limited.map(z => OBS_ZONES[z].label))]);
   const allMarked = Object.keys(OBS_ZONES).every(z => areaStatusOf(z));
   return { hindered, restricted, highRisk, allMarked };
 }
@@ -1123,7 +1144,7 @@ function accessSpotPhotos() {
     [...zones, '_other'].forEach(key => {
       const photos = (reportData.photosBySection || {})[spotPhotoSection(kind, key)] || [];
       if (!photos.length || (key === '_other' && !accessSpot(kind, '_other', zones))) return;
-      const where = (key === '_other' ? 'Other spot' : OBS_ZONES[key].label.replace(/^The /, '')) + (kind === 'restricted' ? ', restricted' : ', obstruction');
+      const where = (key === '_other' ? 'Other spot' : zoneName(key)) + (kind === 'restricted' ? ', restricted' : ', obstruction');
       photos.forEach(p => out.push({ ...p, caption: [where, (p.caption || '').trim()].filter(Boolean).join(': ') }));
     });
   });
@@ -2011,13 +2032,24 @@ let updateReloadPending = false;
 
 function appIsBusy() {
   const el = document.activeElement;
-  return isRecording || document.body.classList.contains('ai-busy')
+  return isRecording || document.body.classList.contains('ai-busy') || formSheetOpen()
     || !!(el && el.matches('input, textarea, select, [contenteditable="true"]'));
+}
+
+// A sheet with a form of its own is open (the treatment record, a bait
+// visit, the client's answer, the site plan, the agreement, an email being
+// checked, a photo being marked up). What's on it isn't saved until its
+// button is tapped, so an update waits until it's closed.
+const FORM_SHEETS = ['treatmentOverlay', 'baitOverlay', 'quoteAnswerOverlay', 'sitePlanOverlay', 'agreementOverlay', 'sendReviewOverlay'];
+function formSheetOpen() {
+  const markup = document.getElementById('photoMarkup');
+  return FORM_SHEETS.some(id => { const el = document.getElementById(id); return !!el && el.classList.contains('open'); })
+    || !!(markup && !markup.hidden);
 }
 
 function reloadForUpdate() {
   if (appIsBusy()) { updateReloadPending = true; return; }
-  flushDraftSave();
+  saveBeforeLeaving();
   location.reload();
 }
 
@@ -2102,7 +2134,7 @@ window.addEventListener('load', () => {
   const statusEl = document.getElementById('splashStatus');
   const messages = [
     'Initialising vocabulary…',
-    'Loading NSW species reference…',
+    'Loading the termite species reference…',
     'Preparing report template…',
   ];
   let msgIndex = 0;
@@ -2123,32 +2155,38 @@ window.addEventListener('load', () => {
 
   setTimeout(async () => {
     const splash = document.getElementById('splash');
-    splash.style.opacity = '0';
-    setTimeout(async () => {
-      splash.style.display = 'none';
+    const hideSplash = () => new Promise(done => {
+      splash.style.opacity = '0';
+      setTimeout(() => { splash.style.display = 'none'; done(); }, 600);
+    });
 
-      // If we arrived here via a "reset your password" email link, Supabase
-      // redirects back with the recovery tokens in the URL hash. Handle that
-      // before anything else — it takes priority over any existing session.
-      const recovery = parseRecoveryHash();
-      if (recovery) {
-        pendingRecoverySession = recovery;
-        // Strip the tokens out of the visible URL/history now that we've read them.
-        history.replaceState(null, '', window.location.pathname + window.location.search);
-        document.getElementById('authScreen').style.display = 'flex';
-        showAuth('authResetPassword');
-        return;
-      }
+    // If we arrived here via a "reset your password" email link, Supabase
+    // redirects back with the recovery tokens in the URL hash. Handle that
+    // before anything else — it takes priority over any existing session.
+    const recovery = parseRecoveryHash();
+    if (recovery) {
+      await hideSplash();
+      pendingRecoverySession = recovery;
+      // Strip the tokens out of the visible URL/history now that we've read them.
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+      document.getElementById('authScreen').style.display = 'flex';
+      showAuth('authResetPassword');
+      return;
+    }
 
-      const hasSession = await restoreAuthSession();
-      if (hasSession) { enterApp(); noticeInviteWhileSignedIn(); }
-      else {
-        document.getElementById('authScreen').style.display = 'flex';
-        // The website's "Start your free trial" lands on the sign-up card.
-        showAuth(new URLSearchParams(window.location.search).get('signup') ? 'authSignUp' : 'authSignIn');
-        applyInviteToSignUp();
-      }
-    }, 600);
+    // The splash stays up while the sign-in and the business load, so the
+    // screen is never blank on a weak signal (see START_NETWORK_WAIT_MS).
+    const slow = setTimeout(() => { if (statusEl) statusEl.textContent = 'Signing in…'; }, 1000);
+    const hasSession = await restoreAuthSession();
+    clearTimeout(slow);
+    await hideSplash();
+    if (hasSession) { enterApp(); noticeInviteWhileSignedIn(); }
+    else {
+      document.getElementById('authScreen').style.display = 'flex';
+      // The website's "Start your free trial" lands on the sign-up card.
+      showAuth(new URLSearchParams(window.location.search).get('signup') ? 'authSignUp' : 'authSignIn');
+      applyInviteToSignUp();
+    }
   }, 2200);
 });
 
@@ -2365,7 +2403,7 @@ function useTranscriptForNotes() {
   const key = activeNotesTargetKey;
   const text = currentTranscript.trim();
   if (!text) {
-    showToast('Nothing to add yet — speak first', 'error');
+    showToast('Nothing to add yet. Speak first', 'error');
     return;
   }
 
@@ -2391,7 +2429,7 @@ function useTranscriptForNotes() {
 function resetVoicePopoverToDefault() {
   activeNotesTargetKey = null;
   const title = document.getElementById('voicePopoverTitleText');
-  if (title) title.textContent = 'Voice Capture';
+  if (title) title.textContent = 'Voice capture';
   document.getElementById('extractBtn').style.display = 'flex';
   document.getElementById('useTranscriptBtn').style.display = 'none';
   const box = document.getElementById('transcriptBox');
@@ -2724,7 +2762,7 @@ function applyCleanupSuggestion() {
   // longer matches what's in the box - dismiss rather than silently
   // overwrite edits the inspector made in the meantime.
   if (currentTranscript !== cleanupOriginalText) {
-    showToast('Transcript changed since this suggestion was made — dismissed rather than risk overwriting your edits', 'error');
+    showToast('The transcript changed after this suggestion was made, so it was dropped to keep your edits', 'error');
     dismissCleanupSuggestion();
     return;
   }
@@ -2734,7 +2772,7 @@ function applyCleanupSuggestion() {
     box.textContent = currentTranscript;
     box.classList.add('active');
   }
-  showToast('Cleanup applied — review before extracting', 'success');
+  showToast('Cleanup applied. Check it before extracting', 'success');
   dismissCleanupSuggestion();
 }
 
@@ -2923,7 +2961,7 @@ function showServerTranscriptionSuggestion(transcript, before) {
 function applyServerTranscript() {
   if (!serverTranscriptSuggestion) return;
   if (currentTranscript !== serverTranscriptOriginalText) {
-    showToast('Transcript changed since this alternate version was generated — dismissed rather than risk overwriting your edits', 'error');
+    showToast('The transcript changed after this version was made, so it was dropped to keep your edits', 'error');
     dismissServerTranscript();
     return;
   }
@@ -3182,7 +3220,7 @@ function driveWave(on) {
 function startRecording() {
   const SR = getSpeechRecognitionCtor();
   const useWhisper = canUseWhisperListening();
-  if (!SR && !useWhisper) { showToast('Speech recognition not supported — tap the transcript box to type instead', 'error'); return; }
+  if (!SR && !useWhisper) { showToast('Speech recognition isn\'t supported here. Tap the transcript box to type instead', 'error'); return; }
   track('dictation_started');
 
   lowConfidenceFlagged = false;
@@ -3280,11 +3318,11 @@ function startRecording() {
       // reason to stop: onend opens a fresh session and keeps listening.
       if (reason === 'no-speech' || reason === 'aborted') return;
       const messages = {
-        'network': 'No signal for voice recording. Tap the box and use your keyboard\'s mic to dictate instead — the note will be saved and filled in when you\'re back online.',
-        'audio-capture': 'Microphone not available — check mic permission and that no other app is using it.',
-        'not-allowed': 'Microphone permission denied — enable it in your browser/device settings.',
-        'service-not-allowed': 'Speech service not allowed — check your browser/device permissions.',
-        'language-not-supported': 'This device doesn\'t support en-AU speech recognition.',
+        'network': 'No signal for voice recording. Tap the box and use your keyboard\'s mic to dictate instead. The note is saved and fills in when you\'re back online',
+        'audio-capture': 'The microphone isn\'t available. Check the mic permission and that no other app is using it',
+        'not-allowed': 'Microphone permission is off. Turn it on in your browser or phone settings',
+        'service-not-allowed': 'Speech recognition isn\'t allowed. Check your browser or phone permissions',
+        'language-not-supported': 'This phone doesn\'t support Australian English speech recognition',
       };
       showToast(messages[reason] || `Speech recognition stopped (${reason})`, 'error');
       stopRecording();
@@ -3324,7 +3362,7 @@ function startRecording() {
   isRecording = true;
   updateVoiceHud();
   document.getElementById('voiceBtn').classList.add('recording');
-  document.getElementById('voiceBtnText').textContent = 'Recording… Tap to Stop';
+  document.getElementById('voiceBtnText').textContent = 'Recording… tap to stop';
   document.getElementById('waveform').classList.add('show');
   driveWave(true);
   document.getElementById('extractBtn').disabled = true;
@@ -3386,7 +3424,7 @@ function stopRecording() {
   isRecording = false;
   updateVoiceHud();
   document.getElementById('voiceBtn').classList.remove('recording');
-  document.getElementById('voiceBtnText').textContent = 'Tap to Speak';
+  document.getElementById('voiceBtnText').textContent = 'Tap to speak';
   document.getElementById('waveform').classList.remove('show');
   driveWave(false);
   if (currentTranscript.trim()) document.getElementById('extractBtn').disabled = false;
@@ -3643,7 +3681,7 @@ function buildSpeciesIntelHTML(data) {
   // On-site field identification — rendered first, most useful in the moment
   if (data.fieldID && data.fieldID.length > 0) {
     html += `<div class="intel-section intel-section-field-id">
-      <div class="intel-section-title">🔍 On Site — What to Look For</div>
+      <div class="intel-section-title">🔍 On site: what to look for</div>
       <div class="intel-list">`;
     data.fieldID.forEach(item => {
       html += `<div class="intel-item intel-field-id-item">${item}</div>`;
@@ -3676,7 +3714,7 @@ function buildSpeciesIntelHTML(data) {
   // Nest locations
   if (data.nestTypes && data.nestTypes.length > 0) {
     html += `<div class="intel-section">
-      <div class="intel-section-title">Nest Locations</div>
+      <div class="intel-section-title">Nest locations</div>
       <div class="intel-list">`;
     data.nestTypes.forEach(item => {
       html += `<div class="intel-item">${item}</div>`;
@@ -3698,7 +3736,7 @@ function buildSpeciesIntelHTML(data) {
   // Treatment options
   if (data.treatmentOptions && data.treatmentOptions.length > 0) {
     html += `<div class="intel-section">
-      <div class="intel-section-title">Treatment Options</div>
+      <div class="intel-section-title">Treatment options</div>
       <div class="intel-treatments">`;
     data.treatmentOptions.forEach(opt => {
       html += `<div class="intel-treatment">
@@ -3716,7 +3754,7 @@ function buildSpeciesIntelHTML(data) {
   // Field note prompts
   if (data.fieldNotePrompts && data.fieldNotePrompts.length > 0) {
     html += `<div class="intel-section">
-      <div class="intel-section-title">Field Note Prompts</div>
+      <div class="intel-section-title">Field note prompts</div>
       <div class="intel-prompts">`;
     data.fieldNotePrompts.forEach(prompt => {
       html += `<div class="intel-prompt-item">${prompt}</div>`;
@@ -4284,7 +4322,7 @@ async function runFill({ whileRecording = false } = {}) {
   learnFromTranscriptEdit();
   const note = currentTranscript;
   if (!note.trim()) return false;
-  setAI('thinking', 'Filling in the report from your note...');
+  setAI('thinking', 'Filling in the report from your note…');
   document.getElementById('extractBtn').disabled = true;
   const before = extractSnapshot();
   const fillTarget = reportData;
@@ -4319,7 +4357,7 @@ async function runFill({ whileRecording = false } = {}) {
     if (err.tooLong || err.status === 413) {
       setAI('ready', 'AI ready');
       if (!isRecording) document.getElementById('extractBtn').disabled = false;
-      showToast('That note is too long for the AI in one go. Split it into shorter notes and extract each one', 'error');
+      showToast('That note is too long for the AI in one go. Split it into shorter notes and fill each one in', 'error');
       return false;
     }
     // Nothing is guessed from the note: it waits with any others until the
@@ -4339,13 +4377,13 @@ async function runFill({ whileRecording = false } = {}) {
       const waiting = getPendingNotes()[getPendingNotes().length - 1];
       if (waiting) { waiting.problem = extractionProblem(err); saveDraft(); renderPendingNotes(); }
       setAI('ready', 'Note saved');
-      showToast(`${extractionProblem(err)}. Your note is saved under Waiting notes.`, 'error');
+      showToast(`${extractionProblem(err)}. Your note is saved under Waiting notes`, 'error');
     } else if (err.noSignal) {
       setAI('ready', 'Saved until there\'s signal');
-      showToast('No signal — note saved. It will fill in the report when you\'re back online.', 'info');
+      showToast('No signal, so your note is saved. It fills in the report when you\'re back online', 'info');
     } else {
       setAI('ready', 'Note saved');
-      showToast(`${pendingNotesProblem}. Your note is saved and will fill in once that's sorted.`, 'error');
+      showToast(`${pendingNotesProblem}. Your note is saved and fills in once that's sorted`, 'error');
     }
   }
 
@@ -4389,7 +4427,7 @@ function getPendingNotes() {
 function queuePendingNote(text) {
   const notes = getPendingNotes();
   if (notes.length >= MAX_PENDING_NOTES) {
-    showToast(`${MAX_PENDING_NOTES} notes are already waiting — fill those in before adding more`, 'error');
+    showToast(`${MAX_PENDING_NOTES} notes are already waiting. Fill those in before adding more`, 'error');
     return false;
   }
   const id = 'note_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4441,14 +4479,14 @@ function renderPendingNotes() {
 async function processPendingNotes(manual) {
   if (pendingNotesRunning || !getPendingNotes().length || isReportLocked()) return;
   if (!navigator.onLine) {
-    if (manual) showToast('Still no signal — the notes will fill in when you\'re back online', 'info');
+    if (manual) showToast('Still no signal. The notes fill in when you\'re back online', 'info');
     return;
   }
   const target = reportData;
   const before = extractSnapshot();
   pendingNotesRunning = true;
   renderPendingNotes();
-  setAI('thinking', 'Filling in saved notes...');
+  setAI('thinking', 'Filling in saved notes…');
   let filled = 0, stillNoSignal = false, stuck = 0, kept = false;
   try {
     // Oldest first. A note with a problem of its own (too long, an answer
@@ -4471,7 +4509,7 @@ async function processPendingNotes(manual) {
           continue;
         }
         pendingNotesProblem = extractionProblem(err);
-        if (manual) showToast(`${pendingNotesProblem}. Your notes are still saved.`, 'error');
+        if (manual) showToast(`${pendingNotesProblem}. Your notes are still saved`, 'error');
         break;
       }
       pendingNotesProblem = null;
@@ -4494,13 +4532,13 @@ async function processPendingNotes(manual) {
   if (filled && reportData === target && currentReportId && getSavedReports().some(r => r.id === currentReportId)) {
     saveCurrentReport(true);
   }
-  if (filled) showToast(`${filled} saved note${filled !== 1 ? 's' : ''} filled in — check the report`, 'success');
+  if (filled) showToast(`${filled} saved note${filled !== 1 ? 's' : ''} filled in. Check the report`, 'success');
   // Fill in now shows what the notes filled; processTranscript() shows its
   // own sheet when it ran the queue.
   if (filled && manual && !extractSummaryOwned && reportData === target) showExtractSummary(before);
   else if (kept) showToast('Your notes are kept under Waiting notes. Tap Fill in now when you\'re ready', 'info');
-  else if (stillNoSignal && manual) showToast('Still no signal — the notes will fill in when you\'re back online', 'info');
-  if (stuck && (manual || !filled)) showToast(`${stuck} note${stuck !== 1 ? 's' : ''} couldn't be read — see the reason under the note`, 'error');
+  else if (stillNoSignal && manual) showToast('Still no signal. The notes fill in when you\'re back online', 'info');
+  if (stuck && (manual || !filled)) showToast(`${stuck} note${stuck !== 1 ? 's' : ''} couldn't be read. See why under ${stuck !== 1 ? 'each note' : 'the note'}`, 'error');
 }
 
 // ── EXTRACT SUMMARY ─────────────────────────────────────────────────────
@@ -4666,8 +4704,8 @@ function goToReportField(target, referral) {
   if (section && section.id.startsWith('section-')) showSection(section.id.slice(8));
   openFieldGroups(el);
   if (referral) {
-    // The "Builder / Engineer Referral" field inside the finding card.
-    const label = [...el.querySelectorAll('.field-label')].find(l => /builder or engineer/i.test(l.textContent));
+    // The "Builder or engineer referral" field inside the finding card.
+    const label = [...el.querySelectorAll('.field-label')].find(l => /builder (or|\/) engineer/i.test(l.textContent));
     if (label && label.nextElementSibling) el = label.nextElementSibling;
   }
   setTimeout(() => {
@@ -4722,7 +4760,7 @@ async function scanCompliancePlate(fromFile) {
   } catch (e) {
     const msg = ((e && e.message) || '') + '';
     if (!/cancel/i.test(msg)) {
-      showToast('Could not open the camera — check camera permission in Settings', 'error');
+      showToast('Could not open the camera. Check the camera permission in Settings', 'error');
     }
     return;
   }
@@ -4736,7 +4774,7 @@ async function scanCompliancePlate(fromFile) {
   if (btn) btn.disabled = true;
   if (fileBtn) fileBtn.disabled = true;
   if (btnText) btnText.textContent = 'Reading plate…';
-  setAI('thinking', 'Reading compliance plate...');
+  setAI('thinking', 'Reading the compliance plate…');
 
   try {
     const res = await workerFetch('', {
@@ -4787,13 +4825,13 @@ async function scanCompliancePlate(fromFile) {
         setTimeout(() => showToast(parsed.extraDetails, 'info'), 1600);
       }
     } else {
-      showToast("Couldn't read a compliance plate clearly in that photo — try again with better light, or enter it manually", 'info');
+      showToast("Couldn't read a compliance plate in that photo. Try again in better light, or type it in", 'info');
     }
     setAI('ready', 'Ready');
 
   } catch (err) {
     console.warn('Plate scan failed:', err);
-    showToast('Could not read the plate — check your connection and try again', 'error');
+    showToast('Could not read the plate. Check your signal and try again', 'error');
     setAI('ready', 'Ready');
   } finally {
     if (btn) btn.disabled = false;
@@ -4851,8 +4889,8 @@ async function analyzeGalleryPhoto(photoId) {
   const mediaType = match[1];
   const base64 = match[2];
 
-  if (btn) { btn.disabled = true; btn.textContent = 'Analyzing…'; }
-  setAI('thinking', 'Analyzing photo...');
+  if (btn) { btn.disabled = true; btn.textContent = 'Analysing…'; }
+  setAI('thinking', 'Analysing the photo…');
 
   try {
     const res = await workerFetch('', {
@@ -4899,7 +4937,7 @@ async function analyzeGalleryPhoto(photoId) {
         renderPhotoGrid();
         saveDraft();
       }
-      showToast(`${note} — please confirm before adding to a finding`, 'success');
+      showToast(`${note}. Check it before you add it to a finding`, 'success');
       if (parsed.notes) {
         setTimeout(() => showToast(parsed.notes, 'info'), 1600);
       }
@@ -4910,7 +4948,7 @@ async function analyzeGalleryPhoto(photoId) {
 
   } catch (err) {
     console.warn('Photo analysis failed:', err);
-    showToast('Could not analyze the photo — check your connection and try again', 'error');
+    showToast('Could not analyse the photo. Check your signal and try again', 'error');
     setAI('ready', 'Ready');
   } finally {
     renderPhotoGrid(); // restores the button (re-render clears the disabled/label override above)
@@ -5101,7 +5139,7 @@ function populateFields(data, transcript) {
       const combined = [...kept, ...incoming];
       reportData.findings = combined.slice(0, MAX_FINDINGS);
       if (combined.length > MAX_FINDINGS) {
-        showToast(`Only ${MAX_FINDINGS} findings can be tracked per report — some new ones weren't added. Review and merge manually if needed.`, 'info');
+        showToast(`A report holds ${MAX_FINDINGS} findings, so some new ones weren't added. Add their details to the findings already there`, 'info');
       }
     } else if (kept.length !== existing.length || merged) {
       reportData.findings = kept;
@@ -5423,8 +5461,15 @@ const DETAIL_FIELD_FOR = {
 
 // More detail boxes that show and hide with the first one.
 const MORE_DETAIL_FIELDS = { previousTreatment: ['previousTreatmentWhere'], decayFound: ['decayWhere'], delignification: ['delignificationWhere'], nonDurableTimber: ['nonDurableTimberWhere'] };
-// "what (where)" for the summary and other one-line uses.
-const whatWhere = (what, where) => [what, where && `(${where})`].filter(Boolean).join(' ');
+// "what (where)" for the summary and other one-line uses. When either
+// already has brackets, the where follows a comma instead, so brackets never
+// sit inside or beside brackets: "Fungal decay (wet rot), bottom of the door".
+const whatWhere = (what, where) => {
+  what = String(what || '').trim().replace(/[.;,]+$/, '');
+  where = String(where || '').trim().replace(/[.;,]+$/, '');
+  if (!what || !where) return what || where;
+  return /[()]/.test(what + where) ? `${what}, ${lowerFirst(bracketText(where))}` : `${what}${inBrackets(where)}`;
+};
 
 function syncDetailField(key) {
   const [detailKey, noAnswers] = DETAIL_FIELD_FOR[key] || [];
@@ -5548,20 +5593,20 @@ function findingCardHTML(finding, index, total) {
       </div>
       <div class="finding-card-body">
         <!-- Activity gate: the question every finding must answer -->
-        <div class="findings-gate choice-panel${act ? '' : ' unset'}" role="radiogroup" aria-label="Termite Activity Status">
-          <div class="field-label">Termite Activity Status</div>
+        <div class="findings-gate choice-panel${act ? '' : ' unset'}" role="radiogroup" aria-label="Termite activity status">
+          <div class="field-label">Termite activity status</div>
           ${choiceCardsHTML('activity', 'activity-' + id, act, `data-finding="${id}" data-fkey="termiteActivity"`)}
           ${!act ? `<p class="findings-gate-hint">Pick one to continue.</p>` : ''}
         </div>
         ${showDetails ? `
         <div class="findings-details" style="display:block">
           <div class="section-fields">
-            <div class="field field-wide"><div class="field-label">Location of Activity</div>${pickFieldHTML(id, 'activityLocation', PLACES, finding.activityLocation)}</div>
-            <div class="field field-wide"><div class="field-label">Timber Affected</div>${pickFieldHTML(id, 'timberAffected', TIMBER_PARTS, finding.timberAffected)}</div>
-            <div class="field field-wide"><div class="field-label">Damage Description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${pickFieldHTML(id, 'damageDescription', TERMITE_SIGNS, finding.damageDescription)}</div>
-            <div class="field field-wide"><div class="field-label">Species / Genus</div>${fv('species','specieslist')}</div>
-            <div class="field choice-field"><div class="field-label">Termite Nest Found?</div>${fv('nestLocated','yesno')}</div>
-            <div class="field choice-field"><div class="field-label">Builder / Engineer Referral</div>${fv('structuralConcern','yesno')}</div>
+            <div class="field field-wide"><div class="field-label">Location of activity</div>${pickFieldHTML(id, 'activityLocation', PLACES, finding.activityLocation)}</div>
+            <div class="field field-wide"><div class="field-label">Timber affected</div>${pickFieldHTML(id, 'timberAffected', TIMBER_PARTS, finding.timberAffected)}</div>
+            <div class="field field-wide"><div class="field-label">Damage description <span class="field-hint">Location, extent and what's visible. No severity opinion.</span></div>${pickFieldHTML(id, 'damageDescription', TERMITE_SIGNS, finding.damageDescription)}</div>
+            <div class="field field-wide"><div class="field-label">Species / genus</div>${fv('species','specieslist')}</div>
+            <div class="field choice-field"><div class="field-label">Termite nest found?</div>${fv('nestLocated','yesno')}</div>
+            <div class="field choice-field"><div class="field-label">Builder or engineer referral</div>${fv('structuralConcern','yesno')}</div>
             <div class="field field-wide finding-photos"><div class="field-label">Photos of this finding</div>${spotPhotosHTML(findingPhotoSection(id))}</div>
           </div>
           ${act === 'INACTIVE' ? `<div class="inactive-reminder" style="display:flex"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg><span>Inactive workings can mean termites have temporarily abandoned the area, not that the risk is gone. Continued, regular inspections remain essential.</span></div>` : ''}
@@ -5638,7 +5683,7 @@ function startFindingEdit(findingId, key, type) {
   ta.type = 'text';
   ta.style.width = '100%';
   ta.value = cur;
-  ta.placeholder = 'Type value...';
+  ta.placeholder = 'Type a value';
 
   const isThis = () => activeFindingEdit && activeFindingEdit.findingId === findingId && activeFindingEdit.key === key;
   wireInlineTextEdit(ta,
@@ -5902,16 +5947,16 @@ function borerCardHTML(b, index) {
       </div>
       <div class="finding-card-body">
         <div class="findings-gate choice-panel${act ? '' : ' unset'}" role="radiogroup" aria-label="Borer activity here">
-          <div class="field-label">Borer Activity</div>
+          <div class="field-label">Borer activity</div>
           ${choiceCardsHTML('borerCard', 'borer-' + id, act, `data-finding="${id}" data-fkey="borerActivity"`)}
         </div>
         <div class="findings-details" style="display:block">
         <div class="section-fields">
           <div class="field field-wide"><div class="field-label">Location</div>${pickFieldHTML(id, 'location', PLACES, b.location)}</div>
-          <div class="field field-wide"><div class="field-label">Timber Affected</div>${pickFieldHTML(id, 'timberAffected', TIMBER_PARTS, b.timberAffected)}</div>
-          <div class="field field-wide"><div class="field-label">Borer Type</div>${pickFieldHTML(id, 'borerType', BORER_TYPES, b.borerType)}</div>
-          <div class="field field-wide"><div class="field-label">What Was Seen <span class="field-hint">Exit holes, frass, tunnelling. No severity opinion.</span></div>${pickFieldHTML(id, 'description', BORER_SIGNS, b.description)}</div>
-          <div class="field choice-field"><div class="field-label">Builder / Engineer Referral</div><div class="choice-panel${b.structuralConcern ? '' : ' unset'}" role="radiogroup">${choiceCardsHTML('finding', `structuralConcern-${id}`, b.structuralConcern, `data-finding="${id}" data-fkey="structuralConcern"`)}</div></div>
+          <div class="field field-wide"><div class="field-label">Timber affected</div>${pickFieldHTML(id, 'timberAffected', TIMBER_PARTS, b.timberAffected)}</div>
+          <div class="field field-wide"><div class="field-label">Borer type</div>${pickFieldHTML(id, 'borerType', BORER_TYPES, b.borerType)}</div>
+          <div class="field field-wide"><div class="field-label">What was seen <span class="field-hint">Exit holes, frass, tunnelling. No severity opinion.</span></div>${pickFieldHTML(id, 'description', BORER_SIGNS, b.description)}</div>
+          <div class="field choice-field"><div class="field-label">Builder or engineer referral</div><div class="choice-panel${b.structuralConcern ? '' : ' unset'}" role="radiogroup">${choiceCardsHTML('finding', `structuralConcern-${id}`, b.structuralConcern, `data-finding="${id}" data-fkey="structuralConcern"`)}</div></div>
           <div class="field field-wide finding-photos"><div class="field-label">Photos of this finding</div>${spotPhotosHTML(findingPhotoSection(id))}</div>
         </div>
         ${b.structuralConcern === 'YES' ? `<div class="warn-note note-info" style="margin:0 0 10px"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Referral recorded. The PDF recommends a licensed builder or engineer assess this damage.</div>` : ''}
@@ -5934,7 +5979,7 @@ function renderBorerFindings() {
   const add = document.getElementById('addBorerBtn');
   if (add) {
     add.disabled = cards.length >= MAX_BORER_FINDINGS;
-    add.querySelector('span').textContent = cards.length ? 'Add Another Borer Finding' : 'Add Where Borers Were Found';
+    add.querySelector('span').textContent = cards.length ? 'Add another borer finding' : 'Add where borers were found';
   }
 }
 
@@ -6053,12 +6098,12 @@ function checkSystemVerify() {
 
   const concerns = [];
   if (reportData.durableNoticePresent === 'NO') concerns.push('durable notice sticker not found in meter box');
-  if (reportData.hardLandscaping === 'YES' && reportData.zone25mmVisible === 'NO') concerns.push('25mm inspection zone not visible against hard landscaping');
-  if (reportData.softLandscaping === 'YES' && reportData.zone75mmVisible === 'NO') concerns.push('75mm inspection zone not visible against soft landscaping');
-  if (reportData.antCapSoldered === 'NO') concerns.push('ant cap / strip shield joins not soldered — shielding inadequate');
+  if (reportData.hardLandscaping === 'YES' && reportData.zone25mmVisible === 'NO') concerns.push('25 mm inspection zone not visible against hard landscaping');
+  if (reportData.softLandscaping === 'YES' && reportData.zone75mmVisible === 'NO') concerns.push('75 mm inspection zone not visible against soft landscaping');
+  if (reportData.antCapSoldered === 'NO') concerns.push('ant cap / strip shield joins not soldered, so the shielding is inadequate');
 
   if (concerns.length > 0) {
-    flagText.textContent = 'Verification concern' + (concerns.length > 1 ? 's' : '') + ': ' + concerns.join('; ') + '. Recommend rectification and re-verification of the existing system.';
+    flagText.textContent = 'Verification concern' + (concerns.length > 1 ? 's' : '') + ': ' + concerns.join('; ') + '. Rectification and re-verification of the existing system are recommended.';
     flag.style.display = 'flex';
   } else {
     flag.style.display = 'none';
@@ -6748,7 +6793,7 @@ function startEdit(el, key, type) {
     input = document.createElement('input');
     input.type = 'text';
     input.value = cur;
-    input.placeholder = 'Type value...';
+    input.placeholder = 'Type a value';
     wireInlineTextEdit(input,
       v => { if (el.classList.contains('editing')) commitEdit(el, key, v); },
       () => { if (el.classList.contains('editing')) cancelEdit(el, key); });
@@ -7029,7 +7074,7 @@ const FGROUP_PHRASES = {
   wallConstruction: v => /wall/i.test(v) ? v : v + ' walls',
   roofType: v => /roof/i.test(v) ? v : v + ' roof',
   facadeDirection: v => 'front faces ' + v,
-  constructionEra: v => 'built ' + v.replace(/(\d)-(\d)/g, '$1\u2060–\u2060$2'),
+  constructionEra: v => 'built ' + v.replace(/(\ds?)-(\d)/g, '$1\u2060–\u2060$2'),
   siteSurroundings: v => v.replace(/^suburban, few trees$/, 'suburban with few trees'),
   siteSlope: v => /^slopes/.test(v) ? 'site ' + v : /site|block|land/.test(v) ? v : v + ' site',
   termiteHistory: v => ({ 'none known': 'no known termite history', unknown: 'termite history unknown', 'treated before': 'treated for termites before' })[v] || v,
@@ -7847,7 +7892,7 @@ function updateAgreementSignButton() {
   const needEl = document.getElementById('agreementSignNeed');
   if (needEl) {
     needEl.hidden = !need.length;
-    needEl.textContent = need.length ? `To sign: ${need.join(', ')}.` : '';
+    needEl.textContent = need.length ? `To sign, ${joinWithAnd(need)}.` : '';
   }
 }
 
@@ -7976,7 +8021,7 @@ async function sendAgreementLinkOn() {
 
 function agreementLinkMessage(r) {
   const company = getCompanyDetails().name || 'your inspector';
-  return `Hi ${r.signerName.split(' ')[0]}, here is the pre-inspection agreement from ${company} for ${getFullAddress() || 'your inspection'}. Please read it and sign on your phone before the inspection:`;
+  return `Hi ${greetingName(r.signerName) || 'there'}, here is the pre-inspection agreement from ${company} for ${getFullAddress() || 'your inspection'}. Please read it and sign on your phone before the inspection:`;
 }
 
 // The share sheet (text, email, WhatsApp), or the clipboard where there's none.
@@ -8068,12 +8113,12 @@ function removeAgreement() {
 // A PDF of the signed agreement for the client to keep.
 function shareAgreementPdf() {
   const a = reportData.agreement;
-  if (!a || !window.jspdf) { showToast('PDF tools are still loading — try again in a moment', 'error'); return; }
+  if (!a || !window.jspdf) { showToast('PDF tools are still loading. Try again in a moment', 'error'); return; }
   const { blob, fname } = buildAgreementPdf(a);
   deliverPdfBlob(blob, fname, {
     title: 'Pre-Inspection Agreement',
     text: `Pre-inspection agreement — ${getFullAddress() || 'Property'}`,
-    readyToast: 'Agreement ready — choose where to save or send it',
+    readyToast: 'Agreement ready. Choose where to save or send it',
   });
 }
 
@@ -8095,7 +8140,7 @@ function buildAgreementPdf(a) {
     ] });
   y += 2;
   y = drawAgreementBody(doc, a, y, { M, CW, onNewPage: header });
-  drawPdfDocFooters(doc, `Pre-inspection agreement${company.name ? `  ·  ${company.name}` : ''}`);
+  drawPdfDocFooters(doc, `Pre-Inspection Agreement${company.name ? `  ·  ${company.name}` : ''}`);
   const fname = `Agreement_${fileNamePart(getFullAddress()) || 'Property'}.pdf`;
   return { blob: doc.output('blob'), fname };
 }
@@ -8579,9 +8624,9 @@ async function handleSectionPhotoFiles(fileList, section) {
   const replacing = limit === 1 && getSectionPhotos(section).length > 0;
   const existing = replacing ? [] : getSectionPhotos(section);
   const remaining = limit - existing.length;
-  if (remaining <= 0) { showToast(`Photo limit reached for this section (${limit})`, 'error'); return; }
+  if (remaining <= 0) { showToast(`This box is full. It holds ${limit} photos`, 'error'); return; }
   const toProcess = files.slice(0, remaining);
-  if (files.length > toProcess.length) showToast(`Only added ${toProcess.length} of ${files.length} photos`, 'warn');
+  if (files.length > toProcess.length) showToast(`Only ${toProcess.length} of ${files.length} added. This box holds ${limit} photos`, 'error');
 
   for (const file of toProcess) {
     try {
@@ -8661,7 +8706,7 @@ function renderSectionPhotoGrid(section) {
   if (!grid) return;
   const photos = getSectionPhotos(section);
   const limit = sectionPhotoLimit(section);
-  if (count) count.textContent = limit === 1 ? '' : `${photos.length}/${limit} photos`;
+  if (count) count.textContent = limit === 1 ? '' : `${photos.length} of ${limit} photos`;
   // Areas and Access take photos per spot now; their old boxes only show
   // for reports that already have photos in them.
   const box = grid.closest('[data-legacy-photos]');
@@ -8761,7 +8806,7 @@ async function handlePhotoFiles(fileList) {
   const remaining = MAX_PHOTOS_PER_REPORT - reportData.photos.length;
   if (remaining <= 0) { showToast(`Photo limit reached (${MAX_PHOTOS_PER_REPORT} per report)`, 'error'); return; }
   const toProcess = files.slice(0, remaining);
-  if (files.length > toProcess.length) showToast(`Only added ${toProcess.length} of ${files.length} — limit reached`, 'error');
+  if (files.length > toProcess.length) showToast(`Only ${toProcess.length} of ${files.length} added. A report holds ${MAX_PHOTOS_PER_REPORT} photos`, 'error');
 
   for (const file of toProcess) {
     try {
@@ -8814,7 +8859,7 @@ function renderPhotoGrid() {
   if (!grid) return;
 
   const photos = reportData.photos || [];
-  countEl.textContent = `${photos.length} of ${MAX_PHOTOS_PER_REPORT} photos attached`;
+  countEl.textContent = `${photos.length} of ${MAX_PHOTOS_PER_REPORT} photos`;
   countEl.classList.toggle('at-cap', photos.length >= MAX_PHOTOS_PER_REPORT);
   addBtn.disabled = photos.length >= MAX_PHOTOS_PER_REPORT;
 
@@ -8834,7 +8879,7 @@ function renderPhotoGrid() {
                value="${escapeHtml(p.caption || '')}"
                oninput="updatePhotoCaption('${p.id}', this.value)">
         <div class="photo-card-footer">
-          <button class="photo-analyze-btn" id="analyzeBtn-${p.id}" onclick="analyzeGalleryPhoto('${p.id}')">Analyze</button>
+          <button class="photo-analyze-btn" id="analyzeBtn-${p.id}" onclick="analyzeGalleryPhoto('${p.id}')">Analyse</button>
           <button class="photo-remove-btn" onclick="removePhoto('${p.id}')">Remove</button>
         </div>
       </div>
@@ -9298,7 +9343,7 @@ function termiteHistoryFrom(entry) {
   const when = formatIssueDate(visitDate(entry));
   const fs = (rd.findings || []).filter(f => f && f.termiteActivity);
   const live = fs.filter(f => f.termiteActivity === 'ACTIVE'), old = fs.filter(f => f.termiteActivity === 'INACTIVE');
-  const where = list => list.map(f => f.activityLocation).filter(Boolean).slice(0, 2).join('; ');
+  const where = list => joinPlaces(list.map(f => bracketText(f.activityLocation)).filter(Boolean).slice(0, 2), true);
   const t = entry.quote && entry.quote.treatment;
   const treatedOn = t && t.date ? formatIssueDate(new Date(t.date + 'T00:00:00')) : '';
   if (treatedOn) return `Treated before (${treatedOn}, after our inspection on ${when}${live.length ? `: live termites, ${where(live)}` : ''})`;
@@ -9756,8 +9801,8 @@ function clearJobInfo() {
 // name/licence/phone/ABN/logo into another business's reports.
 const COMPANY_KEY = 'korva_company'; // legacy flat key, pre-multi-tenant - kept only for one-time migration below
 
-function companyStorageKey() {
-  return (authBusiness && authBusiness.id) ? `korva_company_${authBusiness.id}` : COMPANY_KEY;
+function companyStorageKey(business = authBusiness) {
+  return (business && business.id) ? `korva_company_${business.id}` : COMPANY_KEY;
 }
 
 // One-time migration for accounts that already had data under the old flat
@@ -9800,6 +9845,64 @@ function companyDetailGaps() {
 }
 function joinWithAnd(list) {
   return list.length < 2 ? (list[0] || '') : list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
+}
+
+// The name an email or text greets the client by: the first name ("Hi
+// Jo,"), "Mr Smith" for "Mr John Smith", "Jo and Sam" for "Jo & Sam Lee",
+// and nothing for a business or a bare initial, so the message opens "Hi,"
+// instead of "Hi Mr," or "Hi Harbour,". A name typed all in lower or
+// upper case gets its capitals.
+const GREETING_TITLE = /^(mr|mrs|ms|miss|mx|dr|prof|sir|dame|rev)\.?$/i;
+const GREETING_BUSINESS = /\b(pty|ltd|limited|inc|corp|co|company|strata|owners|corporation|council|trust|trustees?|estate|realty|property|properties|management|managers|agency|agents|partners|group|holdings|services|church|school|club|association|the)\b/i;
+function greetingName(name) {
+  const fix = w => w === w.toLowerCase() || w === w.toUpperCase()
+    ? w.toLowerCase().replace(/(^|[-'’])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()) : w;
+  const words = String(name || '').replace(/[.,]+$/, '').trim().split(/\s+/).filter(Boolean);
+  if (!words.length || GREETING_BUSINESS.test(words.join(' '))) return '';
+  const and = i => words[i] === '&' || /^and$/i.test(words[i]);
+  if (GREETING_TITLE.test(words[0])) {
+    const title = w => fix(w.replace(/\.$/, ''));
+    // "Mr & Mrs Smith": both titles and the surname.
+    if (words.length > 3 && and(1) && GREETING_TITLE.test(words[2])) return `${title(words[0])} and ${title(words[2])} ${fix(words[words.length - 1])}`;
+    const last = words[words.length - 1];
+    return words.length > 1 && !and(words.length - 1) && !GREETING_TITLE.test(last) ? `${title(words[0])} ${fix(last)}` : '';
+  }
+  const first = words[0];
+  if (/^\p{L}\.?$/u.test(first)) return '';
+  // "Jo & Sam Lee", "Jo Lee and Sam Ng": both first names.
+  const join = words.findIndex((w, i) => i > 0 && and(i));
+  if (join > 0 && words[join + 1] && !GREETING_TITLE.test(words[join + 1])) return `${fix(first)} and ${fix(words[join + 1])}`;
+  return fix(first);
+}
+
+// The inspector's words placed inside a sentence, used by the report, the
+// quote and the certificate.
+// lowerFirst: the first letter lower-cased ("Garage door" reads "garage
+// door"), unless the first word looks like a name or an abbreviation
+// ("NSW", "Smith St", "John's shed").
+function lowerFirst(text) {
+  const t = String(text || '').trim();
+  const [first = '', second = ''] = t.split(/\s+/);
+  if (!/^[A-Z][a-z]/.test(first) || /'s\b/.test(first) || /^[A-Z]/.test(second)) return t;
+  return t.charAt(0).toLowerCase() + t.slice(1);
+}
+// bracketText: words to set inside brackets, with no brackets of their own
+// ("Fungal decay (wet rot)" becomes "Fungal decay, wet rot") and no full
+// stop or comma at the end.
+function bracketText(text) {
+  return String(text || '').trim().replace(/\s*\(([^()]*)\)/g, ', $1').replace(/[()]/g, '').replace(/[.;,\s]+$/, '').replace(/^[,\s]+/, '');
+}
+// inBrackets: " (words)" ready to follow a phrase, or '' when there are none.
+function inBrackets(text) {
+  const t = lowerFirst(bracketText(text));
+  return t ? ` (${t})` : '';
+}
+// joinPlaces: places one after another with semicolons. The first keeps its
+// capital unless lowerAll; the rest are lower-cased, so the list reads as one
+// sentence: "Rear deck; garage door; front stump".
+function joinPlaces(list, lowerAll) {
+  return list.map(t => String(t || '').trim().replace(/[.;,]+$/, '')).filter(Boolean)
+    .map((t, i) => i || lowerAll ? lowerFirst(t) : t).join('; ');
 }
 
 function getCompanyDetails() {
@@ -9937,7 +10040,11 @@ function loadSession() {
   } catch(e) { return null; }
 }
 
+// Counted so a renewal of the sign-in still on its way when the person
+// signs out isn't kept (refreshSession).
+let sessionsEnded = 0;
 function clearSession() {
+  sessionsEnded++;
   try { localStorage.removeItem('korva_session'); } catch(e) {}
   authSession = null; authUser = null; authBusiness = null;
   resetBillingDisplay();
@@ -10162,7 +10269,7 @@ async function confirmBillingAfterCheckout() {
   if (el) el.textContent = 'Confirming your payment…';
   for (let i = 0; i < 10; i++) {
     const sub = await loadBillingStatus();
-    if (sub && (sub.status !== 'trialing' || sub.subscribed)) { showToast('Subscription updated — thanks!', 'success'); return; }
+    if (sub && (sub.status !== 'trialing' || sub.subscribed)) { showToast('Subscription updated. Thank you', 'success'); return; }
     if (el && i < 9) el.textContent = 'Confirming your payment…';
     await new Promise(r => setTimeout(r, 2000));
   }
@@ -10213,9 +10320,9 @@ async function openCheckout(plan, seats) {
     // 400, 402 and 409 carry a reason worth reading: the number of
     // inspectors, a declined card, or a team too big for the plan.
     showToast(status === 403
-      ? 'Only the business owner can change the plan.'
-      : (status === 400 || status === 402 || status === 409) && e.message ? e.message
-      : 'Couldn\'t open checkout. Check your signal and try again.', 'error');
+      ? 'Only the business owner can change the plan'
+      : (status === 400 || status === 402 || status === 409) && e.message ? e.message.replace(/\.$/, '')
+      : 'Could not open checkout. Check your signal and try again', 'error');
     console.warn('openCheckout failed:', e.message);
   } finally {
     // Leaving for Stripe keeps the lock on, so a tap during the redirect
@@ -10237,7 +10344,7 @@ function handleBillingReturn() {
     if (billing === 'success') {
       confirmBillingAfterCheckout();
     } else if (billing === 'cancelled') {
-      showToast('Checkout cancelled — no changes made', 'info');
+      showToast('Checkout cancelled. Nothing was changed', 'info');
     } else if (billing === 'updated') {
       loadBillingStatus();
     }
@@ -10264,7 +10371,7 @@ async function openBillingPortal() {
     if (!res.ok || !data.url) throw new Error(data && data.message || rawBody || `HTTP ${res.status}`);
     window.location.href = data.url;
   } catch (e) {
-    showToast('Could not open billing portal — try again shortly.', 'error');
+    showToast('Could not open billing. Try again shortly', 'error');
     console.warn('openBillingPortal failed:', e.message);
   }
 }
@@ -10324,7 +10431,7 @@ async function submitPasswordReset() {
   if (!pw || pw.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; return; }
   if (pw !== pw2) { errEl.textContent = 'Passwords do not match.'; return; }
   if (!pendingRecoverySession?.access_token) {
-    errEl.textContent = 'This reset link has expired — please request a new one.';
+    errEl.textContent = 'This reset link has expired. Ask for a new one from Forgot password on the sign-in screen.';
     return;
   }
 
@@ -10341,14 +10448,14 @@ async function submitPasswordReset() {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      errEl.textContent = data.msg || data.error_description || data.error?.message || 'Could not update password — the link may have expired.';
+      errEl.textContent = data.msg || data.error_description || data.error?.message || 'Could not update the password. The link may have expired.';
       return;
     }
     pendingRecoverySession = null;
     document.getElementById('rpPassword').value = '';
     document.getElementById('rpPasswordConfirm').value = '';
     showAuth('authSignIn');
-    showToast('Password updated — sign in with your new password', 'success');
+    showToast('Password updated. Sign in with your new password', 'success');
   } catch(e) {
     errEl.textContent = 'Couldn\'t reach SAYON. Check your signal and try again.';
   } finally {
@@ -10362,9 +10469,12 @@ let lastRefreshWasOffline = false;
 
 async function refreshSession(refreshToken) {
   lastRefreshWasOffline = false;
+  const ended = sessionsEnded;
   try {
     const data = await supabaseAuth('token?grant_type=refresh_token', { refresh_token: refreshToken });
-    if (data.access_token) {
+    // Signed out while it was on its way (on a weak signal it can take a
+    // while): the new sign-in would sign them back in, so it's dropped.
+    if (data.access_token && ended === sessionsEnded) {
       authSession = data;
       saveSession(data);
       return true;
@@ -10407,7 +10517,7 @@ function stopAuthAutoRefresh() {
 // ── SIGN UP ──────────────────────────────────────────────────────────────
 // The Terms and Privacy versions a new account agrees to at sign-up. Raise
 // these with the "Version N" lines at the top of terms.html and privacy.html.
-const LEGAL_VERSIONS = { terms: 3, privacy: 6 };
+const LEGAL_VERSIONS = { terms: 3, privacy: 7 };
 
 async function signUp() {
   const name     = document.getElementById('suName').value.trim();
@@ -10516,6 +10626,7 @@ async function signIn() {
     const prevUserId = localStorage.getItem('korva_last_user_id');
     if (prevUserId && prevUserId !== data.user.id) {
       localStorage.removeItem(DRAFT_KEY);
+      localStorage.removeItem(UNSAVED_SHEETS_KEY);
     }
     localStorage.setItem('korva_last_user_id', data.user.id);
 
@@ -10611,7 +10722,7 @@ async function endSessionOnDevice() {
   clearSession();
   localStorage.removeItem('korva_last_user_id');
   localStorage.removeItem(BUSINESS_CACHE_KEY);
-  [reportsKey, quotesKey, DRAFT_KEY].forEach(k => localStorage.removeItem(k));
+  [reportsKey, quotesKey, DRAFT_KEY, UNSAVED_SHEETS_KEY].forEach(k => localStorage.removeItem(k));
   try { await photoStoreRequest('readwrite', st => st.clear()); } catch (e) {}
   currentReportId = null;
   if (appInitialised) {
@@ -10633,8 +10744,8 @@ async function endSessionOnDevice() {
 // go next, through the storage API, then the account itself, then this
 // phone's copy.
 const DELETE_ACCOUNT_BLOCKERS = {
-  ACTIVE_SUBSCRIPTION: 'Your plan is still active. Cancel it in Menu › Billing › Manage first, then delete your account.',
-  HAS_TEAM: 'Other people are still on your team. Remove them in Menu › Your team first, then delete your account.',
+  ACTIVE_SUBSCRIPTION: 'Your plan is still active. Cancel it in Menu › Billing › Manage first, then delete your account',
+  HAS_TEAM: 'Other people are still on your team. Remove them in Menu › Your team first, then delete your account',
 };
 
 async function deleteAccountRpc(dryRun) {
@@ -10646,7 +10757,7 @@ async function deleteAccountRpc(dryRun) {
   if (res.ok) return null;
   const err = await res.json().catch(() => ({}));
   const code = Object.keys(DELETE_ACCOUNT_BLOCKERS).find(k => (err.message || '').includes(k));
-  return code ? DELETE_ACCOUNT_BLOCKERS[code] : 'Could not delete your account. Check your connection and try again.';
+  return code ? DELETE_ACCOUNT_BLOCKERS[code] : 'Could not delete your account. Check your signal and try again';
 }
 
 async function deleteMyPhotos() {
@@ -10710,7 +10821,7 @@ async function deleteMyAccount() {
     if (failed) { showToast(failed, 'error'); return; }
   } catch (e) {
     console.warn('deleteMyAccount:', e);
-    showToast('Could not delete your account. Check your connection and try again.', 'error');
+    showToast('Could not delete your account. Check your signal and try again', 'error');
     return;
   }
   await endSessionOnDevice();
@@ -10933,7 +11044,7 @@ async function sendInviteLink(email, token) {
   }
   try {
     await navigator.clipboard.writeText(`${text} ${link}`);
-    showToast('The sign-up link is copied: paste it into a text or email to them', 'success');
+    showToast('Sign-up link copied. Paste it into a text or email to them', 'success');
   } catch (e) {
     showToast(`Send them this sign-up link: ${link}`, 'info');
   }
@@ -11019,11 +11130,11 @@ async function noticeInviteWhileSignedIn() {
   } catch (e) { return; }
   const me = (authUser && authUser.email || '').toLowerCase();
   if (!invite || !invite.email) {
-    showToast('That invite link has expired or been replaced. Ask for a new one.', 'info');
+    showToast('That invite link has expired or been replaced. Ask for a new one', 'info');
   } else if (String(invite.email).toLowerCase() === me) {
-    showToast(`You're already signed in as ${invite.email}.`, 'info');
+    showToast(`You're already signed in as ${invite.email}`, 'info');
   } else {
-    showToast(`That invite is for ${invite.email}, but you're signed in as ${authUser.email}. To use it, sign out and open the link again.`, 'error');
+    showToast(`That invite is for ${invite.email}, but you're signed in as ${authUser.email}. To use it, sign out and open the link again`, 'error');
   }
 }
 
@@ -11082,11 +11193,30 @@ function rememberBusiness() {
   } catch (e) {}
 }
 
+// The business as kept on this phone, when the account couldn't be read
+// (no signal) or hadn't answered yet (a weak one). Its settings can be
+// older than the account's, so the account's copy is read again before
+// anything is written to it (pushBusinessSettings).
+let businessFromCache = null;
 function restoreCachedBusiness() {
   try {
     const cached = JSON.parse(localStorage.getItem(BUSINESS_CACHE_KEY) || 'null');
-    if (cached && authUser && cached.user_id === authUser.id && cached.business) authBusiness = cached.business;
+    if (cached && authUser && cached.user_id === authUser.id && cached.business) authBusiness = businessFromCache = cached.business;
   } catch (e) {}
+}
+function businessIsFromCache() {
+  return !!authBusiness && authBusiness === businessFromCache;
+}
+// The account's copy of the business, read again. True once it's in.
+async function readBusinessFromAccount() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/businesses?id=eq.${authBusiness.id}&limit=1`, { headers: getAuthHeaders() });
+    const rows = res.ok ? await res.json() : [];
+    if (!rows.length) return false;
+    authBusiness = rows[0];
+    rememberBusiness();
+    return true;
+  } catch (e) { return false; }
 }
 
 async function _loadBusinessImpl() {
@@ -11352,9 +11482,59 @@ function toggleAuthReveal(btn) {
 }
 
 // ── SESSION RESTORE ON LOAD ──────────────────────────────────────────────
+// On a phone that has kept the account's business and finished setting it
+// up, opening the app waits this long at most for the account (the sign-in
+// and the business together). On a weak signal a call can hang for
+// minutes, so after this the app opens with what the phone has kept and
+// takes in the account's copy when it lands. Any other phone (a new one,
+// or one where setting up was left unfinished and done on another phone)
+// waits for the account as before, or it would offer to set up the
+// business again.
+const START_NETWORK_WAIT_MS = 6000;
+let startDeadline = 0;
+function startWait(promise, userId) {
+  if (!businessKeptFor(userId)) return promise;
+  return Promise.race([promise, new Promise(done => setTimeout(() => done('slow'), Math.max(0, startDeadline - Date.now())))]);
+}
+// Set up on this phone: what shouldShowOnboarding() reads.
+function businessKeptFor(userId) {
+  try {
+    const cached = JSON.parse(localStorage.getItem(BUSINESS_CACHE_KEY) || 'null');
+    if (!(cached && userId && cached.user_id === userId && cached.business)) return false;
+    if (localStorage.getItem(obKey(userId))) return true;
+    const company = JSON.parse(localStorage.getItem(companyStorageKey(cached.business)) || 'null');
+    return !!(company && company.updatedAt);
+  } catch (e) { return false; }
+}
+
+async function loadBusinessForStart() {
+  const loading = loadBusiness();
+  if (await startWait(loading.then(() => 'done'), authUser && authUser.id) !== 'slow') return;
+  if (!authBusiness) restoreCachedBusiness();
+  loading.then(takeInAccountBusiness);
+}
+// The account's copy of the business, landed after the app opened with the
+// phone's: taken in as enterApp() takes it in.
+function takeInAccountBusiness() {
+  if (!authBusiness || businessIsFromCache()) return;
+  migrateLegacyCompanyDetails();
+  applyCloudBusinessSettings();
+  renderProfileMenu();
+}
+// The sign-in renewed after the app opened with the old one: the account
+// refused what was read or sent with that, so the business and the reports
+// are read again now, and reports saved meanwhile go up.
+function afterLateSignIn() {
+  if (!authUser || !authBusiness) return;
+  if (businessIsFromCache()) readBusinessFromAccount().then(read => { if (read) takeInAccountBusiness(); });
+  supabaseSyncOnOpen();
+  pushUnsyncedReports();
+}
+
 async function restoreAuthSession() {
   const stored = loadSession();
   if (!stored?.access_token) return false;
+  startDeadline = Date.now() + START_NETWORK_WAIT_MS;
 
   // Check if token is still valid (exp is in seconds)
   const exp = stored.expires_at || 0;
@@ -11368,30 +11548,37 @@ async function restoreAuthSession() {
     const prevUserId = localStorage.getItem('korva_last_user_id');
     if (prevUserId && prevUserId !== stored.user?.id) {
       localStorage.removeItem(DRAFT_KEY);
+      localStorage.removeItem(UNSAVED_SHEETS_KEY);
     }
     if (stored.user?.id) localStorage.setItem('korva_last_user_id', stored.user.id);
-    await loadBusiness();
+    await loadBusinessForStart();
     startAuthAutoRefresh();
     return true;
   }
 
-  // Try to refresh
+  // Try to refresh. A refresh still on its way when the app opens is the
+  // one any other call waits for (authRefreshInFlight), so the same token
+  // is never sent twice.
   if (stored.refresh_token) {
-    const ok = await refreshSession(stored.refresh_token);
-    if (ok) {
+    authRefreshInFlight = refreshSession(stored.refresh_token).finally(() => { authRefreshInFlight = null; });
+    const ok = await startWait(authRefreshInFlight, stored.user && stored.user.id);
+    if (ok === true) {
       authUser = authSession.user;
-      await loadBusiness();
+      await loadBusinessForStart();
       startAuthAutoRefresh();
       return true;
     }
-    // No signal (in a subfloor, out of range): keep the saved sign-in and
-    // open the app so the inspector can keep working. The token is refreshed
-    // once the signal is back; only a refusal from Supabase signs them out.
-    if (lastRefreshWasOffline || !navigator.onLine) {
+    // No signal (in a subfloor, out of range), or too weak to answer in
+    // time: keep the saved sign-in and open the app so the inspector can
+    // keep working. The token is refreshed once the signal is back; only a
+    // refusal from Supabase signs them out.
+    if (ok === 'slow' || lastRefreshWasOffline || !navigator.onLine) {
+      const renewing = ok === 'slow' && authRefreshInFlight;
       authSession = stored;
       authUser    = stored.user;
-      await loadBusiness();
+      await loadBusinessForStart();
       startAuthAutoRefresh();
+      if (renewing) renewing.then(renewed => { if (renewed === true) afterLateSignIn(); });
       return true;
     }
     // Refused: say so, or "did I lose my report?" is the first thought.
@@ -11625,7 +11812,7 @@ async function keepBothCopies(local) {
   if (currentReportId === local.id) loadReport(local.id, true);
   renderSavedList();
   showToast(copy
-    ? "This report was changed on another device. That version is open now; this phone's version is saved beside it as a copy."
+    ? "This report was changed on another device, so that version is open now. This phone's version is saved beside it as a copy"
     : 'Updated this report with the newer copy from your other device', 'info');
   return copy ? supabaseSave(copy, true) : true;
 }
@@ -11732,7 +11919,7 @@ function flushDraftSave() {
     // may not be persisting, without spamming a toast on every keystroke.
     if (!saveDraftFailureNotified) {
       saveDraftFailureNotified = true;
-      showToast('Could not save your progress — device storage may be full', 'error');
+      showToast('Could not save your progress. The phone\'s storage may be full', 'error');
     }
     updateSyncStatus('error');
   }
@@ -11760,18 +11947,18 @@ function updateSyncStatus(state) {
   if (!navigator.onLine) {
     el.classList.add('offline');
     textEl.textContent = lastLocalSaveAt
-      ? 'Saved on this device — will sync when back online'
-      : 'Offline — saving to this device only';
+      ? 'Saved on this phone. It syncs when you\'re back online'
+      : 'Offline, so saving to this phone only';
     return;
   }
   if (state === 'error') {
     el.classList.add('error');
-    textEl.textContent = 'Could not save — check device storage';
+    textEl.textContent = 'Could not save. Check the phone\'s storage';
     return;
   }
   if (state === 'cloud_error') {
     el.classList.add('error');
-    textEl.textContent = 'Saved on this device — could not sync to your account';
+    textEl.textContent = 'Saved on this phone, but not synced to your account';
     return;
   }
   if (state === 'saved' || lastLocalSaveAt) {
@@ -11793,8 +11980,8 @@ window.addEventListener('offline', () => updateSyncStatus());
 // slept, so refresh it before anything talks to the server.
 document.addEventListener('visibilitychange', async () => {
   if (document.hidden) {
-    flushDraftSave();
-    if (updateReloadPending && !isRecording && !document.body.classList.contains('ai-busy')) location.reload();
+    saveBeforeLeaving();
+    if (updateReloadPending && !isRecording && !document.body.classList.contains('ai-busy') && !formSheetOpen()) location.reload();
     return;
   }
   // An app left open for days never navigates, so ask for a new version here.
@@ -11804,8 +11991,19 @@ document.addEventListener('visibilitychange', async () => {
   pushUnsyncedReports();
   checkAddressMove();
 });
-window.addEventListener('pagehide', flushDraftSave);
-window.addEventListener('beforeunload', flushDraftSave);
+window.addEventListener('pagehide', saveBeforeLeaving);
+window.addEventListener('beforeunload', saveBeforeLeaving);
+
+// The app is being put away, closed or reloaded: everything still waiting
+// to be saved is saved now. A box being typed in is let go first, so the
+// ones that save when you leave them (Your prices, say) save too.
+function saveBeforeLeaving() {
+  const el = document.activeElement;
+  if (el && el.matches('input, textarea')) el.blur();
+  flushDraftSave();
+  if (typeof flushQuoteSave === 'function') flushQuoteSave();
+  if (typeof keepUnsavedSheet === 'function') keepUnsavedSheet();
+}
 
 function loadDraft() {
   try {
@@ -11906,8 +12104,8 @@ function setSavedReports(reports, retrying) {
     // make room, then this save is tried once more.
     if (isQuotaError(e) && !retrying && freeStorageFor(reports)) return setSavedReports(reports, true);
     showToast(isQuotaError(e)
-      ? 'Could not save: this phone\'s storage is full. Back up from Menu › Data, then delete old jobs'
-      : 'Could not save — storage full or unavailable', 'error');
+      ? 'Could not save. This phone\'s storage is full. Back up from Menu › Settings › Your data, then delete old jobs'
+      : 'Could not save. Storage is full or unavailable', 'error');
     return false;
   }
 }
@@ -12359,7 +12557,7 @@ function importAllData(file) {
     try {
       backup = JSON.parse(e.target.result);
     } catch (err) {
-      showToast('That file isn\'t valid — could not read it', 'error');
+      showToast('Could not read that file. Choose a SAYON backup', 'error');
       return;
     }
 
@@ -12418,9 +12616,16 @@ function importAllData(file) {
 // ACCESSIBILITY SETTINGS
 // ══════════════════════════════════════════════════════════════════════════
 function setTextSize(size) {
+  // Every piece of text takes its new size at once, with nothing easing
+  // (text-size-switching in app.css). Otherwise, in Chrome, text that had
+  // eased before (a report answer once filled in) eased to its old size and
+  // stayed there until something else redrew it.
+  document.body.classList.add('text-size-switching');
   document.body.classList.remove('text-size-large', 'text-size-xl');
   if (size === 'large') document.body.classList.add('text-size-large');
   if (size === 'xl') document.body.classList.add('text-size-xl');
+  document.querySelectorAll('body *').forEach(el => getComputedStyle(el).fontSize);
+  requestAnimationFrame(() => document.body.classList.remove('text-size-switching'));
 
   document.querySelectorAll('#textSizeControl .text-size-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.size === size);
@@ -12436,10 +12641,13 @@ function toggleA11y(className, btnId, storageKey) {
   try { localStorage.setItem(storageKey, on ? '1' : '0'); } catch (e) {}
 }
 
+// Red-green colour blindness (protanopia, deuteranopia): SAYON's own blue
+// already stays apart from the red, amber and green, so those keep it (the
+// lighter blue they used to set put white text on buttons at 2.4:1).
+// Blue-yellow (tritanopia): magenta instead, each shade as dark as the blue
+// it stands in for, so white text on it reads as well.
 const COLOUR_VISION_ACCENTS = {
-  protanopia:    { accent: '#4d8aff', accent2: '#7aa8ff', accent3: '#2f5fd6', rgb: '77,138,255' }, // blue — stays distinct from lime/amber for red-green deficiency
-  deuteranopia:  { accent: '#4d8aff', accent2: '#7aa8ff', accent3: '#2f5fd6', rgb: '77,138,255' }, // blue — same reasoning, most common type
-  tritanopia:    { accent: '#ff4dc4', accent2: '#ff7dd6', accent3: '#d62fa0', rgb: '255,77,196' }, // magenta — stays distinct from red/green for blue-yellow deficiency
+  tritanopia: { accent: '#DB0093', accent2: '#AD0074', accent3: '#7A0052', rgb: '219,0,147' },
 };
 
 function setColourVisionMode(mode) {
@@ -12662,7 +12870,7 @@ function dashboardJob(r, quotes) {
   let onlyReportUnsent = false;
   if (!reportDone) {
     group = 'todo'; status = 'Finish the report';
-    hint = 'Fill in the rest of the report, then make the PDF from the Sign-Off page.';
+    hint = 'Fill in the rest of the report, then make the PDF from its Finish tab.';
     next = { label: 'Open report', to: 'report' };
   } else if (!hasQuote && needsQuote) {
     group = 'todo'; status = 'Write the quote';
@@ -12704,7 +12912,7 @@ function dashboardJob(r, quotes) {
   if (group === 'done' && reportDone && !reportSent && !reportWentWithQuote) {
     onlyReportUnsent = true;
     group = 'todo'; status = 'Send the report';
-    hint = 'The report is ready but hasn\'t gone to ' + who + '. Send it from the Sign-Off page.';
+    hint = 'The report is ready but hasn\'t gone to ' + who + '. Send it from the report\'s Finish tab.';
     next = { label: 'Open report', to: 'report' };
   }
 
@@ -13327,18 +13535,18 @@ const OBS_ZONES_BY_LABEL = Object.fromEntries(Object.entries(OBS_ZONES).map(([z,
 // The conducive conditions a report records, as short phrases.
 function conduciveConditions(rd) {
   const conducive = [];
-  if (rd.waterLeaks === 'YES') conducive.push(`water leak${rd.leakLocation ? ` (${rd.leakLocation})` : ''}`);
+  if (rd.waterLeaks === 'YES') conducive.push(`water leak${inBrackets(rd.leakLocation)}`);
   else if (rd.moistureReadings === 'YES') conducive.push('elevated moisture');
-  if (rd.timberSoil === 'YES') conducive.push(`timber in contact with soil${rd.timberSoilDetails ? ` (${rd.timberSoilDetails})` : ''}`);
+  if (rd.timberSoil === 'YES') conducive.push(`timber in contact with soil${inBrackets(rd.timberSoilDetails)}`);
   if (rd.weepHoles === 'BRIDGED') conducive.push('weep holes bridged');
   if (rd.antCapping === 'GAPS') conducive.push('gaps in the ant capping');
   else if (rd.antCapping === 'NONE') conducive.push('no ant capping on piers');
   if (rd.slabEdge === 'OBSTRUCTED') conducive.push('slab edge concealed');
   if (rd.subfloorVentilation === 'POOR') conducive.push('poor subfloor ventilation');
-  if (rd.mouldSeen === 'YES') conducive.push(`mould growth${rd.mouldWhere ? ` (${rd.mouldWhere})` : ''}`);
+  if (rd.mouldSeen === 'YES') conducive.push(`mould growth${inBrackets(rd.mouldWhere)}`);
   if (rd.siteDrainage === 'POOR') conducive.push('poor site drainage');
   if (rd.subfloorDrainage === 'POOR') conducive.push('poor subfloor drainage');
-  if (rd.nonDurableTimber === 'YES') conducive.push(`untreated or non-durable timber in a damp area${whatWhere(rd.nonDurableTimberDetails, rd.nonDurableTimberWhere) ? ` (${whatWhere(rd.nonDurableTimberDetails, rd.nonDurableTimberWhere)})` : ''}`);
+  if (rd.nonDurableTimber === 'YES') conducive.push(`untreated or non-durable timber in a damp area${inBrackets([bracketText(rd.nonDurableTimberDetails), lowerFirst(bracketText(rd.nonDurableTimberWhere))].filter(Boolean).join(', '))}`);
   return conducive;
 }
 
@@ -13357,7 +13565,7 @@ function reportSummary() {
   const structural = termiteReferral || borerReferral;
   const unanswered = findingsMissingReferral();
   const conducive = conduciveConditions(reportData);
-  const places = list => list.map(f => f.activityLocation).filter(Boolean).join('; ');
+  const places = list => joinPlaces(list.map(f => f.activityLocation));
   const NR = 'NOT RECORDED';
   // A borer-only recommendation ("Borer treatment of the floorboards") is
   // not a termite treatment: the summary and next steps say so.
@@ -13387,9 +13595,9 @@ function reportSummary() {
   const groups = [
     { title: 'Access', items: [
       ['Were there temporary obstructions?', yn(hinderedYes, hinderedNo), ynTone(hinderedYes, hinderedNo, 'warn'), REPORT_PARTS.access,
-        acc.hindered.filter(([l]) => OBS_ZONES_BY_LABEL[l]).map(([l]) => l).join(', ')],
+        zoneList(acc.hindered.filter(([l]) => OBS_ZONES_BY_LABEL[l]).map(([l]) => l))],
       ['Was access restricted (permanent or locked)?', yn(restrictedYes, acc.allMarked), ynTone(restrictedYes, acc.allMarked, 'warn'), REPORT_PARTS.access,
-        acc.restricted.filter(([l]) => OBS_ZONES_BY_LABEL[l]).map(([l]) => l).join(', ')],
+        zoneList(acc.restricted.filter(([l]) => OBS_ZONES_BY_LABEL[l]).map(([l]) => l))],
       ['High risk areas to which access should be gained?', yn(!!acc.highRisk, acc.allMarked), ynTone(!!acc.highRisk, acc.allMarked, 'warn'), REPORT_PARTS.access, acc.highRisk],
       ['Invasive inspection recommended?', { YES: 'YES', NO: 'NO' }[reportData.invasiveInspection] || NR,
         { YES: 'warn', NO: 'good' }[reportData.invasiveInspection] || 'none', REPORT_PARTS.access, reportData.invasiveInspectionDetails || ''],
@@ -13399,7 +13607,7 @@ function reportSummary() {
       ['Termite nest found?', withNest.length ? 'YES' : nestNo ? 'NO' : NR, withNest.length ? 'bad' : nestNo ? 'good' : 'none', REPORT_PARTS.findings, places(withNest)],
       ['Termite workings or damage found?', damaged.length ? 'YES' : fs.length ? 'NO' : NR, damaged.length ? 'warn' : fs.length ? 'good' : 'none', REPORT_PARTS.findings, places(damaged)],
       ['Borers found?', { ACTIVE: 'ACTIVE', INACTIVE: 'OLD DAMAGE', NONE: 'NO' }[reportData.borerActivity] || NR,
-        { ACTIVE: 'bad', INACTIVE: 'warn', NONE: 'good' }[reportData.borerActivity] || 'none', REPORT_PARTS.findings, shownBorerFindings().map(b => b.location || borerLine(b)).filter(Boolean).join('; ')],
+        { ACTIVE: 'bad', INACTIVE: 'warn', NONE: 'good' }[reportData.borerActivity] || 'none', REPORT_PARTS.findings, joinPlaces(shownBorerFindings().map(b => b.location || borerLine(b)))],
       ['Wood decay (rot) found?', { YES: 'YES', NO: 'NO' }[reportData.decayFound] || NR,
         { YES: 'warn', NO: 'good' }[reportData.decayFound] || 'none', REPORT_PARTS.findings, whatWhere(reportData.decayDetails, reportData.decayWhere)],
       ['Chemical delignification found?', { YES: 'YES', NO: 'NO' }[reportData.delignification] || NR,
@@ -13418,13 +13626,14 @@ function reportSummary() {
       ['Risk of termite attack', reportData.riskLevel || NR, { HIGH: 'bad', MEDIUM: 'warn', LOW: 'good' }[reportData.riskLevel] || 'none', REPORT_PARTS.recommendations,
         reportData.riskLevel && basis.length ? `Based on ${basis.join(', ')}` : ''],
       ['Next inspection', nextInspectionChip(reportData.inspectionFrequency), 'none', REPORT_PARTS.recommendations,
-        reportData.inspectionFrequency && nextInspectionChip(reportData.inspectionFrequency) !== String(reportData.inspectionFrequency).trim().toUpperCase() ? reportData.inspectionFrequency : ''],
+        reportData.inspectionFrequency && nextInspectionChip(reportData.inspectionFrequency) !== String(reportData.inspectionFrequency).trim().toUpperCase()
+          ? String(reportData.inspectionFrequency).trim().replace(/^next (timber pest )?inspection:?\s+/i, '').replace(/^./, ch => ch.toUpperCase()) : ''],
     ] },
   ];
   // Areas the inspector couldn't fully see, and why.
   const limited = limitedZones.map(z => {
     const why = ((reportData.areaReasons || {})[z] || []).join(', ');
-    return `${OBS_ZONES[z].label}: ${areaStatusOf(z) === 'NOT' ? 'not inspected' : 'inspected with limits'}${why ? ` (${why})` : ''}`;
+    return `${zoneName(z)}: ${areaStatusOf(z) === 'NOT' ? 'not inspected' : 'inspected with limits'}${why ? ` (${why.toLowerCase()})` : ''}`;
   });
   const next = [];
   if (live.length || (reportData.treatmentRecommended === 'YES' && !borerOnlyTreatment)) {
@@ -13453,8 +13662,8 @@ function reportSummary() {
     if (other) next.push(`Also recommended: ${other.charAt(0).toLowerCase()}${other.slice(1)}.`);
   }
   getRecLines().forEach(l => next.push(l.text));
-  if (limitedZones.length) next.push(`Provide access to ${limitedZones.map(z => OBS_ZONES[z].label.replace(/^The /, '').toLowerCase()).join(', ')} for a follow-up inspection.`);
-  next.push(`Next timber pest inspection: ${reportData.inspectionFrequency || 'within 12 months'}.`);
+  if (limitedZones.length) next.push(`Provide access to the ${joinWithAnd(limitedZones.map(z => OBS_ZONES[z].label.replace(/^The /, '').toLowerCase()))} for a follow-up inspection.`);
+  next.push(nextInspectionStep(reportData.inspectionFrequency));
   return { groups, limited, next, basis };
 }
 
@@ -13475,17 +13684,17 @@ function reportPrepGaps(from = 'send') {
   // sleeper wall was looked at" need different taps, and one button for
   // both got one of them wrong. Many at once keep the quick buttons.
   if (unmarked.length && unmarked.length <= 3) {
-    unmarked.forEach(z => push('status', `${OBS_ZONES[z].label}: no inspection status${areaEvidence(z).length ? ' (a finding mentions it)' : ''}`,
+    unmarked.forEach(z => push('status', `${zoneName(z)}: no inspection status${areaEvidence(z).length ? ' (a finding mentions it)' : ''}`,
       fixBtn('inspected:' + z, 'Inspected') + fixBtn('na:' + z, 'Not applicable')));
-  } else if (unmarked.length) push('status', `${unmarked.length} areas have no inspection status (${unmarked.map(z => OBS_ZONES[z].label).join(', ')})`,
+  } else if (unmarked.length) push('status', `${unmarked.length} areas have no inspection status (${joinWithAnd(unmarked.map(z => zoneName(z).toLowerCase()))})`,
     fixBtn('inspected', 'Mark the rest as inspected') + fixBtn('na', 'Mark the rest not applicable'));
   const noResult = areasMissingResult();
-  if (noResult.length) push('result', `${noResult.length} area${noResult.length === 1 ? ' has' : 's have'} no result for what was found there (${noResult.map(z => OBS_ZONES[z].label.replace(/^The /, '')).join(', ')})`,
+  if (noResult.length) push('result', `${noResult.length} area${noResult.length === 1 ? ' has' : 's have'} no result for what was found there (${joinWithAnd(noResult.map(z => zoneName(z).toLowerCase()))})`,
     fixBtn('clear', 'Mark the rest as nothing found'));
   // "Nothing found" over an area a finding names: the report would contradict itself.
   Object.keys(OBS_ZONES).filter(z => areaResultOf(z) === 'CLEAR' && areaEvidence(z).length).forEach(z =>
-    push('contradiction', `${OBS_ZONES[z].label}: marked "nothing found", but ${areaEvidence(z)[0].replace(/ \(.*$/, '')} is there`, fixBtn('found:' + z, 'Mark evidence found')));
-  areasEvidenceUnlinked().forEach(z => push('evidence', `${OBS_ZONES[z].label}: marked "evidence found", but no finding mentions it`, fixBtn('finding:' + z, 'Add finding')));
+    push('contradiction', `${zoneName(z)}: marked "nothing found", but ${areaEvidence(z)[0].replace(/ \(.*$/, '')} is there`, fixBtn('found:' + z, 'Mark evidence found')));
+  areasEvidenceUnlinked().forEach(z => push('evidence', `${zoneName(z)}: marked "evidence found", but no finding mentions it`, fixBtn('finding:' + z, 'Add finding')));
   findingsMissingReferral().forEach(n => push('referral', `Finding ${n}: "refer to a builder or engineer?" isn't answered`));
   const pending = (reportData.pendingNotes || []).length;
   if (pending) push('pending', `${pending} voice note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
@@ -13516,7 +13725,7 @@ async function backUpPhotosFromGap(from) {
   if (changed) { saveDraft(); if (currentReportId) saveCurrentReport(true); }
   const left = photosOnlyOnThisPhone().length;
   if (!left) showToast('Photos are in your account', 'success');
-  else showToast(`${left} photo${left === 1 ? '' : 's'} couldn\'t be backed up. Check your connection and try again`, 'error');
+  else showToast(`${left} photo${left === 1 ? '' : 's'} couldn\'t be backed up. Check your signal and try again`, 'error');
   reopen();
 }
 
@@ -13637,6 +13846,15 @@ function formatIssueDate(ts) {
   return new Date(ts).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' });
 }
 
+// A time from a time field ("13:30") as it reads on a document: "1:30 pm".
+// Anything that isn't hours and minutes stays as typed.
+function formatClockTime(t) {
+  const m24 = /^(\d{1,2}):(\d{2})/.exec(String(t || '').trim());
+  if (!m24) return t || '';
+  const h = Number(m24[1]), m = Number(m24[2]);
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m || 0).padStart(2, '0')} ${h >= 12 ? 'pm' : 'am'}`;
+}
+
 function renderIssueState() {
   const banner = document.getElementById('issueBanner');
   if (!banner) return;
@@ -13719,13 +13937,13 @@ function installReportLockGuard() {
 // Browsers that can't share files (desktop) download the PDFs and open a
 // new email to the client instead. The share sheet only opens straight
 // from a tap, so the PDFs must already be built when this is called.
-function clientMessage({ client, address, docs, signOff, link }) {
+function clientMessage({ client, address, docs, note, signOff, link }) {
   const company = getCompanyDetails();
-  const firstName = (client || '').trim().split(/\s+/)[0];
+  const firstName = greetingName(client);
   return [
     firstName ? `Hi ${firstName},` : 'Hi,',
     '',
-    `Please find attached your ${docs} for ${address || 'the property'}.`,
+    `Please find attached your ${docs} for ${address || 'the property'}.${note ? ` ${note}` : ''}`,
     '',
     // The client link: read the quote and accept or decline it on a phone.
     ...(link ? ['You can read the quote and accept or decline it on your phone here:', link, ''] : []),
@@ -13778,7 +13996,7 @@ async function sendPdfsToClient({ files, to, subject, body }) {
   if (navigator.share && navigator.canShare && navigator.canShare({ files: fileObjs })) {
     if (to && navigator.clipboard) {
       navigator.clipboard.writeText(to).catch(() => {});
-      showToast(`${to} copied — paste it into To`, 'info');
+      showToast(`${to} copied. Paste it into To`, 'info');
     }
     try {
       await navigator.share({ title: subject, text: body, files: fileObjs });
@@ -13792,7 +14010,7 @@ async function sendPdfsToClient({ files, to, subject, body }) {
   }
   files.forEach(f => downloadBlob(f.blob, f.fname));
   window.location.href = `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  showToast(`PDF${many ? 's' : ''} downloaded — attach ${many ? 'them' : 'it'} to the email that just opened`, 'info');
+  showToast(`PDF${many ? 's' : ''} downloaded. Attach ${many ? 'them' : 'it'} to the email that just opened`, 'info');
   return askDidItSend(many);
 }
 
@@ -13857,13 +14075,24 @@ async function sendPdfsDirect({ files, to, subject, body }) {
     // The phone's mail app from here on, this session. It needs a fresh
     // tap to open, so the inspector taps again.
     directEmail = false;
-    if (!(e instanceof TypeError)) reportError(e, 'send_email');
-    const why = e instanceof TypeError ? 'Could not reach SAYON to send it' : e.message;
-    showToast(`${why}. Tap again to send it from your mail app`, 'error');
+    if (!sendFailedForSignal(e)) reportError(e, 'send_email');
+    showToast(`${sendFailureReason(e)}. Tap again to send it from your email app`, 'error');
     return false;
   } finally {
     directEmailSending = false;
   }
+}
+
+// Why an email through SAYON didn't go, for the toast. No signal, or no
+// answer in time (90 seconds on a weak one), is "Could not reach SAYON".
+// Otherwise it's the Worker's reason without its own advice ("Try again,
+// or send it from your mail app"), as the next tap opens the mail app.
+function sendFailedForSignal(e) {
+  return e instanceof TypeError || !!(e && e.name === 'AbortError');
+}
+function sendFailureReason(e) {
+  if (sendFailedForSignal(e)) return 'Could not reach SAYON to send it';
+  return String((e && e.message) || 'Could not send from SAYON').split('. ')[0].replace(/\.$/, '');
 }
 
 // ── CHECK BEFORE SENDING ────────────────────────────────────────────────
@@ -14095,13 +14324,26 @@ function generateReport() {
     }).then(() => track('report_pdf_made')).catch((e) => {
       console.error('PDF generation failed:', e);
       reportError(e, 'report_pdf');
-      showToast((e && e.message) || 'Could not generate the PDF — check your connection and try again', 'error');
+      showToast((e && e.message) || 'Could not make the PDF. Check your signal and try again', 'error');
     }).finally(() => {
       btn.innerHTML = originalText;
       btn.disabled = false;
       btn.style.opacity = '';
     });
   }, 50);
+}
+
+// The last line of "What to do next": when to inspect again, in the
+// inspector's words. "Re-inspect 4 weeks after treatment…" stands on its own,
+// "Next inspection in 3 months…" isn't given a second "Next inspection", and
+// "12 months" reads "Next timber pest inspection: in 12 months".
+function nextInspectionStep(freq) {
+  const f = String(freq || '').trim().replace(/[.;,\s]+$/, '');
+  if (!f) return 'Next timber pest inspection: within 12 months.';
+  if (/^(re-?inspect|inspect)\b/i.test(f)) return f.charAt(0).toUpperCase() + f.slice(1) + '.';
+  if (/^next (timber pest )?inspection\b/i.test(f)) return f.replace(/^next (timber pest )?inspection\b/i, 'Next timber pest inspection') + '.';
+  const when = /^\d+\s*(week|month|year)s?\b/i.test(f) ? 'in ' + f : lowerFirst(f);
+  return `Next timber pest inspection: ${when}.`;
 }
 
 // The summary's Next inspection answer in a few words ("6 MONTHS"); the
@@ -14116,6 +14358,82 @@ function nextInspectionChip(freq) {
 
 // ── SHARED PDF PIECES ── used by the inspection report and the quote PDF
 // (js/quote.js) so both documents carry the same brand.
+
+// Line breaks in every PDF: a dash never starts a line (it stays with the
+// word before it); a standard, a measurement, a time or a date isn't split
+// ("AS / 4349.3", "400 / mm", "8:30 / am", "28 / October 2026"); a
+// paragraph's last line is never one word on its own when the line above
+// has words to share; and a short value, or text in a narrow box, on two
+// lines breaks after a comma where it can ("Unit 3, 12 Long Road, / Castle
+// Hill NSW 2154", not "…Road, Castle / Hill NSW 2154"). Each rule only moves
+// whole words between lines: a text never takes more lines than it did
+// (layouts sized from splitTextToSize keep their height), and a word is
+// never broken to make it fit. Installed once jsPDF has loaded.
+function tidyPdfLineBreaks(lib) {
+  const api = lib && lib.API;
+  if (!api || typeof api.splitTextToSize !== 'function' || api.splitTextToSize.tidy) return;
+  const split = api.splitTextToSize;
+  const NB = '\u00A0'; // holds two words together while wrapping; a plain space when drawn
+  const words = l => String(l).trim().split(/\s+/).filter(Boolean).length;
+  const flat = lines => lines.map(l => String(l).trim()).join(' ');
+  const tidy = function (text, maxlen, options) {
+    if (typeof text !== 'string' || !text.includes(' ')) return split.call(this, text, maxlen, options);
+    const run = t => split.call(this, t, maxlen, options).map(l => typeof l === 'string' ? l.split(NB).join(' ') : l);
+    const plain = run(text);
+    // Same lines, same words in the same order: only the breaks moved.
+    const same = a => a.length === plain.length && flat(a) === flat(plain);
+    let base = text.replace(/ (?=[—–] )/g, NB).replace(/\b(AS|AS\/NZS|No\.) (?=\d)/g, '$1' + NB)
+      .replace(/(\d) (?=(mm|cm|m|km|L|mL|kg|g|ha|am|pm)\b)/g, '$1' + NB)
+      .replace(/\b(\d{1,2}) (?=(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b)/g, '$1' + NB)
+      .replace(/\b((Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*) (?=\d{4}\b)/g, '$1' + NB);
+    let lines = plain;
+    if (base !== text) { const glued = run(base); if (same(glued)) lines = glued; else base = text; }
+    const last = String(lines[lines.length - 1] || '').trim();
+    if (lines.length > 1 && last && !/\s/.test(last) && words(lines[lines.length - 2]) >= 4) {
+      const t = base.replace(/ +$/, ''), i = t.lastIndexOf(' ');
+      if (i > t.lastIndexOf('\n')) {
+        const again = run(t.slice(0, i) + NB + t.slice(i + 1));
+        if (same(again)) lines = again;
+      }
+    }
+    // A short value, or any text in a narrow box (a table cell, a value
+    // beside its label), on two lines: the break after the last comma,
+    // semicolon or middle dot that lets both parts fit, if the first line
+    // stays at least half as long. Paragraphs across the page keep full
+    // lines. A longer text never breaks inside brackets or before a capital
+    // (Street, Epping).
+    const short = text.length <= 80;
+    const pageW = this && this.internal && this.internal.pageSize ? this.internal.pageSize.getWidth() : 0;
+    const narrow = pageW > 0 && maxlen < pageW * 0.6;
+    if (lines.length === 2 && (short || narrow) && !text.includes('\n')) {
+      const t = base.trim();
+      const at = from => Math.max(t.lastIndexOf(', ', from), t.lastIndexOf('; ', from), t.lastIndexOf('· ', from));
+      for (let i = at(t.length); i > 0; i = at(i - 1)) {
+        const head = t.slice(0, i + 1), rest = t.slice(i + 2);
+        if (!short && (/^[A-Z]/.test(rest) || (head.match(/\(/g) || []).length > (head.match(/\)/g) || []).length)) continue;
+        const a = run(head), b = run(rest);
+        if (a.length > 1) continue;
+        if (b.length === 1 && a[0].length * 2 >= String(lines[0]).length) lines = [a[0], b[0]];
+        break;
+      }
+    }
+    return lines;
+  };
+  tidy.tidy = true;
+  api.splitTextToSize = tidy;
+}
+
+// Text cut to at most max lines. A cut ends the last line with "…", so a
+// line never stops mid-sentence with no sign that there was more.
+function pdfClipLines(doc, text, width, max) {
+  const lines = doc.splitTextToSize(String(text || ''), width);
+  if (lines.length <= max) return lines;
+  const out = lines.slice(0, max);
+  let last = String(out[max - 1]).replace(/[\s,;:–—-]+$/, '');
+  while (/\s/.test(last) && doc.getTextWidth(last + '…') > width) last = last.replace(/\s+\S+$/, '').replace(/[\s,;:–—-]+$/, '');
+  out[max - 1] = last + '…';
+  return out;
+}
 // The sample job's PDFs (js/sample-job.js) carry SAMPLE across every page,
 // faint enough to read through, so one can never pass as a real document.
 // key: the job the PDF is for, the open job when left out.
@@ -14222,7 +14540,7 @@ function drawPdfLetterhead(doc, company, { docLabel, date }) {
   let nameSize = 13.5;
   doc.setFont('helvetica','bold'); doc.setFontSize(nameSize); doc.setTextColor(...C.ink);
   while (nameSize > 11 && doc.getTextWidth(name) > nameW) doc.setFontSize(nameSize -= 0.5);
-  const nameLines = doc.splitTextToSize(name, nameW).slice(0, 2);
+  const nameLines = pdfClipLines(doc, name, nameW, 2);
   const two = nameLines.length > 1;
   doc.text(nameLines, tx, two ? 15 : 17.5, { lineHeightFactor: 1.15 });
   const dy = two ? 1.6 : 0;
@@ -14303,7 +14621,7 @@ async function deliverPdfBlob(blob, fname, { title, text, readyToast }) {
         if (e.name !== 'AbortError') showToast('Share cancelled', 'info');
       }
     } else {
-      showToast('PDF ready — tap Share to save or send it', 'info');
+      showToast('PDF ready. Tap Share to save or send it', 'info');
     }
     return;
   }
@@ -14326,7 +14644,7 @@ function downloadBlob(blob, fname) {
     }, 300);
   } catch(e) {
     window.open(url, '_blank');
-    showToast('PDF opened in new tab — save from there', 'info');
+    showToast('PDF opened in a new tab. Save it from there', 'info');
   }
 }
 
@@ -14346,7 +14664,10 @@ async function buildReportPdf() {
   const address   = getFullAddress() || 'Address Not Set';
   const client    = document.getElementById('jobClient').value    || 'Not specified';
   const inspector = document.getElementById('jobInspector').value || 'Not specified';
-  const today = new Date().toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' });
+  // The report's date: the day it was completed, so a finished report made
+  // as a PDF again later keeps its date; a draft carries today's.
+  const issuedAt = reportData.issue && reportData.issue.completedAt;
+  const today = (issuedAt ? new Date(issuedAt) : new Date()).toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' });
   // The day of the inspection, not the day this PDF was made.
   const inspectedOn = reportData.jobInspectionDate || (reportData.agreement && reportData.agreement.inspectionDate);
   const inspectionDate = inspectedOn
@@ -14746,7 +15067,7 @@ async function buildReportPdf() {
   function photoRow(pair, w = CW) {
     const boxW = (w - 5) / 2, boxH = boxW * 0.72;
     doc.setFontSize(7);
-    const caps = pair.map(p => doc.splitTextToSize((p.caption || '').trim(), boxW - 16).slice(0, 2));
+    const caps = pair.map(p => pdfClipLines(doc, (p.caption || '').trim(), boxW - 16, 2));
     return { boxW, boxH, caps, h: boxH + 5 + Math.max(...caps.map(c => Math.max(1, c.length))) * 3.3 + 4 };
   }
   function photoGrid(photos, x = M, w = CW) {
@@ -14824,7 +15145,7 @@ async function buildReportPdf() {
     borerActivity:'Borers of Seasoned Timber', borerDetails:'Borer Type, Location & Evidence', decayFound:'Wood Decay Fungi (Rot)', decayDetails:'Wood Decay: What', decayWhere:'Wood Decay: Where',
     termiteActivity:'Termite Activity Status', species:'Species', damageDescription:'Damage Description', activityLocation:'Location of Activity', nestLocated:'Termite Nest Found?', structuralConcern:'Builder / Engineer Referral',
     waterLeaks:'Water Leaks', leakLocation:'Location of Moisture Ingress', moistureReadings:'Moisture Readings', timberSoil:'Timber-to-Soil Contact', timberSoilDetails:'Timber-to-Soil: Where and What', slabEdge:'Slab Edge Exposure', weepHoles:'Weep Holes', existingSystem:'Existing System',
-    durableNoticePresent:'Durable Notice Present', hardLandscaping:'Hard Landscaping Adjacent', zone25mmVisible:'25mm Inspection Zone Visible', softLandscaping:'Soft Landscaping Adjacent', zone75mmVisible:'75mm Inspection Zone Visible', antCapSoldered:'Ant Cap Joins Soldered',
+    durableNoticePresent:'Durable Notice Present', hardLandscaping:'Hard Landscaping Adjacent', zone25mmVisible:'25 mm Inspection Zone Visible', softLandscaping:'Soft Landscaping Adjacent', zone75mmVisible:'75 mm Inspection Zone Visible', antCapSoldered:'Ant Cap Joins Soldered',
     treatmentRecommended:'Treatment Recommended', treatmentType:'Treatment Type', inspectionFrequency:'Re-inspection Interval', riskLevel:'Risk of Termite Attack',
     invasiveInspection:'Invasive Inspection Recommended', invasiveInspectionDetails:'Invasive Inspection: Where, Why and When', otherRecommendations:'Other Recommendations', antCapping:'Ant Capping', antCappingDetails:'Ant Capping: Where and What',
     delignification:'Chemical Delignification', delignificationDetails:'Delignification: What', delignificationWhere:'Delignification: Where', subfloorVentilation:'Subfloor Ventilation', nonDurableTimber:'Non-durable Timber in Damp Areas', nonDurableTimberDetails:'Non-durable Timber: What', nonDurableTimberWhere:'Non-durable Timber: Where',
@@ -14892,7 +15213,7 @@ async function buildReportPdf() {
   doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
   pdfTracked(doc, 'PROPERTY INSPECTED', M, 104 + coverShift, { cs: 0.4 });
   doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(...C.ink);
-  const addrLines = doc.splitTextToSize(address, CW).slice(0, 2);
+  const addrLines = pdfClipLines(doc, address, CW, 2);
   doc.text(addrLines, M, 112 + coverShift, { lineHeightFactor: 1.2 });
   let gy = 112 + coverShift + (addrLines.length - 1) * 7.2 + 9;
 
@@ -14902,7 +15223,7 @@ async function buildReportPdf() {
     ['INSPECTOR',         inspector],
     ['PEST LICENCE NO.',  reportData.inspectorLicence || ''],
     ['DATE OF INSPECTION',inspectionDate],
-    ['INSPECTION TIME',   reportData.jobInspectionTime || ''],
+    ['INSPECTION TIME',   formatClockTime(reportData.jobInspectionTime || '')],
     ['REPORT REFERENCE',  reportId],
   ].filter(([, v]) => v);
 
@@ -14942,7 +15263,7 @@ async function buildReportPdf() {
       doc.setFont('helvetica','bold'); doc.setFontSize(6.3); doc.setTextColor(...C.inkMuted);
       pdfTracked(doc, 'BASED ON', W-M-6, riskBadgeY+7.5, { cs: 0.4, align: 'right' });
       doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...C.inkLight);
-      const lines = doc.splitTextToSize(basis.join(' · '), bw).slice(0, 2);
+      const lines = pdfClipLines(doc, basis.join(' · '), bw, 2);
       lines.forEach((ln, i) => doc.text(ln, W-M-6, riskBadgeY+13 + i*4, { align:'right' }));
     }
   }
@@ -14980,7 +15301,7 @@ async function buildReportPdf() {
   const co = getCompanyDetails();
   const clientPhone = reportData.jobClientPhone || document.getElementById('jobClientPhone')?.value?.trim();
   const clientEmail = reportData.jobClientEmail || document.getElementById('jobClientEmail')?.value?.trim();
-  const inspectionTime = reportData.jobInspectionTime || document.getElementById('jobInspectionTime')?.value?.trim();
+  const inspectionTime = formatClockTime(reportData.jobInspectionTime || document.getElementById('jobInspectionTime')?.value?.trim() || '');
   const orderId  = reportData.jobOrderId || document.getElementById('jobOrderId')?.value?.trim();
   const inspType = reportData.jobInspectionType || document.getElementById('jobInspectionType')?.value?.trim();
 
@@ -15046,7 +15367,7 @@ async function buildReportPdf() {
       y += T.head;
       g.items.forEach(([q, answer, tone, section, detail], i) => {
         doc.setFont('helvetica','normal'); doc.setFontSize(7.2);
-        const dl = detail ? doc.splitTextToSize(String(detail), QW).slice(0, 2) : [];
+        const dl = detail ? pdfClipLines(doc, detail, QW, 2) : [];
         const h = T.row + dl.length * T.line;
         if (y + h > 278) newPage();
         if (i % 2 === 1) { doc.setFillColor(...C.rowAlt); doc.rect(M, y, CW, h, 'F'); }
@@ -15111,7 +15432,7 @@ async function buildReportPdf() {
       ['Floor Type', reportData.floorType],
       ['Roof Type', reportData.roofType],
       ['Orientation', reportData.facadeDirection],
-      ['Year / Period of Construction', reportData.constructionEra],
+      ['Year / Period of Construction', String(reportData.constructionEra || '').replace(/(\ds?)-(\d)/g, '$1–$2')],
       ['Occupancy Status', reportData.occupancyStatus],
       ['Furnishing', reportData.furnishing],
       ['Site Slope', reportData.siteSlope],
@@ -15150,17 +15471,17 @@ async function buildReportPdf() {
         ['Durable Notice Present (Meter Box)', reportData.durableNoticePresent, true],
         ...(identified ? [
           ['Hard Landscaping Adjacent', reportData.hardLandscaping, 'plain'],
-          ['25mm Inspection Zone Visible', reportData.zone25mmVisible, true],
+          ['25 mm Inspection Zone Visible', reportData.zone25mmVisible, true],
           ['Soft Landscaping Adjacent', reportData.softLandscaping, 'plain'],
-          ['75mm Inspection Zone Visible', reportData.zone75mmVisible, true],
+          ['75 mm Inspection Zone Visible', reportData.zone75mmVisible, true],
           ['Ant Cap / Strip Shield Joins Soldered', reportData.antCapSoldered, true],
         ] : []),
       ]);
       if (identified) {
         const concerns = [];
         if (reportData.durableNoticePresent === 'NO') concerns.push('Durable notice sticker not found in meter box');
-        if (reportData.hardLandscaping === 'YES' && reportData.zone25mmVisible === 'NO') concerns.push('25mm inspection zone not visible against hard landscaping');
-        if (reportData.softLandscaping === 'YES' && reportData.zone75mmVisible === 'NO') concerns.push('75mm inspection zone not visible against soft landscaping');
+        if (reportData.hardLandscaping === 'YES' && reportData.zone25mmVisible === 'NO') concerns.push('25 mm inspection zone not visible against hard landscaping');
+        if (reportData.softLandscaping === 'YES' && reportData.zone75mmVisible === 'NO') concerns.push('75 mm inspection zone not visible against soft landscaping');
         if (reportData.antCapSoldered === 'NO') concerns.push('Ant cap / strip shield joins not soldered');
         if (concerns.length > 0) {
           gap(3);
@@ -15597,7 +15918,7 @@ async function buildReportPdf() {
   infoPara('This inspection does not involve moving furniture, lifting floor coverings, cutting into walls, removing ceiling linings, dismantling built-in cabinetry, or any other action that could cause damage to the property or its contents. The inspector uses visual observation, a probe or screwdriver for tapping and sounding, and a moisture meter where appropriate. Splinter testing of structural timbers in the subfloor or roof void may be carried out where it can be done safely and with the property owner\'s consent.');
 
   infoHeading('What is "Reasonable Access"?');
-  infoPara('Reasonable access is defined in AS 4349.3-2010 as access to areas of the property that can be inspected without the need to remove, move, or dismantle any fixed or stored items, and which can be reached using a 3.6m ladder or less from the ground. Subfloor areas require a minimum clearance of 400mm under the lowest bearer, and roof voids require an access opening of at least 450mm x 400mm. Areas not meeting these criteria are outside the scope of this inspection.');
+  infoPara('Reasonable access is defined in AS 4349.3-2010 as access to areas of the property that can be inspected without the need to remove, move, or dismantle any fixed or stored items, and which can be reached using a 3.6 m ladder or less from the ground. Subfloor areas require a minimum clearance of 400 mm under the lowest bearer, and roof voids require an access opening of at least 450 mm × 400 mm. Areas not meeting these criteria are outside the scope of this inspection.');
 
   infoHeading('Does this inspection guarantee the property is free of termites?');
   infoPara('No. A visual, non-invasive inspection of this type cannot detect timber pest activity or damage concealed within walls, under floors, inside structural timbers, or in any area that was not accessible at the time of inspection. Termites frequently operate within concealed spaces without external evidence. This report reflects the observable condition of the property at the specific date and time of inspection only. Regular professional re-inspections are the most effective ongoing protection available.');
@@ -15610,7 +15931,7 @@ async function buildReportPdf() {
     ['Timber Pests', 'Subterranean termites, drywood termites, borers of seasoned timber, wood decay fungi (rot) and chemical delignification, as defined in AS 4349.3-2010.'],
     ['Chemical Delignification', 'The breakdown of timber by chemicals, often from salt air or industrial or chimney emissions, which leaves the surface of the timber looking furry or fibrous.'],
     ['Visual Inspection', 'An inspection conducted by an inspector who uses their unaided visual faculties, and may use a probe, screwdriver, or moisture meter, to observe accessible areas of the property for evidence of timber pest activity, damage, and conducive conditions.'],
-    ['Reasonable Access', 'Access to areas of a building that are safe, accessible, and do not require any removal, dismantling, or disturbance of fixed or stored items. Access is via a standard 3.6m ladder from ground level. Subfloor access requires minimum 400mm clearance; roof void access requires minimum 450mm x 400mm opening.'],
+    ['Reasonable Access', 'Access to areas of a building that are safe, accessible, and do not require any removal, dismantling, or disturbance of fixed or stored items. Access is via a standard 3.6 m ladder from ground level. Subfloor access requires a minimum 400 mm clearance; roof void access requires a minimum 450 mm × 400 mm opening.'],
     ['Readily Accessible Area', 'An area that can be inspected without moving furniture, stored goods, floor coverings, wall or ceiling linings, insulation, or personal possessions.'],
     ['Obstructions', 'An area, or part of one, that could not be fully inspected because of temporary obstructions at the time of inspection, such as furniture, stored goods, floor coverings, insulation, vegetation, or low clearance in the subfloor or roof void. The inspector is not required to move obstructions.'],
     ['Restricted Access', 'An area that could not be inspected because of a permanent restriction or locked entry, such as a locked room, a subfloor with no access opening, a roof with no roof void, or a part of the building beyond safe reach.'],
@@ -15763,7 +16084,7 @@ async function buildReportPdf() {
     drawPdfSignature(doc, { x: M + sigColW + 8, y, w: sigColW, caption: agreement.signature ? 'Client signature' : 'How it was signed',
       image: agreement.signature, note: agreement.signature ? '' : agreement.otherNote });
     onSigLine(formatAgreementSignedAt(agreement.signedAt), M + (sigColW + 8) * 2);
-    drawPdfSignature(doc, { x: M + (sigColW + 8) * 2, y, w: sigColW, caption: agreement.method === 'other' ? 'Signed' : 'Signed, before the inspection' });
+    drawPdfSignature(doc, { x: M + (sigColW + 8) * 2, y, w: sigColW, caption: agreement.method === 'other' ? 'Signed' : 'Signed before the inspection' });
     y += 9;
     doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...C.inkMuted);
     doc.text('Signed as the pre-inspection agreement. Its full wording is the appendix to this report.', M, y);
@@ -15888,6 +16209,6 @@ async function _buildAndDownloadPDF() {
   await deliverPdfBlob(blob, fname, {
     title: reportKindTitle(),
     text: `${reportKindTitle()} — ${getFullAddress() || 'Property'}`,
-    readyToast: 'Report ready — choose where to save or send it',
+    readyToast: 'Report ready. Choose where to save or send it',
   });
 }

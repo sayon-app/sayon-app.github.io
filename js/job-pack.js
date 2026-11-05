@@ -15,7 +15,7 @@ function ensurePdfLibLoaded() {
     const s = document.createElement('script');
     s.src = 'js/vendor/pdf-lib-1.17.1.min.js';
     s.onload = () => { jobPdfLib = window.PDFLib || null; jobPdfLib ? resolve(jobPdfLib) : reject(new Error('The PDF joining tools did not load')); };
-    s.onerror = () => { s.remove(); reject(new Error('Could not load the PDF joining tools. Check your connection and try again.')); };
+    s.onerror = () => { s.remove(); reject(new Error('Could not load the PDF joining tools. Check your signal and try again')); };
     document.head.appendChild(s);
   });
 }
@@ -39,17 +39,17 @@ function jobPdfParts() {
     build: () => buildAgreementPdf(a) });
   if (jobReportReady()) {
     const sent = reportData.sent ? `sent ${formatIssueDate(reportData.sent.at)}` : 'not sent yet';
-    parts.push({ title: reportKindTitle(), note: `Report ${ensureReportNumber()}, version ${reportVersion()}, ${sent}`, report: true, build: () => buildReportPdf() });
+    parts.push({ title: reportKindTitle().replace(/ \w/g, w => w.toLowerCase()), note: `Report ${ensureReportNumber()}, version ${reportVersion()}, ${sent}`, report: true, build: () => buildReportPdf() });
   }
   if (quoteHasItems(q)) {
     const ans = quoteAnswerState(q);
     const how = !ans ? (q.sentAt ? `sent ${formatIssueDate(q.sentAt)}, no answer yet` : 'not sent yet')
-      : ans.status === 'accepted' ? `accepted${ans.by ? ' by ' + ans.by : ''} ${formatAnswerDate(ans.date)}` : `declined ${formatAnswerDate(ans.date)}`;
+      : ans.status === 'accepted' ? `accepted ${formatAnswerDate(ans.date)}${ans.by ? ' by ' + ans.by : ''}` : `declined ${formatAnswerDate(ans.date)}`;
     parts.push({ title: `Quote ${q.number || ''}`.trim(), note: `${formatAUD(quoteTotals(q).total)}, ${how}`, build: () => buildQuotePDF(q) });
   }
   if (q && q.treatment) {
     const t = q.treatment;
-    parts.push({ title: 'Treatment certificate', note: `Done ${formatAnswerDate(t.date)}${t.technician ? ' by ' + t.technician : ''}`, build: () => buildTreatmentCertificatePDF(q) });
+    parts.push({ title: 'Treatment certificate', note: `Treated ${formatAnswerDate(t.date)}${t.technician ? ' by ' + t.technician : ''}`, build: () => buildTreatmentCertificatePDF(q) });
     if (installedSystems(t).length) parts.push({ title: 'Certificate of installation', note: installedSystems(t).map(k => (TREATMENT_METHODS[k] || {}).label || k).join(', '), build: () => buildTreatmentCertificatePDF(q, { install: true }) });
   }
   if (q && typeof baitVisitsOf === 'function') baitVisitsOf(q).forEach(v => {
@@ -154,7 +154,7 @@ async function makeJobPdf(how) {
         files: [pack],
         to,
         subject: `Your job file — ${getFullAddress() || 'your property'}`,
-        body: clientMessage({ client: (document.getElementById('jobClient') || {}).value || '', address: getFullAddress(), docs: 'job file, with every document from the job in one PDF', signOff: inspectorDisplayName() }),
+        body: clientMessage({ client: (document.getElementById('jobClient') || {}).value || '', address: getFullAddress(), docs: 'job file', note: 'It has every document from the job in one PDF.', signOff: inspectorDisplayName() }),
       });
       if (sent) {
         reportData.jobPdfSentAt = Date.now();
@@ -164,7 +164,7 @@ async function makeJobPdf(how) {
         track('job_pdf_sent');
       }
     } else {
-      await deliverPdfBlob(pack.blob, pack.fname, { title: 'Job file', text: `Job file — ${getFullAddress() || 'Property'}`, readyToast: 'Job PDF ready — choose where to save or send it' });
+      await deliverPdfBlob(pack.blob, pack.fname, { title: 'Job file', text: `Job file — ${getFullAddress() || 'Property'}`, readyToast: 'Job PDF ready. Choose where to save or send it' });
       track('job_pdf_made');
     }
   } catch (e) {

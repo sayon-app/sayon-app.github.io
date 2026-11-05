@@ -37,14 +37,16 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
       check(/Filled \d+ fields from your note/.test(sheet.text), 'sheet counts what the note filled');
       check(sheet.gaps.includes('status') && sheet.gaps.includes('moisture') && sheet.gaps.includes('notice') && sheet.gaps.includes('agreement'), 'gaps: area status, moisture, durable notice, agreement');
       check(!sheet.gaps.includes('signature') && !sheet.gaps.includes('referral'), 'signature and referral are not driveway gaps');
-      check(/Before you leave/i.test(sheet.text) && /Mark the rest as inspected/.test(sheet.text) && /Get it signed/.test(sheet.text), 'gaps have their one-tap fixes');
+      check(/Before you leave/i.test(sheet.text) && /no inspection status/.test(sheet.text) && /Inspected/.test(sheet.text) && /Get it signed/.test(sheet.text), 'gaps have their one-tap fixes');
       if (!/Before you leave/i.test(sheet.text)) console.log('SHEET TEXT:', sheet.text.slice(0, 400));
       check(/Live termites: yes, Gum tree/.test(sheet.read) && /Before you leave:/.test(sheet.read) && /Risk: high/.test(sheet.read), 'read-back says the headline and the gaps');
       check(!/<|>|"/.test(sheet.read), 'read-back has no markup');
       check(sheet.readBtn, 'Read it back button shows where speech is available');
       console.log('read-back:', sheet.read);
-      // One-tap fix: the rest marked inspected, and the sheet redrawn without that gap.
-      await p.getByRole('button', { name: 'Mark the rest as inspected' }).click(); await p.waitForTimeout(400);
+      // One-tap fix: up to three unmarked areas each get Inspected / Not
+      // applicable; tapping Inspected on each redraws the sheet without that gap.
+      const inspectedBtn = () => p.locator('#extractSummaryGaps').getByRole('button', { name: 'Inspected', exact: true });
+      for (let i = 0; i < 6 && await inspectedBtn().count(); i++) { await inspectedBtn().first().click(); await p.waitForTimeout(400); }
       const after = await p.evaluate(() => ({ open: document.getElementById('extractSummaryOverlay').classList.contains('open'), gaps: driveawayGaps().map(g => g.key), text: document.querySelector('#extractSummaryOverlay .page-sheet').innerText }));
       check(after.open && !after.gaps.includes('status') && /Filled \d+ fields/.test(after.text), 'fix marks the rest inspected and redraws the sheet');
       await p.screenshot({ path: `${OUT}/${W}-2-after-fix.png`, fullPage: false });

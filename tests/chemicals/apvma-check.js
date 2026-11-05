@@ -49,7 +49,7 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   check(Object.values(c.numbers).every(v => v && v.name), 'every starting product is on the list');
   const t = card('Termidor');
   await t.locator('summary').first().click(); await p.waitForTimeout(200);
-  check(/Registered with the APVMA as Termidor Residual Termiticide And Insecticide \(No\. 54624\), checked/.test(await t.locator('.chem-apvma').innerText()), "the card says what the APVMA's list calls it");
+  check(/Registered with the APVMA as Termidor Residual Termiticide and Insecticide \(No\. 54624\), checked/.test(await t.locator('.chem-apvma').innerText()), "the card says what the APVMA's list calls it");
   check(/Last checked/.test(await p.locator('#chemApvmaNote').innerText()) && await p.locator('#chemApvmaNote').isVisible(), 'the page says when it was last checked');
   check(!(await p.locator('#chemList .chem-unreg').count()), 'nothing is flagged');
   await t.locator('.chem-apvma').scrollIntoViewIfNeeded();

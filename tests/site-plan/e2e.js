@@ -72,6 +72,8 @@ let shotN = 0;
   const site = await p.evaluate(() => ['trSiteBuilding', 'trSiteFloor', 'trSiteSurrounds', 'trSiteExisting'].map(id => document.getElementById(id).value));
   console.log('site:', JSON.stringify(site));
   check(/Single storey house/.test(site[0]) && /Brick veneer/.test(site[0]) && site[1] === 'Concrete slab' && /Garden beds/.test(site[2]) && /None found/.test(site[3]), 'the site fields come from the report');
+  // Areas treated may open folded once the record is pre-filled.
+  await p.evaluate(() => { document.getElementById('trFold3').open = true; });
   await p.locator('#trPlan').scrollIntoViewIfNeeded(); await p.evaluate(() => document.getElementById('trSiteBuilding').scrollIntoView({ block: 'start' }));
   await shot('record-site-empty-plan');
 
@@ -171,7 +173,7 @@ let shotN = 0;
   await tool('Findings', 'Ant cap problem'); await tapPlan(400, 300);
   const sub1 = await p.evaluate(() => ({ summary: document.getElementById('spSummary').textContent, legend: [...document.querySelectorAll('#spLegend li')].map(li => li.textContent), siteHit: sitePlanHit([700, 600]) }));
   console.log('subfloor drawn:', JSON.stringify(sub1));
-  check(/1[0-9] piers or stumps, 1 dwarf wall, 2 vents, 1 access point, 1 low clearance area, 1 place timber damage was found and 1 ant cap problem/.test(sub1.summary), 'the subfloor is summed up: ' + sub1.summary);
+  check(/1[0-9] piers or stumps, 1 dwarf wall, 2 vents, 1 access point, 1 low clearance area, 1 place where timber damage was found and 1 ant cap problem/.test(sub1.summary), 'the subfloor is summed up: ' + sub1.summary);
   check(sub1.legend.includes('Subfloor (suspended floor)') && sub1.legend.includes('Pier or stump') && sub1.legend.includes('Low clearance (restricted access)') && !sub1.legend.some(l => /bait station/.test(l)), 'the subfloor has its own legend, without the site plan symbols');
   check(!sub1.siteHit, 'site plan symbols can\'t be picked up from the subfloor view');
   await p.evaluate(() => { sitePlanEditor.sel = null; renderSitePlanEditor(); document.querySelector('#sitePlanOverlay .page-sheet-body').scrollTop = 0; });

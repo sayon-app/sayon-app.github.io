@@ -103,6 +103,15 @@ function scheduleBusinessSync() {
 async function pushBusinessSettings() {
   businessSyncTimer = null;
   if (!isBusinessOwner() || !authSession) return;
+  // With the business as kept on the phone (no signal, or a weak one when
+  // the app opened), the account's copy is read first and anything newer in
+  // it taken in: it can hold changes from another device that this phone's
+  // older settings would otherwise overwrite.
+  if (businessIsFromCache()) {
+    if (!(await readBusinessFromAccount())) return; // the next change or app open tries again
+    applyCloudBusinessSettings();
+    if (!localSettingsAhead(authBusiness.settings || {})) return;
+  }
   // Details from before syncing existed carry no time; stamping them makes
   // the account copy the one other phones take.
   if (!getCompanyDetails().updatedAt && hasContent(getCompanyDetails())) storeCompanyDetails(getCompanyDetails());

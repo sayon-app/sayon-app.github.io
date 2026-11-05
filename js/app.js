@@ -2652,6 +2652,17 @@ function correctKnownMishearings(text) {
   fix(/\bcordon\b(?=\s+(?:physical\s+|termite\s+)*barrier\b)/gi, 'Kordon');
   fix(/\bbats\b(?=\s+(?:laid|lying|covering|over (?:the\s+)?(?:ceiling|joists|top plates|everything)|(?:are|were|get|have been)\s+(?:re)?moved)\b)/gi, 'batts');
   fix(/\binsulation bats\b/gi, 'insulation batts');
+  // Full-coverage car test, 5 Nov 2026. Each has no sensible literal reading
+  // in an inspection, or is fixed only in the phrase it was heard in.
+  fix(/\btermite or foam\b/gi, 'Termidor Foam');
+  fix(/\bultra ?set\b/gi, 'Altriset');
+  fix(/\bthermal track\b/gi, 'Termatrac');
+  fix(/\bacid nasiformis\b/gi, 'acinaciformis');
+  fix(/\brepurchase\b(?=\s+(?:timber\s+)?pest\b)/gi, 'pre-purchase');
+  fix(/\bferry fibrous\b/gi, 'furry fibrous');
+  fix(/\bdrainings\b/gi, 'drainage');
+  fix(/\bbathroom ward\b/gi, 'bathroom wall');
+  text = text.replace(/\b(slab edge)\.?\s+of the extinction\b/gi, '$1 of the extension');
   // "soil barrier" lost its first letter at a phrase break ("Oil barrier").
   text = text.replace(/(^|[.!?]\s+|\bchemical\s+)oil barrier\b/gi, (m, pre) => pre + (/^\s*$|[.!?]\s*$/.test(pre) ? 'Soil' : 'soil') + ' barrier');
   // Subfloor clearance is always millimetres; "400ml", "400 mil".
@@ -2673,7 +2684,7 @@ function correctKnownMishearings(text) {
 // contextual reasoning, which can see the whole sentence.
 const TRANSCRIPTION_VOCAB = [
   'Kordon', 'Termidor', 'Altriset', 'Premise', 'Bifenthrin', 'Biflex',
-  'Exterra', 'Sentricon', 'Trelona', 'Termimesh',
+  'Exterra', 'Sentricon', 'Trelona', 'Termimesh', 'Termatrac',
   'Coptotermes', 'Schedorhinotermes', 'Nasutitermes', 'Cryptotermes',
 ];
 

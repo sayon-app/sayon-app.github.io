@@ -30,7 +30,7 @@ function ensureJsPDFLoaded() {
       tidyPdfLineBreaks(jsPDF);
       if (jsPDF) resolve(jsPDF); else reject(new Error('jsPDF script loaded but did not define window.jspdf.jsPDF'));
     };
-    s.onerror = () => reject(new Error('Could not load the PDF library — check your internet connection and try again.'));
+    s.onerror = () => reject(new Error('Could not load the PDF tools. Check your signal and try again'));
     document.head.appendChild(s);
   });
 }
@@ -824,11 +824,11 @@ function applyObstructionExtraction(data, transcript) {
     });
     if (matchedAny || changed) {
       changed = true;
-      showToast('Areas updated from voice — check they match what you described', 'info');
+      showToast('Areas updated from your note. Check they match what you said', 'info');
     } else {
       // Nothing in our fixed area list matched — surface it rather than
       // silently losing it, so the technician marks the area manually.
-      showToast(`Obstruction mentioned but not auto-matched: "${combinedText.slice(0, 120)}" — mark the area manually`, 'info');
+      showToast(`Mark the area for this obstruction yourself: "${combinedText.slice(0, 120)}"`, 'info');
     }
   }
   if (changed) syncObstructionData();
@@ -2367,7 +2367,7 @@ function useTranscriptForNotes() {
   const key = activeNotesTargetKey;
   const text = currentTranscript.trim();
   if (!text) {
-    showToast('Nothing to add yet — speak first', 'error');
+    showToast('Nothing to add yet. Speak first', 'error');
     return;
   }
 
@@ -2726,7 +2726,7 @@ function applyCleanupSuggestion() {
   // longer matches what's in the box - dismiss rather than silently
   // overwrite edits the inspector made in the meantime.
   if (currentTranscript !== cleanupOriginalText) {
-    showToast('Transcript changed since this suggestion was made — dismissed rather than risk overwriting your edits', 'error');
+    showToast('The transcript changed after this suggestion was made, so it was dropped to keep your edits', 'error');
     dismissCleanupSuggestion();
     return;
   }
@@ -2736,7 +2736,7 @@ function applyCleanupSuggestion() {
     box.textContent = currentTranscript;
     box.classList.add('active');
   }
-  showToast('Cleanup applied — review before extracting', 'success');
+  showToast('Cleanup applied. Check it before extracting', 'success');
   dismissCleanupSuggestion();
 }
 
@@ -2925,7 +2925,7 @@ function showServerTranscriptionSuggestion(transcript, before) {
 function applyServerTranscript() {
   if (!serverTranscriptSuggestion) return;
   if (currentTranscript !== serverTranscriptOriginalText) {
-    showToast('Transcript changed since this alternate version was generated — dismissed rather than risk overwriting your edits', 'error');
+    showToast('The transcript changed after this version was made, so it was dropped to keep your edits', 'error');
     dismissServerTranscript();
     return;
   }
@@ -3184,7 +3184,7 @@ function driveWave(on) {
 function startRecording() {
   const SR = getSpeechRecognitionCtor();
   const useWhisper = canUseWhisperListening();
-  if (!SR && !useWhisper) { showToast('Speech recognition not supported — tap the transcript box to type instead', 'error'); return; }
+  if (!SR && !useWhisper) { showToast('Speech recognition isn\'t supported here. Tap the transcript box to type instead', 'error'); return; }
   track('dictation_started');
 
   lowConfidenceFlagged = false;
@@ -3282,11 +3282,11 @@ function startRecording() {
       // reason to stop: onend opens a fresh session and keeps listening.
       if (reason === 'no-speech' || reason === 'aborted') return;
       const messages = {
-        'network': 'No signal for voice recording. Tap the box and use your keyboard\'s mic to dictate instead — the note will be saved and filled in when you\'re back online.',
-        'audio-capture': 'Microphone not available — check mic permission and that no other app is using it.',
-        'not-allowed': 'Microphone permission denied — enable it in your browser/device settings.',
-        'service-not-allowed': 'Speech service not allowed — check your browser/device permissions.',
-        'language-not-supported': 'This device doesn\'t support en-AU speech recognition.',
+        'network': 'No signal for voice recording. Tap the box and use your keyboard\'s mic to dictate instead. The note is saved and fills in when you\'re back online',
+        'audio-capture': 'The microphone isn\'t available. Check the mic permission and that no other app is using it',
+        'not-allowed': 'Microphone permission is off. Turn it on in your browser or phone settings',
+        'service-not-allowed': 'Speech recognition isn\'t allowed. Check your browser or phone permissions',
+        'language-not-supported': 'This phone doesn\'t support Australian English speech recognition',
       };
       showToast(messages[reason] || `Speech recognition stopped (${reason})`, 'error');
       stopRecording();
@@ -4286,7 +4286,7 @@ async function runFill({ whileRecording = false } = {}) {
   learnFromTranscriptEdit();
   const note = currentTranscript;
   if (!note.trim()) return false;
-  setAI('thinking', 'Filling in the report from your note...');
+  setAI('thinking', 'Filling in the report from your note…');
   document.getElementById('extractBtn').disabled = true;
   const before = extractSnapshot();
   const fillTarget = reportData;
@@ -4341,13 +4341,13 @@ async function runFill({ whileRecording = false } = {}) {
       const waiting = getPendingNotes()[getPendingNotes().length - 1];
       if (waiting) { waiting.problem = extractionProblem(err); saveDraft(); renderPendingNotes(); }
       setAI('ready', 'Note saved');
-      showToast(`${extractionProblem(err)}. Your note is saved under Waiting notes.`, 'error');
+      showToast(`${extractionProblem(err)}. Your note is saved under Waiting notes`, 'error');
     } else if (err.noSignal) {
       setAI('ready', 'Saved until there\'s signal');
-      showToast('No signal — note saved. It will fill in the report when you\'re back online.', 'info');
+      showToast('No signal, so your note is saved. It fills in the report when you\'re back online', 'info');
     } else {
       setAI('ready', 'Note saved');
-      showToast(`${pendingNotesProblem}. Your note is saved and will fill in once that's sorted.`, 'error');
+      showToast(`${pendingNotesProblem}. Your note is saved and fills in once that's sorted`, 'error');
     }
   }
 
@@ -4391,7 +4391,7 @@ function getPendingNotes() {
 function queuePendingNote(text) {
   const notes = getPendingNotes();
   if (notes.length >= MAX_PENDING_NOTES) {
-    showToast(`${MAX_PENDING_NOTES} notes are already waiting — fill those in before adding more`, 'error');
+    showToast(`${MAX_PENDING_NOTES} notes are already waiting. Fill those in before adding more`, 'error');
     return false;
   }
   const id = 'note_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4443,14 +4443,14 @@ function renderPendingNotes() {
 async function processPendingNotes(manual) {
   if (pendingNotesRunning || !getPendingNotes().length || isReportLocked()) return;
   if (!navigator.onLine) {
-    if (manual) showToast('Still no signal — the notes will fill in when you\'re back online', 'info');
+    if (manual) showToast('Still no signal. The notes fill in when you\'re back online', 'info');
     return;
   }
   const target = reportData;
   const before = extractSnapshot();
   pendingNotesRunning = true;
   renderPendingNotes();
-  setAI('thinking', 'Filling in saved notes...');
+  setAI('thinking', 'Filling in saved notes…');
   let filled = 0, stillNoSignal = false, stuck = 0, kept = false;
   try {
     // Oldest first. A note with a problem of its own (too long, an answer
@@ -4473,7 +4473,7 @@ async function processPendingNotes(manual) {
           continue;
         }
         pendingNotesProblem = extractionProblem(err);
-        if (manual) showToast(`${pendingNotesProblem}. Your notes are still saved.`, 'error');
+        if (manual) showToast(`${pendingNotesProblem}. Your notes are still saved`, 'error');
         break;
       }
       pendingNotesProblem = null;
@@ -4496,13 +4496,13 @@ async function processPendingNotes(manual) {
   if (filled && reportData === target && currentReportId && getSavedReports().some(r => r.id === currentReportId)) {
     saveCurrentReport(true);
   }
-  if (filled) showToast(`${filled} saved note${filled !== 1 ? 's' : ''} filled in — check the report`, 'success');
+  if (filled) showToast(`${filled} saved note${filled !== 1 ? 's' : ''} filled in. Check the report`, 'success');
   // Fill in now shows what the notes filled; processTranscript() shows its
   // own sheet when it ran the queue.
   if (filled && manual && !extractSummaryOwned && reportData === target) showExtractSummary(before);
   else if (kept) showToast('Your notes are kept under Waiting notes. Tap Fill in now when you\'re ready', 'info');
-  else if (stillNoSignal && manual) showToast('Still no signal — the notes will fill in when you\'re back online', 'info');
-  if (stuck && (manual || !filled)) showToast(`${stuck} note${stuck !== 1 ? 's' : ''} couldn't be read — see the reason under the note`, 'error');
+  else if (stillNoSignal && manual) showToast('Still no signal. The notes fill in when you\'re back online', 'info');
+  if (stuck && (manual || !filled)) showToast(`${stuck} note${stuck !== 1 ? 's' : ''} couldn't be read. See why under ${stuck !== 1 ? 'each note' : 'the note'}`, 'error');
 }
 
 // ── EXTRACT SUMMARY ─────────────────────────────────────────────────────
@@ -4724,7 +4724,7 @@ async function scanCompliancePlate(fromFile) {
   } catch (e) {
     const msg = ((e && e.message) || '') + '';
     if (!/cancel/i.test(msg)) {
-      showToast('Could not open the camera — check camera permission in Settings', 'error');
+      showToast('Could not open the camera. Check the camera permission in Settings', 'error');
     }
     return;
   }
@@ -4738,7 +4738,7 @@ async function scanCompliancePlate(fromFile) {
   if (btn) btn.disabled = true;
   if (fileBtn) fileBtn.disabled = true;
   if (btnText) btnText.textContent = 'Reading plate…';
-  setAI('thinking', 'Reading compliance plate...');
+  setAI('thinking', 'Reading the compliance plate…');
 
   try {
     const res = await workerFetch('', {
@@ -4789,13 +4789,13 @@ async function scanCompliancePlate(fromFile) {
         setTimeout(() => showToast(parsed.extraDetails, 'info'), 1600);
       }
     } else {
-      showToast("Couldn't read a compliance plate clearly in that photo — try again with better light, or enter it manually", 'info');
+      showToast("Couldn't read a compliance plate in that photo. Try again in better light, or type it in", 'info');
     }
     setAI('ready', 'Ready');
 
   } catch (err) {
     console.warn('Plate scan failed:', err);
-    showToast('Could not read the plate — check your connection and try again', 'error');
+    showToast('Could not read the plate. Check your signal and try again', 'error');
     setAI('ready', 'Ready');
   } finally {
     if (btn) btn.disabled = false;
@@ -4901,7 +4901,7 @@ async function analyzeGalleryPhoto(photoId) {
         renderPhotoGrid();
         saveDraft();
       }
-      showToast(`${note} — please confirm before adding to a finding`, 'success');
+      showToast(`${note}. Check it before you add it to a finding`, 'success');
       if (parsed.notes) {
         setTimeout(() => showToast(parsed.notes, 'info'), 1600);
       }
@@ -4912,7 +4912,7 @@ async function analyzeGalleryPhoto(photoId) {
 
   } catch (err) {
     console.warn('Photo analysis failed:', err);
-    showToast('Could not analyse the photo — check your connection and try again', 'error');
+    showToast('Could not analyse the photo. Check your signal and try again', 'error');
     setAI('ready', 'Ready');
   } finally {
     renderPhotoGrid(); // restores the button (re-render clears the disabled/label override above)
@@ -5103,7 +5103,7 @@ function populateFields(data, transcript) {
       const combined = [...kept, ...incoming];
       reportData.findings = combined.slice(0, MAX_FINDINGS);
       if (combined.length > MAX_FINDINGS) {
-        showToast(`Only ${MAX_FINDINGS} findings can be tracked per report — some new ones weren't added. Review and merge manually if needed.`, 'info');
+        showToast(`A report holds ${MAX_FINDINGS} findings, so some new ones weren't added. Add their details to the findings already there`, 'info');
       }
     } else if (kept.length !== existing.length || merged) {
       reportData.findings = kept;
@@ -8070,12 +8070,12 @@ function removeAgreement() {
 // A PDF of the signed agreement for the client to keep.
 function shareAgreementPdf() {
   const a = reportData.agreement;
-  if (!a || !window.jspdf) { showToast('PDF tools are still loading — try again in a moment', 'error'); return; }
+  if (!a || !window.jspdf) { showToast('PDF tools are still loading. Try again in a moment', 'error'); return; }
   const { blob, fname } = buildAgreementPdf(a);
   deliverPdfBlob(blob, fname, {
     title: 'Pre-Inspection Agreement',
     text: `Pre-inspection agreement — ${getFullAddress() || 'Property'}`,
-    readyToast: 'Agreement ready — choose where to save or send it',
+    readyToast: 'Agreement ready. Choose where to save or send it',
   });
 }
 
@@ -8581,9 +8581,9 @@ async function handleSectionPhotoFiles(fileList, section) {
   const replacing = limit === 1 && getSectionPhotos(section).length > 0;
   const existing = replacing ? [] : getSectionPhotos(section);
   const remaining = limit - existing.length;
-  if (remaining <= 0) { showToast(`Photo limit reached for this section (${limit})`, 'error'); return; }
+  if (remaining <= 0) { showToast(`This box is full. It holds ${limit} photos`, 'error'); return; }
   const toProcess = files.slice(0, remaining);
-  if (files.length > toProcess.length) showToast(`Only added ${toProcess.length} of ${files.length} photos`, 'warn');
+  if (files.length > toProcess.length) showToast(`Only ${toProcess.length} of ${files.length} added. This box holds ${limit} photos`, 'error');
 
   for (const file of toProcess) {
     try {
@@ -8763,7 +8763,7 @@ async function handlePhotoFiles(fileList) {
   const remaining = MAX_PHOTOS_PER_REPORT - reportData.photos.length;
   if (remaining <= 0) { showToast(`Photo limit reached (${MAX_PHOTOS_PER_REPORT} per report)`, 'error'); return; }
   const toProcess = files.slice(0, remaining);
-  if (files.length > toProcess.length) showToast(`Only added ${toProcess.length} of ${files.length} — limit reached`, 'error');
+  if (files.length > toProcess.length) showToast(`Only ${toProcess.length} of ${files.length} added. A report holds ${MAX_PHOTOS_PER_REPORT} photos`, 'error');
 
   for (const file of toProcess) {
     try {
@@ -10164,7 +10164,7 @@ async function confirmBillingAfterCheckout() {
   if (el) el.textContent = 'Confirming your payment…';
   for (let i = 0; i < 10; i++) {
     const sub = await loadBillingStatus();
-    if (sub && (sub.status !== 'trialing' || sub.subscribed)) { showToast('Subscription updated — thanks!', 'success'); return; }
+    if (sub && (sub.status !== 'trialing' || sub.subscribed)) { showToast('Subscription updated. Thank you', 'success'); return; }
     if (el && i < 9) el.textContent = 'Confirming your payment…';
     await new Promise(r => setTimeout(r, 2000));
   }
@@ -10239,7 +10239,7 @@ function handleBillingReturn() {
     if (billing === 'success') {
       confirmBillingAfterCheckout();
     } else if (billing === 'cancelled') {
-      showToast('Checkout cancelled — no changes made', 'info');
+      showToast('Checkout cancelled. Nothing was changed', 'info');
     } else if (billing === 'updated') {
       loadBillingStatus();
     }
@@ -10266,7 +10266,7 @@ async function openBillingPortal() {
     if (!res.ok || !data.url) throw new Error(data && data.message || rawBody || `HTTP ${res.status}`);
     window.location.href = data.url;
   } catch (e) {
-    showToast('Could not open billing portal — try again shortly.', 'error');
+    showToast('Could not open billing. Try again shortly', 'error');
     console.warn('openBillingPortal failed:', e.message);
   }
 }
@@ -10326,7 +10326,7 @@ async function submitPasswordReset() {
   if (!pw || pw.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; return; }
   if (pw !== pw2) { errEl.textContent = 'Passwords do not match.'; return; }
   if (!pendingRecoverySession?.access_token) {
-    errEl.textContent = 'This reset link has expired — please request a new one.';
+    errEl.textContent = 'This reset link has expired. Ask for a new one from Forgot password on the sign-in screen.';
     return;
   }
 
@@ -10343,14 +10343,14 @@ async function submitPasswordReset() {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      errEl.textContent = data.msg || data.error_description || data.error?.message || 'Could not update password — the link may have expired.';
+      errEl.textContent = data.msg || data.error_description || data.error?.message || 'Could not update the password. The link may have expired.';
       return;
     }
     pendingRecoverySession = null;
     document.getElementById('rpPassword').value = '';
     document.getElementById('rpPasswordConfirm').value = '';
     showAuth('authSignIn');
-    showToast('Password updated — sign in with your new password', 'success');
+    showToast('Password updated. Sign in with your new password', 'success');
   } catch(e) {
     errEl.textContent = 'Couldn\'t reach SAYON. Check your signal and try again.';
   } finally {
@@ -10635,8 +10635,8 @@ async function endSessionOnDevice() {
 // go next, through the storage API, then the account itself, then this
 // phone's copy.
 const DELETE_ACCOUNT_BLOCKERS = {
-  ACTIVE_SUBSCRIPTION: 'Your plan is still active. Cancel it in Menu › Billing › Manage first, then delete your account.',
-  HAS_TEAM: 'Other people are still on your team. Remove them in Menu › Your team first, then delete your account.',
+  ACTIVE_SUBSCRIPTION: 'Your plan is still active. Cancel it in Menu › Billing › Manage first, then delete your account',
+  HAS_TEAM: 'Other people are still on your team. Remove them in Menu › Your team first, then delete your account',
 };
 
 async function deleteAccountRpc(dryRun) {
@@ -10648,7 +10648,7 @@ async function deleteAccountRpc(dryRun) {
   if (res.ok) return null;
   const err = await res.json().catch(() => ({}));
   const code = Object.keys(DELETE_ACCOUNT_BLOCKERS).find(k => (err.message || '').includes(k));
-  return code ? DELETE_ACCOUNT_BLOCKERS[code] : 'Could not delete your account. Check your connection and try again.';
+  return code ? DELETE_ACCOUNT_BLOCKERS[code] : 'Could not delete your account. Check your signal and try again';
 }
 
 async function deleteMyPhotos() {
@@ -10712,7 +10712,7 @@ async function deleteMyAccount() {
     if (failed) { showToast(failed, 'error'); return; }
   } catch (e) {
     console.warn('deleteMyAccount:', e);
-    showToast('Could not delete your account. Check your connection and try again.', 'error');
+    showToast('Could not delete your account. Check your signal and try again', 'error');
     return;
   }
   await endSessionOnDevice();
@@ -11021,11 +11021,11 @@ async function noticeInviteWhileSignedIn() {
   } catch (e) { return; }
   const me = (authUser && authUser.email || '').toLowerCase();
   if (!invite || !invite.email) {
-    showToast('That invite link has expired or been replaced. Ask for a new one.', 'info');
+    showToast('That invite link has expired or been replaced. Ask for a new one', 'info');
   } else if (String(invite.email).toLowerCase() === me) {
-    showToast(`You're already signed in as ${invite.email}.`, 'info');
+    showToast(`You're already signed in as ${invite.email}`, 'info');
   } else {
-    showToast(`That invite is for ${invite.email}, but you're signed in as ${authUser.email}. To use it, sign out and open the link again.`, 'error');
+    showToast(`That invite is for ${invite.email}, but you're signed in as ${authUser.email}. To use it, sign out and open the link again`, 'error');
   }
 }
 
@@ -11734,7 +11734,7 @@ function flushDraftSave() {
     // may not be persisting, without spamming a toast on every keystroke.
     if (!saveDraftFailureNotified) {
       saveDraftFailureNotified = true;
-      showToast('Could not save your progress — device storage may be full', 'error');
+      showToast('Could not save your progress. The phone\'s storage may be full', 'error');
     }
     updateSyncStatus('error');
   }
@@ -11756,18 +11756,18 @@ function updateSyncStatus(state) {
   if (!navigator.onLine) {
     el.classList.add('offline');
     textEl.textContent = lastLocalSaveAt
-      ? 'Saved on this device — will sync when back online'
-      : 'Offline — saving to this device only';
+      ? 'Saved on this phone. It syncs when you\'re back online'
+      : 'Offline, so saving to this phone only';
     return;
   }
   if (state === 'error') {
     el.classList.add('error');
-    textEl.textContent = 'Could not save — check device storage';
+    textEl.textContent = 'Could not save. Check the phone\'s storage';
     return;
   }
   if (state === 'cloud_error') {
     el.classList.add('error');
-    textEl.textContent = 'Saved on this device — could not sync to your account';
+    textEl.textContent = 'Saved on this phone, but not synced to your account';
     return;
   }
   if (state === 'saved' || lastLocalSaveAt) {
@@ -11902,8 +11902,8 @@ function setSavedReports(reports, retrying) {
     // make room, then this save is tried once more.
     if (isQuotaError(e) && !retrying && freeStorageFor(reports)) return setSavedReports(reports, true);
     showToast(isQuotaError(e)
-      ? 'Could not save: this phone\'s storage is full. Back up from Menu › Data, then delete old jobs'
-      : 'Could not save — storage full or unavailable', 'error');
+      ? 'Could not save. This phone\'s storage is full. Back up from Menu › Settings › Your data, then delete old jobs'
+      : 'Could not save. Storage is full or unavailable', 'error');
     return false;
   }
 }
@@ -12355,7 +12355,7 @@ function importAllData(file) {
     try {
       backup = JSON.parse(e.target.result);
     } catch (err) {
-      showToast('That file isn\'t valid — could not read it', 'error');
+      showToast('Could not read that file. Choose a SAYON backup', 'error');
       return;
     }
 
@@ -13511,7 +13511,7 @@ async function backUpPhotosFromGap(from) {
   if (changed) { saveDraft(); if (currentReportId) saveCurrentReport(true); }
   const left = photosOnlyOnThisPhone().length;
   if (!left) showToast('Photos are in your account', 'success');
-  else showToast(`${left} photo${left === 1 ? '' : 's'} couldn\'t be backed up. Check your connection and try again`, 'error');
+  else showToast(`${left} photo${left === 1 ? '' : 's'} couldn\'t be backed up. Check your signal and try again`, 'error');
   reopen();
 }
 
@@ -13773,7 +13773,7 @@ async function sendPdfsToClient({ files, to, subject, body }) {
   if (navigator.share && navigator.canShare && navigator.canShare({ files: fileObjs })) {
     if (to && navigator.clipboard) {
       navigator.clipboard.writeText(to).catch(() => {});
-      showToast(`${to} copied — paste it into To`, 'info');
+      showToast(`${to} copied. Paste it into To`, 'info');
     }
     try {
       await navigator.share({ title: subject, text: body, files: fileObjs });
@@ -13787,7 +13787,7 @@ async function sendPdfsToClient({ files, to, subject, body }) {
   }
   files.forEach(f => downloadBlob(f.blob, f.fname));
   window.location.href = `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  showToast(`PDF${many ? 's' : ''} downloaded — attach ${many ? 'them' : 'it'} to the email that just opened`, 'info');
+  showToast(`PDF${many ? 's' : ''} downloaded. Attach ${many ? 'them' : 'it'} to the email that just opened`, 'info');
   return askDidItSend(many);
 }
 
@@ -14090,7 +14090,7 @@ function generateReport() {
     }).then(() => track('report_pdf_made')).catch((e) => {
       console.error('PDF generation failed:', e);
       reportError(e, 'report_pdf');
-      showToast((e && e.message) || 'Could not generate the PDF — check your connection and try again', 'error');
+      showToast((e && e.message) || 'Could not make the PDF. Check your signal and try again', 'error');
     }).finally(() => {
       btn.innerHTML = originalText;
       btn.disabled = false;
@@ -14374,7 +14374,7 @@ async function deliverPdfBlob(blob, fname, { title, text, readyToast }) {
         if (e.name !== 'AbortError') showToast('Share cancelled', 'info');
       }
     } else {
-      showToast('PDF ready — tap Share to save or send it', 'info');
+      showToast('PDF ready. Tap Share to save or send it', 'info');
     }
     return;
   }
@@ -14397,7 +14397,7 @@ function downloadBlob(blob, fname) {
     }, 300);
   } catch(e) {
     window.open(url, '_blank');
-    showToast('PDF opened in new tab — save from there', 'info');
+    showToast('PDF opened in a new tab. Save it from there', 'info');
   }
 }
 
@@ -15962,6 +15962,6 @@ async function _buildAndDownloadPDF() {
   await deliverPdfBlob(blob, fname, {
     title: reportKindTitle(),
     text: `${reportKindTitle()} — ${getFullAddress() || 'Property'}`,
-    readyToast: 'Report ready — choose where to save or send it',
+    readyToast: 'Report ready. Choose where to save or send it',
   });
 }

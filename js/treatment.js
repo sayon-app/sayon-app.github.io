@@ -834,12 +834,12 @@ function downloadTreatmentCertificate(install = false) {
     .then(({ blob, fname }) => { track('certificate_pdf_made', { install }); return deliverPdfBlob(blob, fname, {
       title: name,
       text: `${name} — ${q.address || 'Property'}`,
-      readyToast: 'Certificate ready — choose where to save or send it',
+      readyToast: 'Certificate ready. Choose where to save or send it',
     }); })
     .catch(e => {
       console.error('Certificate PDF failed:', e);
       reportError(e, 'certificate_pdf');
-      showToast((e && e.message) || 'Could not make the certificate. Check your connection and try again', 'error');
+      showToast((e && e.message) || 'Could not make the certificate. Check your signal and try again', 'error');
     });
 }
 

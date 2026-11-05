@@ -82,7 +82,7 @@
       </div>
       <div class="auth-field">
         <label class="auth-label" for="suPassword">Password</label>
-        <div class="auth-pass"><input class="auth-input" id="suPassword" type="password" placeholder="Min. 8 characters" autocomplete="new-password"><button type="button" class="auth-reveal" onclick="toggleAuthReveal(this)" aria-label="Show password" aria-pressed="false">Show</button></div>
+        <div class="auth-pass"><input class="auth-input" id="suPassword" type="password" placeholder="At least 8 characters" autocomplete="new-password"><button type="button" class="auth-reveal" onclick="toggleAuthReveal(this)" aria-label="Show password" aria-pressed="false">Show</button></div>
       </div>
       <label class="auth-consent"><input type="checkbox" id="suConsent"><span>I agree to SAYON's <a href="terms.html" target="_blank">Terms of Service</a> and <a href="privacy.html" target="_blank">Privacy Policy</a>.</span></label>
       <div class="auth-error" id="suError"></div>
@@ -113,7 +113,7 @@
       <p class="auth-subtitle">Choose a new password for your SAYON account</p>
       <div class="auth-field">
         <label class="auth-label" for="rpPassword">New password</label>
-        <div class="auth-pass"><input class="auth-input" id="rpPassword" type="password" placeholder="Min. 8 characters" autocomplete="new-password"><button type="button" class="auth-reveal" onclick="toggleAuthReveal(this)" aria-label="Show password" aria-pressed="false">Show</button></div>
+        <div class="auth-pass"><input class="auth-input" id="rpPassword" type="password" placeholder="At least 8 characters" autocomplete="new-password"><button type="button" class="auth-reveal" onclick="toggleAuthReveal(this)" aria-label="Show password" aria-pressed="false">Show</button></div>
       </div>
       <div class="auth-field">
         <label class="auth-label" for="rpPasswordConfirm">Confirm password</label>
@@ -172,7 +172,7 @@
         <input class="auth-input" id="ob-phone" type="tel" onchange="tidyPhoneInput(this)" placeholder="e.g. 0400 000 000">
       </div>
       <div class="auth-field">
-        <label class="auth-label" for="ob-email">Business email</label>
+        <label class="auth-label" for="ob-email">Business email <span class="auth-label-optional ob-setup-only">(can wait)</span></label>
         <input class="auth-input" id="ob-email" type="email" placeholder="e.g. office@abcpest.com.au">
       </div>
       <div class="auth-field">
@@ -213,7 +213,7 @@
     <div class="auth-card ob-panel" id="ob-panel-2" style="display:none">
       <div class="auth-badge" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v4"/></svg></div>
       <h2 class="auth-title">Meet the voice</h2>
-      <p class="auth-subtitle">SAYON uses AI voice extraction. Speak your inspection notes and it fills in the report for you.</p>
+      <p class="auth-subtitle">Talk through your inspection, and SAYON's AI fills in the report for you.</p>
       <div class="ob-demo-box" id="obDemoBox">
         <div class="ob-demo-text" id="obDemoText">Tap below to see it in action</div>
       </div>
@@ -228,14 +228,14 @@
     <div class="auth-card ob-panel" id="ob-panel-3" style="display:none">
       <div class="auth-badge" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg></div>
       <h2 class="auth-title">You're ready</h2>
-      <p class="auth-subtitle">SAYON is set up and ready to go. Here's the workflow:</p>
+      <p class="auth-subtitle">SAYON is set up and ready to go. Here's how a job goes:</p>
       <div class="ob-checklist">
         <div class="ob-check-item"><span class="ob-check-num">1</span><span>Add the job's address and client in Job details</span></div>
         <div class="ob-check-item"><span class="ob-check-num">2</span><span>Tap the mic at the bottom and talk through the inspection</span></div>
         <div class="ob-check-item"><span class="ob-check-num">3</span><span>Say "Stop Sayon" or tap Extract data with AI, and the report fills itself in</span></div>
         <div class="ob-check-item"><span class="ob-check-num">4</span><span>Check the report, then tap Send to client at the end of it</span></div>
       </div>
-      <p style="font-size:11px;color:var(--text3);line-height:1.6;margin-top:4px">Tip: Start recording, pop the phone in your pocket and talk room by room. Say <strong style="color:var(--accent2)">"Stop Sayon"</strong> when you're done and it fills in the report. Say the quote too, like "48 metres of barrier at $50 a metre, 50% deposit", and it fills in the quote.</p>
+      <p style="font-size:12px;color:var(--text3);line-height:1.6;margin-top:4px">Tip: Start recording, pop the phone in your pocket and talk room by room. Say <strong style="color:var(--accent2)">"Stop Sayon"</strong> when you're done and it fills in the report. Say the quote too, like "48 metres of barrier at $50 a metre, 50% deposit", and it fills in the quote.</p>
       <button class="auth-btn" onclick="obFinish()">Start inspecting →</button>
       <button type="button" class="auth-btn secondary" onclick="obFinish(true)">See a finished sample job first</button>
     </div>

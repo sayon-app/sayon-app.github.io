@@ -8004,7 +8004,7 @@ async function sendAgreementLinkOn() {
 
 function agreementLinkMessage(r) {
   const company = getCompanyDetails().name || 'your inspector';
-  return `Hi ${r.signerName.split(' ')[0]}, here is the pre-inspection agreement from ${company} for ${getFullAddress() || 'your inspection'}. Please read it and sign on your phone before the inspection:`;
+  return `Hi ${greetingName(r.signerName) || 'there'}, here is the pre-inspection agreement from ${company} for ${getFullAddress() || 'your inspection'}. Please read it and sign on your phone before the inspection:`;
 }
 
 // The share sheet (text, email, WhatsApp), or the clipboard where there's none.
@@ -9830,6 +9830,34 @@ function joinWithAnd(list) {
   return list.length < 2 ? (list[0] || '') : list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
 }
 
+// The name an email or text greets the client by: the first name ("Hi
+// Jo,"), "Mr Smith" for "Mr John Smith", "Jo and Sam" for "Jo & Sam Lee",
+// and nothing for a business or a bare initial, so the message opens "Hi,"
+// instead of "Hi Mr," or "Hi Harbour,". A name typed all in lower or
+// upper case gets its capitals.
+const GREETING_TITLE = /^(mr|mrs|ms|miss|mx|dr|prof|sir|dame|rev)\.?$/i;
+const GREETING_BUSINESS = /\b(pty|ltd|limited|inc|corp|co|company|strata|owners|corporation|council|trust|trustees?|estate|realty|property|properties|management|managers|agency|agents|partners|group|holdings|services|church|school|club|association|the)\b/i;
+function greetingName(name) {
+  const fix = w => w === w.toLowerCase() || w === w.toUpperCase()
+    ? w.toLowerCase().replace(/(^|[-'’])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()) : w;
+  const words = String(name || '').replace(/[.,]+$/, '').trim().split(/\s+/).filter(Boolean);
+  if (!words.length || GREETING_BUSINESS.test(words.join(' '))) return '';
+  const and = i => words[i] === '&' || /^and$/i.test(words[i]);
+  if (GREETING_TITLE.test(words[0])) {
+    const title = w => fix(w.replace(/\.$/, ''));
+    // "Mr & Mrs Smith": both titles and the surname.
+    if (words.length > 3 && and(1) && GREETING_TITLE.test(words[2])) return `${title(words[0])} and ${title(words[2])} ${fix(words[words.length - 1])}`;
+    const last = words[words.length - 1];
+    return words.length > 1 && !and(words.length - 1) && !GREETING_TITLE.test(last) ? `${title(words[0])} ${fix(last)}` : '';
+  }
+  const first = words[0];
+  if (/^\p{L}\.?$/u.test(first)) return '';
+  // "Jo & Sam Lee", "Jo Lee and Sam Ng": both first names.
+  const join = words.findIndex((w, i) => i > 0 && and(i));
+  if (join > 0 && words[join + 1] && !GREETING_TITLE.test(words[join + 1])) return `${fix(first)} and ${fix(words[join + 1])}`;
+  return fix(first);
+}
+
 // The inspector's words placed inside a sentence, used by the report, the
 // quote and the certificate.
 // lowerFirst: the first letter lower-cased ("Garage door" reads "garage
@@ -10991,7 +11019,7 @@ async function sendInviteLink(email, token) {
   }
   try {
     await navigator.clipboard.writeText(`${text} ${link}`);
-    showToast('The sign-up link is copied: paste it into a text or email to them', 'success');
+    showToast('Sign-up link copied. Paste it into a text or email to them', 'success');
   } catch (e) {
     showToast(`Send them this sign-up link: ${link}`, 'info');
   }
@@ -13780,13 +13808,13 @@ function installReportLockGuard() {
 // Browsers that can't share files (desktop) download the PDFs and open a
 // new email to the client instead. The share sheet only opens straight
 // from a tap, so the PDFs must already be built when this is called.
-function clientMessage({ client, address, docs, signOff, link }) {
+function clientMessage({ client, address, docs, note, signOff, link }) {
   const company = getCompanyDetails();
-  const firstName = (client || '').trim().split(/\s+/)[0];
+  const firstName = greetingName(client);
   return [
     firstName ? `Hi ${firstName},` : 'Hi,',
     '',
-    `Please find attached your ${docs} for ${address || 'the property'}.`,
+    `Please find attached your ${docs} for ${address || 'the property'}.${note ? ` ${note}` : ''}`,
     '',
     // The client link: read the quote and accept or decline it on a phone.
     ...(link ? ['You can read the quote and accept or decline it on your phone here:', link, ''] : []),
@@ -13919,7 +13947,9 @@ async function sendPdfsDirect({ files, to, subject, body }) {
     // tap to open, so the inspector taps again.
     directEmail = false;
     if (!(e instanceof TypeError)) reportError(e, 'send_email');
-    const why = e instanceof TypeError ? 'Could not reach SAYON to send it' : e.message;
+    // The Worker's reason without its own advice ("Try again, or send it
+    // from your mail app"): the next tap opens the mail app.
+    const why = e instanceof TypeError ? 'Could not reach SAYON to send it' : String(e.message).split('. ')[0].replace(/\.$/, '');
     showToast(`${why}. Tap again to send it from your email app`, 'error');
     return false;
   } finally {

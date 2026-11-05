@@ -1899,7 +1899,7 @@ function cancelQuoteLinkRow(id) {
 
 function quoteLinkMessage(q) {
   const company = getCompanyDetails().name || 'your inspector';
-  return `Hi ${(q.client || '').trim().split(/\s+/)[0] || 'there'}, here is the treatment quote from ${company} for ${q.address || 'your property'}. Open it to read it and accept or decline on your phone:`;
+  return `Hi ${greetingName(q.client) || 'there'}, here is the treatment quote from ${company} for ${q.address || 'your property'}. Open it to read it and accept or decline on your phone:`;
 }
 
 // The share sheet (text, email, WhatsApp), or the clipboard where there's none.

@@ -154,7 +154,7 @@ async function makeJobPdf(how) {
         files: [pack],
         to,
         subject: `Your job file — ${getFullAddress() || 'your property'}`,
-        body: clientMessage({ client: (document.getElementById('jobClient') || {}).value || '', address: getFullAddress(), docs: 'job file, with every document from the job in one PDF', signOff: inspectorDisplayName() }),
+        body: clientMessage({ client: (document.getElementById('jobClient') || {}).value || '', address: getFullAddress(), docs: 'job file', note: 'It has every document from the job in one PDF.', signOff: inspectorDisplayName() }),
       });
       if (sent) {
         reportData.jobPdfSentAt = Date.now();

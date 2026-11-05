@@ -14339,7 +14339,10 @@ async function buildReportPdf() {
   const address   = getFullAddress() || 'Address Not Set';
   const client    = document.getElementById('jobClient').value    || 'Not specified';
   const inspector = document.getElementById('jobInspector').value || 'Not specified';
-  const today = new Date().toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' });
+  // The report's date: the day it was completed, so a finished report made
+  // as a PDF again later keeps its date; a draft carries today's.
+  const issuedAt = reportData.issue && reportData.issue.completedAt;
+  const today = (issuedAt ? new Date(issuedAt) : new Date()).toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' });
   // The day of the inspection, not the day this PDF was made.
   const inspectedOn = reportData.jobInspectionDate || (reportData.agreement && reportData.agreement.inspectionDate);
   const inspectionDate = inspectedOn

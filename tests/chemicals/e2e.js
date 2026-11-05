@@ -1,8 +1,9 @@
 // The chemical register, end to end (no real network calls):
 //   1. Menu › Chemical register lists SAYON's starting products with the
 //      label (the APVMA's copy), SDS and label rates checked for them, no
-//      link where none was checked (never a search page), and fills a
-//      register saved earlier without replacing anything typed;
+//      link where none was checked (never a search page), nothing the
+//      APVMA no longer registers, and fills a register saved earlier
+//      without replacing anything typed;
 //   2. the owner types a rate for a use, adds a product of their own with
 //      a label link, and it syncs to businesses.settings.chemicals;
 //   3. on a treatment record, picking the product asks what it's for and
@@ -45,6 +46,9 @@ const patches = [];
   check(names.includes('Termidor') && names.includes('Exterra') && names.length >= 10, `starting products listed (${names.length})`);
   check(/uses have no rate yet/.test(await p.locator('#chemStatus').innerText()), 'the status says the rates are still to add');
   check(names.includes('Maxxthor 100'), 'Maxxthor 100 is in the starting list');
+  check(!names.some(n => /Termidor Dry|Premise Foam|Termidust/.test(n)), 'products the APVMA no longer registers are not offered');
+  const unreg = await p.evaluate(() => [chemicalNotRegistered({ name: 'Termidor Dry' }), chemicalNotRegistered({ name: 'My dust', apvma: '59345/47889' }), chemicalNotRegistered({ name: 'Termidor', apvma: '54624' }), chemicalLinksHtml({ name: 'Termidust' })]);
+  check(unreg[0] && unreg[1] && !unreg[2] && /Not registered with the APVMA/.test(unreg[3]), 'a product the APVMA no longer registers says so, by name or APVMA No.');
   const old = await p.evaluate(() => withStarterDetails({ products: [
     { id: 'start13', name: 'Sentricon', active: 'noviflumuron', labelUrl: '', uses: [{ id: 'start13u0', pest: 'x', method: 'Bait', surface: 'In-ground station', rate: '', volume: '', life: '' }] },
     { id: 'start0', name: 'Termidor', active: 'fipronil', labelUrl: 'https://example.com/own.pdf', uses: [{ id: 'start0u0', method: 'Soil treatment', rate: 'own rate', volume: '', life: '' }] },
@@ -56,7 +60,7 @@ const patches = [];
   const visible = await p.locator('#chemList .chem-card:not([hidden]) .chem-card-name').allInnerTexts();
   check(visible.length === 1 && visible[0] === 'Maxxthor 100', 'search finds a product by name');
   await p.fill('#chemSearch', 'fipronil');
-  check((await p.locator('#chemList .chem-card:not([hidden])').count()) >= 4, 'search finds products by active constituent');
+  check((await p.locator('#chemList .chem-card:not([hidden])').count()) >= 3, 'search finds products by active constituent');
   await p.fill('#chemSearch', 'zzzz');
   check(await p.locator('#chemNoMatch').isVisible(), 'no match says so');
   await p.fill('#chemSearch', '');

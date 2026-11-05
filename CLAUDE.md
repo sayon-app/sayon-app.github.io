@@ -48,6 +48,7 @@ Read only the files your task needs. `js/app.js` is about 9,200 lines, so jump t
 - **Merging is not deploying.** GitHub Pages publishes the `live` branch. Work goes into `main` by PR. Going live is a separate PR into `live`, built from `origin/live` plus cherry-picked commits, and only after the owner says "deploy". Never push to `live`.
 - **Worker, Supabase and Stripe changes** are applied by hand, and only after the owner has seen the exact change.
 - **Don't rename stored keys.** That covers `korva_*` localStorage keys, the `korvus-photos` IndexedDB and the Worker URL; renaming them loses users' data. The brand was renamed KORVUS → SAYON in display text only.
+- **Font sizes grow with Settings › Text size.** Write one as `calc(13px * var(--ts))`, not `13px`, which stays the same at Large and Extra large (`tests/text-size/e2e.js` checks).
 - **Replace, don't duplicate.** Reuse the shared helpers (`PDF_COLORS`, `drawPdfCompanyMark`, `deliverPdfBlob`, `formatAddress`) instead of adding copies.
 - **Trade wording:** never give a structural verdict (refer to a builder or engineer), and never rate risk by termite species.
 - **No App Store yet.**

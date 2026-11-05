@@ -12522,9 +12522,16 @@ function importAllData(file) {
 // ACCESSIBILITY SETTINGS
 // ══════════════════════════════════════════════════════════════════════════
 function setTextSize(size) {
+  // Every piece of text takes its new size at once, with nothing easing
+  // (text-size-switching in app.css). Otherwise, in Chrome, text that had
+  // eased before (a report answer once filled in) eased to its old size and
+  // stayed there until something else redrew it.
+  document.body.classList.add('text-size-switching');
   document.body.classList.remove('text-size-large', 'text-size-xl');
   if (size === 'large') document.body.classList.add('text-size-large');
   if (size === 'xl') document.body.classList.add('text-size-xl');
+  document.querySelectorAll('body *').forEach(el => getComputedStyle(el).fontSize);
+  requestAnimationFrame(() => document.body.classList.remove('text-size-switching'));
 
   document.querySelectorAll('#textSizeControl .text-size-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.size === size);

@@ -12,6 +12,7 @@
 // entry — only PDF export actually needs jsPDF, so we defer the failure to
 // there instead of crashing everything up front.
 let jsPDF = (window.jspdf && window.jspdf.jsPDF) || null;
+tidyPdfLineBreaks(jsPDF);
 
 // If jsPDF didn't load the first time, retry loading it on demand (e.g. when
 // the technician's connection comes back and they try to generate a PDF)
@@ -26,6 +27,7 @@ function ensureJsPDFLoaded() {
     s.setAttribute('data-jspdf-retry', '1');
     s.onload = () => {
       jsPDF = (window.jspdf && window.jspdf.jsPDF) || null;
+      tidyPdfLineBreaks(jsPDF);
       if (jsPDF) resolve(jsPDF); else reject(new Error('jsPDF script loaded but did not define window.jspdf.jsPDF'));
     };
     s.onerror = () => reject(new Error('Could not load the PDF library — check your internet connection and try again.'));
@@ -14188,6 +14190,82 @@ function drawPdfCompanyMark(doc, company, x = 15, y = 12, size = 17) {
       let drawH = size, drawW = size * (natW / natH);
       if (drawW > size * 2) { drawW = size * 2; drawH = drawW * (natH / natW); }
       doc.addImage(company.logo, 'PNG', x, y + (size - drawH) / 2, drawW, drawH, undefined, 'FAST');
+
+// Line breaks in every PDF: a dash never starts a line (it stays with the
+// word before it); a standard, a measurement, a time or a date isn't split
+// ("AS / 4349.3", "400 / mm", "8:30 / am", "28 / October 2026"); a
+// paragraph's last line is never one word on its own when the line above
+// has words to share; and a short value, or text in a narrow box, on two
+// lines breaks after a comma where it can ("Unit 3, 12 Long Road, / Castle
+// Hill NSW 2154", not "…Road, Castle / Hill NSW 2154"). Each rule only moves
+// whole words between lines: a text never takes more lines than it did
+// (layouts sized from splitTextToSize keep their height), and a word is
+// never broken to make it fit. Installed once jsPDF has loaded.
+function tidyPdfLineBreaks(lib) {
+  const api = lib && lib.API;
+  if (!api || typeof api.splitTextToSize !== 'function' || api.splitTextToSize.tidy) return;
+  const split = api.splitTextToSize;
+  const NB = '\u00A0'; // holds two words together while wrapping; a plain space when drawn
+  const words = l => String(l).trim().split(/\s+/).filter(Boolean).length;
+  const flat = lines => lines.map(l => String(l).trim()).join(' ');
+  const tidy = function (text, maxlen, options) {
+    if (typeof text !== 'string' || !text.includes(' ')) return split.call(this, text, maxlen, options);
+    const run = t => split.call(this, t, maxlen, options).map(l => typeof l === 'string' ? l.split(NB).join(' ') : l);
+    const plain = run(text);
+    // Same lines, same words in the same order: only the breaks moved.
+    const same = a => a.length === plain.length && flat(a) === flat(plain);
+    let base = text.replace(/ (?=[—–] )/g, NB).replace(/\b(AS|AS\/NZS|No\.) (?=\d)/g, '$1' + NB)
+      .replace(/(\d) (?=(mm|cm|m|km|L|mL|kg|g|ha|am|pm)\b)/g, '$1' + NB)
+      .replace(/\b(\d{1,2}) (?=(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b)/g, '$1' + NB)
+      .replace(/\b((Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*) (?=\d{4}\b)/g, '$1' + NB);
+    let lines = plain;
+    if (base !== text) { const glued = run(base); if (same(glued)) lines = glued; else base = text; }
+    const last = String(lines[lines.length - 1] || '').trim();
+    if (lines.length > 1 && last && !/\s/.test(last) && words(lines[lines.length - 2]) >= 4) {
+      const t = base.replace(/ +$/, ''), i = t.lastIndexOf(' ');
+      if (i > t.lastIndexOf('\n')) {
+        const again = run(t.slice(0, i) + NB + t.slice(i + 1));
+        if (same(again)) lines = again;
+      }
+    }
+    // A short value, or any text in a narrow box (a table cell, a value
+    // beside its label), on two lines: the break after the last comma,
+    // semicolon or middle dot that lets both parts fit, if the first line
+    // stays at least half as long. Paragraphs across the page keep full
+    // lines. A longer text never breaks inside brackets or before a capital
+    // (Street, Epping).
+    const short = text.length <= 80;
+    const pageW = this && this.internal && this.internal.pageSize ? this.internal.pageSize.getWidth() : 0;
+    const narrow = pageW > 0 && maxlen < pageW * 0.6;
+    if (lines.length === 2 && (short || narrow) && !text.includes('\n')) {
+      const t = base.trim();
+      const at = from => Math.max(t.lastIndexOf(', ', from), t.lastIndexOf('; ', from), t.lastIndexOf('· ', from));
+      for (let i = at(t.length); i > 0; i = at(i - 1)) {
+        const head = t.slice(0, i + 1), rest = t.slice(i + 2);
+        if (!short && (/^[A-Z]/.test(rest) || (head.match(/\(/g) || []).length > (head.match(/\)/g) || []).length)) continue;
+        const a = run(head), b = run(rest);
+        if (a.length > 1) continue;
+        if (b.length === 1 && a[0].length * 2 >= String(lines[0]).length) lines = [a[0], b[0]];
+        break;
+      }
+    }
+    return lines;
+  };
+  tidy.tidy = true;
+  api.splitTextToSize = tidy;
+}
+
+// Text cut to at most max lines. A cut ends the last line with "…", so a
+// line never stops mid-sentence with no sign that there was more.
+function pdfClipLines(doc, text, width, max) {
+  const lines = doc.splitTextToSize(String(text || ''), width);
+  if (lines.length <= max) return lines;
+  const out = lines.slice(0, max);
+  let last = String(out[max - 1]).replace(/[\s,;:–—-]+$/, '');
+  while (/\s/.test(last) && doc.getTextWidth(last + '…') > width) last = last.replace(/\s+\S+$/, '').replace(/[\s,;:–—-]+$/, '');
+  out[max - 1] = last + '…';
+  return out;
+}
       return drawW;
     } catch (e) {}
   }
@@ -14215,7 +14293,7 @@ function drawPdfLetterhead(doc, company, { docLabel, date }) {
   let nameSize = 13.5;
   doc.setFont('helvetica','bold'); doc.setFontSize(nameSize); doc.setTextColor(...C.ink);
   while (nameSize > 11 && doc.getTextWidth(name) > nameW) doc.setFontSize(nameSize -= 0.5);
-  const nameLines = doc.splitTextToSize(name, nameW).slice(0, 2);
+  const nameLines = pdfClipLines(doc, name, nameW, 2);
   const two = nameLines.length > 1;
   doc.text(nameLines, tx, two ? 15 : 17.5, { lineHeightFactor: 1.15 });
   const dy = two ? 1.6 : 0;
@@ -14742,7 +14820,7 @@ async function buildReportPdf() {
   function photoRow(pair, w = CW) {
     const boxW = (w - 5) / 2, boxH = boxW * 0.72;
     doc.setFontSize(7);
-    const caps = pair.map(p => doc.splitTextToSize((p.caption || '').trim(), boxW - 16).slice(0, 2));
+    const caps = pair.map(p => pdfClipLines(doc, (p.caption || '').trim(), boxW - 16, 2));
     return { boxW, boxH, caps, h: boxH + 5 + Math.max(...caps.map(c => Math.max(1, c.length))) * 3.3 + 4 };
   }
   function photoGrid(photos, x = M, w = CW) {
@@ -14888,7 +14966,7 @@ async function buildReportPdf() {
   doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
   pdfTracked(doc, 'PROPERTY INSPECTED', M, 104 + coverShift, { cs: 0.4 });
   doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(...C.ink);
-  const addrLines = doc.splitTextToSize(address, CW).slice(0, 2);
+  const addrLines = pdfClipLines(doc, address, CW, 2);
   doc.text(addrLines, M, 112 + coverShift, { lineHeightFactor: 1.2 });
   let gy = 112 + coverShift + (addrLines.length - 1) * 7.2 + 9;
 
@@ -14938,7 +15016,7 @@ async function buildReportPdf() {
       doc.setFont('helvetica','bold'); doc.setFontSize(6.3); doc.setTextColor(...C.inkMuted);
       pdfTracked(doc, 'BASED ON', W-M-6, riskBadgeY+7.5, { cs: 0.4, align: 'right' });
       doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...C.inkLight);
-      const lines = doc.splitTextToSize(basis.join(' · '), bw).slice(0, 2);
+      const lines = pdfClipLines(doc, basis.join(' · '), bw, 2);
       lines.forEach((ln, i) => doc.text(ln, W-M-6, riskBadgeY+13 + i*4, { align:'right' }));
     }
   }
@@ -15042,7 +15120,7 @@ async function buildReportPdf() {
       y += T.head;
       g.items.forEach(([q, answer, tone, section, detail], i) => {
         doc.setFont('helvetica','normal'); doc.setFontSize(7.2);
-        const dl = detail ? doc.splitTextToSize(String(detail), QW).slice(0, 2) : [];
+        const dl = detail ? pdfClipLines(doc, detail, QW, 2) : [];
         const h = T.row + dl.length * T.line;
         if (y + h > 278) newPage();
         if (i % 2 === 1) { doc.setFillColor(...C.rowAlt); doc.rect(M, y, CW, h, 'F'); }

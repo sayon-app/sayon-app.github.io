@@ -1614,8 +1614,7 @@ function openQuoteAnswer(mode) {
   document.getElementById('qaNote').placeholder = accepted ? 'e.g. Wants the treatment done before 12 Oct' : 'e.g. Going with another company';
   document.getElementById('qaMethodWrap').style.display = accepted ? '' : 'none';
   document.getElementById('qaMethod').value = 'signed';
-  document.getElementById('qaAcceptText').textContent =
-    `I accept quote ${quoteState.number || ''} for ${formatAUD(quoteTotals(quoteState).total)}${quoteState.gst !== false ? ' (inc GST)' : ''} and authorise the work described in it.`;
+  document.getElementById('qaAcceptText').textContent = quoteAcceptText(quoteState);
   document.getElementById('quoteAnswerOverlay').classList.add('open');
   if (!quoteAnswerPad) {
     quoteAnswerPad = createSignaturePad(document.getElementById('qaSigCanvas'), document.getElementById('qaSigPlaceholder'), updateQuoteAnswerBtn);
@@ -1872,6 +1871,13 @@ function quoteLinkCurrent(q) {
   return r && r.hash === quoteContentHash(q) ? r : null;
 }
 
+// What the client agrees to when they accept, on the link and on the
+// inspector's phone: "I accept quote Q-0012 for $1,254.00 (inc GST) and
+// authorise the work described in it." "(inc GST)" stays on one line.
+function quoteAcceptText(q) {
+  return `I accept ${q.number ? `quote ${q.number}` : 'this quote'} for ${formatAUD(quoteTotals(q).total)}${q.gst !== false ? ' (inc\u00a0GST)' : ''} and authorise the work described in it.`;
+}
+
 // What the client's page shows: everything the quote PDF says.
 function quoteLinkDoc(q, files) {
   const company = getCompanyDetails();
@@ -1893,7 +1899,7 @@ function quoteLinkDoc(q, files) {
       we: lines(plan.we), owner: lines(plan.owner) },
     exclusions: lines(q.exclusions), notes: lines(q.notes), paymentTerms: (q.paymentTerms || '').trim(),
     files: files || {},
-    acceptText: `I accept ${q.number ? `quote ${q.number}` : 'this quote'} for ${formatAUD(totals.total)}${q.gst !== false ? ' (inc\u00a0GST)' : ''} and authorise the work described in it.`,
+    acceptText: quoteAcceptText(q),
   };
 }
 

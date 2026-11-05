@@ -72,6 +72,8 @@ let shotN = 0;
   const site = await p.evaluate(() => ['trSiteBuilding', 'trSiteFloor', 'trSiteSurrounds', 'trSiteExisting'].map(id => document.getElementById(id).value));
   console.log('site:', JSON.stringify(site));
   check(/Single storey house/.test(site[0]) && /Brick veneer/.test(site[0]) && site[1] === 'Concrete slab' && /Garden beds/.test(site[2]) && /None found/.test(site[3]), 'the site fields come from the report');
+  // Areas treated may open folded once the record is pre-filled.
+  await p.evaluate(() => { document.getElementById('trFold3').open = true; });
   await p.locator('#trPlan').scrollIntoViewIfNeeded(); await p.evaluate(() => document.getElementById('trSiteBuilding').scrollIntoView({ block: 'start' }));
   await shot('record-site-empty-plan');
 

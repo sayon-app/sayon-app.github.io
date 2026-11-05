@@ -64,7 +64,7 @@ const scenarios = require('./scenarios.js');
     await save(`const q = quoteState; const sig = window.__sig;
       q.treatment = Object.assign({ date: new Date().toISOString().slice(0,10), technician: 'Alex Example', licence: 'NSW 000000', supervisor: '', supervisorLicence: '', start: '08:30', finish: '12:00', pest: 'Subterranean termites', weather: 'Fine and dry', equipment: 'Low-pressure sprayer, trenching tools',
         methods: { direct: '', bait: '8' }, products: [{ name: 'Termidor Foam', active: 'fipronil', rate: 'As per label', amount: '2 cans', batch: 'B-0000' }],
-        areas: 'Backyard gum tree; perimeter of the house', notTreated: 'Back section of the subfloor (stored items)', sketch: '', notice: 'new', noticeWhere: 'Meter box', cautions: 'Keep garden beds below the slab edge and away from the bait stations', nextInspection: 'In 3 months', warranty: '', notes: '', signature: sig, at: Date.now() }, ${JSON.stringify(sc.treatment || {})});
+        areas: 'Backyard gum tree; perimeter of the house', notTreated: 'Back section of the subfloor (stored items)', sketch: '', notice: 'new', noticeWhere: 'Meter box', cautions: 'Keep garden beds below the slab edge and away from the bait stations', nextInspection: addMonthsIso(new Date().toISOString().slice(0,10), 3), warranty: '', notes: '', signature: sig, at: Date.now() }, ${JSON.stringify(sc.treatment || {})});
       const { blob } = await buildTreatmentCertificatePDF(q); return toB64(blob);`, 'certificate');
     console.log(sc.name, 'errors', errs.length ? errs : 'none');
     await ctx.close();

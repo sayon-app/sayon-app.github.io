@@ -469,7 +469,11 @@ function textAreas(text) {
 // "Finding 2 (rear left fence post)", "Borers (front bedroom floorboards)".
 function areaEvidence(zoneId) {
   const out = [];
-  const short = t => { const s = String(t || '').trim().replace(/[.;]+$/, ''); return s.length > 60 ? s.slice(0, 57).replace(/\s+\S*$/, '') + '...' : s; };
+  const short = t => {
+    const s = lowerFirst(bracketText(t));
+    return s.length <= 60 ? s : s.slice(0, 57).replace(/\s+\S*$/, '').replace(/[\s,;:–—-]+$/, '')
+      .replace(/\s+(the|a|an|and|or|of|to|in|on|at|by|with|where|from|for)$/i, '') + '…';
+  };
   (reportData.findings || []).forEach((f, i) => {
     if (!f || f.termiteActivity === 'NONE') return;
     if (textAreas([f.activityLocation, f.damageDescription].join(' ')).includes(zoneId)) out.push(`Finding ${i + 1}${f.activityLocation ? ` (${short(f.activityLocation)})` : ''}`);
@@ -477,12 +481,13 @@ function areaEvidence(zoneId) {
   shownBorerFindings().forEach((b, i) => {
     if (textAreas([b.location, b.timberAffected, b.description].join(' ')).includes(zoneId)) out.push(`Borer finding ${i + 1}${b.location ? ` (${short(b.location)})` : ''}`);
   });
+  // Decay and delignification are named by where they are, or else by what.
   const other = [
-    ['Wood decay', reportData.decayFound === 'YES', whatWhere(reportData.decayDetails, reportData.decayWhere)],
-    ['Chemical delignification', reportData.delignification === 'YES', whatWhere(reportData.delignificationDetails, reportData.delignificationWhere)],
+    ['Wood decay', reportData.decayFound === 'YES', reportData.decayDetails, reportData.decayWhere],
+    ['Chemical delignification', reportData.delignification === 'YES', reportData.delignificationDetails, reportData.delignificationWhere],
   ];
-  other.forEach(([label, found, details]) => {
-    if (found && textAreas(details).includes(zoneId)) out.push(`${label} (${short(details)})`);
+  other.forEach(([label, found, what, where]) => {
+    if (found && textAreas([what, where].join(' ')).includes(zoneId)) out.push(`${label} (${short(where || what)})`);
   });
   return out;
 }
@@ -625,7 +630,7 @@ function renderAreaChecklist() {
     return `<div class="area-node${status ? ' area-node-' + status.toLowerCase() : ''}${areaOpen.has(zoneId) ? ' open' : ''}" data-zone-node="${zoneId}">
       <span class="area-node-dot" aria-hidden="true">${dot}</span>
       <details class="obs-zone-panel" data-zone="${zoneId}"${areaOpen.has(zoneId) ? ' open' : ''} ontoggle="onAreaToggle('${zoneId}', this.open)">
-      <summary class="obs-zone-panel-header area-summary">${areaSummary(zoneId, zone.label.replace(/^The /, ''))}</summary>
+      <summary class="obs-zone-panel-header area-summary">${areaSummary(zoneId, zoneName(zoneId))}</summary>
       <div class="area-status">${statusBtns}</div>${result}${reasons}</details></div>`;
   }).join('');
 }
@@ -641,6 +646,19 @@ function onAreaToggle(zoneId, open) {
   if (open) areaOpen.add(zoneId); else areaOpen.delete(zoneId);
   const node = document.querySelector(`[data-zone-node="${zoneId}"]`);
   if (node) node.classList.toggle('open', open);
+}
+
+// An area's name as the app shows it, in sentence case: "Interior", "Roof
+// void". OBS_ZONES labels stay as they are: saved reports are read by them.
+function zoneName(z) {
+  const l = OBS_ZONES[z].label.replace(/^The /, '');
+  return l.charAt(0) + l.slice(1).toLowerCase();
+}
+
+// Areas named in a sentence, from their labels: "The interior, subfloor
+// and roof void".
+function zoneList(labels) {
+  return joinWithAnd(labels.map((l, i) => i ? l.replace(/^The /, '').toLowerCase() : l.charAt(0) + l.slice(1).toLowerCase()));
 }
 
 function areaSummary(zoneId, name) {
@@ -908,7 +926,7 @@ function voiceAccessSpots(kind, zones) {
     const z = zones.find(z => (ZONE_SPOT_ALIASES[z] || []).some(a => low.startsWith(a) && !/[a-z]/.test(low.charAt(a.length))));
     if (!z) { out._other.push(seg); return; }
     const alias = ZONE_SPOT_ALIASES[z].find(a => low.startsWith(a));
-    const rest = seg.slice(alias.length).replace(/^[\s:,–—-]+/, '').replace(/[.;]$/, '').trim();
+    const rest = seg.slice(alias.length).replace(/^[\s:,–—-]+/, '').replace(/[.;]$/, '').trim().replace(/^\(([^()]*)\)$/, '$1');
     (out[z] = out[z] || []).push(rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : seg);
   });
   return out;
@@ -990,7 +1008,7 @@ function renderAccessSummary() {
     const status = areaStatusOf(z) === 'NOT' ? 'Not inspected' : 'Inspected with limits';
     const kind = restricted ? 'restricted' : 'hindered';
     return `<div class="access-item">
-      <span class="access-item-name">${OBS_ZONES[z].label.replace(/^The /, '')}</span>
+      <span class="access-item-name">${zoneName(z)}</span>
       <button type="button" class="access-item-state" onclick="openAreaRow('${z}')" aria-label="${status}. Change in Areas">${status}</button>${why}
       ${spotLine(kind, z)}${spotPhotos(kind, z)}</div>`;
   }).filter(Boolean);
@@ -1056,14 +1074,15 @@ function accessLimits() {
   // 'What hindered it'.
   const areaRows = hindered.length;
   const hOther = accessSpot('hindered', '_other', hZones), rOther = accessSpot('restricted', '_other', rZones);
-  if (hOther) hindered.push([areaRows ? 'Other spots' : 'Where', hOther]);
+  const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+  if (hOther) hindered.push([areaRows ? 'Other spots' : 'Where', cap(hOther)]);
   // The inspector's own words about what was in the way always print, so a
   // dictated reason isn't lost behind the per-area rows.
   if (detail && !hinderedTextIsNil()) hindered.push(['What obstructed it', detail]);
-  if (rOther) restricted.push([restricted.length ? 'Other spots' : 'Where and why', rOther]);
+  if (rOther) restricted.push([restricted.length ? 'Other spots' : 'Where and why', cap(rOther)]);
   const limited = areasNotFullyInspected();
   const highRisk = !isBlankValue(reportData.highRiskAreas) ? reportData.highRiskAreas
-    : [!isBlankValue(reportData.noAccessAreas) ? reportData.noAccessAreas : '', ...limited.map(z => OBS_ZONES[z].label)].filter(Boolean).join('; ');
+    : joinPlaces([!isBlankValue(reportData.noAccessAreas) ? reportData.noAccessAreas : '', zoneList(limited.map(z => OBS_ZONES[z].label))]);
   const allMarked = Object.keys(OBS_ZONES).every(z => areaStatusOf(z));
   return { hindered, restricted, highRisk, allMarked };
 }
@@ -1125,7 +1144,7 @@ function accessSpotPhotos() {
     [...zones, '_other'].forEach(key => {
       const photos = (reportData.photosBySection || {})[spotPhotoSection(kind, key)] || [];
       if (!photos.length || (key === '_other' && !accessSpot(kind, '_other', zones))) return;
-      const where = (key === '_other' ? 'Other spot' : OBS_ZONES[key].label.replace(/^The /, '')) + (kind === 'restricted' ? ', restricted' : ', obstruction');
+      const where = (key === '_other' ? 'Other spot' : zoneName(key)) + (kind === 'restricted' ? ', restricted' : ', obstruction');
       photos.forEach(p => out.push({ ...p, caption: [where, (p.caption || '').trim()].filter(Boolean).join(': ') }));
     });
   });
@@ -2393,7 +2412,7 @@ function useTranscriptForNotes() {
 function resetVoicePopoverToDefault() {
   activeNotesTargetKey = null;
   const title = document.getElementById('voicePopoverTitleText');
-  if (title) title.textContent = 'Voice Capture';
+  if (title) title.textContent = 'Voice capture';
   document.getElementById('extractBtn').style.display = 'flex';
   document.getElementById('useTranscriptBtn').style.display = 'none';
   const box = document.getElementById('transcriptBox');
@@ -5425,8 +5444,15 @@ const DETAIL_FIELD_FOR = {
 
 // More detail boxes that show and hide with the first one.
 const MORE_DETAIL_FIELDS = { previousTreatment: ['previousTreatmentWhere'], decayFound: ['decayWhere'], delignification: ['delignificationWhere'], nonDurableTimber: ['nonDurableTimberWhere'] };
-// "what (where)" for the summary and other one-line uses.
-const whatWhere = (what, where) => [what, where && `(${where})`].filter(Boolean).join(' ');
+// "what (where)" for the summary and other one-line uses. When either
+// already has brackets, the where follows a comma instead, so brackets never
+// sit inside or beside brackets: "Fungal decay (wet rot), bottom of the door".
+const whatWhere = (what, where) => {
+  what = String(what || '').trim().replace(/[.;,]+$/, '');
+  where = String(where || '').trim().replace(/[.;,]+$/, '');
+  if (!what || !where) return what || where;
+  return /[()]/.test(what + where) ? `${what}, ${lowerFirst(bracketText(where))}` : `${what}${inBrackets(where)}`;
+};
 
 function syncDetailField(key) {
   const [detailKey, noAnswers] = DETAIL_FIELD_FOR[key] || [];
@@ -6055,12 +6081,12 @@ function checkSystemVerify() {
 
   const concerns = [];
   if (reportData.durableNoticePresent === 'NO') concerns.push('durable notice sticker not found in meter box');
-  if (reportData.hardLandscaping === 'YES' && reportData.zone25mmVisible === 'NO') concerns.push('25mm inspection zone not visible against hard landscaping');
-  if (reportData.softLandscaping === 'YES' && reportData.zone75mmVisible === 'NO') concerns.push('75mm inspection zone not visible against soft landscaping');
-  if (reportData.antCapSoldered === 'NO') concerns.push('ant cap / strip shield joins not soldered — shielding inadequate');
+  if (reportData.hardLandscaping === 'YES' && reportData.zone25mmVisible === 'NO') concerns.push('25 mm inspection zone not visible against hard landscaping');
+  if (reportData.softLandscaping === 'YES' && reportData.zone75mmVisible === 'NO') concerns.push('75 mm inspection zone not visible against soft landscaping');
+  if (reportData.antCapSoldered === 'NO') concerns.push('ant cap / strip shield joins not soldered, so the shielding is inadequate');
 
   if (concerns.length > 0) {
-    flagText.textContent = 'Verification concern' + (concerns.length > 1 ? 's' : '') + ': ' + concerns.join('; ') + '. Recommend rectification and re-verification of the existing system.';
+    flagText.textContent = 'Verification concern' + (concerns.length > 1 ? 's' : '') + ': ' + concerns.join('; ') + '. Rectification and re-verification of the existing system are recommended.';
     flag.style.display = 'flex';
   } else {
     flag.style.display = 'none';
@@ -7031,7 +7057,7 @@ const FGROUP_PHRASES = {
   wallConstruction: v => /wall/i.test(v) ? v : v + ' walls',
   roofType: v => /roof/i.test(v) ? v : v + ' roof',
   facadeDirection: v => 'front faces ' + v,
-  constructionEra: v => 'built ' + v.replace(/(\d)-(\d)/g, '$1\u2060–\u2060$2'),
+  constructionEra: v => 'built ' + v.replace(/(\ds?)-(\d)/g, '$1\u2060–\u2060$2'),
   siteSurroundings: v => v.replace(/^suburban, few trees$/, 'suburban with few trees'),
   siteSlope: v => /^slopes/.test(v) ? 'site ' + v : /site|block|land/.test(v) ? v : v + ' site',
   termiteHistory: v => ({ 'none known': 'no known termite history', unknown: 'termite history unknown', 'treated before': 'treated for termites before' })[v] || v,
@@ -8097,7 +8123,7 @@ function buildAgreementPdf(a) {
     ] });
   y += 2;
   y = drawAgreementBody(doc, a, y, { M, CW, onNewPage: header });
-  drawPdfDocFooters(doc, `Pre-inspection agreement${company.name ? `  ·  ${company.name}` : ''}`);
+  drawPdfDocFooters(doc, `Pre-Inspection Agreement${company.name ? `  ·  ${company.name}` : ''}`);
   const fname = `Agreement_${fileNamePart(getFullAddress()) || 'Property'}.pdf`;
   return { blob: doc.output('blob'), fname };
 }
@@ -9300,7 +9326,7 @@ function termiteHistoryFrom(entry) {
   const when = formatIssueDate(visitDate(entry));
   const fs = (rd.findings || []).filter(f => f && f.termiteActivity);
   const live = fs.filter(f => f.termiteActivity === 'ACTIVE'), old = fs.filter(f => f.termiteActivity === 'INACTIVE');
-  const where = list => list.map(f => f.activityLocation).filter(Boolean).slice(0, 2).join('; ');
+  const where = list => joinPlaces(list.map(f => bracketText(f.activityLocation)).filter(Boolean).slice(0, 2), true);
   const t = entry.quote && entry.quote.treatment;
   const treatedOn = t && t.date ? formatIssueDate(new Date(t.date + 'T00:00:00')) : '';
   if (treatedOn) return `Treated before (${treatedOn}, after our inspection on ${when}${live.length ? `: live termites, ${where(live)}` : ''})`;
@@ -9802,6 +9828,36 @@ function companyDetailGaps() {
 }
 function joinWithAnd(list) {
   return list.length < 2 ? (list[0] || '') : list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
+}
+
+// The inspector's words placed inside a sentence, used by the report, the
+// quote and the certificate.
+// lowerFirst: the first letter lower-cased ("Garage door" reads "garage
+// door"), unless the first word looks like a name or an abbreviation
+// ("NSW", "Smith St", "John's shed").
+function lowerFirst(text) {
+  const t = String(text || '').trim();
+  const [first = '', second = ''] = t.split(/\s+/);
+  if (!/^[A-Z][a-z]/.test(first) || /'s\b/.test(first) || /^[A-Z]/.test(second)) return t;
+  return t.charAt(0).toLowerCase() + t.slice(1);
+}
+// bracketText: words to set inside brackets, with no brackets of their own
+// ("Fungal decay (wet rot)" becomes "Fungal decay, wet rot") and no full
+// stop or comma at the end.
+function bracketText(text) {
+  return String(text || '').trim().replace(/\s*\(([^()]*)\)/g, ', $1').replace(/[()]/g, '').replace(/[.;,\s]+$/, '').replace(/^[,\s]+/, '');
+}
+// inBrackets: " (words)" ready to follow a phrase, or '' when there are none.
+function inBrackets(text) {
+  const t = lowerFirst(bracketText(text));
+  return t ? ` (${t})` : '';
+}
+// joinPlaces: places one after another with semicolons. The first keeps its
+// capital unless lowerAll; the rest are lower-cased, so the list reads as one
+// sentence: "Rear deck; garage door; front stump".
+function joinPlaces(list, lowerAll) {
+  return list.map(t => String(t || '').trim().replace(/[.;,]+$/, '')).filter(Boolean)
+    .map((t, i) => i || lowerAll ? lowerFirst(t) : t).join('; ');
 }
 
 function getCompanyDetails() {
@@ -13322,18 +13378,18 @@ const OBS_ZONES_BY_LABEL = Object.fromEntries(Object.entries(OBS_ZONES).map(([z,
 // The conducive conditions a report records, as short phrases.
 function conduciveConditions(rd) {
   const conducive = [];
-  if (rd.waterLeaks === 'YES') conducive.push(`water leak${rd.leakLocation ? ` (${rd.leakLocation})` : ''}`);
+  if (rd.waterLeaks === 'YES') conducive.push(`water leak${inBrackets(rd.leakLocation)}`);
   else if (rd.moistureReadings === 'YES') conducive.push('elevated moisture');
-  if (rd.timberSoil === 'YES') conducive.push(`timber in contact with soil${rd.timberSoilDetails ? ` (${rd.timberSoilDetails})` : ''}`);
+  if (rd.timberSoil === 'YES') conducive.push(`timber in contact with soil${inBrackets(rd.timberSoilDetails)}`);
   if (rd.weepHoles === 'BRIDGED') conducive.push('weep holes bridged');
   if (rd.antCapping === 'GAPS') conducive.push('gaps in the ant capping');
   else if (rd.antCapping === 'NONE') conducive.push('no ant capping on piers');
   if (rd.slabEdge === 'OBSTRUCTED') conducive.push('slab edge concealed');
   if (rd.subfloorVentilation === 'POOR') conducive.push('poor subfloor ventilation');
-  if (rd.mouldSeen === 'YES') conducive.push(`mould growth${rd.mouldWhere ? ` (${rd.mouldWhere})` : ''}`);
+  if (rd.mouldSeen === 'YES') conducive.push(`mould growth${inBrackets(rd.mouldWhere)}`);
   if (rd.siteDrainage === 'POOR') conducive.push('poor site drainage');
   if (rd.subfloorDrainage === 'POOR') conducive.push('poor subfloor drainage');
-  if (rd.nonDurableTimber === 'YES') conducive.push(`untreated or non-durable timber in a damp area${whatWhere(rd.nonDurableTimberDetails, rd.nonDurableTimberWhere) ? ` (${whatWhere(rd.nonDurableTimberDetails, rd.nonDurableTimberWhere)})` : ''}`);
+  if (rd.nonDurableTimber === 'YES') conducive.push(`untreated or non-durable timber in a damp area${inBrackets([bracketText(rd.nonDurableTimberDetails), lowerFirst(bracketText(rd.nonDurableTimberWhere))].filter(Boolean).join(', '))}`);
   return conducive;
 }
 
@@ -13352,7 +13408,7 @@ function reportSummary() {
   const structural = termiteReferral || borerReferral;
   const unanswered = findingsMissingReferral();
   const conducive = conduciveConditions(reportData);
-  const places = list => list.map(f => f.activityLocation).filter(Boolean).join('; ');
+  const places = list => joinPlaces(list.map(f => f.activityLocation));
   const NR = 'NOT RECORDED';
   // A borer-only recommendation ("Borer treatment of the floorboards") is
   // not a termite treatment: the summary and next steps say so.
@@ -13382,9 +13438,9 @@ function reportSummary() {
   const groups = [
     { title: 'Access', items: [
       ['Were there temporary obstructions?', yn(hinderedYes, hinderedNo), ynTone(hinderedYes, hinderedNo, 'warn'), REPORT_PARTS.access,
-        acc.hindered.filter(([l]) => OBS_ZONES_BY_LABEL[l]).map(([l]) => l).join(', ')],
+        zoneList(acc.hindered.filter(([l]) => OBS_ZONES_BY_LABEL[l]).map(([l]) => l))],
       ['Was access restricted (permanent or locked)?', yn(restrictedYes, acc.allMarked), ynTone(restrictedYes, acc.allMarked, 'warn'), REPORT_PARTS.access,
-        acc.restricted.filter(([l]) => OBS_ZONES_BY_LABEL[l]).map(([l]) => l).join(', ')],
+        zoneList(acc.restricted.filter(([l]) => OBS_ZONES_BY_LABEL[l]).map(([l]) => l))],
       ['High risk areas to which access should be gained?', yn(!!acc.highRisk, acc.allMarked), ynTone(!!acc.highRisk, acc.allMarked, 'warn'), REPORT_PARTS.access, acc.highRisk],
       ['Invasive inspection recommended?', { YES: 'YES', NO: 'NO' }[reportData.invasiveInspection] || NR,
         { YES: 'warn', NO: 'good' }[reportData.invasiveInspection] || 'none', REPORT_PARTS.access, reportData.invasiveInspectionDetails || ''],
@@ -13394,7 +13450,7 @@ function reportSummary() {
       ['Termite nest found?', withNest.length ? 'YES' : nestNo ? 'NO' : NR, withNest.length ? 'bad' : nestNo ? 'good' : 'none', REPORT_PARTS.findings, places(withNest)],
       ['Termite workings or damage found?', damaged.length ? 'YES' : fs.length ? 'NO' : NR, damaged.length ? 'warn' : fs.length ? 'good' : 'none', REPORT_PARTS.findings, places(damaged)],
       ['Borers found?', { ACTIVE: 'ACTIVE', INACTIVE: 'OLD DAMAGE', NONE: 'NO' }[reportData.borerActivity] || NR,
-        { ACTIVE: 'bad', INACTIVE: 'warn', NONE: 'good' }[reportData.borerActivity] || 'none', REPORT_PARTS.findings, shownBorerFindings().map(b => b.location || borerLine(b)).filter(Boolean).join('; ')],
+        { ACTIVE: 'bad', INACTIVE: 'warn', NONE: 'good' }[reportData.borerActivity] || 'none', REPORT_PARTS.findings, joinPlaces(shownBorerFindings().map(b => b.location || borerLine(b)))],
       ['Wood decay (rot) found?', { YES: 'YES', NO: 'NO' }[reportData.decayFound] || NR,
         { YES: 'warn', NO: 'good' }[reportData.decayFound] || 'none', REPORT_PARTS.findings, whatWhere(reportData.decayDetails, reportData.decayWhere)],
       ['Chemical delignification found?', { YES: 'YES', NO: 'NO' }[reportData.delignification] || NR,
@@ -13413,13 +13469,14 @@ function reportSummary() {
       ['Risk of termite attack', reportData.riskLevel || NR, { HIGH: 'bad', MEDIUM: 'warn', LOW: 'good' }[reportData.riskLevel] || 'none', REPORT_PARTS.recommendations,
         reportData.riskLevel && basis.length ? `Based on ${basis.join(', ')}` : ''],
       ['Next inspection', nextInspectionChip(reportData.inspectionFrequency), 'none', REPORT_PARTS.recommendations,
-        reportData.inspectionFrequency && nextInspectionChip(reportData.inspectionFrequency) !== String(reportData.inspectionFrequency).trim().toUpperCase() ? reportData.inspectionFrequency : ''],
+        reportData.inspectionFrequency && nextInspectionChip(reportData.inspectionFrequency) !== String(reportData.inspectionFrequency).trim().toUpperCase()
+          ? String(reportData.inspectionFrequency).trim().replace(/^next (timber pest )?inspection:?\s+/i, '').replace(/^./, ch => ch.toUpperCase()) : ''],
     ] },
   ];
   // Areas the inspector couldn't fully see, and why.
   const limited = limitedZones.map(z => {
     const why = ((reportData.areaReasons || {})[z] || []).join(', ');
-    return `${OBS_ZONES[z].label}: ${areaStatusOf(z) === 'NOT' ? 'not inspected' : 'inspected with limits'}${why ? ` (${why})` : ''}`;
+    return `${zoneName(z)}: ${areaStatusOf(z) === 'NOT' ? 'not inspected' : 'inspected with limits'}${why ? ` (${why.toLowerCase()})` : ''}`;
   });
   const next = [];
   if (live.length || (reportData.treatmentRecommended === 'YES' && !borerOnlyTreatment)) {
@@ -13448,8 +13505,8 @@ function reportSummary() {
     if (other) next.push(`Also recommended: ${other.charAt(0).toLowerCase()}${other.slice(1)}.`);
   }
   getRecLines().forEach(l => next.push(l.text));
-  if (limitedZones.length) next.push(`Provide access to ${limitedZones.map(z => OBS_ZONES[z].label.replace(/^The /, '').toLowerCase()).join(', ')} for a follow-up inspection.`);
-  next.push(`Next timber pest inspection: ${reportData.inspectionFrequency || 'within 12 months'}.`);
+  if (limitedZones.length) next.push(`Provide access to the ${joinWithAnd(limitedZones.map(z => OBS_ZONES[z].label.replace(/^The /, '').toLowerCase()))} for a follow-up inspection.`);
+  next.push(nextInspectionStep(reportData.inspectionFrequency));
   return { groups, limited, next, basis };
 }
 
@@ -13470,17 +13527,17 @@ function reportPrepGaps(from = 'send') {
   // sleeper wall was looked at" need different taps, and one button for
   // both got one of them wrong. Many at once keep the quick buttons.
   if (unmarked.length && unmarked.length <= 3) {
-    unmarked.forEach(z => push('status', `${OBS_ZONES[z].label}: no inspection status${areaEvidence(z).length ? ' (a finding mentions it)' : ''}`,
+    unmarked.forEach(z => push('status', `${zoneName(z)}: no inspection status${areaEvidence(z).length ? ' (a finding mentions it)' : ''}`,
       fixBtn('inspected:' + z, 'Inspected') + fixBtn('na:' + z, 'Not applicable')));
-  } else if (unmarked.length) push('status', `${unmarked.length} areas have no inspection status (${unmarked.map(z => OBS_ZONES[z].label).join(', ')})`,
+  } else if (unmarked.length) push('status', `${unmarked.length} areas have no inspection status (${joinWithAnd(unmarked.map(z => zoneName(z).toLowerCase()))})`,
     fixBtn('inspected', 'Mark the rest as inspected') + fixBtn('na', 'Mark the rest not applicable'));
   const noResult = areasMissingResult();
-  if (noResult.length) push('result', `${noResult.length} area${noResult.length === 1 ? ' has' : 's have'} no result for what was found there (${noResult.map(z => OBS_ZONES[z].label.replace(/^The /, '')).join(', ')})`,
+  if (noResult.length) push('result', `${noResult.length} area${noResult.length === 1 ? ' has' : 's have'} no result for what was found there (${joinWithAnd(noResult.map(z => zoneName(z).toLowerCase()))})`,
     fixBtn('clear', 'Mark the rest as nothing found'));
   // "Nothing found" over an area a finding names: the report would contradict itself.
   Object.keys(OBS_ZONES).filter(z => areaResultOf(z) === 'CLEAR' && areaEvidence(z).length).forEach(z =>
-    push('contradiction', `${OBS_ZONES[z].label}: marked "nothing found", but ${areaEvidence(z)[0].replace(/ \(.*$/, '')} is there`, fixBtn('found:' + z, 'Mark evidence found')));
-  areasEvidenceUnlinked().forEach(z => push('evidence', `${OBS_ZONES[z].label}: marked "evidence found", but no finding mentions it`, fixBtn('finding:' + z, 'Add finding')));
+    push('contradiction', `${zoneName(z)}: marked "nothing found", but ${areaEvidence(z)[0].replace(/ \(.*$/, '')} is there`, fixBtn('found:' + z, 'Mark evidence found')));
+  areasEvidenceUnlinked().forEach(z => push('evidence', `${zoneName(z)}: marked "evidence found", but no finding mentions it`, fixBtn('finding:' + z, 'Add finding')));
   findingsMissingReferral().forEach(n => push('referral', `Finding ${n}: "refer to a builder or engineer?" isn't answered`));
   const pending = (reportData.pendingNotes || []).length;
   if (pending) push('pending', `${pending} voice note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
@@ -13630,6 +13687,15 @@ function cancelAmendment() {
 
 function formatIssueDate(ts) {
   return new Date(ts).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' });
+}
+
+// A time from a time field ("13:30") as it reads on a document: "1:30 pm".
+// Anything that isn't hours and minutes stays as typed.
+function formatClockTime(t) {
+  const m24 = /^(\d{1,2}):(\d{2})/.exec(String(t || '').trim());
+  if (!m24) return t || '';
+  const h = Number(m24[1]), m = Number(m24[2]);
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m || 0).padStart(2, '0')} ${h >= 12 ? 'pm' : 'am'}`;
 }
 
 function renderIssueState() {
@@ -14099,6 +14165,19 @@ function generateReport() {
   }, 50);
 }
 
+// The last line of "What to do next": when to inspect again, in the
+// inspector's words. "Re-inspect 4 weeks after treatment…" stands on its own,
+// "Next inspection in 3 months…" isn't given a second "Next inspection", and
+// "12 months" reads "Next timber pest inspection: in 12 months".
+function nextInspectionStep(freq) {
+  const f = String(freq || '').trim().replace(/[.;,\s]+$/, '');
+  if (!f) return 'Next timber pest inspection: within 12 months.';
+  if (/^(re-?inspect|inspect)\b/i.test(f)) return f.charAt(0).toUpperCase() + f.slice(1) + '.';
+  if (/^next (timber pest )?inspection\b/i.test(f)) return f.replace(/^next (timber pest )?inspection\b/i, 'Next timber pest inspection') + '.';
+  const when = /^\d+\s*(week|month|year)s?\b/i.test(f) ? 'in ' + f : lowerFirst(f);
+  return `Next timber pest inspection: ${when}.`;
+}
+
 // The summary's Next inspection answer in a few words ("6 MONTHS"); the
 // inspector's full wording prints under the question.
 function nextInspectionChip(freq) {
@@ -14111,6 +14190,82 @@ function nextInspectionChip(freq) {
 
 // ── SHARED PDF PIECES ── used by the inspection report and the quote PDF
 // (js/quote.js) so both documents carry the same brand.
+
+// Line breaks in every PDF: a dash never starts a line (it stays with the
+// word before it); a standard, a measurement, a time or a date isn't split
+// ("AS / 4349.3", "400 / mm", "8:30 / am", "28 / October 2026"); a
+// paragraph's last line is never one word on its own when the line above
+// has words to share; and a short value, or text in a narrow box, on two
+// lines breaks after a comma where it can ("Unit 3, 12 Long Road, / Castle
+// Hill NSW 2154", not "…Road, Castle / Hill NSW 2154"). Each rule only moves
+// whole words between lines: a text never takes more lines than it did
+// (layouts sized from splitTextToSize keep their height), and a word is
+// never broken to make it fit. Installed once jsPDF has loaded.
+function tidyPdfLineBreaks(lib) {
+  const api = lib && lib.API;
+  if (!api || typeof api.splitTextToSize !== 'function' || api.splitTextToSize.tidy) return;
+  const split = api.splitTextToSize;
+  const NB = '\u00A0'; // holds two words together while wrapping; a plain space when drawn
+  const words = l => String(l).trim().split(/\s+/).filter(Boolean).length;
+  const flat = lines => lines.map(l => String(l).trim()).join(' ');
+  const tidy = function (text, maxlen, options) {
+    if (typeof text !== 'string' || !text.includes(' ')) return split.call(this, text, maxlen, options);
+    const run = t => split.call(this, t, maxlen, options).map(l => typeof l === 'string' ? l.split(NB).join(' ') : l);
+    const plain = run(text);
+    // Same lines, same words in the same order: only the breaks moved.
+    const same = a => a.length === plain.length && flat(a) === flat(plain);
+    let base = text.replace(/ (?=[—–] )/g, NB).replace(/\b(AS|AS\/NZS|No\.) (?=\d)/g, '$1' + NB)
+      .replace(/(\d) (?=(mm|cm|m|km|L|mL|kg|g|ha|am|pm)\b)/g, '$1' + NB)
+      .replace(/\b(\d{1,2}) (?=(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b)/g, '$1' + NB)
+      .replace(/\b((Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*) (?=\d{4}\b)/g, '$1' + NB);
+    let lines = plain;
+    if (base !== text) { const glued = run(base); if (same(glued)) lines = glued; else base = text; }
+    const last = String(lines[lines.length - 1] || '').trim();
+    if (lines.length > 1 && last && !/\s/.test(last) && words(lines[lines.length - 2]) >= 4) {
+      const t = base.replace(/ +$/, ''), i = t.lastIndexOf(' ');
+      if (i > t.lastIndexOf('\n')) {
+        const again = run(t.slice(0, i) + NB + t.slice(i + 1));
+        if (same(again)) lines = again;
+      }
+    }
+    // A short value, or any text in a narrow box (a table cell, a value
+    // beside its label), on two lines: the break after the last comma,
+    // semicolon or middle dot that lets both parts fit, if the first line
+    // stays at least half as long. Paragraphs across the page keep full
+    // lines. A longer text never breaks inside brackets or before a capital
+    // (Street, Epping).
+    const short = text.length <= 80;
+    const pageW = this && this.internal && this.internal.pageSize ? this.internal.pageSize.getWidth() : 0;
+    const narrow = pageW > 0 && maxlen < pageW * 0.6;
+    if (lines.length === 2 && (short || narrow) && !text.includes('\n')) {
+      const t = base.trim();
+      const at = from => Math.max(t.lastIndexOf(', ', from), t.lastIndexOf('; ', from), t.lastIndexOf('· ', from));
+      for (let i = at(t.length); i > 0; i = at(i - 1)) {
+        const head = t.slice(0, i + 1), rest = t.slice(i + 2);
+        if (!short && (/^[A-Z]/.test(rest) || (head.match(/\(/g) || []).length > (head.match(/\)/g) || []).length)) continue;
+        const a = run(head), b = run(rest);
+        if (a.length > 1) continue;
+        if (b.length === 1 && a[0].length * 2 >= String(lines[0]).length) lines = [a[0], b[0]];
+        break;
+      }
+    }
+    return lines;
+  };
+  tidy.tidy = true;
+  api.splitTextToSize = tidy;
+}
+
+// Text cut to at most max lines. A cut ends the last line with "…", so a
+// line never stops mid-sentence with no sign that there was more.
+function pdfClipLines(doc, text, width, max) {
+  const lines = doc.splitTextToSize(String(text || ''), width);
+  if (lines.length <= max) return lines;
+  const out = lines.slice(0, max);
+  let last = String(out[max - 1]).replace(/[\s,;:–—-]+$/, '');
+  while (/\s/.test(last) && doc.getTextWidth(last + '…') > width) last = last.replace(/\s+\S+$/, '').replace(/[\s,;:–—-]+$/, '');
+  out[max - 1] = last + '…';
+  return out;
+}
 // The sample job's PDFs (js/sample-job.js) carry SAMPLE across every page,
 // faint enough to read through, so one can never pass as a real document.
 // key: the job the PDF is for, the open job when left out.
@@ -14190,82 +14345,6 @@ function drawPdfCompanyMark(doc, company, x = 15, y = 12, size = 17) {
       let drawH = size, drawW = size * (natW / natH);
       if (drawW > size * 2) { drawW = size * 2; drawH = drawW * (natH / natW); }
       doc.addImage(company.logo, 'PNG', x, y + (size - drawH) / 2, drawW, drawH, undefined, 'FAST');
-
-// Line breaks in every PDF: a dash never starts a line (it stays with the
-// word before it); a standard, a measurement, a time or a date isn't split
-// ("AS / 4349.3", "400 / mm", "8:30 / am", "28 / October 2026"); a
-// paragraph's last line is never one word on its own when the line above
-// has words to share; and a short value, or text in a narrow box, on two
-// lines breaks after a comma where it can ("Unit 3, 12 Long Road, / Castle
-// Hill NSW 2154", not "…Road, Castle / Hill NSW 2154"). Each rule only moves
-// whole words between lines: a text never takes more lines than it did
-// (layouts sized from splitTextToSize keep their height), and a word is
-// never broken to make it fit. Installed once jsPDF has loaded.
-function tidyPdfLineBreaks(lib) {
-  const api = lib && lib.API;
-  if (!api || typeof api.splitTextToSize !== 'function' || api.splitTextToSize.tidy) return;
-  const split = api.splitTextToSize;
-  const NB = '\u00A0'; // holds two words together while wrapping; a plain space when drawn
-  const words = l => String(l).trim().split(/\s+/).filter(Boolean).length;
-  const flat = lines => lines.map(l => String(l).trim()).join(' ');
-  const tidy = function (text, maxlen, options) {
-    if (typeof text !== 'string' || !text.includes(' ')) return split.call(this, text, maxlen, options);
-    const run = t => split.call(this, t, maxlen, options).map(l => typeof l === 'string' ? l.split(NB).join(' ') : l);
-    const plain = run(text);
-    // Same lines, same words in the same order: only the breaks moved.
-    const same = a => a.length === plain.length && flat(a) === flat(plain);
-    let base = text.replace(/ (?=[—–] )/g, NB).replace(/\b(AS|AS\/NZS|No\.) (?=\d)/g, '$1' + NB)
-      .replace(/(\d) (?=(mm|cm|m|km|L|mL|kg|g|ha|am|pm)\b)/g, '$1' + NB)
-      .replace(/\b(\d{1,2}) (?=(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b)/g, '$1' + NB)
-      .replace(/\b((Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*) (?=\d{4}\b)/g, '$1' + NB);
-    let lines = plain;
-    if (base !== text) { const glued = run(base); if (same(glued)) lines = glued; else base = text; }
-    const last = String(lines[lines.length - 1] || '').trim();
-    if (lines.length > 1 && last && !/\s/.test(last) && words(lines[lines.length - 2]) >= 4) {
-      const t = base.replace(/ +$/, ''), i = t.lastIndexOf(' ');
-      if (i > t.lastIndexOf('\n')) {
-        const again = run(t.slice(0, i) + NB + t.slice(i + 1));
-        if (same(again)) lines = again;
-      }
-    }
-    // A short value, or any text in a narrow box (a table cell, a value
-    // beside its label), on two lines: the break after the last comma,
-    // semicolon or middle dot that lets both parts fit, if the first line
-    // stays at least half as long. Paragraphs across the page keep full
-    // lines. A longer text never breaks inside brackets or before a capital
-    // (Street, Epping).
-    const short = text.length <= 80;
-    const pageW = this && this.internal && this.internal.pageSize ? this.internal.pageSize.getWidth() : 0;
-    const narrow = pageW > 0 && maxlen < pageW * 0.6;
-    if (lines.length === 2 && (short || narrow) && !text.includes('\n')) {
-      const t = base.trim();
-      const at = from => Math.max(t.lastIndexOf(', ', from), t.lastIndexOf('; ', from), t.lastIndexOf('· ', from));
-      for (let i = at(t.length); i > 0; i = at(i - 1)) {
-        const head = t.slice(0, i + 1), rest = t.slice(i + 2);
-        if (!short && (/^[A-Z]/.test(rest) || (head.match(/\(/g) || []).length > (head.match(/\)/g) || []).length)) continue;
-        const a = run(head), b = run(rest);
-        if (a.length > 1) continue;
-        if (b.length === 1 && a[0].length * 2 >= String(lines[0]).length) lines = [a[0], b[0]];
-        break;
-      }
-    }
-    return lines;
-  };
-  tidy.tidy = true;
-  api.splitTextToSize = tidy;
-}
-
-// Text cut to at most max lines. A cut ends the last line with "…", so a
-// line never stops mid-sentence with no sign that there was more.
-function pdfClipLines(doc, text, width, max) {
-  const lines = doc.splitTextToSize(String(text || ''), width);
-  if (lines.length <= max) return lines;
-  const out = lines.slice(0, max);
-  let last = String(out[max - 1]).replace(/[\s,;:–—-]+$/, '');
-  while (/\s/.test(last) && doc.getTextWidth(last + '…') > width) last = last.replace(/\s+\S+$/, '').replace(/[\s,;:–—-]+$/, '');
-  out[max - 1] = last + '…';
-  return out;
-}
       return drawW;
     } catch (e) {}
   }
@@ -14898,7 +14977,7 @@ async function buildReportPdf() {
     borerActivity:'Borers of Seasoned Timber', borerDetails:'Borer Type, Location & Evidence', decayFound:'Wood Decay Fungi (Rot)', decayDetails:'Wood Decay: What', decayWhere:'Wood Decay: Where',
     termiteActivity:'Termite Activity Status', species:'Species', damageDescription:'Damage Description', activityLocation:'Location of Activity', nestLocated:'Termite Nest Found?', structuralConcern:'Builder / Engineer Referral',
     waterLeaks:'Water Leaks', leakLocation:'Location of Moisture Ingress', moistureReadings:'Moisture Readings', timberSoil:'Timber-to-Soil Contact', timberSoilDetails:'Timber-to-Soil: Where and What', slabEdge:'Slab Edge Exposure', weepHoles:'Weep Holes', existingSystem:'Existing System',
-    durableNoticePresent:'Durable Notice Present', hardLandscaping:'Hard Landscaping Adjacent', zone25mmVisible:'25mm Inspection Zone Visible', softLandscaping:'Soft Landscaping Adjacent', zone75mmVisible:'75mm Inspection Zone Visible', antCapSoldered:'Ant Cap Joins Soldered',
+    durableNoticePresent:'Durable Notice Present', hardLandscaping:'Hard Landscaping Adjacent', zone25mmVisible:'25 mm Inspection Zone Visible', softLandscaping:'Soft Landscaping Adjacent', zone75mmVisible:'75 mm Inspection Zone Visible', antCapSoldered:'Ant Cap Joins Soldered',
     treatmentRecommended:'Treatment Recommended', treatmentType:'Treatment Type', inspectionFrequency:'Re-inspection Interval', riskLevel:'Risk of Termite Attack',
     invasiveInspection:'Invasive Inspection Recommended', invasiveInspectionDetails:'Invasive Inspection: Where, Why and When', otherRecommendations:'Other Recommendations', antCapping:'Ant Capping', antCappingDetails:'Ant Capping: Where and What',
     delignification:'Chemical Delignification', delignificationDetails:'Delignification: What', delignificationWhere:'Delignification: Where', subfloorVentilation:'Subfloor Ventilation', nonDurableTimber:'Non-durable Timber in Damp Areas', nonDurableTimberDetails:'Non-durable Timber: What', nonDurableTimberWhere:'Non-durable Timber: Where',
@@ -14976,7 +15055,7 @@ async function buildReportPdf() {
     ['INSPECTOR',         inspector],
     ['PEST LICENCE NO.',  reportData.inspectorLicence || ''],
     ['DATE OF INSPECTION',inspectionDate],
-    ['INSPECTION TIME',   reportData.jobInspectionTime || ''],
+    ['INSPECTION TIME',   formatClockTime(reportData.jobInspectionTime || '')],
     ['REPORT REFERENCE',  reportId],
   ].filter(([, v]) => v);
 
@@ -15054,7 +15133,7 @@ async function buildReportPdf() {
   const co = getCompanyDetails();
   const clientPhone = reportData.jobClientPhone || document.getElementById('jobClientPhone')?.value?.trim();
   const clientEmail = reportData.jobClientEmail || document.getElementById('jobClientEmail')?.value?.trim();
-  const inspectionTime = reportData.jobInspectionTime || document.getElementById('jobInspectionTime')?.value?.trim();
+  const inspectionTime = formatClockTime(reportData.jobInspectionTime || document.getElementById('jobInspectionTime')?.value?.trim() || '');
   const orderId  = reportData.jobOrderId || document.getElementById('jobOrderId')?.value?.trim();
   const inspType = reportData.jobInspectionType || document.getElementById('jobInspectionType')?.value?.trim();
 
@@ -15185,7 +15264,7 @@ async function buildReportPdf() {
       ['Floor Type', reportData.floorType],
       ['Roof Type', reportData.roofType],
       ['Orientation', reportData.facadeDirection],
-      ['Year / Period of Construction', reportData.constructionEra],
+      ['Year / Period of Construction', String(reportData.constructionEra || '').replace(/(\ds?)-(\d)/g, '$1–$2')],
       ['Occupancy Status', reportData.occupancyStatus],
       ['Furnishing', reportData.furnishing],
       ['Site Slope', reportData.siteSlope],
@@ -15224,17 +15303,17 @@ async function buildReportPdf() {
         ['Durable Notice Present (Meter Box)', reportData.durableNoticePresent, true],
         ...(identified ? [
           ['Hard Landscaping Adjacent', reportData.hardLandscaping, 'plain'],
-          ['25mm Inspection Zone Visible', reportData.zone25mmVisible, true],
+          ['25 mm Inspection Zone Visible', reportData.zone25mmVisible, true],
           ['Soft Landscaping Adjacent', reportData.softLandscaping, 'plain'],
-          ['75mm Inspection Zone Visible', reportData.zone75mmVisible, true],
+          ['75 mm Inspection Zone Visible', reportData.zone75mmVisible, true],
           ['Ant Cap / Strip Shield Joins Soldered', reportData.antCapSoldered, true],
         ] : []),
       ]);
       if (identified) {
         const concerns = [];
         if (reportData.durableNoticePresent === 'NO') concerns.push('Durable notice sticker not found in meter box');
-        if (reportData.hardLandscaping === 'YES' && reportData.zone25mmVisible === 'NO') concerns.push('25mm inspection zone not visible against hard landscaping');
-        if (reportData.softLandscaping === 'YES' && reportData.zone75mmVisible === 'NO') concerns.push('75mm inspection zone not visible against soft landscaping');
+        if (reportData.hardLandscaping === 'YES' && reportData.zone25mmVisible === 'NO') concerns.push('25 mm inspection zone not visible against hard landscaping');
+        if (reportData.softLandscaping === 'YES' && reportData.zone75mmVisible === 'NO') concerns.push('75 mm inspection zone not visible against soft landscaping');
         if (reportData.antCapSoldered === 'NO') concerns.push('Ant cap / strip shield joins not soldered');
         if (concerns.length > 0) {
           gap(3);
@@ -15671,7 +15750,7 @@ async function buildReportPdf() {
   infoPara('This inspection does not involve moving furniture, lifting floor coverings, cutting into walls, removing ceiling linings, dismantling built-in cabinetry, or any other action that could cause damage to the property or its contents. The inspector uses visual observation, a probe or screwdriver for tapping and sounding, and a moisture meter where appropriate. Splinter testing of structural timbers in the subfloor or roof void may be carried out where it can be done safely and with the property owner\'s consent.');
 
   infoHeading('What is "Reasonable Access"?');
-  infoPara('Reasonable access is defined in AS 4349.3-2010 as access to areas of the property that can be inspected without the need to remove, move, or dismantle any fixed or stored items, and which can be reached using a 3.6m ladder or less from the ground. Subfloor areas require a minimum clearance of 400mm under the lowest bearer, and roof voids require an access opening of at least 450mm x 400mm. Areas not meeting these criteria are outside the scope of this inspection.');
+  infoPara('Reasonable access is defined in AS 4349.3-2010 as access to areas of the property that can be inspected without the need to remove, move, or dismantle any fixed or stored items, and which can be reached using a 3.6 m ladder or less from the ground. Subfloor areas require a minimum clearance of 400 mm under the lowest bearer, and roof voids require an access opening of at least 450 mm × 400 mm. Areas not meeting these criteria are outside the scope of this inspection.');
 
   infoHeading('Does this inspection guarantee the property is free of termites?');
   infoPara('No. A visual, non-invasive inspection of this type cannot detect timber pest activity or damage concealed within walls, under floors, inside structural timbers, or in any area that was not accessible at the time of inspection. Termites frequently operate within concealed spaces without external evidence. This report reflects the observable condition of the property at the specific date and time of inspection only. Regular professional re-inspections are the most effective ongoing protection available.');
@@ -15684,7 +15763,7 @@ async function buildReportPdf() {
     ['Timber Pests', 'Subterranean termites, drywood termites, borers of seasoned timber, wood decay fungi (rot) and chemical delignification, as defined in AS 4349.3-2010.'],
     ['Chemical Delignification', 'The breakdown of timber by chemicals, often from salt air or industrial or chimney emissions, which leaves the surface of the timber looking furry or fibrous.'],
     ['Visual Inspection', 'An inspection conducted by an inspector who uses their unaided visual faculties, and may use a probe, screwdriver, or moisture meter, to observe accessible areas of the property for evidence of timber pest activity, damage, and conducive conditions.'],
-    ['Reasonable Access', 'Access to areas of a building that are safe, accessible, and do not require any removal, dismantling, or disturbance of fixed or stored items. Access is via a standard 3.6m ladder from ground level. Subfloor access requires minimum 400mm clearance; roof void access requires minimum 450mm x 400mm opening.'],
+    ['Reasonable Access', 'Access to areas of a building that are safe, accessible, and do not require any removal, dismantling, or disturbance of fixed or stored items. Access is via a standard 3.6 m ladder from ground level. Subfloor access requires a minimum 400 mm clearance; roof void access requires a minimum 450 mm × 400 mm opening.'],
     ['Readily Accessible Area', 'An area that can be inspected without moving furniture, stored goods, floor coverings, wall or ceiling linings, insulation, or personal possessions.'],
     ['Obstructions', 'An area, or part of one, that could not be fully inspected because of temporary obstructions at the time of inspection, such as furniture, stored goods, floor coverings, insulation, vegetation, or low clearance in the subfloor or roof void. The inspector is not required to move obstructions.'],
     ['Restricted Access', 'An area that could not be inspected because of a permanent restriction or locked entry, such as a locked room, a subfloor with no access opening, a roof with no roof void, or a part of the building beyond safe reach.'],
@@ -15837,7 +15916,7 @@ async function buildReportPdf() {
     drawPdfSignature(doc, { x: M + sigColW + 8, y, w: sigColW, caption: agreement.signature ? 'Client signature' : 'How it was signed',
       image: agreement.signature, note: agreement.signature ? '' : agreement.otherNote });
     onSigLine(formatAgreementSignedAt(agreement.signedAt), M + (sigColW + 8) * 2);
-    drawPdfSignature(doc, { x: M + (sigColW + 8) * 2, y, w: sigColW, caption: agreement.method === 'other' ? 'Signed' : 'Signed, before the inspection' });
+    drawPdfSignature(doc, { x: M + (sigColW + 8) * 2, y, w: sigColW, caption: agreement.method === 'other' ? 'Signed' : 'Signed before the inspection' });
     y += 9;
     doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...C.inkMuted);
     doc.text('Signed as the pre-inspection agreement. Its full wording is the appendix to this report.', M, y);

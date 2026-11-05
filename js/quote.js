@@ -350,7 +350,7 @@ function buildQuoteItemsFromReport(rd, system) {
   if (active.length) {
     items.push(newQuoteItem('direct', {
       qty: active.length,
-      detail: active.map(f => (f.activityLocation || '').trim()).filter(Boolean).join('; '),
+      detail: joinPlaces(active.map(f => f.activityLocation)),
       source: active.map(f => `Finding ${findings.indexOf(f) + 1}`).join(', ') + ': active termites',
     }));
   }
@@ -390,8 +390,8 @@ function buildQuoteItemsFromReport(rd, system) {
   // The detail names the places with live borers, not the old damage.
   if (rd.borerActivity === 'ACTIVE' || borerOnly) {
     const live = (Array.isArray(rd.borerFindings) ? rd.borerFindings : []).filter(b => b && b.borerActivity === 'ACTIVE')
-      .map(b => [b.location, b.timberAffected].filter(Boolean).join(', ')).filter(Boolean);
-    items.push(newQuoteItem('borer', { detail: live.length ? live.join('; ') : (rd.borerDetails || ''), source: 'Finding: active borers' }));
+      .map(b => [(b.location || '').trim(), lowerFirst(b.timberAffected)].filter(Boolean).join(', ')).filter(Boolean);
+    items.push(newQuoteItem('borer', { detail: live.length ? joinPlaces(live) : (rd.borerDetails || ''), source: 'Finding: active borers' }));
   }
 
   if (rd.timberSoil === 'YES') {
@@ -510,7 +510,7 @@ function applySpokenQuote(q, rd) {
 // wrote them. No risk rating and no verdict on the structure.
 function buildQuoteProblem(rd) {
   rd = rd || {};
-  const lc = v => { v = (v || '').trim(); return /^[A-Z][a-z]/.test(v) ? v[0].toLowerCase() + v.slice(1) : v; };
+  const lc = lowerFirst;
   const where = list => list.length ? ` (${list.join('; ')})` : '';
   const findings = (Array.isArray(rd.findings) ? rd.findings : []).filter(f => f && f.termiteActivity);
   const at = status => findings.filter(f => f.termiteActivity === status).map(f => lc(f.activityLocation)).filter(Boolean);
@@ -546,19 +546,11 @@ function quoteProblem(q) {
 }
 
 // A report detail set in brackets mid-sentence: "Fungal decay (wet rot)."
-// reads as " (fungal decay, wet rot)". An acronym or name in capitals keeps
-// its first letter.
-function quoteDetailInBrackets(text) {
-  let t = String(text || '').trim().replace(/[.;,\s]+$/, '').replace(/\s*\(([^()]*)\)/g, ', $1').replace(/[()]/g, '');
-  if (!t) return '';
-  if (!/^[A-Z]{2}/.test(t)) t = t.charAt(0).toLowerCase() + t.slice(1);
-  return ` (${t})`;
-}
-
+// reads as " (fungal decay, wet rot)" (inBrackets, js/app.js).
 function buildQuoteExclusions(rd) {
   rd = rd || {};
   const out = [];
-  const detail = quoteDetailInBrackets;
+  const detail = inBrackets;
   const findings = Array.isArray(rd.findings) ? rd.findings : [];
   if (findings.some(f => f && f.structuralConcern === 'YES')) {
     out.push('Assessment of termite damage by a licensed builder or structural engineer, and repair of damaged timbers.');
@@ -596,7 +588,7 @@ const QUOTE_PLAN_SERVICE = ['None', '12 months', '24 months', '36 months', '60 m
 
 function buildPlanWe(rd, system) {
   rd = rd || {};
-  const lc = v => { v = (v || '').trim(); return /^[A-Z][a-z]/.test(v) ? v[0].toLowerCase() + v.slice(1) : v; };
+  const lc = lowerFirst;
   const findings = (Array.isArray(rd.findings) ? rd.findings : []).filter(f => f && f.termiteActivity === 'ACTIVE');
   const places = findings.map(f => lc(f.activityLocation)).filter(Boolean);
   const type = (rd.treatmentType || '').trim();

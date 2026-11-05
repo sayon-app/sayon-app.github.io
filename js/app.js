@@ -263,14 +263,16 @@ function obRunDemo() {
   }, 22);
 }
 
-function obFinish() {
+// sample: open the finished sample job (js/sample-job.js) instead of a new one.
+function obFinish(sample) {
   try { localStorage.setItem(obKey(), '1'); } catch (e) {}
   document.getElementById('onboardScreen').style.display = 'none';
   document.getElementById('mainMenu').style.display      = 'flex';
   // Open the job details so they can start a new job immediately
   setTimeout(() => {
     openApp('inspect');
-    openJobDetails();
+    if (sample && typeof openSampleJob === 'function') openSampleJob('signup');
+    else openJobDetails();
   }, 400);
 }
 
@@ -7907,6 +7909,7 @@ function agreementLinkUrl(id) {
 
 async function sendAgreementLink() {
   if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  if (isSampleJob(currentReportId)) { showToast('The sample job doesn\'t make signing links. Try it on a real job', 'info'); return; }
   const signerName = document.getElementById('agreementSignerName').value.trim();
   if (!agreementTypeChosen()) { showToast('Choose the inspection type first: it sets the standard the agreement names', 'error'); return; }
   if (!signerName) { showToast('Enter the name of the person signing', 'error'); return; }
@@ -9000,6 +9003,7 @@ function renderJobPage() {
   const chev = '<svg class="icon dash-timeline-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
   const group = (DASHBOARD_TABS.find(([k]) => k === j.group) || [, ''])[1];
   body.innerHTML = `
+    ${isSampleJob(currentReportId) && typeof sampleJobNoteHTML === 'function' ? sampleJobNoteHTML() : ''}
     <div class="job-hero">
       ${addr ? `<span class="dash-detail-chip ${j.group}">${group}</span>` : ''}
       <h3 class="job-hero-addr">${escapeHtml(addr || 'New job')}</h3>
@@ -9254,7 +9258,7 @@ function addressKey(street, suburb) {
 function previousVisitFor() {
   const key = addressKey(document.getElementById('jobAddress').value, document.getElementById('jobSuburb').value);
   if (!key) return null;
-  const list = getSavedReports().filter(r => r && r.id !== currentReportId && r.reportData && addressKey(r.jobAddress, r.jobSuburb) === key);
+  const list = getSavedReports().filter(r => r && r.id !== currentReportId && !isSampleJob(r) && r.reportData && addressKey(r.jobAddress, r.jobSuburb) === key);
   if (!list.length) return null;
   // A completed report over a draft, then the most recent.
   list.sort((a, b) => ((b.reportData.issue ? 1 : 0) - (a.reportData.issue ? 1 : 0)) || ((b.savedAt || 0) - (a.savedAt || 0)));
@@ -9634,6 +9638,15 @@ function setStandard(val, fromHeader = false) {
 const STORAGE_KEY = 'korva_saved_reports'; // legacy flat key, pre-multi-tenant - kept only for one-time migration below
 const DRAFT_KEY = 'korva_draft';
 let currentReportId = null;
+
+// The made-up job a new inspector can tap through (js/sample-job.js). It
+// stays on this phone: never synced, backed up, listed as due or offered as
+// a last visit, and its emails go to the business, not a client.
+const SAMPLE_JOB_ID = 'sample_job';
+function isSampleJob(idOrEntry) {
+  const id = idOrEntry && typeof idOrEntry === 'object' ? idOrEntry.id : idOrEntry;
+  return id === SAMPLE_JOB_ID;
+}
 
 function reportsStorageKey() {
   return (authUser && authUser.id) ? `korva_saved_reports_${authUser.id}` : STORAGE_KEY;
@@ -11415,6 +11428,7 @@ function supabaseSave(entry, quiet) {
 
 async function supabaseSaveNow(entry, quiet) {
   if (!authSession) return false; // only sync when authenticated
+  if (isSampleJob(entry)) return true; // the sample stays on this phone
   // Only the version stored on this phone goes up. When it has changed since
   // (a newer save, which goes up next, or the other device's copy taken in),
   // or the report was deleted, this older one is skipped.
@@ -11654,10 +11668,10 @@ async function supabaseSyncOnOpen() {
 // with no signal, or while the account refused it. cloudSavedAt is 0 until
 // the first save lands and null on reports from before it was recorded.
 function notInAccount(entry) {
-  return !!entry && entry.cloudSavedAt != null && (entry.savedAt || 0) > entry.cloudSavedAt;
+  return !!entry && !isSampleJob(entry) && entry.cloudSavedAt != null && (entry.savedAt || 0) > entry.cloudSavedAt;
 }
 function inAccount(entry) {
-  return !!entry && entry.cloudSavedAt != null && entry.cloudSavedAt >= (entry.savedAt || 0);
+  return !!entry && !isSampleJob(entry) && entry.cloudSavedAt != null && entry.cloudSavedAt >= (entry.savedAt || 0);
 }
 // Those reports go up the next time the app is online and in front, so a
 // job finished in a subfloor is never left only on the phone.
@@ -12183,7 +12197,7 @@ async function finishDelete(item) {
   const keep = referencedPhotoIds();
   const paths = (item.paths || []).filter((path, i) => !keep.has((item.photoIds || [])[i]));
   if (paths.length) deleteCloudPhotos(paths);
-  if (!authSession || await supabaseDelete(item.id)) setPendingDeletes(getPendingDeletes().filter(d => d.id !== item.id));
+  if (!authSession || isSampleJob(item.id) || await supabaseDelete(item.id)) setPendingDeletes(getPendingDeletes().filter(d => d.id !== item.id));
 }
 async function flushPendingDeletes() {
   for (const item of getPendingDeletes()) {
@@ -12274,7 +12288,7 @@ const BACKUP_PREF_KEYS = ['korva_a11y_textsize', 'korva_a11y_contrast', 'korva_a
 
 async function exportAllData() {
   try {
-    const reports = getSavedReports();
+    const reports = getSavedReports().filter(r => !isSampleJob(r));
     const prefs = {};
     BACKUP_PREF_KEYS.forEach(key => {
       const v = localStorage.getItem(key);
@@ -12468,7 +12482,7 @@ function restoreA11ySettings() {
 // every job.
 function lastInspectorDetails() {
   const latest = getSavedReports()
-    .filter(r => r.inspector || (r.reportData && r.reportData.inspectorLicence))
+    .filter(r => !isSampleJob(r) && (r.inspector || (r.reportData && r.reportData.inspectorLicence)))
     .sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))[0];
   // No report yet: the signed-in person's own name is the best guess.
   const meta = (typeof authUser !== 'undefined' && authUser && authUser.user_metadata) || {};
@@ -12846,7 +12860,7 @@ function renderDashboardJobs(fade) {
           ${dashboardRing(j.steps, j.group)}
           <span class="dash-row-text">
             <span class="dash-row-addr">${escapeHtml(j.r.address || 'No address')}</span>
-            <span class="dash-row-sub"><span class="dash-row-status">${escapeHtml(j.status)}</span>${j.r.client ? ' · ' + escapeHtml(j.r.client) : ''}</span>
+            <span class="dash-row-sub">${isSampleJob(j.r) ? '<span class="dash-row-sample">Sample</span>' : ''}<span class="dash-row-status">${escapeHtml(j.status)}</span>${j.r.client ? ' · ' + escapeHtml(j.r.client) : ''}</span>
           </span>
           <span class="dash-row-end">
             <span class="dash-row-total">${j.total ? formatAUD(j.total).replace(/\.00$/, '') : ''}</span>
@@ -12854,6 +12868,11 @@ function renderDashboardJobs(fade) {
           </span>
           <svg class="icon dash-row-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
         </button>`).join('')}
+    </div>` : !query && !dashboardJobs.length && typeof openSampleJob === 'function' ? `
+    <div class="dash-sample${fade ? ' fade-in' : ''}">
+      <p class="dash-sample-title">See a finished job first</p>
+      <p class="dash-sample-text">A made-up job from start to finish, with your business on every page: the agreement, report, quote, the client's signed answer and the treatment certificate.</p>
+      <button type="button" class="dash-detail-primary" onclick="openSampleJob('jobs')">See a sample job</button>
     </div>` : `<p class="dash-none${fade ? ' fade-in' : ''}">${empty}</p>`;
 }
 
@@ -13075,7 +13094,7 @@ function renderSavedList() {
     const date = new Date(r.savedAt);
     const dateStr = date.toLocaleDateString('en-AU', { day:'numeric', month:'short' });
     const risk = r.reportData.riskLevel || 'none';
-    const addr = (r.address || 'Untitled property') + (r.conflictCopy ? ' (copy from this phone)' : '');
+    const addr = (r.address || 'Untitled property') + (r.conflictCopy ? ' (copy from this phone)' : '') + (isSampleJob(r) ? ' (sample)' : '');
     const pending = (r.reportData.pendingNotes || []).length;
     const status = savedReportStatus(r);
     const statusTag = `<span class="saved-item-status ${status.tone}">${status.label}</span>`;
@@ -13741,6 +13760,11 @@ async function checkDirectEmail() {
 // was closed, or the PDFs were downloaded for an email), it asks the
 // inspector "Did that send?" and returns their answer.
 async function sendPdfsToClient({ files, to, subject, body }) {
+  // The sample job's emails come to the business, so they see what a client gets.
+  if (isSampleJob(currentReportId) && typeof sampleJobSendTo === 'function') {
+    to = sampleJobSendTo();
+    subject = `Sample: ${subject}`;
+  }
   if (directEmail && to) return sendPdfsDirect({ files, to, subject, body });
   const fileObjs = files.map(f => new File([f.blob], f.fname, { type: 'application/pdf' }));
   const many = files.length > 1;
@@ -13856,7 +13880,8 @@ function openSendReview() {
   const quote = currentJobQuote();
   const address = getFullAddress();
   const client = document.getElementById('jobClient').value.trim();
-  const email = (reportData.jobClientEmail || '').trim();
+  const sampleTo = isSampleJob(currentReportId) && typeof sampleJobSendTo === 'function' ? sampleJobSendTo() : '';
+  const email = sampleTo || (reportData.jobClientEmail || '').trim();
   // A quote the client already declined isn't sent again with the report.
   const answer = quoteHasItems(quote) && typeof quoteAnswerState === 'function' ? quoteAnswerState(quote) : null;
   const declined = !!(answer && !answer.stale && answer.status !== 'accepted');
@@ -13865,7 +13890,7 @@ function openSendReview() {
 
   const esc = escapeHtml;
   document.getElementById('sendReviewTo').innerHTML =
-    `<div class="send-review-name">${esc(client || 'No client name')}</div>` +
+    `<div class="send-review-name">${esc(sampleTo ? 'You, not a client: this is the sample job' : client || 'No client name')}</div>` +
     (email ? `<div class="send-review-email">${esc(email)}</div>`
       : isReportLocked() ? `<div class="send-review-warn">No client email. Type it into your email app.</div>`
       : `<div class="send-review-warn">No client email. Add it so SAYON can send it for you.</div>
@@ -13926,7 +13951,7 @@ function openSendReview() {
 // Attached list. The PDFs are built now so the page can offer them; they
 // are the same files the send then uses.
 async function prepareSendReviewLink(r) {
-  if (!authSession || !navigator.onLine) return;
+  if (!authSession || !navigator.onLine || isSampleJob(currentReportId)) return;
   let link = null;
   try {
     const files = await sendReviewFiles(r);
@@ -14084,6 +14109,25 @@ function nextInspectionChip(freq) {
 
 // ── SHARED PDF PIECES ── used by the inspection report and the quote PDF
 // (js/quote.js) so both documents carry the same brand.
+// The sample job's PDFs (js/sample-job.js) carry SAMPLE across every page,
+// faint enough to read through, so one can never pass as a real document.
+// key: the job the PDF is for, the open job when left out.
+function stampSamplePdf(doc, key) {
+  if (!isSampleJob(key === undefined ? currentReportId : key)) return;
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  const word = 'SAMPLE', deg = 35, a = deg * Math.PI / 180;
+  for (let p = 1; p <= doc.internal.getNumberOfPages(); p++) {
+    doc.setPage(p);
+    doc.saveGraphicsState();
+    if (doc.GState) doc.setGState(new doc.GState({ opacity: 0.09 }));
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(120); doc.setTextColor(...PDF_COLORS.accent);
+    const tw = doc.getTextWidth(word), lift = 120 * 0.3528 * 0.35;
+    // Centred on the page: from the middle, back half the word along its slope.
+    doc.text(word, W / 2 - (tw / 2) * Math.cos(a) + lift * Math.sin(a), H / 2 + (tw / 2) * Math.sin(a) + lift * Math.cos(a), { angle: deg });
+    doc.restoreGraphicsState();
+  }
+}
+
 const PDF_COLORS = {
   white:       [255, 255, 255],
   pageBg:      [250, 251, 252],
@@ -15813,6 +15857,7 @@ async function buildReportPdf() {
   }
 
   // ── PAGE FOOTERS ──────────────────────────────────────────────────────────
+  stampSamplePdf(doc);
   const totalPages = doc.internal.getNumberOfPages();
   for (let p = 2; p <= totalPages; p++) {
     doc.setPage(p);

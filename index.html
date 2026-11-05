@@ -237,6 +237,7 @@
       </div>
       <p style="font-size:11px;color:var(--text3);line-height:1.6;margin-top:4px">Tip: Start recording, pop the phone in your pocket and talk room by room. Say <strong style="color:var(--accent2)">"Stop Sayon"</strong> when you're done and it fills the report. Say the quote too, like "48 metres of barrier at $50 a metre, 50% deposit", and it fills the quote.</p>
       <button class="auth-btn" onclick="obFinish()">Start inspecting →</button>
+      <button type="button" class="auth-btn secondary" onclick="obFinish(true)">See a finished sample job first</button>
     </div>
   </div>
 </div>
@@ -1463,6 +1464,13 @@
       </div>
 
 
+      <!-- The made-up finished job (js/sample-job.js), to open or bring back. -->
+      <button type="button" class="panel-label drawer-help" onclick="openSampleJob('menu')">
+        <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="m9 15 2 2 4-4"/></svg></span>
+        <span class="panel-title">Sample job</span>
+        <span class="job-panel-summary">See a finished job</span>
+      </button>
+
       <!-- Help: one real address, the same one the legal pages give. -->
       <a class="panel-label drawer-help" href="mailto:sayon.application@gmail.com?subject=SAYON%20help">
         <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
@@ -2638,5 +2646,6 @@
 <script src="js/job-pack.js"></script>
 <script src="js/site-plan.js"></script>
 <script src="js/business-sync.js"></script>
+<script src="js/sample-job.js"></script>
 </body>
 </html>

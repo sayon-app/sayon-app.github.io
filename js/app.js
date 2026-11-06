@@ -9077,6 +9077,34 @@ function jobAgreementStep() {
   return { label: 'Agreement', to: 'agreement', state: 'done', text: `${how}${a.signerName ? ' by ' + a.signerName : ''}` };
 }
 
+// The job page's icons: one per document, plus the hero's actions.
+const JOB_ICONS = {
+  agreement: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  report: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+  quote: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/>',
+  answer: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="m9 10 2 2 4-4"/>',
+  treatment: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
+  certificate: '<circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/>',
+  bait: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  jobpdf: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h8"/><path d="M8 17h5"/>',
+  details: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  tick: '<path d="M20 6 9 17l-5-5"/>',
+  phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  directions: '<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
+};
+function jobIcon(name, size) {
+  return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${JOB_ICONS[name] || JOB_ICONS.clock}</svg>`;
+}
+
+// The closed Job details line: the inspection type, the client's phone or
+// email, the order number.
+function jobDetailsSummary() {
+  const v = id => ((document.getElementById(id) || {}).value || '').trim();
+  return [(v('jobInspectionType') || '').split(' — ')[0], v('jobClientPhone') || v('jobClientEmail'), v('jobOrderId')].filter(Boolean).join(' · ');
+}
+
 function renderJobPage() {
   const body = document.getElementById('jobPageBody');
   if (!body) return;
@@ -9100,43 +9128,95 @@ function renderJobPage() {
     : j.clientNotGoingAhead && !quoteHasItems(j.q) ? '<button type="button" onclick="setClientNotGoingAhead(false)">Write a quote after all</button>' : '';
   if (reportData.agreement && j.steps.some(st => st.state === 'now')) steps[0].state = 'done';
   else if (!reportData.agreement) steps.slice(1).forEach(st => { if (st.state === 'now') st.state = 'todo'; });
-  const icon = d => `<svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
-  const dot = (st, i) => st.state === 'done' ? icon('<path d="M20 6 9 17l-5-5"/>')
-    : st.state === 'bad' ? icon('<path d="M18 6 6 18"/><path d="M6 6l12 12"/>') : st.state === 'skip' ? '–' : i + 1;
   const pct = calculateCompletion();
-  const detail = (st) => st.to === 'report' && st.state !== 'done' && st.state !== 'skip' && !st.ready ? `${pct}% filled in`
-    : st.to === 'quote' && j.total ? `${formatAUD(j.total).replace(/\.00$/, '')}${j.q && j.q.sentAt ? ', sent' : ', not sent yet'}` : st.text;
-  const chev = '<svg class="icon dash-timeline-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
+  const who = (j.r.client || '').trim().split(/\s+/)[0];
+  // Each step's line: the fuller wording for one that's done or still to
+  // come, and what a later step is waiting on.
+  const detail = (st) => {
+    if (st.to === 'report' && st.state !== 'done' && st.state !== 'skip' && !st.ready) return `${pct}% filled in`;
+    if (st.to === 'quote' && j.total && st.state !== 'skip') return `${formatAUD(j.total).replace(/\.00$/, '')}${j.q && j.q.sentAt ? ', sent ' + dashDate(j.q.sentAt) : ', not sent yet'}`;
+    if (st.state === 'now' || st.state === 'bad' || st.state === 'skip' || !st.full) return st.text;
+    if (st.state === 'todo' && st.to === 'answer') return j.q && j.q.sentAt ? `Waiting on ${who || 'the client'}` : 'Once the quote is sent';
+    if (st.state === 'todo' && st.to === 'treatment') return quoteHasItems(j.q) && (quoteAnswerState(j.q) || {}).status === 'accepted' ? 'Accepted, not recorded yet' : 'Once the client accepts';
+    if (st.state === 'todo' && st.to === 'agreement') return st.text;
+    return st.full.replace(/ · /g, ', ');
+  };
+  const done = steps.filter(st => st.state === 'done' || st.state === 'skip').length;
+  // What the job is and when, over the address.
+  const type = (reportData.jobInspectionType || '').split(' — ')[0];
+  const when = reportData.jobInspectionDate ? new Date(reportData.jobInspectionDate + 'T00:00:00') : null;
+  const time = (reportData.jobInspectionTime || '').match(/^(\d{1,2}):(\d{2})/);
+  const eyebrow = [type,
+    when && !isNaN(when) ? when.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }) : '',
+    time ? `${(+time[1] % 12) || 12}:${time[2]} ${+time[1] < 12 ? 'am' : 'pm'}` : ''].filter(Boolean).join(' · ');
+  // One tap to ring, email or drive to the job.
+  const phone = ((document.getElementById('jobClientPhone') || {}).value || '').trim();
+  const email = typeof jobClientEmailOf === 'function' ? jobClientEmailOf() : (reportData.jobClientEmail || '').trim();
+  const actions = [
+    phone && `<a class="job-act" href="tel:${escapeHtml(phone.replace(/[^\d+]/g, ''))}">${jobIcon('phone', 18)}Call</a>`,
+    email && `<a class="job-act" href="mailto:${escapeHtml(email)}">${jobIcon('mail', 18)}Email</a>`,
+    addr && `<a class="job-act" href="https://maps.apple.com/?q=${encodeURIComponent(addr)}" target="_blank" rel="noopener">${jobIcon('directions', 18)}Directions</a>`,
+  ].filter(Boolean).join('');
+  const nextIcon = next.next ? (next.next.to.startsWith('jobpdf') ? 'jobpdf' : next.next.to) : j.group === 'done' && addr ? 'tick' : !addr ? 'details' : 'clock';
+  const tick = '<svg class="icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+  const chev = '<svg class="icon job-step-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
   const group = (DASHBOARD_TABS.find(([k]) => k === j.group) || [, ''])[1];
+  // A redraw while the page is open keeps Job details as they were.
+  const fold = document.getElementById('jobDetailsFold');
+  const detailsOpen = !addr || !!(fold && fold.open && document.getElementById('jobOverlay').classList.contains('open'));
+  const stateWord = { done: 'done', now: 'next', todo: 'to come', skip: 'not needed', bad: 'declined' };
+  const detailsHTML = `
+    <details class="job-details" id="jobDetailsFold"${detailsOpen ? ' open' : ''}>
+      <summary class="job-details-head" id="jobDetailsHead">
+        <span class="job-tile" aria-hidden="true">${jobIcon('details', 20)}</span>
+        <span class="job-step-main">
+          <span class="job-step-label">Job details</span>
+          <span class="job-step-text">${escapeHtml(jobDetailsSummary() || 'Address, client and booking')}</span>
+        </span>
+        ${chev}
+      </summary>
+      <div id="jobPageSlot"></div>
+    </details>`;
   body.innerHTML = `
     ${isSampleJob(currentReportId) && typeof sampleJobNoteHTML === 'function' ? sampleJobNoteHTML() : ''}
-    <div class="job-hero">
-      ${addr ? `<span class="dash-detail-chip ${j.group}">${group}</span>` : ''}
+    <div class="job-hero ${j.group}">
+      ${addr ? `<div class="job-hero-top"><span class="dash-detail-chip ${j.group}">${group}</span><span class="job-hero-count">${done} of ${steps.length} done</span></div>` : ''}
+      ${eyebrow ? `<div class="job-hero-eyebrow">${escapeHtml(eyebrow)}</div>` : ''}
       <h3 class="job-hero-addr">${escapeHtml(addr || 'New job')}</h3>
       ${j.r.client ? `<p class="job-hero-sub">${escapeHtml(j.r.client)}</p>` : ''}
+      ${addr ? `<div class="job-progress" aria-hidden="true">${steps.map(st => `<i class="${st.state}"></i>`).join('')}</div>` : ''}
+      ${actions ? `<div class="job-acts">${actions}</div>` : ''}
     </div>
     <section class="dash-next job-next ${j.group}">
-      <div class="dash-next-label">${next.next ? 'Next step' : addr ? 'Where it\'s at' : 'Next step'}</div>
-      <div class="dash-next-title">${escapeHtml(next.status)}</div>
+      <div class="job-next-head">
+        <span class="job-tile ${j.group === 'done' && addr && !next.next ? 'done' : 'now'}" aria-hidden="true">${jobIcon(nextIcon, 22)}</span>
+        <div>
+          <div class="dash-next-label">${next.next ? 'Next step' : addr ? 'Where it\'s at' : 'Next step'}</div>
+          <div class="dash-next-title">${escapeHtml(next.status)}</div>
+        </div>
+      </div>
       ${next.hint ? `<p class="dash-next-hint">${escapeHtml(next.hint)}</p>` : ''}
       ${next.next ? `<button type="button" class="dash-detail-primary" onclick="jobGo('${next.next.to}')">${next.next.label}</button>` : ''}
       ${skipLink ? `<div class="dash-detail-links">${skipLink}</div>` : ''}
     </section>
-    <div class="job-section-head">The job, step by step</div>
-    <ol class="dash-timeline job-steps">
+    ${addr ? '' : detailsHTML}
+    <div class="job-section-head">Job steps</div>
+    <ol class="job-steps">
       ${steps.map((st, i) => `
         <li class="${st.state}">
-          <span class="dash-timeline-dot" aria-hidden="true">${dot(st, i)}</span>
-          <button type="button" class="dash-timeline-btn" onclick="jobGo('${st.to}')">
-            <span class="dash-timeline-label">${st.label}</span>
-            <span class="dash-timeline-text">${escapeHtml(detail(st))}</span>
+          <button type="button" class="job-step" onclick="jobGo('${st.to}')" aria-label="${i + 1}. ${escapeHtml(st.label)}, ${stateWord[st.state] || ''}: ${escapeHtml(detail(st))}">
+            <span class="job-tile ${st.state}" aria-hidden="true">${jobIcon(st.to, 20)}${st.state === 'done' ? `<span class="job-tile-tick">${tick}</span>` : ''}</span>
+            <span class="job-step-main">
+              <span class="job-step-label">${st.label}${st.state === 'now' ? '<span class="job-step-flag">Next</span>' : ''}</span>
+              <span class="job-step-text">${escapeHtml(detail(st))}</span>
+              ${st.to === 'report' && st.state === 'now' && !st.ready ? `<span class="job-step-bar"><i style="width:${Math.max(4, Math.min(100, pct))}%"></i></span>` : ''}
+            </span>
             ${chev}
           </button>
         </li>`).join('')}
     </ol>
     ${typeof jobPdfSectionHTML === 'function' ? jobPdfSectionHTML() : ''}
-    <div class="job-section-head" id="jobDetailsHead">Job details</div>
-    <div id="jobPageSlot"></div>`;
+    ${addr ? detailsHTML : ''}`;
   const panel = document.getElementById('jobPanel');
   if (panel) document.getElementById('jobPageSlot').appendChild(panel);
 }
@@ -9151,7 +9231,7 @@ function jobGo(to) {
     if (document.getElementById('app').style.display !== 'flex') openApp('inspect');
   }
   if (to === 'job') { openJobPage(); return; }
-  if (to === 'details') { openJobPage(); document.getElementById('jobDetailsHead')?.scrollIntoView({ block: 'start' }); return; }
+  if (to === 'details') { openJobPage(); const f = document.getElementById('jobDetailsFold'); if (f) f.open = true; document.getElementById('jobDetailsHead')?.scrollIntoView({ block: 'start' }); return; }
   if (to === 'agreement') { openAgreementSheet(); return; }
   if (to === 'report') return;
   if (!document.getElementById('quoteScreen').classList.contains('open')) openQuoteFromReport();
@@ -13021,6 +13101,8 @@ function dashboardJob(r, quotes) {
   ];
   steps.forEach(s => { if (s.state === 'skip') s.text = clientNotGoingAhead ? 'Skipped, client not going ahead' : 'Not needed'; });
   // Each step just says whether it's done; the preview has the detail. A declined answer keeps its wording.
+  // The job page keeps the fuller wording (when, who, how much).
+  steps.forEach(s => { s.full = s.text; });
   steps.forEach(s => { if (s.state === 'done' || s.state === 'todo') s.text = s.state === 'done' ? 'Completed' : 'Not completed'; });
   // A PDF made but never sent isn't a finished report: the client still
   // hasn't got it (unless it went on the quote's link), so the step says so

@@ -5339,6 +5339,16 @@ body:not(.dark-screen) .page-topbar .drawer-back { background: rgba(255,255,255,
   background: linear-gradient(145deg, var(--accent-hi), var(--accent2)); color: #fff; font: 800 calc(12px * var(--ts)) 'Inter', sans-serif;
 }
 body:not(.dark-screen) .page-topbar .topbar-account { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
+/* This job's New job: the one place a new job starts, kept in sight
+   rather than at the foot of Job details. */
+.topbar-new {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px 0 11px; border-radius: 22px;
+  border: 1px solid var(--border); background: var(--surface2); color: var(--text); font: 650 calc(14px * var(--ts)) 'Inter', sans-serif; cursor: pointer;
+}
+.topbar-new svg { color: var(--accent2); }
+.topbar-new:active { transform: scale(0.97); }
+body:not(.dark-screen) .page-topbar .topbar-new { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
+body:not(.dark-screen) .page-topbar .topbar-new svg { color: var(--accent-glow); }
 
 /* The dashboard and the menu's list sit on the backdrop like the report
    and the quote, white cards on ink, so the four places read as one app.
@@ -5678,23 +5688,17 @@ body:not(.dark-screen) .agreement-banner.last-visit-banner .agreement-banner-btn
 .job-page { height: 100%; display: flex; flex-direction: column; transform: translateY(14px); transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1); }
 .job-overlay.open .job-page { transform: none; }
 .job-page-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 max(16px, calc(50% - 340px)); }
-.job-hero { padding: 18px 0 4px; }
-.job-hero .dash-detail-chip { margin-bottom: 8px; }
 .job-hero-addr { margin: 0; font: 700 calc(26px * var(--ts))/1.15 'Space Grotesk', sans-serif; letter-spacing: -0.02em; color: var(--text); }
 .job-hero-sub { margin: 6px 0 0; font-size: calc(15px * var(--ts)); color: var(--text2); }
 .job-next { background: var(--surface); border: none; border-top: 3px solid var(--accent); box-shadow: 0 14px 36px rgba(0,0,0,0.25); }
 .job-next.waiting { background: var(--surface); border-top-color: #F0B43C; }
 .job-next.done { background: var(--surface); border-top-color: var(--border2); }
 .job-section-head { margin: 24px 2px 10px; font-size: calc(11px * var(--ts)); font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); }
-.job-steps .dash-timeline-btn { min-height: 58px; }
-.job-pdf { padding: 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); }
-.job-pdf-lede { margin: 0 0 10px; font-size: calc(14px * var(--ts)); line-height: 1.5; color: var(--text2); }
 .job-pdf-list { margin: 0 0 12px; padding: 0 0 0 20px; }
 .job-pdf-list li { padding: 5px 0; font-size: calc(14px * var(--ts)); color: var(--text); }
 .job-pdf-list li strong { display: block; font-weight: 650; }
 .job-pdf-list li span { display: block; font-size: calc(12.5px * var(--ts)); color: var(--text3); }
 .job-pdf-note { margin: 0 0 12px; font-size: calc(13px * var(--ts)); color: var(--text3); }
-.job-pdf .job-pdf-btn:disabled { opacity: 0.6; cursor: default; }
 .job-next .dash-detail-links { margin-top: 10px; }
 .job-page #jobPanel > .panel-label { display: none; }
 .job-page #jobPanel { border-radius: 16px; margin-bottom: 8px; }
@@ -5705,18 +5709,120 @@ body:not(.dark-screen) .job-hero-addr { color: var(--on-ink); }
 body:not(.dark-screen) .job-hero-sub,
 body:not(.dark-screen) .job-section-head { color: var(--on-ink2); }
 body:not(.dark-screen) .job-section-head { color: var(--accent-glow); }
-body:not(.dark-screen) .job-steps .dash-timeline-btn { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
-/* The job page sits on dark ink: a see-through hover would take the card's
-   white away and its dark title with it (and touch keeps hover after a tap). */
-body:not(.dark-screen) .job-steps .dash-timeline-btn:hover,
-body:not(.dark-screen) .job-steps .dash-timeline-btn:focus-visible { background: var(--surface); border-color: rgba(var(--accent-rgb), 0.45); }
-body:not(.dark-screen) .job-steps .dash-timeline-btn:active { background: var(--surface2, var(--surface)); }
-body:not(.dark-screen) .job-steps li::before { background: rgba(255,255,255,0.18); }
-body:not(.dark-screen) .job-steps li.done::before { background: var(--accent-hi); }
-body:not(.dark-screen) .job-steps .dash-timeline-dot { border-color: rgba(255,255,255,0.3); background: #0F1A23; color: var(--on-ink2); }
-body:not(.dark-screen) .job-steps li.done .dash-timeline-dot { background: var(--accent-hi); border-color: var(--accent-hi); color: var(--accent-ink); }
-body:not(.dark-screen) .job-steps li.now .dash-timeline-dot { border-color: var(--accent-glow); color: var(--accent-glow); box-shadow: 0 0 0 4px rgba(var(--accent-glow-rgb),0.18); }
 body:not(.dark-screen) .job-page #jobPanel { border-color: transparent; box-shadow: 0 14px 36px rgba(0,0,0,0.35); }
+
+/* The job page's look: a hero with what the job is, how far along it is
+   and one-tap Call, Email and Directions; the next step with its
+   document's icon; each step as a card with an icon tile in the colour of
+   where it's up to (green done, blue next, grey to come), joined by a
+   short line; then Job PDF and Job details, which folds shut once the
+   address is in. */
+.job-hero { padding: 18px 0 6px; }
+.job-hero-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.job-hero-top .dash-detail-chip { margin: 0; }
+.job-hero-count { font-size: calc(12.5px * var(--ts)); font-weight: 650; color: var(--text3); }
+.job-hero-eyebrow { margin-bottom: 6px; font-size: calc(11.5px * var(--ts)); font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent2); }
+.job-progress { display: flex; gap: 5px; margin-top: 16px; }
+.job-progress i { flex: 1; height: 6px; border-radius: 99px; background: var(--surface3); }
+.job-progress i.done { background: var(--green-fill); }
+.job-progress i.now { background: var(--accent); }
+.job-progress i.bad { background: var(--risk); }
+.job-progress i.skip { background: var(--border); opacity: 0.6; }
+.job-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.job-act {
+  flex: 1 1 0; min-width: 96px; min-height: 48px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  border-radius: 14px; background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  font: 650 calc(14px * var(--ts)) 'Inter', sans-serif; text-decoration: none; -webkit-tap-highlight-color: transparent;
+}
+.job-act svg { flex: none; color: var(--accent2); }
+.job-act:active { transform: scale(0.97); }
+.job-act:focus-visible { outline: 3px solid rgba(var(--accent-rgb), 0.45); outline-offset: 2px; }
+
+.job-tile {
+  flex: none; position: relative; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text3);
+}
+.job-tile.done { background: var(--green-wash); border-color: var(--green-edge); color: var(--green); }
+.job-tile.now { background: var(--accent-grad); border-color: transparent; color: #fff; box-shadow: 0 6px 16px rgba(var(--accent-rgb), 0.35); }
+.job-tile.bad { background: rgba(192,57,43,0.1); border-color: rgba(192,57,43,0.3); color: var(--risk); }
+.job-tile.skip { background: transparent; border-style: dashed; }
+.job-tile-tick {
+  position: absolute; right: -5px; bottom: -5px; width: 19px; height: 19px; border-radius: 99px; display: grid; place-items: center;
+  background: var(--green-fill); color: #fff; border: 2px solid var(--surface);
+}
+
+.job-next-head { display: flex; align-items: center; gap: 14px; }
+.job-next .job-tile { width: 48px; height: 48px; border-radius: 14px; }
+.job-next .dash-next-title { margin-top: 3px; }
+.job-next.done { border-top-color: var(--green-fill); }
+.job-next.waiting .job-tile.now { background: linear-gradient(180deg, #FFC65C 0%, #F0A81E 100%); color: #3A2600; box-shadow: 0 6px 16px rgba(240,168,30,0.35); }
+
+.job-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.job-steps li { position: relative; }
+.job-steps li:not(:last-child)::after { content: ''; position: absolute; left: 33px; top: 100%; width: 2px; height: 10px; background: var(--border2); }
+.job-steps li.done:not(:last-child)::after { background: var(--green-fill); }
+.job-step, .job-details-head {
+  width: 100%; min-height: 72px; padding: 12px 14px 12px 12px; display: flex; align-items: center; gap: 14px;
+  border-radius: 16px; background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  font-family: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.job-steps li.now .job-step { border: 2px solid var(--accent); padding: 11px 13px 11px 11px; }
+.job-steps li.skip .job-step { opacity: 0.72; }
+.job-step:active { transform: scale(0.99); background: var(--surface2); }
+.job-step:focus-visible, .job-details-head:focus-visible { outline: 3px solid rgba(var(--accent-rgb), 0.45); outline-offset: 2px; }
+.job-step-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.job-step-label { display: flex; align-items: center; gap: 8px; font-size: calc(15.5px * var(--ts)); font-weight: 650; line-height: 1.25; letter-spacing: -0.01em; color: var(--text); }
+.job-step-flag { padding: 3px 7px; border-radius: 6px; background: rgba(var(--accent-rgb), 0.12); color: var(--accent2); font-size: calc(10.5px * var(--ts)); font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.job-step-text { font-size: calc(13.5px * var(--ts)); font-weight: 500; line-height: 1.35; color: var(--text3); }
+.job-steps li.done .job-step-text { color: var(--green); }
+.job-steps li.now .job-step-text { color: var(--text2); }
+.job-steps li.bad .job-step-text { color: var(--risk); }
+.job-step-bar { display: block; height: 6px; margin-top: 5px; border-radius: 99px; background: var(--surface3); overflow: hidden; }
+.job-step-bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent-grad); }
+.job-step-chev { flex: none; color: var(--text3); transition: transform 0.2s; }
+
+.job-pdf { margin-top: 24px; padding: 12px 14px 14px 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); }
+.job-pdf-head { display: flex; align-items: center; gap: 14px; min-height: 46px; }
+.job-pdf-head + * { margin-top: 12px; }
+.job-pdf-list { margin-left: 58px; padding: 0; list-style: none; }
+.job-pdf-list li { border-top: 1px solid var(--border); }
+.job-pdf .job-pdf-note { margin-left: 58px; }
+.job-pdf .dash-detail-links { margin-left: 58px; }
+.job-pdf .dash-detail-links button { min-height: 48px; }
+
+.job-details { margin-top: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); overflow: hidden; }
+.job-details-head { list-style: none; border: none; border-radius: 0; background: transparent; }
+.job-details-head::-webkit-details-marker { display: none; }
+.job-details[open] .job-details-head .job-step-chev { transform: rotate(90deg); }
+body .job-page .job-details #jobPanel:not(.menu-page-active) { margin: 0; border: none; border-top: 1px solid var(--border); border-radius: 0; box-shadow: none; }
+
+/* On the ink backdrop (the light screen): white cards with a shadow, the
+   hero's text and buttons light. */
+body:not(.dark-screen) .job-hero-eyebrow { color: var(--accent-glow); }
+body:not(.dark-screen) .job-hero-count { color: var(--on-ink2); }
+body:not(.dark-screen) .job-progress i { background: rgba(255,255,255,0.14); }
+body:not(.dark-screen) .job-progress i.done { background: var(--green-fill); }
+body:not(.dark-screen) .job-progress i.now { background: var(--accent-hi); }
+body:not(.dark-screen) .job-progress i.bad { background: #FF5A4F; }
+body:not(.dark-screen) .job-progress i.skip { background: rgba(255,255,255,0.07); }
+body:not(.dark-screen) .job-act { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.16); color: var(--on-ink); }
+body:not(.dark-screen) .job-act svg { color: var(--accent-glow); }
+body:not(.dark-screen) .job-step,
+body:not(.dark-screen) .job-pdf,
+body:not(.dark-screen) .job-details { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
+body:not(.dark-screen) .job-steps li.now .job-step { border-color: var(--accent-hi); }
+body:not(.dark-screen) .job-steps li:not(:last-child)::after { background: rgba(255,255,255,0.2); }
+body:not(.dark-screen) .job-steps li.done:not(:last-child)::after { background: var(--green-fill); }
+/* Touch keeps hover after a tap: a card keeps its white. */
+body:not(.dark-screen) .job-step:hover { background: var(--surface); }
+body:not(.dark-screen) .job-step:active { background: var(--surface2); }
+
+/* Dark screen: tinted tiles, and the amber frame round Job details. */
+body.dark-screen .job-tile.done { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.35); }
+body.dark-screen .job-tile.bad { background: rgba(255,90,79,0.12); border-color: rgba(255,90,79,0.35); }
+body.dark-screen .job-tile-tick { color: #04210F; }
+body.dark-screen .job-act { background: var(--surface); border-color: var(--border2); }
+body.dark-screen .job-details { border: 3px solid var(--frame); border-radius: 6px; }
 
 /* ── DOCUMENT STRIP ──
    At the top of the report and the quote: back to the job's page, then the

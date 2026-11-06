@@ -154,8 +154,13 @@ const telemetryDeviceProps = telemetryDevice();
 // anything the inspector typed or said.
 function track(event, props = {}) {
   if (!telemetryEnabled) return;
+  // Steps taken on the sample job are marked, so they can be left out of
+  // counts of real work (reports sent, quotes sent).
+  let sample = false;
+  try { sample = typeof isSampleJob === 'function' && isSampleJob(currentReportId); } catch (e) {}
   const properties = {
     ...props,
+    ...(sample ? { sample_job: true } : {}),
     ...telemetryDeviceProps,
     distinct_id: telemetryUserId || telemetryAnonId(),
     $process_person_profile: !!telemetryUserId,

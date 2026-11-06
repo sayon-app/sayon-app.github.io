@@ -188,8 +188,13 @@ function openBaitVisit(id) {
   if (!q || !baitInstalled(q)) return;
   const visits = baitVisitsOf(q);
   const existing = id ? visits.find(v => v.id === id) : null;
-  const v = existing ? JSON.parse(JSON.stringify(existing)) : draftBaitVisit(q, visits[visits.length - 1]);
-  baitDraft = { id: existing ? existing.id : null, stations: v.stations || [], nextTouched: !!existing };
+  // What was on the sheet when the app closed comes back, unless the visit
+  // has been saved since (UNSAVED SHEETS in js/quote.js).
+  const sheetKey = `bait|${q.reportKey}|${existing ? existing.id : 'new'}`;
+  const copy = unsavedSheetCopy(sheetKey);
+  const restored = !!copy && copy.at > ((existing && existing.at) || 0);
+  const v = restored ? copy.data : existing ? JSON.parse(JSON.stringify(existing)) : draftBaitVisit(q, visits[visits.length - 1]);
+  baitDraft = { id: existing ? existing.id : null, stations: v.stations || [], nextTouched: restored ? !!v.nextTouched : !!existing };
   track('screen_viewed', { screen: 'bait_visit' });
   document.getElementById('baitTitle').textContent = existing ? 'Edit the bait station visit' : 'Bait station visit';
   document.getElementById('bvDate').value = v.date || todayIsoDate();
@@ -206,55 +211,47 @@ function openBaitVisit(id) {
   cancelSheetVoice('bait');
   document.getElementById('baitOverlay').classList.add('open');
   document.querySelector('#baitOverlay .page-sheet-body').scrollTop = 0;
-  if (!baitPad) baitPad = createSignaturePad(document.getElementById('bvSigCanvas'), document.getElementById('bvSigPlaceholder'), updateBaitSaveBtn);
+  if (!baitPad) baitPad = createSignaturePad(document.getElementById('bvSigCanvas'), document.getElementById('bvSigPlaceholder'), () => { updateBaitSaveBtn(); unsavedSheetChanged(); });
   baitPad.show(v.signature || '');
   updateBaitSaveBtn();
   renderBaitFolds(true);
   const sheet = document.getElementById('baitOverlay');
   if (!sheet.dataset.folds) {
     sheet.dataset.folds = '1';
-    ['input', 'change'].forEach(ev => sheet.addEventListener(ev, () => renderBaitFolds()));
+    ['input', 'change'].forEach(ev => sheet.addEventListener(ev, () => { renderBaitFolds(); unsavedSheetChanged(); }));
   }
+  watchUnsavedSheet(sheetKey, () => Object.assign(readBaitForm(), { nextTouched: baitDraft.nextTouched }));
+  if (restored) showToast('Picked up where you left off. Save the visit when you\'re done', 'info');
 }
 
-// ── THE FOLDS ── As on the treatment record: each part folds to a line of
-// what it holds, amber when something's missing, and opening the sheet (or
-// a voice fill) opens only the parts with a gap.
+// ── THE FOLDS ── As on the treatment record: each part folds to its title,
+// with a green tick once it's done or a short amber note saying what's
+// still needed, and opening the sheet (or a voice fill) opens only the
+// parts with a gap.
 function baitFoldLines() {
   const v = id => document.getElementById(id).value.trim();
-  const tech = v('bvTech'), lic = v('bvLicence');
-  const when = v('bvDate') ? formatAnswerDate(v('bvDate')) : '';
   const s = baitDraft ? baitDraft.stations : [];
   const left = s.filter(x => !x.status).length;
-  const summary = (document.getElementById('bvSummary').textContent || '').trim();
   const finished = document.getElementById('bvFinished').checked;
-  const product = [v('bvProduct'), v('bvBatch') ? 'batch ' + v('bvBatch') : ''].filter(Boolean).join(', ');
   const baitAdded = s.some(x => (x.bait || '').trim());
-  const next = finished ? 'Baiting finished' : v('bvNext') ? 'Next visit ' + formatAnswerDate(v('bvNext')) : '';
   return [
-    !tech ? { warn: true, text: `${when ? when + '. ' : ''}Technician not filled in` }
-      : !lic ? { warn: true, text: `${when ? when + ' · ' : ''}${tech}, licence no. missing` }
-      : { text: [when, `${tech}, ${lic}`].filter(Boolean).join(' · ') },
-    !s.length ? { warn: true, text: 'No stations listed yet' }
-      : left ? { warn: true, text: summary || `${left} still to mark` }
-      : { text: summary },
-    !next ? { warn: true, text: [product, 'next visit not set'].filter(Boolean).join(' · ') }
-      : baitAdded && !v('bvProduct') ? { warn: true, text: `Say which bait was added · ${next}` }
-      : { text: [product, next].filter(Boolean).join(' · ') },
+    !v('bvTech') ? 'Add the technician' : !v('bvLicence') ? 'Add the licence no.' : '',
+    !s.length ? 'Add the stations' : left ? `Mark ${left === 1 ? 'one station' : left + ' stations'}` : '',
+    baitAdded && !v('bvProduct') ? 'Name the bait added' : !finished && !v('bvNext') ? 'Set the next visit' : '',
   ];
 }
 
 function renderBaitFolds(reset) {
   if (!document.getElementById('bvFold1') || !baitDraft) return;
-  baitFoldLines().forEach((line, i) => {
-    const sub = document.getElementById('bvSub' + (i + 1));
-    sub.textContent = line.text;
-    sub.classList.toggle('warn', !!line.warn);
-    if (reset) document.getElementById('bvFold' + (i + 1)).open = !!line.warn;
+  baitFoldLines().forEach((note, i) => {
+    const fold = document.getElementById('bvFold' + (i + 1));
+    setFoldNote(fold, document.getElementById('bvSub' + (i + 1)), note);
+    if (reset) fold.open = !!note;
   });
 }
 
 function closeBaitVisit() {
+  dropUnsavedSheet();
   cancelSheetVoice('bait');
   document.getElementById('baitOverlay').classList.remove('open');
 }
@@ -377,6 +374,7 @@ function onBaitProductName(inp) {
 }
 
 function updateBaitSummary() {
+  unsavedSheetChanged();
   const s = baitDraft.stations;
   const el = document.getElementById('bvSummary');
   if (!s.length) { el.textContent = ''; return; }
@@ -411,15 +409,12 @@ function updateBaitSaveBtn() {
   renderBaitFolds();
 }
 
-function saveBaitVisit() {
-  const q = quoteState;
-  if (!q || !baitDraft) return;
-  const need = baitSaveNeed();
-  if (need) { showToast(need, 'error'); return; }
+// The visit as the sheet has it now: what Save keeps, and the copy kept
+// while it's being filled in.
+function readBaitForm() {
   const v = id => document.getElementById(id).value.trim();
   const finished = document.getElementById('bvFinished').checked;
-  const visit = {
-    id: baitDraft.id || 'bv' + Date.now().toString(36),
+  return {
     date: v('bvDate') || todayIsoDate(),
     technician: v('bvTech'),
     licence: v('bvLicence'),
@@ -428,9 +423,17 @@ function saveBaitVisit() {
     nextVisit: finished ? '' : v('bvNext'),
     finished,
     notes: v('bvNotes'),
-    signature: baitPad.canvas.toDataURL('image/png'),
+    signature: baitPad && !baitPad.empty ? baitPad.canvas.toDataURL('image/png') : '',
     at: Date.now(),
   };
+}
+
+function saveBaitVisit() {
+  const q = quoteState;
+  if (!q || !baitDraft) return;
+  const need = baitSaveNeed();
+  if (need) { showToast(need, 'error'); return; }
+  const visit = Object.assign({ id: baitDraft.id || 'bv' + Date.now().toString(36) }, readBaitForm());
   const old = (q.baitVisits || []).find(x => x.id === visit.id);
   // An edit that changes what the client was told needs sending again.
   const said = x => JSON.stringify([x.date, x.stations, x.product, x.nextVisit, x.finished, x.notes, x.technician, x.licence]);
@@ -443,7 +446,7 @@ function saveBaitVisit() {
   renderQuoteAnswer();
   if (typeof renderSavedList === 'function') renderSavedList();
   showToast(visit.sentAt ? 'Visit saved' : 'Visit saved. Email the client their visit report', 'success');
-  track('bait_visit_recorded', { stations: visit.stations.length, active: visit.stations.filter(s => BAIT_FEEDING.includes(s.status)).length, finished });
+  track('bait_visit_recorded', { stations: visit.stations.length, active: visit.stations.filter(s => BAIT_FEEDING.includes(s.status)).length, finished: visit.finished });
   // The report to email is the next tap.
   setTimeout(() => { const card = document.getElementById('qpBait'); if (card) card.scrollIntoView({ block: 'center' }); }, 60);
 }
@@ -525,7 +528,7 @@ function downloadBaitVisit(id) {
     .then(({ blob, fname }) => { track('bait_visit_pdf_made'); return deliverPdfBlob(blob, fname, {
       title: 'Bait station visit report',
       text: `Bait station visit report — ${q.address || 'Property'}`,
-      readyToast: 'Visit report ready — choose where to save or send it',
+      readyToast: 'Visit report ready. Choose where to save or send it',
     }); })
     .catch(e => {
       console.error('Bait visit PDF failed:', e);
@@ -657,8 +660,11 @@ function buildBaitVisitPDF(q, v) {
   };
   ensure(20); y -= 2.5; head();
   stations.forEach((s, i) => {
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-    const cells = cols.map(c => doc.splitTextToSize(c.f(s) || '', c.w - 3));
+    // Feeding stations stand out in bold, and each cell is measured in the
+    // font it's drawn in, so a bold one stays inside its column.
+    const bold = ci => ci === 0 || (cols[ci].h === 'FINDING' && BAIT_FEEDING.includes(s.status));
+    doc.setFontSize(8.5);
+    const cells = cols.map((c, ci) => { doc.setFont('helvetica', bold(ci) ? 'bold' : 'normal'); return doc.splitTextToSize(c.f(s) || '', c.w - 3); });
     // Short rows: twelve or more stations still leave room for the sign-off.
     const rowH = Math.max(...cells.map(l => l.length * 3.6)) + 1.7;
     if (y + rowH > BOTTOM) { doc.addPage(); y = drawPdfRunningHeader(doc, company, docName, q.address, number); head(); }
@@ -667,8 +673,7 @@ function buildBaitVisitPDF(q, v) {
     let x = M + 3;
     cells.forEach((lines, ci) => {
       const finding = cols[ci].h === 'FINDING';
-      // Feeding stations stand out in bold.
-      doc.setFont('helvetica', ci === 0 || (finding && BAIT_FEEDING.includes(s.status)) ? 'bold' : 'normal');
+      doc.setFont('helvetica', bold(ci) ? 'bold' : 'normal');
       doc.setFontSize(8.5); doc.setTextColor(...(finding && BAIT_FEEDING.includes(s.status) ? C.accentDark : C.ink));
       doc.text(lines, x, y + 3.8);
       x += cols[ci].w;

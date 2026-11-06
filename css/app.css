@@ -3623,44 +3623,54 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
   font: inherit; font-size: calc(15px * var(--ts)); color: var(--text);
 }
 
-.dash-list {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
-  box-shadow: 0 1px 2px rgba(16,24,40,0.04), 0 8px 24px rgba(16,24,40,0.06);
-}
-.dash-row {
-  display: grid; grid-template-columns: 36px minmax(0, 1fr) auto 16px; align-items: center; gap: 12px;
-  width: 100%; padding: 14px 12px 14px 14px; border: 0; background: none;
-  font: inherit; color: inherit; text-align: left; cursor: pointer;
-  transition: background 0.15s;
-}
-.dash-row + .dash-row { border-top: 1px solid var(--border); }
-.dash-row:hover, .dash-row:active { background: rgba(var(--accent-rgb), 0.05); }
-.dash-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.dash-row-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.dash-row-addr {
-  font-size: calc(15px * var(--ts)); line-height: 1.3; font-weight: 650; letter-spacing: -0.01em; color: var(--text);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-.dash-row-sub { font-size: calc(13px * var(--ts)); color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dash-row-status { font-weight: 600; color: var(--text2); }
-.dash-row.todo .dash-row-status { color: var(--accent2); }
-.dash-row.waiting .dash-row-status { color: var(--yellow-text); }
-.dash-row-end { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.dash-row-total { font-size: calc(14.5px * var(--ts)); font-weight: 650; letter-spacing: -0.01em; color: var(--text); }
-.dash-row-date { font-size: calc(12.5px * var(--ts)); color: var(--text3); }
-.dash-row-chev { color: var(--text3); opacity: 0.7; }
 
-.dash-ring circle { fill: none; stroke: var(--border); stroke-width: 3.2; stroke-linecap: round; }
-.dash-ring circle.done { stroke: var(--accent); }
-.dash-ring circle.now { stroke: rgba(var(--accent-rgb), 0.4); }
-.dash-ring circle.bad { stroke: var(--risk); }
-.dash-ring circle.skip { stroke: var(--accent); opacity: 0.4; }
-.dash-ring text { font-size: calc(9.5px * var(--ts)); font-weight: 700; fill: var(--text2); font-family: 'Inter', sans-serif; font-feature-settings: 'tnum'; }
-.dash-ring .tick { fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The Jobs list: a card per job with its icon tile (the next document in
+   blue, amber while it waits on the client, a green tick when done), the
+   street and suburb on their own lines, how far along it is, and the next
+   step as a button along its foot. */
+.dash-cards { display: flex; flex-direction: column; gap: 12px; }
+.dash-card { border-radius: 16px; background: var(--surface); border: 1px solid var(--border); overflow: hidden; }
+.dash-card-main {
+  width: 100%; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; column-gap: 14px; row-gap: 10px; align-items: start;
+  padding: 13px 14px 12px; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.dash-card-main:active { background: var(--surface2); }
+.dash-card-main:focus-visible, .dash-card-act:focus-visible { outline: 3px solid rgba(var(--accent-rgb), 0.45); outline-offset: -3px; }
+.dash-card-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dash-card-street { font-size: calc(16px * var(--ts)); font-weight: 650; line-height: 1.25; letter-spacing: -0.01em; color: var(--text); overflow-wrap: anywhere; }
+.dash-card-suburb { font-size: calc(13.5px * var(--ts)); color: var(--text2); }
+.dash-card-sub { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: calc(13px * var(--ts)); color: var(--text3); }
+.dash-card.waiting .dash-card-sub > span:last-child { color: var(--yellow-text); font-weight: 600; }
+.dash-card.done:not(.declined) .dash-card-sub > span:last-child { color: var(--green); font-weight: 600; }
+.dash-card-tag {
+  padding: 2px 7px; border-radius: 6px; background: rgba(var(--accent-rgb), 0.12); color: var(--accent2);
+  font-size: calc(10.5px * var(--ts)); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.dash-card-tag.sample { background: rgba(var(--pink-rgb), 0.12); color: var(--pink-text); }
+.dash-card-end { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; padding-top: 1px; }
+.dash-card-when { font-size: calc(12.5px * var(--ts)); font-weight: 650; color: var(--text3); white-space: nowrap; }
+.dash-card-total { font-size: calc(14.5px * var(--ts)); font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dash-card-progress { grid-column: 1 / -1; display: flex; gap: 4px; }
+.dash-card-progress i { flex: 1; height: 5px; border-radius: 99px; background: var(--surface3); }
+.dash-card-progress i.done { background: var(--green-fill); }
+.dash-card-progress i.now { background: var(--accent); }
+.dash-card-progress i.bad { background: var(--risk); }
+.dash-card-progress i.skip { background: var(--border); }
+.dash-card-act {
+  width: 100%; min-height: 50px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 16px;
+  border: 0; border-top: 1px solid var(--accent-edge); background: var(--accent-wash); color: var(--accent2);
+  font: 700 calc(15px * var(--ts)) 'Inter', sans-serif; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.dash-card-act svg { flex: none; }
+.dash-card-act:active { background: var(--accent-pale); }
+.dash-card.waiting .dash-card-act { border-top-color: rgba(240,168,30,0.4); background: rgba(255,182,72,0.12); color: var(--yellow-text); }
+body:not(.dark-screen) .dash-card { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
+body.dark-screen .dash-card-act { border-top-color: var(--border2); background: rgba(var(--accent-rgb), 0.14); }
 
 .dash-none { margin: 0; padding: 36px 12px; text-align: center; font-size: calc(14px * var(--ts)); color: var(--text3); }
 .dash-empty { padding-top: 4px; }
-.dash-list.fade-in, .dash-none.fade-in { animation: dashFade 0.22s ease-out; }
+.dash-cards.fade-in, .dash-none.fade-in { animation: dashFade 0.22s ease-out; }
 @keyframes dashFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
 /* A job's sheet: address, its four steps as a timeline, the next step. */
@@ -3733,41 +3743,6 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 .dash-detail-section span + span { letter-spacing: 0; text-transform: none; font-size: calc(12.5px * var(--ts)); font-weight: 600; color: var(--text2); }
 
 /* The side line: numbered dots, ticked when done, joined by a line that fills in blue. */
-.dash-timeline { list-style: none; margin: 0; padding: 0; }
-.dash-timeline li { position: relative; padding: 0 0 10px 40px; }
-.dash-timeline li:last-child { padding-bottom: 0; }
-.dash-timeline li::before {
-  content: ''; position: absolute; left: 11px; top: 30px; bottom: 2px; width: 2px;
-  border-radius: 2px; background: var(--border);
-}
-.dash-timeline li:last-child::before { display: none; }
-.dash-timeline li.done::before { background: var(--accent); }
-.dash-timeline-dot {
-  position: absolute; left: 0; top: 8px; width: 24px; height: 24px; border-radius: 99px;
-  border: 2px solid var(--border); background: var(--surface); box-sizing: border-box;
-  display: flex; align-items: center; justify-content: center;
-  font-size: calc(11.5px * var(--ts)); font-weight: 700; color: var(--text3); font-variant-numeric: tabular-nums;
-}
-.dash-timeline li.done .dash-timeline-dot { background: var(--accent); border-color: var(--accent); color: #fff; }
-.dash-timeline li.now .dash-timeline-dot { border-color: var(--accent); color: var(--accent2); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.16); }
-.dash-timeline li.bad .dash-timeline-dot { background: var(--risk); border-color: var(--risk); color: #fff; }
-.dash-timeline li.skip .dash-timeline-dot { border-style: dashed; }
-.dash-timeline li.skip { opacity: 0.75; }
-.dash-timeline-btn {
-  position: relative; display: block; width: 100%; padding: 9px 36px 9px 12px;
-  border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer;
-  min-height: 52px; box-sizing: border-box; transition: border-color 0.15s, background 0.15s;
-}
-.dash-timeline li.now .dash-timeline-btn { border-color: rgba(var(--accent-rgb), 0.45); }
-.dash-timeline-btn:hover, .dash-timeline-btn:focus-visible { background: rgba(var(--accent-rgb), 0.06); border-color: rgba(var(--accent-rgb), 0.45); outline: none; }
-.dash-timeline-btn:active { background: rgba(var(--accent-rgb), 0.12); }
-.dash-timeline-chev { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text3); }
-.dash-timeline-label { display: block; font-size: calc(14.5px * var(--ts)); font-weight: 650; letter-spacing: -0.01em; color: var(--text); }
-.dash-timeline-text { display: block; margin-top: 2px; font-size: calc(13px * var(--ts)); font-weight: 500; color: var(--text3); }
-.dash-timeline li.done .dash-timeline-text { color: var(--accent2); }
-.dash-timeline li.now .dash-timeline-text { color: var(--text2); }
-.dash-timeline li.bad .dash-timeline-text { color: var(--risk); }
-.dash-timeline li.now .dash-timeline-label { color: var(--accent2); }
 
 .dash-detail-primary {
   width: 100%; min-height: 50px; border: 0; border-radius: 14px;
@@ -3787,17 +3762,10 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 }
 .dash-detail-links:empty { display: none; }
 
-/* Re-inspections due (js/reinspection.js): a calendar badge in the ring's place. */
-.reinspect-badge {
-  width: 36px; height: 36px; border-radius: 99px; display: flex; align-items: center; justify-content: center;
-  background: rgba(255,182,72,0.16); color: var(--yellow-text);
-}
-.reinspect-row.overdue .reinspect-badge { background: rgba(192,57,43,0.12); color: var(--risk); }
-.reinspect-row.reminded .reinspect-badge { background: rgba(var(--accent-rgb), 0.12); color: var(--accent2); }
-.reinspect-row .dash-row-status { color: var(--yellow-text); }
-.reinspect-row.overdue .dash-row-status { color: var(--risk); }
-.reinspect-row.reminded .dash-row-status { color: var(--accent2); }
-.reinspect-row .dash-row-total { font-size: calc(13.5px * var(--ts)); }
+/* Re-inspections due (js/reinspection.js): the status line in the tile's colour. */
+.reinspect-card .dash-card-sub > span { color: var(--yellow-text); font-weight: 600; }
+.reinspect-card.overdue .dash-card-sub > span { color: var(--risk); }
+.reinspect-card.reminded .dash-card-sub > span { color: var(--accent2); }
 .dash-detail-chip.overdue { background: rgba(192,57,43,0.12); color: var(--risk); }
 .dash-next .dash-detail-links { margin-top: 10px; }
 .reinspect-note { margin: 12px 2px 0; font-size: calc(13px * var(--ts)); line-height: 1.5; color: var(--text3); }
@@ -3853,7 +3821,7 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 
 @media (prefers-reduced-motion: reduce) {
   .dashboard-panel, .dash-tab-line, .dash-detail-sheet { transition: none; }
-  .dash-list.fade-in, .dash-none.fade-in { animation: none; }
+  .dash-cards.fade-in, .dash-none.fade-in, .dash-start.fade-in, .dash-sample.fade-in { animation: none; }
 }
 
 .asb-banner {
@@ -5368,7 +5336,6 @@ body:not(.dark-screen) .dash-tabs.searching .dash-tab.active { color: var(--on-i
 body:not(.dark-screen) .dash-tab-line { background: var(--accent-glow); box-shadow: 0 0 10px rgba(var(--glow-hi),0.6); }
 body:not(.dark-screen) .dash-none,
 body:not(.dark-screen) .dash-search,
-body:not(.dark-screen) .dash-list { border-color: transparent; box-shadow: 0 14px 36px rgba(0,0,0,0.35); }
 body:not(.dark-screen) .sidebar:not(.on-page) .drawer-group-label { color: var(--accent-glow); }
 body:not(.dark-screen) .sidebar:not(.on-page) .drawer-group-label::after { background: linear-gradient(90deg, rgba(var(--glow-hi),0.6), rgba(var(--glow-hi),0)); }
 body:not(.dark-screen) .sidebar:not(.on-page) .drawer-legal,
@@ -5744,6 +5711,7 @@ body:not(.dark-screen) .job-page #jobPanel { border-color: transparent; box-shad
 }
 .job-tile.done { background: var(--green-wash); border-color: var(--green-edge); color: var(--green); }
 .job-tile.now { background: var(--accent-grad); border-color: transparent; color: #fff; box-shadow: 0 6px 16px rgba(var(--accent-rgb), 0.35); }
+.job-tile.wait { background: rgba(255,182,72,0.16); border-color: rgba(240,168,30,0.45); color: var(--yellow-text); }
 .job-tile.bad { background: rgba(192,57,43,0.1); border-color: rgba(192,57,43,0.3); color: var(--risk); }
 .job-tile.skip { background: transparent; border-style: dashed; }
 .job-tile-tick {
@@ -5807,15 +5775,15 @@ body:not(.dark-screen) .job-progress i.bad { background: #FF5A4F; }
 body:not(.dark-screen) .job-progress i.skip { background: rgba(255,255,255,0.07); }
 body:not(.dark-screen) .job-act { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.16); color: var(--on-ink); }
 body:not(.dark-screen) .job-act svg { color: var(--accent-glow); }
-body:not(.dark-screen) .job-step,
+body:not(.dark-screen) .job-page .job-step,
 body:not(.dark-screen) .job-pdf,
 body:not(.dark-screen) .job-details { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
-body:not(.dark-screen) .job-steps li.now .job-step { border-color: var(--accent-hi); }
-body:not(.dark-screen) .job-steps li:not(:last-child)::after { background: rgba(255,255,255,0.2); }
-body:not(.dark-screen) .job-steps li.done:not(:last-child)::after { background: var(--green-fill); }
+body:not(.dark-screen) .job-page .job-steps li.now .job-step { border-color: var(--accent-hi); }
+body:not(.dark-screen) .job-page .job-steps li:not(:last-child)::after { background: rgba(255,255,255,0.2); }
+body:not(.dark-screen) .job-page .job-steps li.done:not(:last-child)::after { background: var(--green-fill); }
 /* Touch keeps hover after a tap: a card keeps its white. */
-body:not(.dark-screen) .job-step:hover { background: var(--surface); }
-body:not(.dark-screen) .job-step:active { background: var(--surface2); }
+body:not(.dark-screen) .job-page .job-step:hover { background: var(--surface); }
+body:not(.dark-screen) .job-page .job-step:active { background: var(--surface2); }
 
 /* Dark screen: tinted tiles, and the amber frame round Job details. */
 body.dark-screen .job-tile.done { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.35); }
@@ -5862,8 +5830,6 @@ body:not(.dark-screen) .doc-strip-bar { background: var(--ink); }
   border-color: rgba(var(--green-rgb), 0.35);
 }
 .agr-signed-chip { background: rgba(var(--green-rgb), 0.16); color: var(--green); }
-body:not(.dark-screen) .job-steps li.done .dash-timeline-dot { background: var(--green-fill); border-color: var(--green-fill); color: #052E14; }
-body:not(.dark-screen) .job-steps li.done::before { background: var(--green-fill); }
 body:not(.dark-screen) .doc-chip.done::after { background: var(--green-fill); }
 ::selection { background: rgba(var(--pink-rgb), 0.28); }
 
@@ -6016,12 +5982,21 @@ body.dark-screen .chem-rate-val.none { color: var(--yellow); }
   font: inherit; font-size: calc(14px * var(--ts)); font-weight: 650; color: var(--accent2); text-decoration: underline; text-underline-offset: 3px;
 }
 /* The tag on its row in Jobs. */
-.dash-row-sample {
-  display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 99px; vertical-align: 1px;
-  background: rgba(var(--pink-rgb), 0.12); color: var(--pink-text);
-  font-size: calc(10.5px * var(--ts)); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+/* An empty Jobs list starts the first job, and offers the sample. */
+.dashboard-panel-body.no-jobs .dash-tabs, .dashboard-panel-body.no-jobs .dash-search { display: none; }
+.dash-start {
+  padding: 18px 16px 16px; border-radius: 16px; background: var(--surface); border-top: 3px solid var(--accent);
+  box-shadow: 0 14px 36px rgba(0,0,0,0.25);
 }
-/* An empty Jobs list offers the sample. */
+.dash-start .job-tile { width: 48px; height: 48px; border-radius: 14px; margin-bottom: 12px; }
+.dash-start-title { margin: 0; font: 700 calc(19px * var(--ts))/1.2 'Space Grotesk', sans-serif; letter-spacing: -0.02em; color: var(--text); }
+.dash-start-text { margin: 6px 0 14px; font-size: calc(14px * var(--ts)); line-height: 1.55; color: var(--text2); text-wrap: pretty; }
+.dash-start + .dash-sample { margin-top: 12px; }
+.dash-sample-btn {
+  width: 100%; min-height: 48px; border-radius: 12px; border: 1px solid var(--border2); background: var(--surface2); color: var(--text);
+  font: 650 calc(15px * var(--ts)) 'Inter', sans-serif; cursor: pointer;
+}
+.dash-start.fade-in { animation: dashFade 0.22s ease-out; }
 .dash-sample {
   padding: 18px 16px 16px; border-radius: 16px; background: var(--surface); border-top: 3px solid var(--pink);
   box-shadow: 0 14px 36px rgba(0,0,0,0.25);

@@ -86,7 +86,7 @@ let shotN = 0;
     const pages = (s.match(/\/Type \/Page\b/g) || []).length, stamps = (s.match(/\(SAMPLE\) Tj/g) || []).length;
     check(pages > 0 && stamps === pages, `${n} PDF: SAMPLE on all ${pages} pages (${stamps})`);
   });
-  await tap(p.locator('#jobOverlay .dash-timeline-btn', { hasText: 'Quote' }), 'Quote step'); await p.waitForTimeout(1200); await shot('quote');
+  await tap(p.locator('#jobOverlay .job-step', { hasText: 'Quote' }), 'Quote step'); await p.waitForTimeout(1200); await shot('quote');
   const guide = await p.evaluate(() => document.getElementById('quoteScreen').innerText);
   check(!/Check \d+ prices?|Set the service period/.test(guide), 'the sent quote asks for nothing more: no prices to check, a service period set');
   await tap(p.locator('#quotePdfBtn'), 'quote PDF'); await p.waitForTimeout(2500);
@@ -122,7 +122,7 @@ let shotN = 0;
   check(!elsewhere.due, 'the sample is not on the Due list');
   await p.evaluate(() => { openDashboard(); }); await p.waitForTimeout(800); await shot('jobs-with-sample');
   check(/Sample/.test(await p.evaluate(() => document.getElementById('dashboardJobs').innerText)), 'the Jobs row is tagged Sample');
-  check(/Your jobs will show up here/.test(await p.evaluate(() => document.querySelector('.dash-hero-title').textContent)), 'with only the sample, Jobs still says your jobs will show up here');
+  check(/No jobs yet/.test(await p.evaluate(() => document.querySelector('.dash-hero-title').textContent)), 'with only the sample, Jobs still says there are no jobs yet');
 
   // 5. Reload keeps it; remove it; the empty list and the menu bring it back.
   await p.reload(); await p.waitForTimeout(3000);

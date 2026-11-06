@@ -122,7 +122,7 @@ let shotN = 0;
   check(!elsewhere.due, 'the sample is not on the Due list');
   await p.evaluate(() => { openDashboard(); }); await p.waitForTimeout(800); await shot('jobs-with-sample');
   check(/Sample/.test(await p.evaluate(() => document.getElementById('dashboardJobs').innerText)), 'the Jobs row is tagged Sample');
-  check(/Your jobs will show up here/.test(await p.evaluate(() => document.querySelector('.dash-hero-title').textContent)), 'with only the sample, Jobs still says your jobs will show up here');
+  check(/No jobs yet/.test(await p.evaluate(() => document.querySelector('.dash-hero-title').textContent)), 'with only the sample, Jobs still says there are no jobs yet');
 
   // 5. Reload keeps it; remove it; the empty list and the menu bring it back.
   await p.reload(); await p.waitForTimeout(3000);

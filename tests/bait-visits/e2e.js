@@ -76,10 +76,10 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
 
   // 1. The job knows about the stations: the first check is due 4 weeks
   // after the install, so this job is back in To do.
-  const j0 = await p.evaluate(() => { const j = dashboardJob(getSavedReports()[0], getSavedQuotes()); return { group: j.group, status: j.status, next: j.next && j.next.to, steps: j.steps.map(s => `${s.label}:${s.state}:${s.text}`), ring: dashboardRing(j.steps, j.group).includes('/5') }; });
+  const j0 = await p.evaluate(() => { const j = dashboardJob(getSavedReports()[0], getSavedQuotes()); return { group: j.group, status: j.status, next: j.next && j.next.to, steps: j.steps.map(s => `${s.label}:${s.state}:${s.text}`), bars: (dashCardHTML(j).match(/<i class=/g) || []).length }; });
   console.log('job before any visit:', JSON.stringify(j0));
   check(j0.group === 'todo' && /First bait station check due/.test(j0.status) && j0.next === 'bait', 'a baiting job with no visit yet is in To do, first check due');
-  check(j0.steps.length === 5 && /Bait station visits:now:First check due .*overdue/.test(j0.steps[4]) && j0.ring, 'the job has a fifth stage, Bait station visits, and the ring counts 5');
+  check(j0.steps.length === 5 && /Bait station visits:now:First check due .*overdue/.test(j0.steps[4]) && j0.bars === 6, 'the job has a fifth stage, Bait station visits, and its Jobs card shows six steps with the agreement');
   const strip = await p.evaluate(() => [...document.querySelectorAll('#quoteScreen .doc-strip .doc-chip')].map(c => c.textContent.trim()));
   check(strip.includes('Bait visits'), 'the document strip gains Bait visits: ' + strip.join(', '));
   await p.evaluate(() => document.getElementById('qpBait').scrollIntoView({ block: 'center' })); await shot('bait-card');

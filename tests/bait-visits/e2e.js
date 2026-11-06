@@ -178,7 +178,7 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   // 8. The job page shows the stage; the dashboard peek lists the visits.
   await p.evaluate(() => { jobGo('job'); });
   await p.waitForTimeout(600); await shot('job-page');
-  const jp = await p.evaluate(() => [...document.querySelectorAll('#jobOverlay .job-steps li')].map(li => li.className + ':' + li.querySelector('.dash-timeline-label').textContent + ':' + li.querySelector('.dash-timeline-text').textContent));
+  const jp = await p.evaluate(() => [...document.querySelectorAll('#jobOverlay .job-steps li')].map(li => li.className + ':' + li.querySelector('.job-step-label').firstChild.textContent + ':' + li.querySelector('.job-step-text').textContent));
   console.log('job page steps:', JSON.stringify(jp));
   check(jp.length === 6 && /Bait station visits:Visit report not emailed yet/.test(jp[5]), 'the job page lists Bait station visits after Treatment');
   await p.evaluate(() => { closeJobPage(); openDashboard(); openDashboardDetail(getSavedReports()[0].id); openDashboardPeek(getSavedReports()[0].id, 'bait'); });

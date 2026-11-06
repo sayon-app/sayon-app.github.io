@@ -81,7 +81,7 @@ let shotN = 0;
   check(/Banksia/.test(job.hero), 'the job page shows the address as it is typed');
 
   // 3. The report, opened from the job page's steps, and the agreement.
-  await tap(p.locator('#jobOverlay .dash-timeline-btn', { hasText: 'Report' }), 'Report step on the job page'); await p.waitForTimeout(800); await shot('report');
+  await tap(p.locator('#jobOverlay .job-step', { hasText: 'Report' }), 'Report step on the job page'); await p.waitForTimeout(800); await shot('report');
   await tap(p.locator('#agreementBannerBtn'), 'Get it signed'); await p.waitForTimeout(800); await shot('agreement-open');
   const agFields = await p.evaluate(() => [...document.querySelectorAll('#agreementOverlay input, #agreementOverlay textarea, #agreementOverlay select')].filter(e => e.offsetParent).map(e => `${e.id}=${e.value}`));
   console.log('agreement fields:', agFields.join(' | '));

@@ -86,7 +86,7 @@ let shotN = 0;
     const pages = (s.match(/\/Type \/Page\b/g) || []).length, stamps = (s.match(/\(SAMPLE\) Tj/g) || []).length;
     check(pages > 0 && stamps === pages, `${n} PDF: SAMPLE on all ${pages} pages (${stamps})`);
   });
-  await tap(p.locator('#jobOverlay .dash-timeline-btn', { hasText: 'Quote' }), 'Quote step'); await p.waitForTimeout(1200); await shot('quote');
+  await tap(p.locator('#jobOverlay .job-step', { hasText: 'Quote' }), 'Quote step'); await p.waitForTimeout(1200); await shot('quote');
   const guide = await p.evaluate(() => document.getElementById('quoteScreen').innerText);
   check(!/Check \d+ prices?|Set the service period/.test(guide), 'the sent quote asks for nothing more: no prices to check, a service period set');
   await tap(p.locator('#quotePdfBtn'), 'quote PDF'); await p.waitForTimeout(2500);

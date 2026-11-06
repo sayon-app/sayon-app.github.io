@@ -50,3 +50,7 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 ## Full chain
 
 `tests/full-chain/e2e.js <outDir> [width]` runs a whole job by tapping the real buttons on a phone: business setup, job details on the dashboard, the agreement signed on the phone, a typed note filled by a canned AI, the after-fill fixes, sign-off, the report sent, the quote sent, the client's accepted answer with a signature, the treatment record, the certificate emailed, then a reload. It checks that areas a finding names aren't marked "nothing found", that PDF file names keep the whole address, and that nothing is lost on reload. It writes a screenshot per step and the PDFs that were emailed to `<outDir>`. Run it at 390 and 320.
+
+## Job page
+
+`tests/visual/job-page.js <outDir> [width]` shoots This job at five points (a new job, waiting on the agreement, quote sent, quote accepted, the finished sample job) in light and dark, at the top and in full. Before and after shots from the 2026-11-06 clean-up are in `docs/screenshots/job-page/`.

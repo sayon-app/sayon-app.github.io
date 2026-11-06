@@ -5557,11 +5557,14 @@ function syncSelectCards(id) {
   panel.dataset.value = sel.value;
   const hadFocus = panel.contains(document.activeElement);
   const opts = [...sel.options].filter(o => o.value);
-  panel.innerHTML = `<div class="choice-grid" style="--cols:${SELECT_CARDS[id].cols}">${opts.map(o => `
+  // "Pre-Purchase — Timber Pest" reads as Pre-Purchase over Timber Pest.
+  panel.innerHTML = `<div class="choice-grid" style="--cols:${SELECT_CARDS[id].cols}">${opts.map(o => {
+    const [main, sub] = o.textContent.split(' — ');
+    return `
     <label class="choice-card tone-neutral">
       <input type="radio" class="sr-only" name="cards-${id}" value="${escapeHtml(o.value)}"${sel.value === o.value ? ' checked' : ''}>
-      <span class="choice-card-code">${escapeHtml(o.textContent)}</span>
-    </label>`).join('')}</div>`;
+      <span class="choice-card-code">${escapeHtml(main)}</span>${sub ? `<span class="choice-card-desc">${escapeHtml(sub)}</span>` : ''}
+    </label>`; }).join('')}</div>`;
   if (hadFocus) { const c = panel.querySelector('input:checked'); if (c) c.focus({ preventScroll: true }); }
 }
 
@@ -9098,10 +9101,11 @@ function renderJobPage() {
   parkJobPanel();
   const j = currentJobSummary();
   const addr = (j.r.address || '').trim();
+  // No street address yet: a new job, still being filled in.
+  const isNew = !(document.getElementById('jobAddress').value || '').trim();
   const steps = jobPageSteps(j);
   // Before the agreement is signed, that is the next step.
   const next = !reportData.agreement && addr ? { status: 'Get the agreement signed', hint: 'The client signs it before the inspection starts.', next: { label: 'Open the agreement', to: 'agreement' } }
-    : !addr ? { status: 'Start the job', hint: 'Type the address and the client\'s name below, get the agreement signed, then tap the mic and talk through the inspection.', next: null }
     : j.finished && !reportData.jobPdfAt && typeof jobPdfSectionHTML === 'function' ? {
         status: 'Finalise the job',
         hint: j.onlyReportUnsent
@@ -9133,11 +9137,13 @@ function renderJobPage() {
   const nextIcon = next.next ? (next.next.to.startsWith('jobpdf') ? 'jobpdf' : next.next.to) : j.group === 'done' && addr ? 'tick' : !addr ? 'details' : 'clock';
   const chev = '<svg class="icon job-step-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
   const group = (DASHBOARD_TABS.find(([k]) => k === j.group) || [, ''])[1];
-  // A redraw while the page is open keeps Job details as they were.
+  // A redraw while the page is open keeps Job details as they were. A new
+  // job's details are the page itself: Property, Client and Booking cards.
   const fold = document.getElementById('jobDetailsFold');
-  const detailsOpen = !addr || !!(fold && fold.open && document.getElementById('jobOverlay').classList.contains('open'));
+  const detailsOpen = isNew || !!(fold && fold.open && document.getElementById('jobOverlay').classList.contains('open'));
+  document.getElementById('jobOverlay').classList.toggle('new-job', isNew);
   const detailsHTML = `
-    <details class="job-details" id="jobDetailsFold"${detailsOpen ? ' open' : ''}>
+    <details class="job-details${isNew ? ' new' : ''}" id="jobDetailsFold"${detailsOpen ? ' open' : ''}>
       <summary class="job-details-head" id="jobDetailsHead">
         <span class="job-tile" aria-hidden="true">${jobIcon('details', 20)}</span>
         <span class="job-step-main">
@@ -9148,6 +9154,35 @@ function renderJobPage() {
       </summary>
       <div id="jobPageSlot"></div>
     </details>`;
+  const stepsHTML = `
+    <div class="job-section-head">Job steps</div>
+    ${jobStepsHTML(j, steps, st => `jobGo('${st.to}')`)}`;
+  // A new job: what to fill in, the form, then the agreement as the next step.
+  if (isNew) {
+    body.innerHTML = `
+    <div class="job-hero new">
+      <div class="job-hero-eyebrow">${escapeHtml(eyebrow || new Date().toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }))}</div>
+      <h3 class="job-hero-addr">New job</h3>
+      <p class="job-hero-sub">Fill in the property and the client. The rest can wait.</p>
+      <p class="job-hero-tip"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v4"/></svg><span>Or tap the mic and say the address and the client's name.</span></p>
+    </div>
+    ${detailsHTML}
+    <section class="dash-next job-next job-next-new">
+      <div class="job-next-head">
+        <span class="job-tile now" aria-hidden="true">${jobIcon('agreement', 22)}</span>
+        <div>
+          <div class="dash-next-label">Next step</div>
+          <div class="dash-next-title">Get the agreement signed</div>
+        </div>
+      </div>
+      <p class="dash-next-hint">The client signs it before you start. Then tap the mic and talk through the inspection.</p>
+      <button type="button" class="dash-detail-primary" onclick="jobNewAgreement()">Open the agreement</button>
+      <div class="dash-detail-links"><button type="button" onclick="saveJobNow(true)">Save it for later</button></div>
+    </section>
+    ${stepsHTML}`;
+    document.getElementById('jobPageSlot').appendChild(document.getElementById('jobPanel'));
+    return;
+  }
   body.innerHTML = `
     ${isSampleJob(currentReportId) && typeof sampleJobNoteHTML === 'function' ? sampleJobNoteHTML() : ''}
     <div class="job-hero ${j.group}">
@@ -9170,11 +9205,9 @@ function renderJobPage() {
       ${next.next ? `<button type="button" class="dash-detail-primary" onclick="jobGo('${next.next.to}')">${next.next.label}</button>` : ''}
       ${skipLink ? `<div class="dash-detail-links">${skipLink}</div>` : ''}
     </section>
-    ${addr ? '' : detailsHTML}
-    <div class="job-section-head">Job steps</div>
-    ${jobStepsHTML(j, steps, st => `jobGo('${st.to}')`)}
+    ${stepsHTML}
     ${typeof jobPdfSectionHTML === 'function' ? jobPdfSectionHTML() : ''}
-    ${addr ? detailsHTML : ''}`;
+    ${detailsHTML}`;
   const panel = document.getElementById('jobPanel');
   if (panel) document.getElementById('jobPageSlot').appendChild(panel);
 }
@@ -9211,6 +9244,28 @@ function jobGo(to) {
     const btn = document.querySelector('#quoteAnswer .qp-cert-email');
     if (btn) { btn.scrollIntoView({ block: 'center' }); btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 2400); }
   }
+}
+
+// A new job's next step: the agreement, once there's an address to put on it.
+function jobNewAgreement() {
+  if (!document.getElementById('jobAddress').value.trim()) { askForJobAddress(); return; }
+  jobGo('agreement');
+}
+
+function askForJobAddress() {
+  showToast('Type the property address first', 'error');
+  const el = document.getElementById('jobAddress');
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.focus({ preventScroll: true });
+}
+
+// Save from the job's details. later: a job booked ahead, so it goes to the
+// Jobs list to come back to on the day.
+function saveJobNow(later) {
+  if (!document.getElementById('jobAddress').value.trim()) { askForJobAddress(); return; }
+  if (!saveCurrentReport(true)) return;
+  showToast(later ? 'Saved to your jobs' : 'Job saved', 'success');
+  if (later) tabGo('dashboard'); else refreshDashboardIfOpen();
 }
 
 // The strip at the top of the report and the quote: back to the job's page,
@@ -9665,6 +9720,32 @@ async function pickAddressSuggestion(i) {
   if (a.location) reportData.siteLocation = a.location;
   updateJob();
   if (a.location && inspectionIsToday()) fillWeather({ quiet: true });
+}
+
+// The state a postcode belongs to, by Australia Post's ranges, or ''.
+function stateForPostcode(pc) {
+  if (!/^\d{4}$/.test(pc || '')) return '';
+  const n = +pc;
+  if ((n >= 200 && n <= 299) || (n >= 2600 && n <= 2618) || (n >= 2900 && n <= 2920)) return 'ACT';
+  if (n >= 800 && n <= 999) return 'NT';
+  if (n >= 1000 && n <= 2999) return 'NSW';
+  if ((n >= 3000 && n <= 3999) || (n >= 8000 && n <= 8999)) return 'VIC';
+  if ((n >= 4000 && n <= 4999) || (n >= 9000 && n <= 9999)) return 'QLD';
+  if (n >= 5000 && n <= 5999) return 'SA';
+  if (n >= 6000 && n <= 6999) return 'WA';
+  if (n >= 7000 && n <= 7999) return 'TAS';
+  return '';
+}
+
+// A typed postcode fills in the state: when none is picked yet, or the
+// picked one came from an earlier postcode. A state tapped by hand stays.
+function onPostcodeTyped(el) {
+  const digits = el.value.replace(/\D/g, '').slice(0, 4);
+  if (digits !== el.value) el.value = digits;
+  const st = stateForPostcode(digits);
+  const sel = document.getElementById('jobState');
+  if (st && sel && (!sel.value || sel.value === sel.dataset.auto)) { sel.value = st; sel.dataset.auto = st; }
+  updateJob();
 }
 
 // ── WEATHER ON THE DAY ───────────────────────────────────────────────────
@@ -12062,7 +12143,10 @@ function updateSyncStatus(state) {
   }
   if (state === 'saved' || lastLocalSaveAt) {
     el.classList.add('saved');
-    textEl.textContent = (typeof authSession !== 'undefined' && authSession)
+    // A job with no address yet is only a draft on the phone.
+    const street = (document.getElementById('jobAddress') || {}).value;
+    textEl.textContent = !(street || '').trim() ? 'Kept on this phone until the address is in'
+      : (typeof authSession !== 'undefined' && authSession)
       ? 'Saved & syncing to your account'
       : 'Saved on this device';
     return;
@@ -12403,6 +12487,7 @@ function saveCurrentReport(quiet) {
     lastLocalSaveAt = Date.now();
     updateSyncStatus('saved');
     supabaseSave(entry); // background cloud sync — non-blocking
+    return true;
   }
 }
 
@@ -12805,12 +12890,13 @@ function lastInspectorDetails() {
   };
 }
 
-function newReport() {
+// quiet: the page that opens already says it's a new job.
+function newReport(quiet) {
   saveOpenReportNow();
   track('report_started');
   startBlankReport();
   refreshDashboardIfOpen();
-  showToast('New report started', 'info');
+  if (!quiet) showToast('New report started', 'info');
 }
 
 // Empties the screen for a new job. Doesn't save the one that was open.
@@ -12824,6 +12910,7 @@ function startBlankReport() {
   document.getElementById('jobAddress').value = '';
   document.getElementById('jobSuburb').value = '';
   document.getElementById('jobState').value = '';
+  delete document.getElementById('jobState').dataset.auto;
   document.getElementById('jobPostcode').value = '';
   document.getElementById('jobClient').value = '';
   const lastInspector = lastInspectorDetails();
@@ -13148,13 +13235,15 @@ function dashCardHTML(j) {
     </div>`;
 }
 
-// New job from the Jobs list: the open job is saved, the screen emptied,
-// and the job page opens on its details.
-function newJobFromJobs() {
+// New job, from the Jobs list, the job page or the menu: the open job is
+// saved, the screen emptied, and the job page opens with the address ready
+// to type.
+function startNewJob() {
   if (document.getElementById('app').style.display !== 'flex') openApp('inspect');
-  closeDashboard();
-  newReport();
-  openJobPage();
+  newReport(true);
+  tabGo('job');
+  const addr = document.getElementById('jobAddress');
+  if (addr) addr.focus({ preventScroll: true });
 }
 
 function renderDashboard() {
@@ -13236,7 +13325,7 @@ function renderDashboardJobs(fade) {
       <span class="job-tile now" aria-hidden="true">${jobIcon('details', 22)}</span>
       <p class="dash-start-title">Start your first job</p>
       <p class="dash-start-text">Type the address, get the agreement signed, then tap the mic and talk through the inspection. The job shows up here.</p>
-      <button type="button" class="dash-detail-primary" onclick="newJobFromJobs()">New job</button>
+      <button type="button" class="dash-detail-primary" onclick="startNewJob()">New job</button>
     </div>
     ${typeof openSampleJob === 'function' ? `<div class="dash-sample${fade ? ' fade-in' : ''}">
       <p class="dash-sample-title">Or see a finished job first</p>

@@ -1262,6 +1262,7 @@ function placeTalkPhotos() {
   for (const p of waiting) {
     const text = p.heard.text || heardAround(p.heard.at);
     const f = findingForHeard(text, findings);
+    saveTestEvent('talk-photo', text, { placedOn: f ? [f.activityLocation, f.timberAffected].filter(Boolean).join(', ') : null, caption: f && !p.caption ? talkCaption(text, f) : (p.caption || null) });
     if (!f) continue;
     const section = findingPhotoSection(f.id);
     if (getSectionPhotos(section).length >= sectionPhotoLimit(section)) continue;
@@ -2652,6 +2653,17 @@ function correctKnownMishearings(text) {
   fix(/\bcordon\b(?=\s+(?:physical\s+|termite\s+)*barrier\b)/gi, 'Kordon');
   fix(/\bbats\b(?=\s+(?:laid|lying|covering|over (?:the\s+)?(?:ceiling|joists|top plates|everything)|(?:are|were|get|have been)\s+(?:re)?moved)\b)/gi, 'batts');
   fix(/\binsulation bats\b/gi, 'insulation batts');
+  // Full-coverage car test, 5 Nov 2026. Each has no sensible literal reading
+  // in an inspection, or is fixed only in the phrase it was heard in.
+  fix(/\btermite or foam\b/gi, 'Termidor Foam');
+  fix(/\bultra ?set\b/gi, 'Altriset');
+  fix(/\bthermal track\b/gi, 'Termatrac');
+  fix(/\bacid nasiformis\b/gi, 'acinaciformis');
+  fix(/\brepurchase\b(?=\s+(?:timber\s+)?pest\b)/gi, 'pre-purchase');
+  fix(/\bferry fibrous\b/gi, 'furry fibrous');
+  fix(/\bdrainings\b/gi, 'drainage');
+  fix(/\bbathroom ward\b/gi, 'bathroom wall');
+  text = text.replace(/\b(slab edge)\.?\s+of the extinction\b/gi, '$1 of the extension');
   // "soil barrier" lost its first letter at a phrase break ("Oil barrier").
   text = text.replace(/(^|[.!?]\s+|\bchemical\s+)oil barrier\b/gi, (m, pre) => pre + (/^\s*$|[.!?]\s*$/.test(pre) ? 'Soil' : 'soil') + ' barrier');
   // Subfloor clearance is always millimetres; "400ml", "400 mil".
@@ -2673,7 +2685,7 @@ function correctKnownMishearings(text) {
 // contextual reasoning, which can see the whole sentence.
 const TRANSCRIPTION_VOCAB = [
   'Kordon', 'Termidor', 'Altriset', 'Premise', 'Bifenthrin', 'Biflex',
-  'Exterra', 'Sentricon', 'Trelona', 'Termimesh',
+  'Exterra', 'Sentricon', 'Trelona', 'Termimesh', 'Termatrac',
   'Coptotermes', 'Schedorhinotermes', 'Nasutitermes', 'Cryptotermes',
 ];
 
@@ -2736,6 +2748,7 @@ async function suggestTranscriptCleanup() {
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
     if (!parsed || typeof parsed.cleaned !== 'string') throw new Error('Unexpected response shape');
     cleanupSuggestion = parsed;
+    saveTestEvent('cleanup', currentTranscript, { cleaned: parsed.cleaned, hasUncertainSections: !!parsed.hasUncertainSections });
     showCleanupSuggestion(parsed);
   } catch (err) {
     const reason = ((err && err.message) ? String(err.message) : 'unknown error').slice(0, 140);
@@ -2937,6 +2950,7 @@ async function tryServerSideTranscription(blob, before) {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (!data || typeof data.transcript !== 'string' || !data.transcript.trim()) throw new Error('Unexpected response shape');
+    saveTestEvent('other-version', data.transcript.trim(), { onDevice: currentTranscript.slice((before || '').length).trim() });
     showServerTranscriptionSuggestion(data.transcript.trim(), before);
   } catch (err) {
     console.warn('Server-side transcription unavailable this recording — keeping the on-device transcript:', err && err.message);
@@ -3153,7 +3167,7 @@ function whisperApply() {
     let text = (entry.text || '').trim();
     if (!text || WHISPER_NOISE_RE.test(text)) continue;
     if (entry.epoch !== voiceJobEpoch) { showToast('You changed job before the last words came back, so they were left out', 'info'); continue; }
-    text = correctKnownMishearings(text);
+    text = correctHeard(text);
     const stopAt = text.search(VOICE_STOP_LIVE_RE);
     if (stopAt >= 0) text = text.slice(0, stopAt).trim();
     if (text) { currentTranscript += text + ' '; speechHeard(text); }
@@ -3276,7 +3290,7 @@ function startRecording() {
           if (typeof conf === 'number' && conf > 0 && conf < 0.6) {
             lowConfidenceFlagged = true;
           }
-          finalChunk = correctKnownMishearings(finalChunk);
+          finalChunk = correctHeard(finalChunk);
           // Cut from the stop words on, again if the phone repeated them.
           for (let stopAt; (stopAt = finalChunk.search(VOICE_STOP_RE)) >= 0;) { finalChunk = finalChunk.slice(0, stopAt); stopByVoice = true; }
           if (finalChunk.trim()) final += finalChunk.trim() + ' ';
@@ -3329,7 +3343,7 @@ function startRecording() {
     };
     recognition.onend = () => {
       if (!isRecording) return;
-      let kept = correctKnownMishearings(pendingInterim).trim();
+      let kept = correctHeard(pendingInterim).trim();
       pendingInterim = '';
       if (kept) {
         const stopAt = kept.search(VOICE_STOP_RE);
@@ -3784,12 +3798,14 @@ async function requestExtraction(text) {
     const parsed = await callExtraction(text);
     track('note_filled', { seconds: seconds(), words: text.split(/\s+/).filter(Boolean).length });
     saveTestNote(text, parsed, null, seconds());
+    flushTestHeard('report');
     return parsed;
   } catch (err) {
     const reason = err.kept ? 'kept_for_later' : err.noSignal ? 'no_signal' : err.tooLong ? 'too_long' : err.badAnswer ? 'bad_answer'
       : err.status ? 'http_' + err.status : 'other';
     track('note_failed', { reason, seconds: seconds() });
     saveTestNote(text, null, reason, seconds());
+    flushTestHeard('report');
     if (!err.noSignal && ![401, 402, 429].includes(err.status)) reportError(new Error('Extraction failed: ' + reason), 'extraction');
     throw err;
   }
@@ -3996,6 +4012,7 @@ function learnFieldCorrection(key, value) {
   }
   fill.cid = entry.id;
   storeLearned(l);
+  saveTestEvent('field-fix', entry.said || `${entry.label}: ${entry.ai}`, { key, label: entry.label, ai: entry.ai, fixed: entry.fixed });
 }
 
 // Where two transcripts differ, word by word: [{ from: [words], to: [words],
@@ -4048,6 +4065,7 @@ function wordFixesFromEdit(heardText, typedText) {
 
 function learnWordFixes(fixes) {
   if (!fixes.length) return;
+  saveTestEvent('word-fix', fixes.map(f => `${f.heard} → ${f.meant}`).join('\n'), { fixes });
   const l = getLearned();
   fixes.forEach(f => {
     const have = l.words.find(w => w.heard === f.heard);
@@ -4201,6 +4219,38 @@ function saveTestNote(transcript, extraction, problem, seconds) {
     headers: getAuthHeaders({ 'Prefer': 'return=minimal' }),
     body: JSON.stringify({ transcript: String(transcript).slice(0, 100000), extraction, problem, seconds }),
   }).catch(() => {});
+}
+
+// Everything else Test mode saves, in the same table: each row's extraction
+// carries a "kind" saying where it came from, so a report note (no kind)
+// reads as it always has. Kinds: agreement, treatment, bait (Say it instead
+// on those sheets), heard (what the speech service heard, before the app's
+// own word fixes), fill-summary (what the sheet after a fill said and read
+// aloud), cleanup (the AI's suggested transcript fixes), other-version (the
+// server's version of a recording), word-fix and field-fix (a correction
+// the inspector made), talk-photo (a photo placed on a finding from speech),
+// plate-photo and photo-id (what the AI read from a photo, never the photo),
+// treatment-plan (the AI's plan for the quote).
+function saveTestEvent(kind, transcript, data, problem, seconds) {
+  if (!testModeOn()) return;
+  const text = String(transcript == null ? '' : transcript).trim();
+  if (!text) return;
+  saveTestNote(text, Object.assign({ kind }, data || {}), problem || null, seconds == null ? null : seconds);
+}
+
+// The words as the speech service heard them, before correctKnownMishearings,
+// gathered until the next note is filled. Only kept while Test mode is on.
+let testHeardRaw = [];
+function correctHeard(raw) {
+  const fixed = correctKnownMishearings(raw);
+  if (raw && String(raw).trim() && testModeOn()) testHeardRaw.push({ raw: String(raw).trim(), fixed: String(fixed || '').trim() });
+  return fixed;
+}
+function flushTestHeard(source) {
+  if (!testHeardRaw.length) return;
+  const heard = testHeardRaw; testHeardRaw = [];
+  const changed = heard.filter(h => h.raw !== h.fixed);
+  saveTestEvent('heard', heard.map(h => h.raw).join(' '), { source, phrases: heard.length, fixed: changed });
 }
 
 function toggleTestMode() {
@@ -4621,6 +4671,9 @@ function showExtractSummary(before) {
   const readBtn = document.getElementById('extractReadBackBtn');
   if (readBtn) { readBtn.hidden = !('speechSynthesis' in window); readBtn.textContent = 'Read it back'; }
   overlay.classList.add('open');
+  if (testModeOn()) {
+    try { saveTestEvent('fill-summary', readBackText(), { filled: n, blanks: extractSummaryBlanks.map(b => b.label), gaps: gaps.map(g => g.text) }); } catch (e) { /* testing never gets in the way */ }
+  }
 }
 
 function closeExtractSummary() {
@@ -4813,6 +4866,7 @@ async function scanCompliancePlate(fromFile) {
     const text = data.content.map(i => i.text || '').join('');
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
 
+    saveTestEvent('plate-photo', 'Durable notice photo', { read: parsed });
     if (parsed.systemFound === 'YES') {
       const update = {};
       if (parsed.existingSystem) update.existingSystem = parsed.existingSystem;
@@ -4929,6 +4983,7 @@ async function analyzeGalleryPhoto(photoId) {
     const text = data.content.map(i => i.text || '').join('');
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
 
+    saveTestEvent('photo-id', photo.caption || 'Photo of an insect or damage', { read: parsed });
     if (parsed.identified === 'YES' && parsed.species) {
       const confLabel = parsed.confidence ? parsed.confidence.toLowerCase() + ' confidence' : 'unconfirmed';
       const note = `Possible ID: ${parsed.species} (${confLabel})`;
@@ -7517,7 +7572,7 @@ async function sheetVoiceHear(kind, blob) {
     if (res.status === 502 && /no text/i.test(await res.clone().text().catch(() => ''))) { setSheetVoiceState(kind, 'idle', ''); showToast('Didn\'t catch anything. Try again closer to the phone', 'info'); return; }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    const text = correctKnownMishearings(typeof data?.transcript === 'string' ? data.transcript.trim() : '');
+    const text = correctHeard(typeof data?.transcript === 'string' ? data.transcript.trim() : '');
     sheetVoiceFill(kind, text);
   } catch (e) {
     setSheetVoiceState(kind, 'idle', '');
@@ -7530,6 +7585,8 @@ async function sheetVoiceFill(kind, text) {
   text = (text || '').trim();
   if (!text) { setSheetVoiceState(kind, 'idle', ''); showToast('Didn\'t catch anything. Try again', 'info'); return; }
   setSheetVoiceState(kind, 'filling', text);
+  const started = Date.now();
+  const seconds = () => Math.round((Date.now() - started) / 100) / 10;
   try {
     const res = await workerFetch('', {
       method: 'POST',
@@ -7548,10 +7605,14 @@ async function sheetVoiceFill(kind, text) {
     const answer = (data.content || []).map(c => c.text || '').join('');
     const fields = JSON.parse(answer.replace(/```json|```/g, '').trim());
     const n = k.apply(fields || {});
+    saveTestEvent(kind, text, { fields: fields || {}, boxesFilled: n }, null, seconds());
+    flushTestHeard(kind);
     setSheetVoiceState(kind, 'idle', text);
     showToast(n ? `Filled in ${n} box${n === 1 ? '' : 'es'}. Check them before you save` : 'Nothing in that note fits these boxes', n ? 'success' : 'info');
     track('sheet_voice_filled', { kind, boxes: n });
   } catch (e) {
+    saveTestEvent(kind, text, null, e && e.status ? 'http_' + e.status : 'failed', seconds());
+    flushTestHeard(kind);
     setSheetVoiceState(kind, 'idle', text);
     showToast(e && e.status ? extractionProblem(e) : 'Couldn\'t fill it in. Check the signal and try again, or type it', 'error');
   }

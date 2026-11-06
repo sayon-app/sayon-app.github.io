@@ -9068,13 +9068,61 @@ function closeJobPage() {
   parkJobPanel();
 }
 
-function jobAgreementStep() {
-  const a = reportData.agreement;
-  const sent = !a && reportData.agreementRequest;
+function jobAgreementStep(d = reportData) {
+  const a = d.agreement;
+  const sent = !a && d.agreementRequest;
   if (sent) return { label: 'Agreement', to: 'agreement', state: 'now', text: `Link sent${sent.signerName ? ' to ' + sent.signerName : ''}, waiting for them to sign` };
   if (!a) return { label: 'Agreement', to: 'agreement', state: 'now', text: 'Not signed yet. Get it signed before you start' };
   const how = a.method === 'onsite' ? 'Signed on site' : a.method === 'email' ? 'Signed by email' : a.method === 'paper' ? 'Signed on paper' : 'Signed';
   return { label: 'Agreement', to: 'agreement', state: 'done', text: `${how}${a.signerName ? ' by ' + a.signerName : ''}` };
+}
+
+// A job's steps as its page shows them: the agreement first, then the
+// report, quote, the client's answer, treatment (and bait visits). Until
+// the agreement is signed, nothing after it is next.
+function jobPageSteps(j) {
+  const d = j.r.reportData || {};
+  const steps = [jobAgreementStep(d), ...j.steps.map(st => ({ ...st }))];
+  if (!d.agreement) steps.slice(1).forEach(st => { if (st.state === 'now') st.state = 'todo'; });
+  return steps;
+}
+
+// A step's line: the fuller wording for one that's done or still to come
+// (when, who, how much), and what a later step is waiting on.
+function jobStepLine(j, st) {
+  const who = (j.r.client || '').trim().split(/\s+/)[0];
+  if (st.to === 'report' && st.state !== 'done' && st.state !== 'skip' && !st.ready) return `${Math.round(j.r.completion || 0)}% filled in`;
+  if (st.to === 'quote' && j.total && st.state !== 'skip') return `${formatAUD(j.total).replace(/\.00$/, '')}${j.q && j.q.sentAt ? ', sent ' + dashDate(j.q.sentAt) : ', not sent yet'}`;
+  if (st.state === 'now' || st.state === 'bad' || st.state === 'skip' || !st.full) return st.text;
+  if (st.state === 'todo' && st.to === 'answer') return j.q && j.q.sentAt ? `Waiting on ${who || 'the client'}` : 'Once the quote is sent';
+  if (st.state === 'todo' && st.to === 'treatment') return quoteHasItems(j.q) && (quoteAnswerState(j.q) || {}).status === 'accepted' ? 'Accepted, not recorded yet' : 'Once the client accepts';
+  return st.full.replace(/ · /g, ', ');
+}
+
+// The steps as cards, each with its document's icon in the colour of where
+// it's up to. tap(st) is the step's onclick. Shared by the job page and the
+// job's sheet on the Jobs list.
+function jobStepsHTML(j, steps, tap) {
+  const tick = '<svg class="icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+  const stateWord = { done: 'done', now: 'next', todo: 'to come', skip: 'not needed', bad: 'declined' };
+  const chev = '<svg class="icon job-step-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
+  const pct = Math.round(j.r.completion || 0);
+  return `<ol class="job-steps">
+      ${steps.map((st, i) => {
+        const line = jobStepLine(j, st);
+        return `
+        <li class="${st.state}">
+          <button type="button" class="job-step" onclick="${tap(st)}" aria-label="${i + 1}. ${escapeHtml(st.label)}, ${stateWord[st.state] || ''}: ${escapeHtml(line)}">
+            <span class="job-tile ${st.state}" aria-hidden="true">${jobIcon(st.to, 20)}${st.state === 'done' ? `<span class="job-tile-tick">${tick}</span>` : ''}</span>
+            <span class="job-step-main">
+              <span class="job-step-label">${st.label}${st.state === 'now' ? '<span class="job-step-flag">Next</span>' : ''}</span>
+              <span class="job-step-text">${escapeHtml(line)}</span>
+              ${st.to === 'report' && st.state === 'now' && !st.ready ? `<span class="job-step-bar"><i style="width:${Math.max(4, Math.min(100, pct))}%"></i></span>` : ''}
+            </span>
+            ${chev}
+          </button>
+        </li>`; }).join('')}
+    </ol>`;
 }
 
 // The job page's icons: one per document, plus the hero's actions.
@@ -9111,7 +9159,7 @@ function renderJobPage() {
   parkJobPanel();
   const j = currentJobSummary();
   const addr = (j.r.address || '').trim();
-  const steps = [jobAgreementStep(), ...j.steps];
+  const steps = jobPageSteps(j);
   // Before the agreement is signed, that is the next step.
   const next = !reportData.agreement && addr ? { status: 'Get the agreement signed', hint: 'The client signs it before the inspection starts.', next: { label: 'Open the agreement', to: 'agreement' } }
     : !addr ? { status: 'Start the job', hint: 'Type the address and the client\'s name below, get the agreement signed, then tap the mic and talk through the inspection.', next: null }
@@ -9126,21 +9174,7 @@ function renderJobPage() {
   // the treatment and bait steps with it.
   const skipLink = j.status === 'Write the quote' ? '<button type="button" onclick="setClientNotGoingAhead(true)">Client isn\'t going ahead</button>'
     : j.clientNotGoingAhead && !quoteHasItems(j.q) ? '<button type="button" onclick="setClientNotGoingAhead(false)">Write a quote after all</button>' : '';
-  if (reportData.agreement && j.steps.some(st => st.state === 'now')) steps[0].state = 'done';
-  else if (!reportData.agreement) steps.slice(1).forEach(st => { if (st.state === 'now') st.state = 'todo'; });
-  const pct = calculateCompletion();
-  const who = (j.r.client || '').trim().split(/\s+/)[0];
-  // Each step's line: the fuller wording for one that's done or still to
-  // come, and what a later step is waiting on.
-  const detail = (st) => {
-    if (st.to === 'report' && st.state !== 'done' && st.state !== 'skip' && !st.ready) return `${pct}% filled in`;
-    if (st.to === 'quote' && j.total && st.state !== 'skip') return `${formatAUD(j.total).replace(/\.00$/, '')}${j.q && j.q.sentAt ? ', sent ' + dashDate(j.q.sentAt) : ', not sent yet'}`;
-    if (st.state === 'now' || st.state === 'bad' || st.state === 'skip' || !st.full) return st.text;
-    if (st.state === 'todo' && st.to === 'answer') return j.q && j.q.sentAt ? `Waiting on ${who || 'the client'}` : 'Once the quote is sent';
-    if (st.state === 'todo' && st.to === 'treatment') return quoteHasItems(j.q) && (quoteAnswerState(j.q) || {}).status === 'accepted' ? 'Accepted, not recorded yet' : 'Once the client accepts';
-    if (st.state === 'todo' && st.to === 'agreement') return st.text;
-    return st.full.replace(/ · /g, ', ');
-  };
+
   const done = steps.filter(st => st.state === 'done' || st.state === 'skip').length;
   // What the job is and when, over the address.
   const type = (reportData.jobInspectionType || '').split(' — ')[0];
@@ -9158,13 +9192,11 @@ function renderJobPage() {
     addr && `<a class="job-act" href="https://maps.apple.com/?q=${encodeURIComponent(addr)}" target="_blank" rel="noopener">${jobIcon('directions', 18)}Directions</a>`,
   ].filter(Boolean).join('');
   const nextIcon = next.next ? (next.next.to.startsWith('jobpdf') ? 'jobpdf' : next.next.to) : j.group === 'done' && addr ? 'tick' : !addr ? 'details' : 'clock';
-  const tick = '<svg class="icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
   const chev = '<svg class="icon job-step-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
   const group = (DASHBOARD_TABS.find(([k]) => k === j.group) || [, ''])[1];
   // A redraw while the page is open keeps Job details as they were.
   const fold = document.getElementById('jobDetailsFold');
   const detailsOpen = !addr || !!(fold && fold.open && document.getElementById('jobOverlay').classList.contains('open'));
-  const stateWord = { done: 'done', now: 'next', todo: 'to come', skip: 'not needed', bad: 'declined' };
   const detailsHTML = `
     <details class="job-details" id="jobDetailsFold"${detailsOpen ? ' open' : ''}>
       <summary class="job-details-head" id="jobDetailsHead">
@@ -9201,20 +9233,7 @@ function renderJobPage() {
     </section>
     ${addr ? '' : detailsHTML}
     <div class="job-section-head">Job steps</div>
-    <ol class="job-steps">
-      ${steps.map((st, i) => `
-        <li class="${st.state}">
-          <button type="button" class="job-step" onclick="jobGo('${st.to}')" aria-label="${i + 1}. ${escapeHtml(st.label)}, ${stateWord[st.state] || ''}: ${escapeHtml(detail(st))}">
-            <span class="job-tile ${st.state}" aria-hidden="true">${jobIcon(st.to, 20)}${st.state === 'done' ? `<span class="job-tile-tick">${tick}</span>` : ''}</span>
-            <span class="job-step-main">
-              <span class="job-step-label">${st.label}${st.state === 'now' ? '<span class="job-step-flag">Next</span>' : ''}</span>
-              <span class="job-step-text">${escapeHtml(detail(st))}</span>
-              ${st.to === 'report' && st.state === 'now' && !st.ready ? `<span class="job-step-bar"><i style="width:${Math.max(4, Math.min(100, pct))}%"></i></span>` : ''}
-            </span>
-            ${chev}
-          </button>
-        </li>`).join('')}
-    </ol>
+    ${jobStepsHTML(j, steps, st => `jobGo('${st.to}')`)}
     ${typeof jobPdfSectionHTML === 'function' ? jobPdfSectionHTML() : ''}
     ${addr ? detailsHTML : ''}`;
   const panel = document.getElementById('jobPanel');
@@ -13123,23 +13142,80 @@ function dashboardJob(r, quotes) {
   return { r, q, group, status, hint, next, steps, total, time: dashboardJobTime(r), finished, onlyReportUnsent, clientNotGoingAhead };
 }
 
-// A ring of four arcs, one per step, filled as the job moves along.
-function dashboardRing(steps, group) {
-  const C = 2 * Math.PI * 15, seg = C / steps.length, gap = 3.2;
-  const arcs = steps.map((s, i) => `<circle cx="18" cy="18" r="15" class="${s.state}" stroke-dasharray="${(seg - gap).toFixed(2)} ${(C - seg + gap).toFixed(2)}" stroke-dashoffset="${(-(i * seg) - gap / 2).toFixed(2)}"/>`).join('');
-  // A step the job didn't need counts as done, so a job with no quote still fills.
-  const done = steps.filter(s => s.state === 'done' || s.state === 'skip').length;
-  const mid = group === 'done'
-    ? '<path d="m12.5 18.5 3.5 3.5 7-8" class="tick"/>'
-    : `<text x="18" y="18" dy="0.35em" text-anchor="middle">${done}/${steps.length}</text>`;
-  return `<svg class="dash-ring" width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><g transform="rotate(-90 18 18)">${arcs}</g>${mid}</svg>`;
-}
-
 function setDashboardTab(tab) {
   dashboardTab = tab;
   const search = document.getElementById('dashboardSearch');
   if (search) search.value = '';
   renderDashboardJobs(true);
+}
+
+// When a job is, as an inspector says it: Today, Yesterday, Tomorrow, the
+// weekday within the week, else the date.
+function dashWhen(ts) {
+  const day = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  const n = Math.round((day(ts) - day(Date.now())) / 864e5);
+  if (n === 0) return 'Today';
+  if (n === -1) return 'Yesterday';
+  if (n === 1) return 'Tomorrow';
+  if (Math.abs(n) < 7) return new Date(ts).toLocaleDateString('en-AU', { weekday: 'short' });
+  return dashDate(ts);
+}
+
+// A job's next step on the Jobs list and its sheet. Before the report's
+// under way, the agreement comes first, as on the job page.
+function dashNext(j) {
+  const d = j.r.reportData || {};
+  return j.group === 'todo' && !d.agreement && j.status === 'Finish the report'
+    ? { status: 'Get the agreement signed', hint: 'The client signs it before the inspection starts.', next: { label: 'Open the agreement', to: 'agreement' } }
+    : { status: j.status, hint: j.hint, next: j.next };
+}
+
+// One job on the Jobs list: the street big and the suburb under it, the
+// client, how far along it is, and the next step as its own button, so a
+// job in To do is one tap from its next document. The card opens the
+// job's sheet.
+function dashCardHTML(j) {
+  const id = j.r.id;
+  const steps = jobPageSteps(j);
+  const addr = (j.r.address || 'No address').trim();
+  const cut = addr.indexOf(', ');
+  const street = cut > 0 ? addr.slice(0, cut) : addr;
+  const suburb = cut > 0 ? addr.slice(cut + 2) : '';
+  const next = dashNext(j);
+  const declined = j.group === 'done' && /declined|not going ahead/i.test(j.status);
+  const tile = j.group === 'todo' ? ['now', next.next ? next.next.to : 'report']
+    : j.group === 'waiting' ? ['wait', 'clock'] : declined ? ['', 'answer'] : ['done', 'tick'];
+  const sub = [j.r.client, j.group !== 'todo' ? j.status : ''].filter(Boolean);
+  const act = next.next && j.group === 'todo' ? next.status : next.next ? next.next.label : '';
+  const tags = (id === currentReportId ? '<span class="dash-card-tag">This job</span>' : '')
+    + (isSampleJob(j.r) ? '<span class="dash-card-tag sample">Sample</span>' : '');
+  const arrow = '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
+  return `
+    <div class="dash-card ${j.group}${declined ? ' declined' : ''}">
+      <button type="button" class="dash-card-main" onclick="openDashboardDetail('${id}')">
+        <span class="job-tile ${tile[0]}" aria-hidden="true">${jobIcon(tile[1], 20)}</span>
+        <span class="dash-card-text">
+          <span class="dash-card-street">${escapeHtml(street)}</span>
+          ${suburb ? `<span class="dash-card-suburb">${escapeHtml(suburb)}</span>` : ''}
+          ${sub.length || tags ? `<span class="dash-card-sub">${tags}${sub.length ? `<span>${sub.map(escapeHtml).join(' · ')}</span>` : ''}</span>` : ''}
+        </span>
+        <span class="dash-card-end">
+          <span class="dash-card-when">${dashWhen(j.time)}</span>
+          ${j.total ? `<span class="dash-card-total">${formatAUD(j.total).replace(/\.00$/, '')}</span>` : ''}
+        </span>
+        <span class="dash-card-progress" aria-hidden="true">${steps.map(st => `<i class="${st.state}"></i>`).join('')}</span>
+      </button>
+      ${act ? `<button type="button" class="dash-card-act" onclick="openDashboardJob('${id}', '${next.next.to}')"><span>${escapeHtml(act)}</span>${arrow}</button>` : ''}
+    </div>`;
+}
+
+// New job from the Jobs list: the open job is saved, the screen emptied,
+// and the job page opens on its details.
+function newJobFromJobs() {
+  if (document.getElementById('app').style.display !== 'flex') openApp('inspect');
+  closeDashboard();
+  newReport();
+  openJobPage();
 }
 
 function renderDashboard() {
@@ -13151,10 +13227,12 @@ function renderDashboard() {
   const need = dashboardJobs.filter(j => j.group === 'todo').length;
   const today = new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
   // The sample alone isn't work done: a new business still has no jobs.
-  const lead = !dashboardJobs.some(j => !isSampleJob(j.r)) ? 'Your jobs will show up here once you save a report.'
+  const lead = !dashboardJobs.some(j => !isSampleJob(j.r)) ? 'No jobs yet.'
     : need ? `<b>${need} job${need === 1 ? '' : 's'}</b> need${need === 1 ? 's' : ''} you today.`
     : 'You\'re all caught up.';
 
+  // Nothing saved at all: no tabs or search, just the way in.
+  body.classList.toggle('no-jobs', !dashboardJobs.length);
   body.innerHTML = `
     <div class="dash-hero">
       <span class="dash-hero-date">${today}</span>
@@ -13212,26 +13290,20 @@ function renderDashboardJobs(fade) {
     : { todo: 'Nothing to do right now.', waiting: 'Nothing is waiting on a client.', done: 'No finished jobs yet.' }[dashboardTab];
   if (dashboardTab === 'due' && !query && typeof renderReinspectionList === 'function') { wrap.innerHTML = renderReinspectionList(fade); return; }
   wrap.innerHTML = shown.length ? `
-    <div class="dash-list${fade ? ' fade-in' : ''}">
-      ${shown.map(j => `
-        <button type="button" class="dash-row ${j.group}" onclick="openDashboardDetail('${j.r.id}')">
-          ${dashboardRing(j.steps, j.group)}
-          <span class="dash-row-text">
-            <span class="dash-row-addr">${escapeHtml(j.r.address || 'No address')}</span>
-            <span class="dash-row-sub">${isSampleJob(j.r) ? '<span class="dash-row-sample">Sample</span>' : ''}<span class="dash-row-status">${escapeHtml(j.status)}</span>${j.r.client ? ' · ' + escapeHtml(j.r.client) : ''}</span>
-          </span>
-          <span class="dash-row-end">
-            <span class="dash-row-total">${j.total ? formatAUD(j.total).replace(/\.00$/, '') : ''}</span>
-            <span class="dash-row-date">${dashDate(j.time)}</span>
-          </span>
-          <svg class="icon dash-row-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
-        </button>`).join('')}
-    </div>` : !query && !dashboardJobs.length && typeof openSampleJob === 'function' ? `
-    <div class="dash-sample${fade ? ' fade-in' : ''}">
-      <p class="dash-sample-title">See a finished job first</p>
+    <div class="dash-cards${fade ? ' fade-in' : ''}">
+      ${shown.map(dashCardHTML).join('')}
+    </div>` : !query && !dashboardJobs.length ? `
+    <div class="dash-start${fade ? ' fade-in' : ''}">
+      <span class="job-tile now" aria-hidden="true">${jobIcon('details', 22)}</span>
+      <p class="dash-start-title">Start your first job</p>
+      <p class="dash-start-text">Type the address, get the agreement signed, then tap the mic and talk through the inspection. The job shows up here.</p>
+      <button type="button" class="dash-detail-primary" onclick="newJobFromJobs()">New job</button>
+    </div>
+    ${typeof openSampleJob === 'function' ? `<div class="dash-sample${fade ? ' fade-in' : ''}">
+      <p class="dash-sample-title">Or see a finished job first</p>
       <p class="dash-sample-text">A made-up job from start to finish, with your business on every page: the agreement, report, quote, the client's signed answer and the treatment certificate.</p>
-      <button type="button" class="dash-detail-primary" onclick="openSampleJob('jobs')">See a sample job</button>
-    </div>` : `<p class="dash-none${fade ? ' fade-in' : ''}">${empty}</p>`;
+      <button type="button" class="dash-sample-btn" onclick="openSampleJob('jobs')">See a sample job</button>
+    </div>` : ''}` : `<p class="dash-none${fade ? ' fade-in' : ''}">${empty}</p>`;
 }
 
 // One job's timeline and its next step, in a sheet over the list.
@@ -13240,10 +13312,9 @@ function openDashboardDetail(id) {
   const sheet = document.getElementById('dashboardDetailSheet');
   if (!j || !sheet) return;
   const group = (DASHBOARD_TABS.find(([k]) => k === j.group) || [, ''])[1];
-  const done = j.steps.filter(s => s.state === 'done' || s.state === 'skip').length;
-  const icon = (d) => `<svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
-  const dot = (s, i) => s.state === 'done' ? icon('<path d="M20 6 9 17l-5-5"/>')
-    : s.state === 'bad' ? icon('<path d="M18 6 6 18"/><path d="M6 6l12 12"/>') : s.state === 'skip' ? '–' : i + 1;
+  const steps = jobPageSteps(j);
+  const next = dashNext(j);
+  const done = steps.filter(s => s.state === 'done' || s.state === 'skip').length;
   const facts = [
     ['Client', j.r.client || 'Not entered'],
     ['Quote', j.total ? formatAUD(j.total).replace(/\.00$/, '') : 'None yet'],
@@ -13264,25 +13335,15 @@ function openDashboardDetail(id) {
       ${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${escapeHtml(v)}</dd></div>`).join('')}
     </dl>
     <section class="dash-next ${j.group}">
-      <div class="dash-next-label">${j.next ? 'Next step' : 'Where it\'s at'}</div>
-      <div class="dash-next-title">${escapeHtml(j.status)}</div>
-      ${j.hint ? `<p class="dash-next-hint">${escapeHtml(j.hint)}</p>` : ''}
-      ${j.next ? `<button type="button" class="dash-detail-primary" onclick="openDashboardJob('${j.r.id}', '${j.next.to}')">${j.next.label}</button>` : ''}
+      <div class="dash-next-label">${next.next ? 'Next step' : 'Where it\'s at'}</div>
+      <div class="dash-next-title">${escapeHtml(next.status)}</div>
+      ${next.hint ? `<p class="dash-next-hint">${escapeHtml(next.hint)}</p>` : ''}
+      ${next.next ? `<button type="button" class="dash-detail-primary" onclick="openDashboardJob('${j.r.id}', '${next.next.to}')">${next.next.label}</button>` : ''}
     </section>
     <div class="dash-detail-section">
-      <span>Progress</span><span>${done} of ${j.steps.length} done</span>
+      <span>Job steps</span><span>${done} of ${steps.length} done</span>
     </div>
-    <ol class="dash-timeline">
-      ${j.steps.map((s, i) => `
-        <li class="${s.state}">
-          <span class="dash-timeline-dot" aria-hidden="true">${dot(s, i)}</span>
-          <button type="button" class="dash-timeline-btn" onclick="openDashboardPeek('${j.r.id}', '${s.to}')">
-            <span class="dash-timeline-label">${s.label}</span>
-            <span class="dash-timeline-text">${escapeHtml(s.text)}</span>
-            <svg class="icon dash-timeline-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-          </button>
-        </li>`).join('')}
-    </ol>
+    ${jobStepsHTML(j, steps, st => st.to === 'agreement' ? `openDashboardJob('${j.r.id}', 'agreement')` : `openDashboardPeek('${j.r.id}', '${st.to}')`)}
     <div class="dash-detail-foot">
       <button type="button" class="dash-detail-delete" onclick="closeDashboardDetail(); deleteReport('${j.r.id}')">
         <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete this job

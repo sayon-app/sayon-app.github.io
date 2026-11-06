@@ -95,21 +95,29 @@ function renderReinspectionList(fade) {
   if (!items.length) {
     return `<p class="dash-none${fade ? ' fade-in' : ''}">No properties are due for a re-inspection in the next ${REINSPECT_AHEAD_DAYS} days. Each finished report puts its property here when its next inspection comes up.</p>`;
   }
+  // The same cards as the other tabs: the calendar in red when overdue,
+  // amber while it's coming up, blue once the reminder has gone.
   return `
-    <div class="dash-list${fade ? ' fade-in' : ''}">
-      ${items.map(it => `
-        <button type="button" class="dash-row reinspect-row${it.overdue ? ' overdue' : ''}${it.mark.sentAt ? ' reminded' : ''}" onclick="openReinspectDetail('${it.r.id}')">
-          <span class="reinspect-badge">${REINSPECT_ICON}</span>
-          <span class="dash-row-text">
-            <span class="dash-row-addr">${escapeHtml(it.r.address || 'No address')}</span>
-            <span class="dash-row-sub"><span class="dash-row-status">${escapeHtml(reinspectStatusLine(it))}</span>${it.r.client ? ' · ' + escapeHtml(it.r.client) : ''}</span>
-          </span>
-          <span class="dash-row-end">
-            <span class="dash-row-total">${escapeHtml(dashDay(it.due))}</span>
-            <span class="dash-row-date">${it.overdue ? 'was due' : 'due'}</span>
-          </span>
-          <svg class="icon dash-row-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
-        </button>`).join('')}
+    <div class="dash-cards${fade ? ' fade-in' : ''}">
+      ${items.map(it => {
+        const addr = (it.r.address || 'No address').trim();
+        const cut = addr.indexOf(', ');
+        const tile = it.mark.sentAt ? 'now' : it.overdue ? 'bad' : 'wait';
+        return `
+        <div class="dash-card reinspect-card${it.overdue ? ' overdue' : ''}${it.mark.sentAt ? ' reminded' : ''}">
+          <button type="button" class="dash-card-main reinspect-row" onclick="openReinspectDetail('${it.r.id}')">
+            <span class="job-tile ${tile}" aria-hidden="true">${REINSPECT_ICON}</span>
+            <span class="dash-card-text">
+              <span class="dash-card-street">${escapeHtml(cut > 0 ? addr.slice(0, cut) : addr)}</span>
+              ${cut > 0 ? `<span class="dash-card-suburb">${escapeHtml(addr.slice(cut + 2))}</span>` : ''}
+              <span class="dash-card-sub"><span>${[it.r.client, reinspectStatusLine(it)].filter(Boolean).map(escapeHtml).join(' · ')}</span></span>
+            </span>
+            <span class="dash-card-end">
+              <span class="dash-card-when">${it.overdue ? 'Was due' : 'Due'}</span>
+              <span class="dash-card-total">${escapeHtml(dashDay(it.due))}</span>
+            </span>
+          </button>
+        </div>`; }).join('')}
     </div>`;
 }
 

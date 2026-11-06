@@ -58,3 +58,7 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 ## Jobs list
 
 `tests/visual/jobs-list.js <outDir> [width]` builds a business with six made-up jobs at different stages (a report under way, one to quote, a quote waiting, one accepted, one treated, one declined) and shoots each tab, a job's sheet and a brand-new business's empty list. `MODES=light,dark` adds dark. Before and after shots are in `docs/screenshots/jobs-list/`.
+
+## New job
+
+`tests/visual/new-job.js <outDir> [width]` taps New job on the Jobs list and types a job in by hand, checking on the way: the job page opens empty with the address ready to type and today's date, the page shows the address as it's typed, a postcode fills in the state (but not over one picked by hand), Open the agreement with no address asks for one, Save it for later puts the job on the Jobs list, and once saved the job page leads with the agreement. It shoots the empty page, the filled-in page, the Jobs list and the saved job's page. `MODES=light,dark` adds dark shots of the empty page. Before and after shots are in `docs/screenshots/new-job/`.

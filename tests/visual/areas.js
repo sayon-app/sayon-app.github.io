@@ -35,8 +35,7 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
     syncObstructionData(); goStep('areas');
   }, sc);
   await p.waitForTimeout(800);
-  const card = p.locator('#section-obstructions');
-  const shoot = async (name) => {
+  const shoot = async (name, card = p.locator('#section-obstructions')) => {
     for (const mode of MODES) {
       await p.evaluate(m => { document.body.classList.toggle('dark-screen', m === 'dark'); const t = document.getElementById('toast'); if (t) t.className = 'toast'; }, mode);
       // A tall window so the whole card is in view, not cut off by the
@@ -89,8 +88,22 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   console.log('rows:', JSON.stringify(await rows()));
   await shoot('4-all-marked');
 
+  // Areas unable to be inspected: filled in from the ticks above.
+  const access = p.locator('#section-restrictions');
+  const acc = await p.evaluate(() => [...document.querySelectorAll('#section-restrictions .access-item-name')].map(e => e.textContent));
+  check(acc.includes('Interior') && acc.includes('Outbuildings'), 'Areas unable to be inspected lists the limited areas: ' + JSON.stringify(acc));
+  // Where exactly, typed on the interior's row.
+  await p.locator('#section-restrictions .access-spot[data-key="interior"]').click();
+  await p.keyboard.type('Bedroom 2 walls behind the wardrobe'); await p.keyboard.press('Enter'); await p.waitForTimeout(400);
+  const spot = await p.evaluate(() => ({ saved: accessSpot('hindered', 'interior', accessZones('hindered')), shown: (document.querySelector('#section-restrictions .access-spot[data-key="interior"]') || {}).textContent }));
+  check(/wardrobe/.test(spot.saved) && /wardrobe/.test(spot.shown), 'an exact spot is saved and shown on its row: ' + JSON.stringify(spot));
+  await shoot('5-access', access);
+  // Tapping an area's status there opens it in Areas.
+  await p.locator('#section-restrictions .access-item-head').first().click(); await p.waitForTimeout(600);
+  check(await p.evaluate(() => [...document.querySelectorAll('#areaChecklist details')].some(d => d.open)), 'tapping a status in Areas unable to be inspected opens the area above');
+
   // Nothing scrolls sideways.
-  const wide = await p.evaluate(() => { const c = document.getElementById('section-obstructions'); return [...c.querySelectorAll('*')].filter(e => e.getBoundingClientRect().right > c.getBoundingClientRect().right + 1).map(e => e.className).slice(0, 5); });
+  const wide = await p.evaluate(() => ['section-obstructions', 'section-restrictions'].flatMap(id => { const c = document.getElementById(id); return [...c.querySelectorAll('*')].filter(e => e.getBoundingClientRect().right > c.getBoundingClientRect().right + 1).map(e => e.className); }).slice(0, 5));
   check(!wide.length, 'nothing runs past the card: ' + JSON.stringify(wide));
 
   console.log(errs.length ? 'errors: ' + errs.join(' | ') : 'no page errors');

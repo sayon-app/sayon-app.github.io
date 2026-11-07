@@ -1008,6 +1008,8 @@ function editAccessSpot(kind, key) {
   input.focus();
 }
 
+const ACCESS_CHEV = '<svg class="area-sum-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+const ACCESS_PIN = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
 const ACCESS_GROUP_ICONS = {
   hindered: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>',
   restricted: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
@@ -1031,16 +1033,20 @@ function renderAccessSummary() {
     if (!items.length && !noReason) return '';
     const why = noReason ? '<span class="access-item-why missing">No reason ticked yet</span>'
       : `<span class="access-item-why">${escapeHtml(items.join(', '))}</span>`;
-    const status = areaStatusOf(z) === 'NOT' ? 'Not inspected' : 'Inspected with limits';
+    const st = areaStatusOf(z) === 'NOT' ? 'not' : 'partial';
+    const status = st === 'not' ? 'Not inspected' : 'Inspected with limits';
     const kind = restricted ? 'restricted' : 'hindered';
-    return `<div class="access-item">
-      <span class="access-item-name">${zoneName(z)}</span>
-      <button type="button" class="access-item-state" onclick="openAreaRow('${z}')" aria-label="${status}. Change in Areas">${status}</button>${why}
+    // The area's head is the same as its card in Areas (its icon on a tile
+    // in its status colour) and opens it there.
+    const tile = `<span class="area-tile" aria-hidden="true">${AREA_ICONS[z] || ''}<span class="area-tile-badge">${st === 'not' ? AREA_DOT_CROSS : AREA_DOT_TICK}</span></span>`;
+    return `<div class="access-item access-item-${st}">
+      <button type="button" class="access-item-head" onclick="openAreaRow('${z}')" aria-label="${zoneName(z)}, ${status}. Change in Areas">${tile}
+        <span class="access-item-main"><span class="access-item-name">${zoneName(z)}</span><span class="access-item-state">${status}</span>${why}</span>${ACCESS_CHEV}</button>
       ${spotLine(kind, z)}${spotPhotos(kind, z)}</div>`;
   }).filter(Boolean);
   const spotLine = (kind, key) => {
     const spot = accessSpot(kind, key, accessZones(kind));
-    return `<button type="button" class="access-spot${spot ? '' : ' empty'}" data-kind="${kind}" data-key="${key}" onclick="editAccessSpot('${kind}','${key}')">${spot ? escapeHtml(spot) : '+ Add exact spot'}</button>`;
+    return `<button type="button" class="access-spot${spot ? '' : ' empty'}" data-kind="${kind}" data-key="${key}" onclick="editAccessSpot('${kind}','${key}')">${ACCESS_PIN}<span>${spot ? escapeHtml(spot) : 'Add exact spot'}</span></button>`;
   };
   // Photos of the spot, each with its own details box.
   const spotPhotos = (kind, key) => spotPhotosHTML(spotPhotoSection(kind, key));
@@ -1065,7 +1071,7 @@ function renderAccessSummary() {
     rows(true), allMarked);
   [hBox, rBox].forEach(hydrateSpotPhotos);
   const intro = document.getElementById('accessIntro');
-  if (intro) intro.innerHTML = allMarked || limited.length ? 'Filled in from your ticks in Areas. Tap a status to change it there, or add where exactly.'
+  if (intro) intro.innerHTML = allMarked || limited.length ? 'Filled in from your ticks in Areas. Tap an area to change it there, or add where exactly.'
     : `Mark every area above and these fill themselves in. <button type="button" class="link-btn" onclick="document.getElementById('section-obstructions').scrollIntoView({ behavior: 'smooth', block: 'start' })">Back to the areas</button>`;
   const hint = document.getElementById('accessHighRiskHint');
   if (hint) {

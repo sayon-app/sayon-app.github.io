@@ -50,7 +50,7 @@ for (const f of ['css/app.css', 'css/quote.css']) {
     document.querySelectorAll('body *').forEach((el, i) => {
       if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) return;
       const r = el.getBoundingClientRect(); if (!r.width || !r.height) return;
-      out[i] = { size: parseFloat(getComputedStyle(el).fontSize), fixed: !!el.closest('.section-tabs, .quote-bar, .access-item-state, .text-size-btn'), fit: !!el.closest('.choice-card-code'), text: (el.id ? '#' + el.id + ' ' : '') + el.textContent.trim().slice(0, 30) };
+      out[i] = { size: parseFloat(getComputedStyle(el).fontSize), fixed: !!el.closest('.section-tabs, .quote-bar, .text-size-btn'), fit: !!el.closest('.choice-card-code'), text: (el.id ? '#' + el.id + ' ' : '') + el.textContent.trim().slice(0, 30) };
     });
     return out;
   });

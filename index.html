@@ -1012,7 +1012,7 @@
     <div class="job-page" role="dialog" aria-modal="true" aria-labelledby="jobPageTitle">
       <div class="page-topbar">
         <h2 class="page-topbar-title" id="jobPageTitle">This job</h2>
-        <button type="button" class="topbar-new" onclick="newReport(); openJobPage()"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>New job</button>
+        <button type="button" class="topbar-new" onclick="startNewJob()"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>New job</button>
       </div>
       <div class="job-page-body" id="jobPageBody"></div>
     </div>
@@ -1022,7 +1022,7 @@
     <div class="dashboard-panel" role="dialog" aria-modal="true" aria-labelledby="dashboardTitle">
       <div class="dashboard-panel-header page-topbar">
         <h2 class="page-topbar-title" id="dashboardTitle">Jobs</h2>
-        <button type="button" class="topbar-new" onclick="newJobFromJobs()"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>New job</button>
+        <button type="button" class="topbar-new" onclick="startNewJob()"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>New job</button>
         <button type="button" class="topbar-account" onclick="openAccountMenu()" aria-label="Account and settings">
           <span class="topbar-account-initials" id="topbarInitials">?</span>
           <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -1044,100 +1044,107 @@
           </button>
           <div class="job-panel-body" id="jobPanelBody">
 
-            <!-- Property address -->
-            <div class="job-field">
-              <div class="job-field-label">Street address</div>
-              <div class="addr-wrap">
-                <input class="job-input" id="jobAddress" placeholder="Start typing the address" autocomplete="off"
-                  oninput="updateJob(); onAddressTyped(this.value)" onblur="setTimeout(hideAddressSuggestions, 200)">
-                <div class="addr-suggest" id="addrSuggest" role="listbox"></div>
-              </div>
-            </div>
-            <div class="job-row job-row-suburb">
+            <!-- The property -->
+            <section class="job-group" aria-labelledby="jobGroupProperty">
+              <h3 class="job-group-head" id="jobGroupProperty"><span class="job-group-icon" aria-hidden="true"><svg class="icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span>Property</h3>
               <div class="job-field">
-                <div class="job-field-label">Suburb</div>
-                <input class="job-input" id="jobSuburb" placeholder="Suburb" oninput="updateJob()">
+                <label class="job-field-label" for="jobAddress">Street address</label>
+                <div class="addr-wrap">
+                  <input class="job-input" id="jobAddress" placeholder="Start typing the address" autocomplete="off" autocapitalize="words" enterkeyhint="next"
+                    oninput="updateJob(); onAddressTyped(this.value)" onblur="setTimeout(hideAddressSuggestions, 200)">
+                  <div class="addr-suggest" id="addrSuggest" role="listbox"></div>
+                </div>
               </div>
-              <div class="job-field">
-                <div class="job-field-label">Postcode</div>
-                <input class="job-input" id="jobPostcode" placeholder="e.g. 2000" inputmode="numeric" maxlength="4" oninput="updateJob()">
-              </div>
-            </div>
-            <div class="job-field">
-              <div class="job-field-label">State</div>
-              <select class="job-input job-select" id="jobState" onchange="updateJob()">
-                <option value="">--</option>
-                <option>NSW</option><option>VIC</option><option>QLD</option>
-                <option>WA</option><option>SA</option><option>TAS</option>
-                <option>ACT</option><option>NT</option>
-              </select>
-            </div>
-            <!-- Client -->
-            <div class="job-row">
-              <div class="job-field">
-                <div class="job-field-label">Client name</div>
-                <input class="job-input" id="jobClient" placeholder="Client name" oninput="updateJob()">
+              <div class="job-row job-row-suburb">
+                <div class="job-field">
+                  <label class="job-field-label" for="jobSuburb">Suburb</label>
+                  <input class="job-input" id="jobSuburb" placeholder="Suburb" autocomplete="off" autocapitalize="words" enterkeyhint="next" oninput="updateJob()">
+                </div>
+                <div class="job-field">
+                  <label class="job-field-label" for="jobPostcode">Postcode</label>
+                  <input class="job-input" id="jobPostcode" placeholder="e.g. 2000" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" enterkeyhint="next" oninput="onPostcodeTyped(this)">
+                </div>
               </div>
               <div class="job-field">
-                <div class="job-field-label">Client phone</div>
-                <input class="job-input" id="jobClientPhone" type="tel" inputmode="tel" onchange="tidyPhoneInput(this)" placeholder="e.g. 0400 000 000" oninput="saveJobInfo()">
+                <div class="job-field-label">State</div>
+                <select class="job-input job-select" id="jobState" onchange="updateJob()">
+                  <option value="">--</option>
+                  <option>NSW</option><option>VIC</option><option>QLD</option>
+                  <option>WA</option><option>SA</option><option>TAS</option>
+                  <option>ACT</option><option>NT</option>
+                </select>
               </div>
-            </div>
-            <div class="job-field">
-              <div class="job-field-label">Client email</div>
-              <input class="job-input" id="jobClientEmail" placeholder="client@email.com" type="email" oninput="saveJobInfo()">
-            </div>
+            </section>
 
+            <!-- The client -->
+            <section class="job-group" aria-labelledby="jobGroupClient">
+              <h3 class="job-group-head" id="jobGroupClient"><span class="job-group-icon" aria-hidden="true"><svg class="icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>Client</h3>
+              <div class="job-row">
+                <div class="job-field">
+                  <label class="job-field-label" for="jobClient">Name</label>
+                  <input class="job-input" id="jobClient" placeholder="Full name" autocomplete="off" autocapitalize="words" enterkeyhint="next" oninput="updateJob()">
+                </div>
+                <div class="job-field">
+                  <label class="job-field-label" for="jobClientPhone">Phone</label>
+                  <input class="job-input" id="jobClientPhone" type="tel" inputmode="tel" autocomplete="off" enterkeyhint="next" onchange="tidyPhoneInput(this)" placeholder="0400 000 000" oninput="saveJobInfo()">
+                </div>
+              </div>
+              <div class="job-field">
+                <label class="job-field-label" for="jobClientEmail">Email</label>
+                <input class="job-input" id="jobClientEmail" placeholder="Where the documents go" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="next" oninput="saveJobInfo()">
+              </div>
+            </section>
 
-            <div class="drawer-subhead">Booking</div>
-
-            <!-- Job tracking -->
-            <div class="job-row">
+            <!-- The booking -->
+            <section class="job-group" aria-labelledby="jobGroupBooking">
+              <h3 class="job-group-head" id="jobGroupBooking"><span class="job-group-icon" aria-hidden="true"><svg class="icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg></span>Booking</h3>
               <div class="job-field">
-                <div class="job-field-label">Order or job ID</div>
-                <input class="job-input" id="jobOrderId" placeholder="e.g. JOB-0042" oninput="saveJobInfo()">
+                <div class="job-field-label">Type of inspection</div>
+                <select class="job-input job-select" id="jobInspectionType" onchange="onInspectionTypeChange()">
+                  <option value="">Select…</option>
+                  <option>Annual — Existing Building</option>
+                  <option>Pre-Purchase — Timber Pest</option>
+                  <option>Pre-Purchase — Combined Building & Pest</option>
+                  <option>New Construction — Completion</option>
+                  <option>Treatment Follow-Up</option>
+                  <option>Re-inspection</option>
+                  <option>Insurance / Legal</option>
+                  <option>Other</option>
+                </select>
+              </div>
+              <div class="job-row">
+                <div class="job-field">
+                  <label class="job-field-label" for="jobInspectionDate">Date</label>
+                  <input class="job-input" id="jobInspectionDate" type="date" oninput="saveJobInfo()">
+                </div>
+                <div class="job-field">
+                  <label class="job-field-label" for="jobInspectionTime">Time</label>
+                  <input class="job-input" id="jobInspectionTime" type="time" oninput="saveJobInfo()">
+                </div>
+              </div>
+              <div class="job-row">
+                <div class="job-field">
+                  <label class="job-field-label" for="jobFee">Fee (inc GST)</label>
+                  <input class="job-input" id="jobFee" inputmode="decimal" autocomplete="off" placeholder="e.g. $330" oninput="addDollarSign(this);saveJobInfo()">
+                </div>
+                <div class="job-field">
+                  <label class="job-field-label" for="jobOrderId">Order or job no.</label>
+                  <input class="job-input" id="jobOrderId" autocomplete="off" placeholder="Optional" oninput="saveJobInfo()">
+                </div>
               </div>
               <div class="job-field">
-                <div class="job-field-label">Inspection fee (inc GST)</div>
-                <input class="job-input" id="jobFee" inputmode="decimal" placeholder="e.g. $330" oninput="addDollarSign(this);saveJobInfo()">
+                <label class="job-field-label" for="jobNotes">Notes <span class="job-field-hint">· only you see these</span></label>
+                <textarea class="job-input" id="jobNotes" placeholder="Gate code, keys, the dog, the agent to call…" rows="3" style="resize:none;line-height:1.5" oninput="saveJobInfo()"></textarea>
               </div>
-            </div>
-            <div class="job-field">
-              <div class="job-field-label">Inspection type</div>
-              <select class="job-input job-select" id="jobInspectionType" onchange="onInspectionTypeChange()">
-                <option value="">Select…</option>
-                <option>Annual — Existing Building</option>
-                <option>Pre-Purchase — Timber Pest</option>
-                <option>Pre-Purchase — Combined Building & Pest</option>
-                <option>New Construction — Completion</option>
-                <option>Treatment Follow-Up</option>
-                <option>Re-inspection</option>
-                <option>Insurance / Legal</option>
-                <option>Other</option>
-              </select>
-            </div>
-            <div class="job-row">
-              <div class="job-field">
-                <div class="job-field-label">Inspection date</div>
-                <input class="job-input" id="jobInspectionDate" type="date" oninput="saveJobInfo()">
-              </div>
-              <div class="job-field">
-                <div class="job-field-label">Inspection time</div>
-                <input class="job-input" id="jobInspectionTime" type="time" oninput="saveJobInfo()">
-              </div>
-            </div>
-            <div class="job-field">
-              <div class="job-field-label">Internal notes</div>
-              <textarea class="job-input" id="jobNotes" placeholder="Gate codes, access instructions, agent contact, special requirements…" rows="3" style="resize:none;line-height:1.5" oninput="saveJobInfo()"></textarea>
-            </div>
+            </section>
 
           </div><!-- /jobPanelBody -->
             <div class="job-actions">
-              <button class="job-action-btn save" onclick="saveCurrentReport(); refreshDashboardIfOpen()">
+              <button class="job-action-btn save" onclick="saveJobNow()">
                 <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>
-                Save report
+                Save job
               </button>
-              <button class="job-action-btn new" onclick="newReport()">
+              <button class="job-action-btn new" onclick="startNewJob()">
                 <svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
                 New
               </button>

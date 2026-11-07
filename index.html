@@ -1733,10 +1733,14 @@
             <p class="access-intro">Mark every area and what was found there. If something limited the inspection, tick the kind of reason. You'll add where exactly further down.</p>
             <div class="areas-bar">
               <span class="areas-progress" id="areasProgress"></span>
-              <button type="button" class="link-btn areas-mark-all" id="markAllAreasBtn" onclick="markRemainingAreasInspected()">Mark the rest as inspected</button>
+              <span class="areas-segs" id="areasSegs" aria-hidden="true"></span>
             </div>
+            <button type="button" class="areas-mark-all" id="markAllAreasBtn" onclick="markRemainingAreasInspected()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg>
+              Mark the rest as inspected
+            </button>
           </div>
-          <div class="obs-panels-wrap" id="areaChecklist" style="padding:4px 14px 8px 10px"></div>
+          <div class="obs-panels-wrap" id="areaChecklist"></div>
 
           <div class="section-photo-widget" data-legacy-photos hidden>
             <div class="section-photo-header">

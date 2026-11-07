@@ -154,10 +154,9 @@ body.dark-screen #darkScreenBtn { color: var(--tone-warn, #FFB000); }
 body.text-size-large { --ts: 1.12; }
 body.text-size-xl { --ts: 1.28; }
 body { font-size: calc(100% * var(--ts)); }
-/* Bars and pills with a fixed amount of room keep their size: the report's
-   step tabs, the quote's total bar, an area's status on Areas unable to be
-   inspected. */
-.section-tabs, .quote-bar, .access-item-state { --ts: 1; }
+/* Bars with a fixed amount of room keep their size: the report's step
+   tabs and the quote's total bar. */
+.section-tabs, .quote-bar { --ts: 1; }
 /* While the size changes, nothing eases (see setTextSize). */
 body.text-size-switching *, body.text-size-switching *::before, body.text-size-switching *::after { transition: none !important; }
 /* With larger text an area's status buttons wrap rather than cut "Not
@@ -4959,6 +4958,59 @@ body:not(.dark-screen) .choice-card { transition: background-color 0.3s, border-
   body.text-size-large #areaChecklist .area-status-btn,
   body.text-size-xl #areaChecklist .area-status-btn { min-height: 52px; flex-direction: row; justify-content: flex-start; gap: 10px; padding: 8px 14px; text-align: left; }
 }
+
+/* Areas unable to be inspected, in the same look: each kind of limit is a
+   card with its icon tile, and each area in it has the head of its card in
+   Areas (icon tile in its status colour, status and reasons under the name)
+   which opens it there. Where exactly and photos sit under it. */
+#section-restrictions .access-group { border-radius: 16px; box-shadow: 0 1px 2px rgba(15,23,42,0.05); }
+#section-restrictions .access-group-head { gap: 12px; padding: 14px; }
+#section-restrictions .access-group-icon { width: 36px; height: 36px; border-radius: 10px; }
+#section-restrictions .access-group-title { font: 700 calc(16px * var(--ts))/1.2 'Space Grotesk', sans-serif; letter-spacing: -0.01em; }
+#section-restrictions .access-group-title small { font-family: 'Inter', sans-serif; letter-spacing: 0; margin-top: 2px; }
+#section-restrictions .access-item { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 14px 14px 12px; }
+.access-item-head {
+  width: 100%; min-height: 64px; padding: 0; display: flex; align-items: center; gap: 14px;
+  border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.access-item-head:active .area-tile { transform: scale(0.96); }
+.access-item-head:focus-visible { outline: 3px solid rgba(var(--accent-rgb), 0.45); outline-offset: 3px; border-radius: 12px; }
+.access-item-partial .area-tile { background: rgba(245,162,35,0.12); border-color: rgba(212,146,10,0.4); color: var(--yellow-text); }
+.access-item-partial .area-tile-badge { background: var(--yellow); }
+.access-item-not .area-tile { background: rgba(192,57,43,0.1); border-color: rgba(192,57,43,0.3); color: var(--risk); }
+.access-item-not .area-tile-badge { background: var(--risk); }
+.access-item-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+#section-restrictions .access-item-name { font-size: calc(15.5px * var(--ts)); font-weight: 650; line-height: 1.25; letter-spacing: -0.01em; margin-bottom: 2px; }
+#section-restrictions .access-item-state {
+  display: block; min-height: 0; padding: 0; border: 0; border-radius: 0; background: none;
+  font-size: calc(13.5px * var(--ts)); font-weight: 600; line-height: 1.35; color: var(--yellow-text);
+}
+#section-restrictions .access-item-state::after { content: none; }
+.access-item-not .access-item-state { color: var(--risk) !important; }
+#section-restrictions .access-item-why { font-size: calc(13.5px * var(--ts)); font-weight: 500; color: var(--text3); line-height: 1.35; }
+#section-restrictions .access-item-why.missing { color: var(--yellow-text); font-weight: 600; }
+#section-restrictions .access-item-head ~ .access-spot,
+#section-restrictions .access-item-head ~ .access-spot-editor,
+#section-restrictions .access-item-head ~ .spot-photos { margin: 0 0 0 58px; }
+#section-restrictions .access-spot { min-height: 48px; display: flex; align-items: center; gap: 9px; padding: 8px 12px; border-radius: 12px; text-align: left; }
+#section-restrictions .access-spot svg { flex: none; color: var(--text3); }
+#section-restrictions .access-spot.empty svg { color: var(--accent2); }
+#section-restrictions .spot-photos { margin-top: 0; }
+#section-restrictions .spot-photo-add {
+  min-height: 44px; margin: 0; padding: 0 14px; display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--accent2);
+  font-weight: 650; text-decoration: none;
+}
+#section-restrictions .spot-photo img { border-radius: 10px; }
+@media (max-width: 359px) {
+  #section-restrictions .access-item-head ~ .access-spot,
+  #section-restrictions .access-item-head ~ .access-spot-editor,
+  #section-restrictions .access-item-head ~ .spot-photos { margin-left: 0; }
+}
+body.dark-screen .access-item-partial .area-tile { background: rgba(255,176,0,0.12); border-color: rgba(255,176,0,0.35); }
+body.dark-screen .access-item-not .area-tile { background: rgba(255,90,79,0.12); border-color: rgba(255,90,79,0.35); }
+body.dark-screen #section-restrictions .access-group { box-shadow: none; }
+body.dark-screen #section-restrictions .spot-photo-add { background: var(--surface2); border-color: var(--border2); }
 
 /* Dark screen: tinted tiles and buttons on the dark cards. */
 body.dark-screen #areaChecklist .obs-zone-panel { box-shadow: none; }

@@ -862,7 +862,13 @@ function applyObstructionExtraction(data, transcript) {
 // where a No button answered the question. That still counts as No.
 function hinderedTextIsNil() {
   const v = (reportData.hinderedAreas || '').trim();
-  return v.startsWith('NIL') || v.includes('N/A');
+  return v.startsWith('NIL') || v.includes('N/A') || saysNoAccessLimit(v);
+}
+// Words that say nothing was in the way or restricted ("NIL — No restricted
+// access areas", "No restrictions", "None"), from an older report's No
+// button or a voice note. They answer No: never print them as a place.
+function saysNoAccessLimit(v) {
+  return /^\s*(nil\b|n\/a\b|none\b(?!\s+of)|no (restricted|restrictions?|hindered|obstructions?|obstructed|limits?|access (issues|restrictions?|problems?))\b|nothing (was )?(restricted|obstructed|hindered|in the way))/i.test(String(v || ''));
 }
 function hasHinderedAreas() {
   return !!(reportData.hinderedAreas || '').trim() && !hinderedTextIsNil();
@@ -920,7 +926,7 @@ const ZONE_SPOT_ALIASES = {
 function voiceAccessSpots(kind, zones) {
   const text = (reportData[ACCESS_SPOT_TEXT[kind]] || '').trim();
   const out = { _other: [] };
-  if (!text || (kind === 'hindered' && hinderedTextIsNil())) return out;
+  if (!text || (kind === 'hindered' && hinderedTextIsNil()) || saysNoAccessLimit(text)) return out;
   text.split(/(?<=[.;])\s+|\n+/).map(t => t.trim()).filter(Boolean).forEach(seg => {
     const low = seg.toLowerCase();
     const z = zones.find(z => (ZONE_SPOT_ALIASES[z] || []).some(a => low.startsWith(a) && !/[a-z]/.test(low.charAt(a.length))));
@@ -1056,7 +1062,7 @@ function renderAccessSummary() {
 // an empty list can be printed as "None".
 function accessLimits() {
   const hindered = [], restricted = [];
-  const detail = isBlankValue(reportData.hinderedAreasDetail) || reportData.hinderedAreas === 'NO' ? '' : reportData.hinderedAreasDetail;
+  const detail = isBlankValue(reportData.hinderedAreasDetail) || reportData.hinderedAreas === 'NO' || saysNoAccessLimit(reportData.hinderedAreasDetail) ? '' : reportData.hinderedAreasDetail;
   const hZones = accessZones('hindered'), rZones = accessZones('restricted');
   const where = (kind, z, zones) => { const s = accessSpot(kind, z, zones); return s ? `. Where: ${s.charAt(0).toUpperCase()}${s.slice(1)}` : ''; };
   Object.entries(OBS_ZONES).forEach(([z, zone]) => {
@@ -1082,7 +1088,7 @@ function accessLimits() {
   if (rOther) restricted.push([restricted.length ? 'Other spots' : 'Where and why', cap(rOther)]);
   const limited = areasNotFullyInspected();
   const highRisk = !isBlankValue(reportData.highRiskAreas) ? reportData.highRiskAreas
-    : joinPlaces([!isBlankValue(reportData.noAccessAreas) ? reportData.noAccessAreas : '', zoneList(limited.map(z => OBS_ZONES[z].label))]);
+    : joinPlaces([!isBlankValue(reportData.noAccessAreas) && !saysNoAccessLimit(reportData.noAccessAreas) ? reportData.noAccessAreas : '', zoneList(limited.map(z => OBS_ZONES[z].label))]);
   const allMarked = Object.keys(OBS_ZONES).every(z => areaStatusOf(z));
   return { hindered, restricted, highRisk, allMarked };
 }
@@ -4991,7 +4997,19 @@ const repeatsText = (have, val) => { const h = new Set(keyWords(have)), v = keyW
 // make it a new place: "garage wall" in a recommendation repeats a finding
 // at "bottom of a timber stud, garage".
 const PLACE_FILLER = new Set(['wall', 'walls', 'area', 'areas', 'side', 'section', 'room', 'part']);
-const repeatsPlace = (have, val) => { const h = new Set(keyWords(have)), v = keyWords(val).filter(w => !PLACE_FILLER.has(w)); return v.length > 0 && v.every(w => h.has(w)); };
+// A place's words, spelled one way: "skirting boards" and "skirting board",
+// "sub-floor" and "subfloor", "north-east" and "northeast" match, and a
+// room number counts ("bedroom two" is "bedroom 2", and never "bedroom 1").
+const PLACE_NUMBERS = { one: 1, first: 1, two: 2, second: 2, three: 3, third: 3, four: 4, fourth: 4, five: 5, fifth: 5, six: 6, sixth: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+const placeWords = t => String(t || '').toLowerCase()
+  .replace(/\b(sub|under)[\s-]+floor/g, '$1floor').replace(/\b(north|south)[\s-]+(east|west)/g, '$1$2')
+  .split(/[^a-z0-9]+/).map(w => {
+    const n = PLACE_NUMBERS[w] || (/^\d+(st|nd|rd|th)?$/.test(w) && parseInt(w, 10));
+    if (n) return '#' + n;
+    if (w.length < 4 || KEY_WORD_SKIP.has(w)) return '';
+    return w.endsWith('ies') ? w.slice(0, -3) + 'y' : w.length > 4 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w;
+  }).filter(w => w && !PLACE_FILLER.has(w));
+const repeatsPlace = (have, val) => { const h = new Set(placeWords(have)), v = placeWords(val); return v.length > 0 && v.every(w => h.has(w)); };
 // Two findings are one when one place repeats the other, in either
 // direction ("laundry door frame" and "the door frame in the laundry, left
 // jamb"), and their activity doesn't contradict: a blank activity, or live
@@ -5006,10 +5024,21 @@ function sameFindingPlace(a, b) {
 // Folds a repeated finding into the recorded one: live activity wins over
 // old evidence, the more detailed place is kept, and other blanks are
 // filled. Returns whether anything changed.
+// A finding with no place of its own ("the termites there are
+// Coptotermes", said in a later note) is more about the one recorded
+// finding, when there is just one and its species doesn't differ. With two
+// or more there's no telling which, so it stays a card of its own.
+function findingFollowedUp(f, recorded) {
+  if (f.activityLocation || f.termiteActivity === 'NONE') return null;
+  const real = recorded.filter(k => k.termiteActivity === 'ACTIVE' || k.termiteActivity === 'INACTIVE');
+  if (real.length !== 1) return null;
+  const k = real[0];
+  return !f.species || !k.species || f.species === k.species ? k : null;
+}
 function mergeFindingInto(have, f) {
   let changed = false;
   if (f.termiteActivity && (!have.termiteActivity || (f.termiteActivity === 'ACTIVE' && have.termiteActivity === 'INACTIVE'))) { have.termiteActivity = f.termiteActivity; changed = true; }
-  if (keyWords(f.activityLocation).length > keyWords(have.activityLocation).length && repeatsPlace(f.activityLocation, have.activityLocation)) { have.activityLocation = f.activityLocation; changed = true; }
+  if (f.activityLocation && (!have.activityLocation || (placeWords(f.activityLocation).length > placeWords(have.activityLocation).length && repeatsPlace(f.activityLocation, have.activityLocation)))) { have.activityLocation = f.activityLocation; changed = true; }
   ['species', 'timberAffected', 'damageDescription', 'nestLocated', 'structuralConcern'].forEach(k => { if (!have[k] && f[k]) { have[k] = f[k]; changed = true; } });
   return changed;
 }
@@ -5129,7 +5158,8 @@ function populateFields(data, transcript) {
     let merged = false;
     const accepted = [];
     incoming.forEach(f => {
-      const same = [...kept, ...accepted].find(k => sameFindingPlace(k, f));
+      const recorded = [...kept, ...accepted];
+      const same = recorded.find(k => sameFindingPlace(k, f)) || findingFollowedUp(f, recorded);
       if (!same) { accepted.push(f); return; }
       if (mergeFindingInto(same, f)) merged = true;
     });
@@ -5234,7 +5264,7 @@ function populateFields(data, transcript) {
   // that never says "weep" sometimes reads "vents are clear" as weep holes
   // clear, which would wipe "bridged" from an earlier exterior note.
   if (values.weepHoles && weepHolesFromSubfloorNote(values, transcript)) delete values.weepHoles;
-  NIL_TEXT_KEYS.forEach(k => { if (values[k] !== undefined && values[k] !== null && isNilText(values[k])) values[k] = k === 'hinderedAreas' ? '' : null; });
+  NIL_TEXT_KEYS.forEach(k => { if (values[k] !== undefined && values[k] !== null && (isNilText(values[k]) || (['hinderedAreas', 'hinderedAreasDetail', 'noAccessAreas'].includes(k) && saysNoAccessLimit(values[k])))) values[k] = k === 'hinderedAreas' ? '' : null; });
   mergeBorerExtraction(values);
 
   // All non-findings fields, in an order where a field that reveals or

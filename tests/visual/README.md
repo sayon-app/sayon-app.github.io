@@ -62,3 +62,7 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 ## New job
 
 `tests/visual/new-job.js <outDir> [width]` taps New job on the Jobs list and types a job in by hand, checking on the way: the job page opens empty with the address ready to type and today's date, the page shows the address as it's typed, a postcode fills in the state (but not over one picked by hand), Open the agreement with no address asks for one, Save it for later puts the job on the Jobs list, and once saved the job page leads with the agreement. It shoots the empty page, the filled-in page, the Jobs list and the saved job's page. `MODES=light,dark` adds dark shots of the empty page. Before and after shots are in `docs/screenshots/new-job/`.
+
+## Areas inspected
+
+`tests/visual/areas.js <outDir> [width]` opens the report's Areas step on the standard job with a mix of statuses and three areas left to mark, then taps through: an area open, a reason ticked, Not inspected and back, a reason ticked and unticked, Nothing found, an unmarked area open, Mark the rest as inspected, then on Areas unable to be inspected types an exact spot and taps an area to open it in Areas. It checks each tap lands in the report and nothing runs past the card, and shoots both cards. `MODES=light,dark` adds dark. Before and after shots from the 2026-11-07 refresh are in `docs/screenshots/areas/`.

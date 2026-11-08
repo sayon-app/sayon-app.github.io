@@ -46,7 +46,7 @@ They are plain scripts, not modules: every top-level name is shared across all o
 | `shell.js` | APP UPDATES, ADDRESS MOVE, SPLASH, PLATFORM NAVIGATION, keyboard access |
 | `voice.js` | FIELD NOTES, NATIVE SPEECH RECOGNITION ADAPTER, VOICE, AI TRANSCRIPT CLEANUP, EXPERIMENTAL AUDIO CAPTURE, WHISPER LISTENING, QUICK PHRASES, VOICE HUD |
 | `extraction.js` | AI EXTRACTION, LEARNED CORRECTIONS, TEST MODE, WAITING NOTES, EXTRACT SUMMARY, SPOKEN READ-BACK, COMPLIANCE PLATE SCAN, INSECT / SPECIES PHOTO ID, ASK THE AI ABOUT A PHOTO (`askAiAboutPhoto`, shared by the photo calls), PHOTO DESCRIPTION (Describe: the AI's suggested photo caption) |
-| `talk-back.js` | TALK IT THROUGH: after a note is filled, the gaps asked aloud and answered out loud (referral, areas, building, system, notice, moisture, slab edge, risk); Settings › Voice › Ask me after each note |
+| `talk-back.js` | TALK IT THROUGH: after a note is filled, the gaps asked aloud and answered out loud (referral, areas, building, system, notice, moisture, slab edge, risk); then "Do you want to say the quote now?" for a job that needs work and has no quote; Settings › Voice › Ask me after each note |
 | `fields.js` | FIELD RENDERING, MULTI-FINDING ENGINE, CHOICE CARDS, SELECT CARDS, BORER FINDINGS, COMPASS, MOISTURE METER READINGS |
 | `editing.js` | EDITING, REPORT STEPS, PROGRESS, SIGNATURE PADS, SAY IT INSTEAD |
 | `agreement.js` | PRE-INSPECTION AGREEMENT, REMOTE SIGNING |

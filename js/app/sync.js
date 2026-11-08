@@ -906,7 +906,7 @@ function deleteAllReports() {
 // store's bookkeeping stay out: the company comes back from the account,
 // and a backup must never hold a sign-in someone else could use.
 const BACKUP_PREF_KEYS = ['korva_a11y_textsize', 'korva_a11y_contrast', 'korva_a11y_touch',
-  'korva_a11y_motion', 'korva_a11y_colorvision', 'korva_audio_capture_enabled', 'korva_telemetry_off'];
+  'korva_a11y_motion', 'korva_a11y_colorvision', 'korva_audio_capture_enabled', 'korva_talk_back_auto', 'korva_telemetry_off'];
 
 async function exportAllData() {
   try {
@@ -1011,6 +1011,7 @@ function importAllData(file) {
       renderSavedList();
       restoreA11ySettings();
       restoreAudioCaptureSetting();
+      restoreTalkBackSetting();
       restoreTelemetrySetting();
       const parts = [];
       if (added) parts.push(`${added} added`);

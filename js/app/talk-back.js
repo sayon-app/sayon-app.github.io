@@ -23,6 +23,13 @@
 // the sheet. The phone's own speech (Web Speech) does the listening; with
 // none, the questions are still read and answered by tapping.
 //
+// When the questions are done and the job calls for work but has no quote
+// yet, it asks "Do you want to say the quote now?". A yes listens to the
+// quote ("baiting system, 12 stations, monitoring for a year at 520, then
+// done"), has the same short AI call as Say the quote read it, keeps it
+// as the job's spoken quote (reportData.quoteSpoken, which the quote takes
+// in when it's opened) and reads the lines and total back. Nothing is sent.
+//
 // Settings › Voice › "Ask me after each note" starts it on its own when a
 // dictated note has been filled (off by default), and the first time it's
 // run by hand it offers to turn that on.
@@ -454,6 +461,7 @@ function talkBackStopListening(keep) {
   clearTimeout(tb.listenTimer);
   const l = tb.listening;
   if (!l) return;
+  if (l.long) { if (keep) l.finish(); else l.cancel(); return; }
   if (keep) { try { l.recognition.stop(); } catch (e) { tb.listening = null; talkBackHandle([]); } return; }
   tb.listening = null;
   try { l.recognition.onend = null; l.recognition.abort(); } catch (e) { /* already stopped */ }
@@ -498,7 +506,7 @@ function talkBackHandle(alternatives, tapped) {
   }
   if (got && got.cmd === 'stop') { talkBackFinish(true); return; }
   if (got && got.cmd === 'undo') { talkBackUndo(); return; }
-  if (tb.offer) { talkBackOfferAnswer(got); return; }
+  if (tb.offer) { tb.offer.handle(got); return; }
   if (!q) return;
   if (got && got.cmd === 'repeat') { talkBackSay(q.ask, talkBackListen); return; }
   if (got && got.cmd === 'skip') { tb.left.push(q.label); talkBackSay('Skipped.', talkBackNext); return; }
@@ -525,7 +533,7 @@ function talkBackUndo() {
   const last = tb.history.pop();
   if (!last) { talkBackSay('Nothing to undo yet.', tb.offer ? talkBackListen : () => tb.current ? talkBackSay(tb.current.ask, talkBackListen) : talkBackNext()); return; }
   try { last.undo(); } catch (e) { reportError(e, 'talk_back_undo'); }
-  tb.answered = Math.max(0, tb.answered - 1);
+  if (last.key !== 'quote') tb.answered = Math.max(0, tb.answered - 1);   // the quote isn't counted as an answer
   tb.offer = null;
   tb.done = false;
   // Asked again; any after it that the answer opened are asked again too.
@@ -553,7 +561,15 @@ function talkBackFinish(stopped) {
   if (!left.length && !screen.length) lines.push('Nothing else the report needs before you leave.');
   tb.summary = lines.join(' ');
   track('talk_back_finished', { answered: tb.answered, left: left.length, stopped: !!stopped });
-  // The first time it's run by hand, offer to ask after every note.
+  if (!stopped && talkBackCanQuote()) { talkBackAskQuote(tb.summary); return; }
+  talkBackWrapUp(tb.summary, stopped);
+}
+
+// The last words: what was said before, then (the first time it's run by
+// hand) the offer to ask after every note, or the end.
+function talkBackWrapUp(text, stopped) {
+  const tb = talkBack;
+  if (!tb) return;
   let offered = true;
   try { offered = localStorage.getItem(TALK_BACK_OFFERED_KEY) === '1'; } catch (e) { /* asked once per visit at most */ }
   if (!stopped && !tb.auto && !talkBackAuto() && !offered) {
@@ -563,12 +579,13 @@ function talkBackFinish(stopped) {
       ask: 'Want me to ask these after every note? Yes or no.',
       hint: 'Say yes or no.',
       options: talkBackYesNo(),
+      handle: talkBackOfferAnswer,
     };
     tb.tries = 0;
-    talkBackSay(`${lines.join(' ')} ${tb.offer.ask}`, talkBackListen);
+    talkBackSay(`${text} ${tb.offer.ask}`.trim(), talkBackListen);
     return;
   }
-  talkBackSay(lines.join(' '), () => talkBackRender('done'));
+  talkBackSay(text, () => talkBackRender('done'));
 }
 
 function talkBackOfferAnswer(got) {
@@ -584,6 +601,196 @@ function talkBackOfferAnswer(got) {
   setTalkBackAuto(yes);
   tb.offer = null;
   talkBackSay(yes ? 'Done. I\'ll ask after each note. Turn it off in Settings, under Voice.' : 'Okay. You can turn it on in Settings, under Voice.', () => talkBackRender('done'));
+}
+
+// ── The quote, said at the end ──
+const talkQuoteDeclined = new WeakSet();   // reports where "no" was said this visit
+const TB_QUOTE_LISTEN_MAX_MS = 90000;
+const TB_QUOTE_QUIET_MS = 4000;        // a pause this long ends the quote
+const TB_QUOTE_STOP_RE = /[\s,.]*\b(?:that'?s it|that'?s all|that'?s the quote|done|finished|end of (?:the )?quote)[.!\s]*$/i;
+
+// Only for a job that calls for work and has no quote yet, with a signal.
+function talkBackCanQuote() {
+  if (!navigator.onLine || !(typeof authSession !== 'undefined' && authSession && authSession.access_token)) return false;
+  if (typeof quoteVoicePrompt !== 'function' || typeof mergeSpokenQuote !== 'function' || typeof spokenQuoteItems !== 'function') return false;
+  if (reportData.noQuoteNeeded || reportData.quoteSpoken || isSampleJob(currentReportId)) return false;
+  if (talkQuoteDeclined.has(reportData)) return false;
+  if (typeof currentJobQuote === 'function' && currentJobQuote()) return false;   // being written on the quote screen
+  const termites = (reportData.findings || []).some(f => f && (f.termiteActivity === 'ACTIVE' || f.termiteActivity === 'INACTIVE'));
+  return termites || reportData.treatmentRecommended === 'YES' || reportData.borerActivity === 'ACTIVE';
+}
+
+function talkBackAskQuote(before) {
+  const tb = talkBack;
+  tb.tries = 0;
+  tb.offer = {
+    key: 'quote-offer', label: 'the quote',
+    ask: 'Do you want to say the quote now? Yes or no.',
+    hint: 'Say yes or no.',
+    options: talkBackYesNo(/go on|go ahead|let'?s do it|ready/, /later|not now|no quote/).map(o => ({ ...o, label: o.value === 'YES' ? 'Say the quote' : 'Not now' })),
+    handle: got => {
+      if (!got || !got.opt) {
+        tb.tries++;
+        if (tb.tries < 2 && !(got && got.cmd === 'skip')) { talkBackSay('Yes or no?', talkBackListen); return; }
+      }
+      tb.offer = null;
+      if (!got || !got.opt || got.opt.value !== 'YES') {
+        talkQuoteDeclined.add(reportData);
+        talkBackWrapUp('Okay, no quote for now.');
+        return;
+      }
+      tb.quoteFor = { rd: reportData, id: currentReportId };
+      talkBackSay('Go ahead. Say the work and the prices, then say done.', () => talkBackListenLong(talkBackQuoteHeard));
+    },
+  };
+  talkBackSay(`${before} ${tb.offer.ask}`.trim(), talkBackListen);
+}
+
+// One long listen, for a quote: it keeps going through short pauses and
+// ends on "done", a longer pause, or the Done button.
+function talkBackListenLong(done) {
+  const tb = talkBack;
+  if (!tb) return;
+  if (!talkBackCanListen() || tb.tapOnly) { done(''); return; }
+  const SR = getSpeechRecognitionCtor();
+  let rec;
+  try { rec = new SR(); } catch (e) { done(''); return; }
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = 'en-AU';
+  const st = { finals: '', interim: '', started: Date.now(), restarts: 0, over: false };
+  const end = give => {
+    if (st.over) return;
+    st.over = true;
+    clearTimeout(st.quiet); clearTimeout(st.max);
+    if (tb.listening && tb.listening.recognition === rec) tb.listening = null;
+    try { rec.onend = null; rec.onresult = null; rec.abort(); } catch (e) { /* stopped already */ }
+    if (give) done(`${st.finals} ${st.interim}`.replace(TB_QUOTE_STOP_RE, '').replace(/\s+/g, ' ').trim());
+  };
+  tb.listening = { recognition: rec, long: true, finish: () => end(true), cancel: () => end(false) };
+  rec.onresult = e => {
+    if (talkBack !== tb || st.over) return;
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) st.finals += r[0].transcript + ' ';
+      else interim += r[0].transcript;
+    }
+    st.interim = interim;
+    const all = `${st.finals}${interim}`.trim();
+    talkBackHeardText(all);
+    clearTimeout(st.quiet);
+    if (TB_QUOTE_STOP_RE.test(all)) { end(true); return; }
+    st.quiet = setTimeout(() => end(true), TB_QUOTE_QUIET_MS);
+  };
+  rec.onerror = e => { if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) { tb.tapOnly = true; end(true); } };
+  // Phones end a long listen on their own; carry on until it's over.
+  rec.onend = () => {
+    if (st.over || talkBack !== tb) return;
+    if (Date.now() - st.started < TB_QUOTE_LISTEN_MAX_MS && st.restarts < 6) { st.restarts++; try { rec.start(); return; } catch (e) { /* ends below */ } }
+    end(true);
+  };
+  st.max = setTimeout(() => end(true), TB_QUOTE_LISTEN_MAX_MS);
+  st.quiet = setTimeout(() => end(true), TALK_BACK_LISTEN_MS + 2000);   // nothing said at all
+  talkBackRender('dictating');
+  try {
+    if (typeof playTone === 'function') playTone(660, 110, 0.12);
+    rec.start();
+  } catch (e) { end(true); }
+}
+
+// The Done and Cancel buttons while the quote is being said.
+function talkBackDictationDone() {
+  const l = talkBack && talkBack.listening;
+  if (l && l.long) l.finish();
+}
+
+// Open the quote: the sheet closes and the quote screen starts with what was said.
+function talkBackOpenQuote() {
+  closeExtractSummary();
+  openQuoteFromReport();
+}
+
+function talkBackDictationCancel() {
+  const l = talkBack && talkBack.listening;
+  if (!l || !l.long) return;
+  l.cancel();
+  talkQuoteDeclined.add(reportData);
+  talkBackWrapUp('Okay, no quote for now.');
+}
+
+async function talkBackQuoteHeard(text) {
+  const tb = talkBack;
+  if (!tb) return;
+  if (!text) { talkBackWrapUp('I didn\'t catch a quote. You can say it on the quote screen.'); return; }
+  talkBackRender('thinking');
+  let fields = null;
+  const started = Date.now();
+  try {
+    const res = await workerFetch('', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        max_tokens: 4000,
+        output_config: { effort: 'low' },
+        system: quoteVoicePrompt(),
+        messages: [{ role: 'user', content: `Today is ${todayIsoDate()}.\n\n${text}` }],
+      }),
+    });
+    const raw = await res.text();
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const answer = (JSON.parse(raw).content || []).map(c => c.text || '').join('');
+    fields = JSON.parse(answer.replace(/```json|```/g, '').trim()) || {};
+  } catch (e) {
+    if (typeof saveTestEvent === 'function') saveTestEvent('talk-back-quote', text, null, 'failed', Math.round((Date.now() - started) / 100) / 10);
+    if (talkBack === tb) talkBackWrapUp('I couldn\'t work out the quote just now. Say it again on the quote screen.');
+    return;
+  }
+  // The job changed while the AI was reading it: nothing lands on the wrong one.
+  const q = tb.quoteFor || {};
+  if (reportData !== q.rd && !(q.id && currentReportId === q.id)) { if (talkBack === tb) talkBackWrapUp('Another job is open now, so that quote wasn\'t kept.'); return; }
+  const items = (Array.isArray(fields.items) ? fields.items : []).filter(it => it && typeof it.description === 'string' && it.description.trim())
+    .map(it => ({ description: it.description, qty: it.qty, unit: it.unit, price: it.price }));
+  const prev = reportData.quoteSpoken;
+  mergeSpokenQuote({ items, exclusions: fields.exclusions, paymentTerms: fields.paymentTerms, timeframe: fields.timeframe, servicePeriod: fields.servicePeriod, notes: fields.notes });
+  if (typeof saveTestEvent === 'function') saveTestEvent('talk-back-quote', text, { fields, lines: items.length }, null, Math.round((Date.now() - started) / 100) / 10);
+  saveDraft();
+  if (talkBack !== tb) return;
+  if (reportData.quoteSpoken === prev) { talkBackWrapUp('I couldn\'t find any work or prices in that. You can say it on the quote screen.'); return; }
+  tb.quoteSaid = true;
+  tb.history.push({ key: 'quote', undo: () => { reportData.quoteSpoken = prev; tb.quoteSaid = false; saveDraft(); } });
+  track('talk_back_quote', { lines: items.length });
+  const said = talkBackQuoteReadBack();
+  tb.summary = `${tb.summary} ${said}`.trim();
+  talkBackWrapUp(said);
+}
+
+// The quote as the quote screen will start it: each line and the total.
+// A line with no price said takes the business's own price ("your
+// price"), else the app's starting price ("a starting price"), else none.
+function talkBackQuoteReadBack() {
+  const sq = reportData.quoteSpoken || {};
+  const said = (Array.isArray(sq.items) ? sq.items : []).filter(it => it && it.description);
+  const items = spokenQuoteItems(reportData);
+  const money = n => '$' + (Math.round(n * 100) / 100).toLocaleString('en-AU', { maximumFractionDigits: 2 });
+  const plural = (unit, n) => n === 1 || /s$|^(lm|m|m2|job)$/i.test(unit) ? unit : unit + 's';
+  let unpriced = 0;
+  const lines = items.map((it, i) => {
+    const qty = Number(it.qty) || 1, price = Number(it.price) || 0;
+    const priceSaid = said[i] && typeof said[i].price === 'number';
+    if (!price) unpriced++;
+    const amount = !price ? (qty > 1 ? `${qty} ${plural(it.unit || 'job', qty)}, no price yet` : 'no price yet')
+      : qty > 1 ? `${qty} ${plural(it.unit || 'job', qty)} at ${money(price)}` : money(price);
+    const note = priceSaid || !price ? '' : it.priceSet ? ', your price' : ', a starting price';
+    return `${it.desc}, ${amount}${note}`;
+  });
+  const total = items.reduce((sum, it) => sum + (Number(it.qty) || 1) * (Number(it.price) || 0), 0);
+  const out = [lines.length ? `Quote: ${lines.join('. ')}.` : 'Quote details saved.'];
+  if (lines.length && total) out.push(`That's ${money(total)} before GST${unpriced ? `, with ${unpriced === 1 ? 'one line' : unpriced + ' lines'} still to price` : ''}.`);
+  if (sq.paymentTerms) out.push(`Payment: ${sq.paymentTerms.replace(/\.$/, '')}.`);
+  out.push('Open the quote to check it before it goes.');
+  return out.join(' ');
 }
 
 // The Stop button, or the sheet being closed (quiet: no goodbye).
@@ -602,6 +809,7 @@ function stopTalkBack(quiet) {
 // The Skip, Undo and Repeat buttons.
 function talkBackCommand(cmd) {
   const tb = talkBack;
+  if (tb && tb.listening && tb.listening.long) { if (cmd === 'skip' || cmd === 'stop') tb.listening.finish(); return; }
   if (!tb || tb.done && !tb.offer) return;
   talkBackStopListening();
   talkBackHandle([], { cmd });
@@ -639,20 +847,28 @@ function talkBackRender(state) {
   const stateEl = document.getElementById('talkBackState');
   if (stateEl) {
     stateEl.textContent = state === 'done' ? 'Finished'
+      : state === 'dictating' ? 'Listening… say the quote, then say done'
+      : state === 'thinking' ? 'Working out the quote…'
       : state === 'listening' ? (tb.tapOnly || !talkBackCanListen() ? 'Tap your answer' : 'Listening… say your answer')
       : 'Speaking…';
   }
   const qEl = document.getElementById('talkBackQ');
-  if (qEl) qEl.textContent = state === 'done' ? (tb.summary || tb.spoken || '') : q ? q.ask : (tb.spoken || '');
+  if (qEl) {
+    qEl.textContent = state === 'done' ? (tb.summary || tb.spoken || '')
+      : state === 'dictating' || state === 'thinking' ? 'The work and the prices, for example "baiting system, 12 stations, monitoring for a year at 520".'
+      : q ? q.ask : (tb.spoken || '');
+  }
   if (state === 'done') talkBackHeardText('');
   const opts = document.getElementById('talkBackOpts');
   if (opts) {
-    opts.innerHTML = q && state !== 'done'
-      ? q.options.map((o, i) => `<button type="button" class="talkback-opt" onclick="talkBackPick(${i})">${escapeHtml(o.label)}</button>`).join('')
-      : '';
+    opts.innerHTML = state === 'dictating' ? '<button type="button" class="talkback-opt" onclick="talkBackDictationDone()">Done</button><button type="button" class="talkback-opt" onclick="talkBackDictationCancel()">Cancel</button>'
+      : state === 'done' && tb.quoteSaid ? '<button type="button" class="talkback-opt" onclick="talkBackOpenQuote()">Open the quote</button>'
+      : q && state !== 'done' && state !== 'thinking'
+        ? q.options.map((o, i) => `<button type="button" class="talkback-opt" onclick="talkBackPick(${i})">${escapeHtml(o.label)}</button>`).join('')
+        : '';
   }
   const live = document.getElementById('talkBackActions');
-  if (live) live.hidden = state === 'done';
+  if (live) live.hidden = state === 'done' || state === 'dictating' || state === 'thinking';
   const closeBtn = document.getElementById('talkBackClose');
   if (closeBtn) closeBtn.hidden = state !== 'done';
   const undo = document.getElementById('talkBackUndo');

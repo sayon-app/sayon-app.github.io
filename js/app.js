@@ -525,9 +525,10 @@ function renderAreaFindingPrompts() {
   if (!el) return;
   const zones = areasEvidenceUnlinked();
   el.innerHTML = zones.map(z => {
-    const where = OBS_ZONES[z].label.replace(/^The /, '');
-    return `<div class="area-finding-prompt"><span>Evidence found in <strong>${where}</strong>. Describe it here.</span>
-      <button class="link-btn" onclick="addFindingForArea('${z}')">Add finding</button></div>`;
+    const where = 'the ' + zoneName(z).toLowerCase();
+    return `<div class="area-finding-prompt"><span class="area-tile" aria-hidden="true">${AREA_ICONS[z] || ''}</span>
+      <span class="area-finding-text">Evidence found in <strong>${where}</strong>. Describe it here.</span>
+      <button type="button" class="spot-photo-add area-finding-add" onclick="addFindingForArea('${z}')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>Add finding</button></div>`;
   }).join('');
   el.hidden = !zones.length;
 }
@@ -1135,6 +1136,7 @@ function spotPhotoSection(kind, key) { return `spot-${kind}-${key}`; }
 function findingPhotoSection(id) { return `finding-${id}`; }
 
 // A strip of photos, each with its own details box, and an add button.
+const PHOTO_ADD_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>';
 function spotPhotosHTML(section) {
   const photos = (reportData.photosBySection || {})[section] || [];
   const cards = photos.map(p => `<div class="spot-photo">
@@ -1144,7 +1146,7 @@ function spotPhotosHTML(section) {
       <button type="button" class="photo-remove-btn" onclick="removeSpotPhoto('${p.id}','${section}')">Remove</button>
     </div>`).join('');
   return `<div class="spot-photos" data-section="${section}">${cards}
-    <button type="button" class="link-btn spot-photo-add" onclick="addSpotPhoto('${section}')">+ Add photo</button></div>`;
+    <button type="button" class="spot-photo-add" onclick="addSpotPhoto('${section}')">${PHOTO_ADD_ICON}Add photo</button></div>`;
 }
 function hydrateSpotPhotos(container) {
   container.querySelectorAll('.spot-photos').forEach(el =>
@@ -5687,11 +5689,34 @@ function syncSelectCards(id) {
 
 function syncAllSelectCards() { Object.keys(SELECT_CARDS).forEach(syncSelectCards); }
 
+// A finding's head, in the look of an area's card: an icon tile in the
+// colour of its activity (red active, amber inactive, green nothing found,
+// grey not answered yet) with the finding's number on its corner, where it
+// is, and under that the activity in its colour.
+const FINDING_ICON = paths => `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+const FINDING_ICONS = {
+  termite: FINDING_ICON('<path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M9 7.13v-1a3 3 0 1 1 6 0v1"/><path d="M6 13H2M22 13h-4M6.53 9C4.6 8.8 3 7.1 3 5M21 5c0 2.1-1.6 3.8-3.5 4M3 21c0-2.1 1.7-3.9 3.8-4M17.2 17c2.1.1 3.8 1.9 3.8 4"/>'),
+  borer: FINDING_ICON('<rect x="3" y="7" width="18" height="10" rx="2"/><circle cx="8" cy="12" r="1"/><circle cx="12" cy="10.5" r="1"/><circle cx="16" cy="13" r="1"/>'),
+};
+const FINDING_ACT_LABEL = { ACTIVE: 'Active', INACTIVE: 'Inactive', NONE: 'Nothing found' };
+const FINDING_REMOVE_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
+function findingHeadHTML(icon, where, label, num, act, removeCall, removeLabel) {
+  const state = act ? act.toLowerCase() : 'unset';
+  const status = act ? FINDING_ACT_LABEL[act] || act : 'Not answered yet';
+  // The finding's number sits on the tile's corner; the title is where it
+  // is, or the number when that isn't known yet.
+  return `<div class="finding-card-header finding-head-${state}">
+        <span class="area-tile finding-tile" aria-hidden="true">${icon}<span class="area-tile-badge finding-tile-num">${num}</span></span>
+        <span class="finding-card-label"><span class="finding-card-title">${where ? escapeHtml(where) : label}</span>
+          <small>${where ? `<span class="sr-only">${label}, </span>` : ''}<span class="finding-act">${status}</span></small></span>
+        ${removeCall ? `<button type="button" class="finding-remove-btn" onclick="${removeCall}" title="${removeLabel}" aria-label="${removeLabel}">${FINDING_REMOVE_ICON}</button>` : ''}
+      </div>`;
+}
+
 // Generates the HTML for one finding card
 function findingCardHTML(finding, index, total) {
   const id = finding.id;
   const act = finding.termiteActivity;
-  const chipClass = act ? act : 'unset';
   const showDetails = act === 'ACTIVE' || act === 'INACTIVE';
   const showNone = act === 'NONE';
   const label = total === 1 ? 'Primary Finding' : `Finding ${index + 1}`;
@@ -5706,11 +5731,7 @@ function findingCardHTML(finding, index, total) {
 
   return `
     <div class="finding-card" id="finding-card-${id}">
-      <div class="finding-card-header">
-        <span class="finding-card-label">${finding.activityLocation ? `<span class="finding-card-title">${escapeHtml(finding.activityLocation)}</span><small>${label}</small>` : label}</span>
-        <span class="finding-activity-chip ${chipClass}">${act ? act : '—'}</span>
-        ${total > 1 ? `<button class="finding-remove-btn" onclick="removeFinding('${id}')" title="Remove this finding">✕</button>` : ''}
-      </div>
+      ${findingHeadHTML(FINDING_ICONS.termite, finding.activityLocation, label, index + 1, act, total > 1 ? `removeFinding('${id}')` : '', 'Remove this finding')}
       <div class="finding-card-body">
         <!-- Activity gate: the question every finding must answer -->
         <div class="findings-gate choice-panel${act ? '' : ' unset'}" role="radiogroup" aria-label="Termite activity status">
@@ -6060,11 +6081,7 @@ function borerCardHTML(b, index) {
   const fv = (key, hint) => `<div class="field-val${b[key] ? ' filled' : ''}" onclick="startFindingEdit('${id}','${key}','text')">${b[key] ? escapeHtml(b[key]) : '—'}</div>`;
   return `
     <div class="finding-card borer-card" id="finding-card-${id}">
-      <div class="finding-card-header">
-        <span class="finding-card-label">${b.location ? `<span class="finding-card-title">${escapeHtml(b.location)}</span><small>Borer finding ${index + 1}</small>` : `Borer finding ${index + 1}`}</span>
-        <span class="finding-activity-chip ${act || 'unset'}">${act || '—'}</span>
-        <button class="finding-remove-btn" onclick="removeBorerFinding('${id}')" title="Remove this borer finding">✕</button>
-      </div>
+      ${findingHeadHTML(FINDING_ICONS.borer, b.location, `Borer finding ${index + 1}`, index + 1, act, `removeBorerFinding('${id}')`, 'Remove this borer finding')}
       <div class="finding-card-body">
         <div class="findings-gate choice-panel${act ? '' : ' unset'}" role="radiogroup" aria-label="Borer activity here">
           <div class="field-label">Borer activity</div>
@@ -6490,7 +6507,7 @@ function renderMoistureTable() {
                oninput="updateMoistureReading('${r.id}','location',this.value)">
         <input class="photo-caption-input moisture-reading" type="text" inputmode="decimal" placeholder="Reading" value="${escapeHtml(r.reading || '')}"
                oninput="updateMoistureReading('${r.id}','reading',this.value)">
-        <button class="photo-remove-btn" onclick="removeMoistureReading('${r.id}')" aria-label="Remove reading">✕</button>
+        <button type="button" class="photo-remove-btn" onclick="removeMoistureReading('${r.id}')" aria-label="Remove reading">${FINDING_REMOVE_ICON}</button>
       </div>`).join('');
 }
 

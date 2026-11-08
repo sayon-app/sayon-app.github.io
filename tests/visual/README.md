@@ -66,3 +66,7 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 ## Areas inspected
 
 `tests/visual/areas.js <outDir> [width]` opens the report's Areas step on the standard job with a mix of statuses and three areas left to mark, then taps through: an area open, a reason ticked, Not inspected and back, a reason ticked and unticked, Nothing found, an unmarked area open, Mark the rest as inspected, then on Areas unable to be inspected types an exact spot and taps an area to open it in Areas. It checks each tap lands in the report and nothing runs past the card, and shoots both cards. `MODES=light,dark` adds dark. Before and after shots from the 2026-11-07 refresh are in `docs/screenshots/areas/`.
+
+## Report tabs
+
+`tests/visual/report-tabs.js <outDir> [width] [scenario] [steps]` shoots each report step's sections whole (Property, Areas, Findings, Conducive, Advice, Finish), not cut by the scroll box, and flags anything that runs past a card. `MODES=light,dark` adds dark, `TS=xl` shoots at Extra large text. `CHECKS=1` then taps through the parts the 2026-11-07 refresh restyled: Add another finding (a card not answered yet), picking Active (the head turns red), a finding's bin, the "Evidence found in …" prompt on Findings and its Add finding, Add a reading and a reading's bin, and Clear on the inspector's signature. Before and after shots are in `docs/screenshots/report-tabs/`.

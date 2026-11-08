@@ -584,17 +584,21 @@ function renderAreaChecklist() {
   const wrap = document.getElementById('areaChecklist');
   if (!wrap) return;
   migrateLegacyObstructions();
+  const zones = Object.keys(OBS_ZONES);
   const markAll = document.getElementById('markAllAreasBtn');
-  if (markAll) markAll.hidden = Object.keys(OBS_ZONES).every(z => areaStatusOf(z));
-  const marked = Object.keys(OBS_ZONES).filter(z => areaStatusOf(z)).length;
+  if (markAll) markAll.hidden = zones.every(z => areaStatusOf(z));
+  const marked = zones.filter(z => areaStatusOf(z)).length;
   const prog = document.getElementById('areasProgress');
-  if (prog) prog.textContent = `${marked} of ${Object.keys(OBS_ZONES).length} areas marked`;
-  wrap.innerHTML = Object.entries(OBS_ZONES).map(([zoneId, zone], i) => {
+  if (prog) prog.textContent = marked === zones.length ? `All ${zones.length} areas marked` : `${marked} of ${zones.length} areas marked`;
+  // One bar per area, in its status colour, like the job page's progress.
+  const segs = document.getElementById('areasSegs');
+  if (segs) segs.innerHTML = zones.map(z => `<i class="${(areaStatusOf(z) || '').toLowerCase()}"></i>`).join('');
+  wrap.innerHTML = Object.entries(OBS_ZONES).map(([zoneId, zone]) => {
     const status = areaStatusOf(zoneId);
     const lit = status === 'PARTIAL' ? 'INSPECTED' : status;
     const statusBtns = AREA_STATUS_BUTTONS.map(([val, label]) =>
-      `<button class="obs-zone-btn area-status-btn${lit === val ? ' active status-' + status.toLowerCase() : ''}"
-        onclick="setAreaStatus('${zoneId}','${val}')">${label}</button>`).join('');
+      `<button type="button" class="obs-zone-btn area-status-btn${lit === val ? ' active status-' + status.toLowerCase() : ''}" aria-pressed="${lit === val}"
+        onclick="setAreaStatus('${zoneId}','${val}')">${AREA_STATUS_ICONS[val]}<span>${label}</span></button>`).join('');
     // The hindered and restricted reasons show as soon as the area is
     // marked, so a limit is one tap away.
     let reasons = '';
@@ -602,7 +606,7 @@ function renderAreaChecklist() {
       const selected = (reportData.areaReasons || {})[zoneId] || [];
       const btn = item => {
         const safe = item.replace(/'/g, '&#39;');
-        return `<button class="obs-item-btn${selected.includes(item) ? ' selected' : ''}"
+        return `<button type="button" class="obs-item-btn${selected.includes(item) ? ' selected' : ''}" aria-pressed="${selected.includes(item)}"
           onclick="toggleObsItem('${zoneId}','${safe}')">${item}</button>`;
       };
       const group = (kind, title, items) => items.length
@@ -615,7 +619,7 @@ function renderAreaChecklist() {
     if (areaWasEntered(zoneId)) {
       const picked = areaResultOf(zoneId);
       result = '<div class="area-result-label">Found here</div><div class="area-result">' + AREA_RESULTS.map(([val, label]) =>
-        `<button class="obs-item-btn area-result-btn${picked === val ? ' selected result-' + val.toLowerCase() : ''}"
+        `<button type="button" class="obs-item-btn area-result-btn${picked === val ? ' selected result-' + val.toLowerCase() : ''}" aria-pressed="${picked === val}"
           onclick="setAreaResult('${zoneId}','${val}')">${label}</button>`).join('') + '</div>';
       if (picked === 'FOUND') {
         const ev = areaEvidence(zoneId);
@@ -624,19 +628,37 @@ function renderAreaChecklist() {
         if (ev.length) result += `<div class="area-evidence">See ${escapeHtml(ev.join('; '))}</div>`;
       }
     }
-    // Each area sits on a side line with a dot showing its status, so with
-    // several open it's clear where one ends and the next begins.
-    const dot = { INSPECTED: AREA_DOT_TICK, PARTIAL: AREA_DOT_TICK, NOT: AREA_DOT_CROSS, NA: AREA_DOT_DASH }[status] || String(i + 1);
+    // Each area is a card like a job's step: the area's own icon on a tile
+    // in its status colour, with a tick, cross or dash on its corner.
+    const badge = { INSPECTED: AREA_DOT_TICK, PARTIAL: AREA_DOT_TICK, NOT: AREA_DOT_CROSS, NA: AREA_DOT_DASH }[status] || '';
+    const tile = `<span class="area-tile" aria-hidden="true">${AREA_ICONS[zoneId] || ''}${badge ? `<span class="area-tile-badge">${badge}</span>` : ''}</span>`;
     return `<div class="area-node${status ? ' area-node-' + status.toLowerCase() : ''}${areaOpen.has(zoneId) ? ' open' : ''}" data-zone-node="${zoneId}">
-      <span class="area-node-dot" aria-hidden="true">${dot}</span>
       <details class="obs-zone-panel" data-zone="${zoneId}"${areaOpen.has(zoneId) ? ' open' : ''} ontoggle="onAreaToggle('${zoneId}', this.open)">
-      <summary class="obs-zone-panel-header area-summary">${areaSummary(zoneId, zoneName(zoneId))}</summary>
-      <div class="area-status">${statusBtns}</div>${result}${reasons}</details></div>`;
+      <summary class="obs-zone-panel-header area-summary">${tile}${areaSummary(zoneId, zoneName(zoneId))}</summary>
+      <div class="area-body"><div class="area-status">${statusBtns}</div>${result}${reasons}</div></details></div>`;
   }).join('');
 }
-const AREA_DOT_TICK = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
-const AREA_DOT_DASH = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M5 12h14"/></svg>';
-const AREA_DOT_CROSS = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+const AREA_DOT_TICK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+const AREA_DOT_DASH = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"><path d="M5 12h14"/></svg>';
+const AREA_DOT_CROSS = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+const AREA_STATUS_ICONS = {
+  INSPECTED: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
+  NOT: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  NA: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>',
+};
+// Each area's own icon, on its tile.
+const AREA_ICON = paths => `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+const AREA_ICONS = {
+  interior: AREA_ICON('<path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3"/><path d="M2 16a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1.5a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5V11a2 2 0 0 0-4 0z"/><path d="M4 18v2"/><path d="M20 18v2"/>'),
+  exterior: AREA_ICON('<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9v12h14V9"/><path d="M10 21v-6h4v6"/>'),
+  subfloor: AREA_ICON('<path d="M2 5h20"/><path d="M2 9h20"/><path d="M6 9v10"/><path d="M12 9v10"/><path d="M18 9v10"/><path d="M2 19h20"/>'),
+  roofvoid: AREA_ICON('<path d="M2 17 12 6l10 11z"/><path d="M12 6v11"/><path d="M7 17l5-5 5 5"/>'),
+  outbuildings: AREA_ICON('<path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"/><path d="M6 18h12"/><path d="M6 14h12"/><path d="M6 10h12v12H6z"/>'),
+  site: AREA_ICON('<path d="M8 19a4 4 0 0 1-2.24-7.32A3.5 3.5 0 0 1 9 6.03V6a3 3 0 1 1 6 0v.04a3.5 3.5 0 0 1 3.24 5.65A4 4 0 0 1 16 19Z"/><path d="M12 19v3"/>'),
+  fences: AREA_ICON('<path d="M4 3 2 5v15c0 .6.4 1 1 1h2c.6 0 1-.4 1-1V5Z"/><path d="M6 8h4"/><path d="M6 18h4"/><path d="m12 3-2 2v15c0 .6.4 1 1 1h2c.6 0 1-.4 1-1V5Z"/><path d="M14 8h4"/><path d="M14 18h4"/><path d="m20 3-2 2v15c0 .6.4 1 1 1h2c.6 0 1-.4 1-1V5Z"/>'),
+  retainingwalls: AREA_ICON('<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 9v6"/><path d="M16 15v6"/><path d="M16 3v6"/><path d="M3 15h18"/><path d="M3 9h18"/><path d="M8 15v6"/><path d="M8 3v6"/>'),
+  landscapingtimbers: AREA_ICON('<rect x="2" y="15" width="20" height="5" rx="2.5"/><rect x="4" y="9" width="16" height="5" rx="2.5"/><rect x="6" y="3" width="12" height="5" rx="2.5"/>'),
+};
 
 // Each area is a row that opens when tapped, showing what's recorded so the
 // list reads at a glance. Which rows are open survives the re-render that
@@ -663,14 +685,18 @@ function zoneList(labels) {
 
 function areaSummary(zoneId, name) {
   const status = areaStatusOf(zoneId);
-  if (!status) return `<span class="area-sum-text"><span class="area-sum-name">${name}</span></span><span class="area-sum-state">Tap to mark</span>`;
+  const chev = '<svg class="area-sum-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+  if (!status) return `<span class="area-sum-text"><span class="area-sum-name">${name}</span><span class="area-sum-state">Tap to mark</span></span>${chev}`;
   const label = (AREA_STATUSES.find(([v]) => v === status) || [])[1] || status;
   const why = (reportData.areaReasons || {})[zoneId] || [];
   const found = areaWasEntered(zoneId) && areaResultOf(zoneId) === 'FOUND';
   const extra = why.length ? why[0] + (why.length > 1 ? ` +${why.length - 1}` : '') : (found ? 'Evidence found' : '');
+  // What's recorded reads under the name, as a job's step does: its status
+  // in colour, then why or what was found.
   return `<span class="area-sum-text"><span class="area-sum-name">${name}</span>`
-    + (extra ? `<span class="area-sum-why">${escapeHtml(extra)}</span>` : '')
-    + `</span><span class="area-sum-state area-sum-${status.toLowerCase()}">${label}</span>`;
+    + `<span class="area-sum-line"><span class="area-sum-state area-sum-${status.toLowerCase()}">${label}</span>`
+    + (extra ? `<span class="area-sum-why${found && !why.length ? ' area-sum-found' : ''}">${escapeHtml(extra)}</span>` : '')
+    + `</span></span>${chev}`;
 }
 
 function syncObstructionData() {
@@ -988,6 +1014,8 @@ function editAccessSpot(kind, key) {
   input.focus();
 }
 
+const ACCESS_CHEV = '<svg class="area-sum-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+const ACCESS_PIN = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
 const ACCESS_GROUP_ICONS = {
   hindered: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>',
   restricted: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
@@ -1011,16 +1039,20 @@ function renderAccessSummary() {
     if (!items.length && !noReason) return '';
     const why = noReason ? '<span class="access-item-why missing">No reason ticked yet</span>'
       : `<span class="access-item-why">${escapeHtml(items.join(', '))}</span>`;
-    const status = areaStatusOf(z) === 'NOT' ? 'Not inspected' : 'Inspected with limits';
+    const st = areaStatusOf(z) === 'NOT' ? 'not' : 'partial';
+    const status = st === 'not' ? 'Not inspected' : 'Inspected with limits';
     const kind = restricted ? 'restricted' : 'hindered';
-    return `<div class="access-item">
-      <span class="access-item-name">${zoneName(z)}</span>
-      <button type="button" class="access-item-state" onclick="openAreaRow('${z}')" aria-label="${status}. Change in Areas">${status}</button>${why}
+    // The area's head is the same as its card in Areas (its icon on a tile
+    // in its status colour) and opens it there.
+    const tile = `<span class="area-tile" aria-hidden="true">${AREA_ICONS[z] || ''}<span class="area-tile-badge">${st === 'not' ? AREA_DOT_CROSS : AREA_DOT_TICK}</span></span>`;
+    return `<div class="access-item access-item-${st}">
+      <button type="button" class="access-item-head" onclick="openAreaRow('${z}')" aria-label="${zoneName(z)}, ${status}. Change in Areas">${tile}
+        <span class="access-item-main"><span class="access-item-name">${zoneName(z)}</span><span class="access-item-state">${status}</span>${why}</span>${ACCESS_CHEV}</button>
       ${spotLine(kind, z)}${spotPhotos(kind, z)}</div>`;
   }).filter(Boolean);
   const spotLine = (kind, key) => {
     const spot = accessSpot(kind, key, accessZones(kind));
-    return `<button type="button" class="access-spot${spot ? '' : ' empty'}" data-kind="${kind}" data-key="${key}" onclick="editAccessSpot('${kind}','${key}')">${spot ? escapeHtml(spot) : '+ Add exact spot'}</button>`;
+    return `<button type="button" class="access-spot${spot ? '' : ' empty'}" data-kind="${kind}" data-key="${key}" onclick="editAccessSpot('${kind}','${key}')">${ACCESS_PIN}<span>${spot ? escapeHtml(spot) : 'Add exact spot'}</span></button>`;
   };
   // Photos of the spot, each with its own details box.
   const spotPhotos = (kind, key) => spotPhotosHTML(spotPhotoSection(kind, key));
@@ -1045,7 +1077,7 @@ function renderAccessSummary() {
     rows(true), allMarked);
   [hBox, rBox].forEach(hydrateSpotPhotos);
   const intro = document.getElementById('accessIntro');
-  if (intro) intro.innerHTML = allMarked || limited.length ? 'Filled in from your ticks in Areas. Tap a status to change it there, or add where exactly.'
+  if (intro) intro.innerHTML = allMarked || limited.length ? 'Filled in from your ticks in Areas. Tap an area to change it there, or add where exactly.'
     : `Mark every area above and these fill themselves in. <button type="button" class="link-btn" onclick="document.getElementById('section-obstructions').scrollIntoView({ behavior: 'smooth', block: 'start' })">Back to the areas</button>`;
   const hint = document.getElementById('accessHighRiskHint');
   if (hint) {

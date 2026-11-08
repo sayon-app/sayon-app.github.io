@@ -4219,6 +4219,11 @@ body.dark-screen .area-status-btn.status-na { background: rgba(147,163,179,0.2);
 .area-finding-prompt .area-finding-add { flex: none; }
 @media (max-width: 459px) { .area-finding-prompt { flex-wrap: wrap; } .area-finding-text { flex-basis: calc(100% - 68px); } .area-finding-prompt .area-finding-add { margin-left: 56px; } }
 body.dark-screen .area-finding-prompt .area-tile { background: rgba(255,90,79,0.12); border-color: rgba(255,90,79,0.35); }
+/* The same prompt inside the open finding card: "Write it up here?" */
+.finding-area-slot { margin: 10px 6px 0; background: rgba(192,57,43,0.05); border-color: rgba(192,57,43,0.28); }
+.finding-area-slot[hidden] { display: none; }
+.finding-area-slot .area-finding-add { min-width: 76px; justify-content: center; }
+body.dark-screen .finding-area-slot { background: rgba(255,90,79,0.07); border-color: rgba(255,90,79,0.3); }
 .area-evidence .link-btn { display: inline; margin-left: 4px; }
 .area-result-btn.result-found { background: rgba(192,57,43,0.12); border-color: var(--risk); color: var(--risk); }
 /* A moisture reading: where, the reading and a bin, at field size. */

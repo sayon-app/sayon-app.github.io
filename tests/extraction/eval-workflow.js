@@ -1,7 +1,7 @@
 export const meta = {
   name: 'extraction-eval',
   description: 'Run SAYON\'s extraction prompt over the test transcripts with Sonnet subagents and score each answer against its answer key',
-  whenToUse: 'Measuring a change to SYSTEM_PROMPT in js/app.js against tests/extraction/gold/',
+  whenToUse: 'Measuring a change to SYSTEM_PROMPT in js/app/prompts.js against tests/extraction/gold/',
   phases: [
     { title: 'Extract', detail: 'one Sonnet subagent per transcript per run, standing in for the app\'s model' },
     { title: 'Score', detail: 'score.mjs against each answer key' },
@@ -23,7 +23,7 @@ const model = args.model || 'sonnet'
 const dir = `${repo}/tests/extraction`
 
 const extractPrompt = (id, k) => `You are standing in for the AI model inside the SAYON app, which receives a system prompt and one user message and replies with JSON. Do exactly this and nothing else:
-1. Read ${repo}/js/app.js and find the line starting \`const SYSTEM_PROMPT = \`\`. Everything from just after that opening backtick to the closing backtick is your system prompt. Read all of it.
+1. Read ${repo}/js/app/prompts.js and find the line starting \`const SYSTEM_PROMPT = \`\`. Everything from just after that opening backtick to the closing backtick is your system prompt. Read all of it.
 2. Read ${dir}/transcripts/${id}.txt. That is the user's message: an inspector's dictated notes.
 3. Answer exactly as the system prompt instructs, as if it were your only instruction.
 4. Use the Write tool to save ONLY that answer (the raw JSON, no other text) to ${dir}/out/${tag}/${id}-run${k}.json.

@@ -10970,6 +10970,23 @@ async function deleteAccountRpc(dryRun) {
   return code ? DELETE_ACCOUNT_BLOCKERS[code] : 'Could not delete your account. Check your signal and try again';
 }
 
+// The owner's Stripe customer (name, email, saved card) goes with the
+// account, through the Worker. Returns an error message, or null to carry
+// on: a business with no Stripe customer, someone who isn't the owner (403), and
+// a Worker without this route yet (404) or without billing (503) all carry
+// on, so deleting an account never waits on billing being set up.
+async function deleteMyStripeCustomer() {
+  const res = await workerFetch('/stripe/delete-customer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  if (res.ok || res.status === 403 || res.status === 404 || res.status === 503) return null;
+  const err = await res.json().catch(() => ({}));
+  const code = Object.keys(DELETE_ACCOUNT_BLOCKERS).find(k => (err.message || '').includes(k));
+  return code ? DELETE_ACCOUNT_BLOCKERS[code] : 'Could not close your billing account. Check your signal and try again';
+}
+
 async function deleteMyPhotos() {
   await deleteMyFiles(PHOTO_BUCKET);
   // The PDFs behind client links: <user id>/<link folder>/<file>.pdf.
@@ -11026,6 +11043,8 @@ async function deleteMyAccount() {
   try {
     const blocked = await deleteAccountRpc(true);
     if (blocked) { showToast(blocked, 'error'); return; }
+    const billing = await deleteMyStripeCustomer();
+    if (billing) { showToast(billing, 'error'); return; }
     await deleteMyPhotos();
     const failed = await deleteAccountRpc(false);
     if (failed) { showToast(failed, 'error'); return; }

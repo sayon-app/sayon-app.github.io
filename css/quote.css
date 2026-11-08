@@ -783,3 +783,8 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-system-choice { background:
 .tp-report-link span { display: flex; flex-direction: column; gap: 2px; }
 .tp-report-link strong { font-size: calc(14px * var(--ts)); }
 .tp-report-link small { font-size: calc(12px * var(--ts)); color: var(--text2); line-height: 1.4; }
+
+/* Say the quote: the spoken-quote box at the top of the editor (js/quote.js) */
+#quoteEditor > .quote-voice { margin: 0 0 12px; }
+body:not(.dark-screen) #quoteEditor > .quote-voice { background: var(--accent-wash); border-color: var(--accent-edge); }
+body:not(.dark-screen) #quoteEditor > .quote-voice .sheet-voice-hint { color: var(--text2); }

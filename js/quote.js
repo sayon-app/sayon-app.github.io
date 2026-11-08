@@ -563,6 +563,103 @@ function applySpokenQuote(q, rd) {
   return true;
 }
 
+// ── SAY THE QUOTE ──
+// "Say the quote" on the quote screen: one spoken note adds, changes or
+// takes off lines and sets the terms, the way a quote dictated in a report
+// note does (SPOKEN QUOTE above), but onto the quote that's open. The AI is
+// shown the current lines, numbered, so "make it 14 stations" changes the
+// stations line rather than adding another. A line said with no price
+// starts at the business's own price (or SAYON's starting price, tagged).
+// Uses the report's "Say it instead" recorder (SAY IT INSTEAD in js/app/).
+function sayQuote() {
+  if (!quoteState) return;
+  if (isQuoteLocked()) { showToast('This job is complete, so the quote is locked', 'info'); return; }
+  if (quoteState.answer) { showToast('The client has answered this quote. Change it and they\'ll need to answer again', 'info'); }
+  toggleSheetVoice('quote');
+}
+
+function quoteVoicePrompt() {
+  const q = quoteState || { items: [] };
+  const lines = q.items.length
+    ? q.items.map((it, i) => `${i + 1}. ${it.desc || 'Untitled line'}: ${it.qty || 1} ${it.unit || 'job'} at $${it.price || 0} each`).join('\n')
+    : '(no lines yet)';
+  return `You update a timber pest treatment quote in SAYON, an app for Australian pest inspectors. The user message is what the inspector said, and the date today. The quote's current lines, numbered:
+${lines}
+
+Return ONLY a JSON object, no markdown:
+{"items":[{"line":number|null,"description":string,"qty":number|null,"unit":string|null,"price":number|null}],"remove":[number],"exclusions":[string],"paymentTerms":string|null,"timeframe":string|null,"servicePeriod":string|null,"notes":string|null}
+- items: one per piece of work they add or change, in the order said. line: the number of the current line it changes ("make it 14 stations" changes the stations line; "the barrier's $2,600" changes the barrier line), or null for new work. description: the work in plain client words ("Chemical soil barrier around the full perimeter", "Follow-up inspection"). qty and unit: the amount said ("48 linear metres" is qty 48, unit "lm"; "12 stations" is qty 12, unit "station"); null when not said. price: the dollar amount for ONE unit as a plain number ("$28 a metre" is 28; "48 metres, $2,400 all up" is qty 48, unit "lm", price 50; "$450" for one job is 450). Null when no amount was said for that line. Never invent a price.
+- remove: the numbers of current lines they say to take off, drop or not quote.
+- exclusions: each thing they say is not included, one per entry ("Repairs to the porch post").
+- paymentTerms: how the client pays, in their words ("50% deposit to book, balance on completion").
+- timeframe: how long the work takes, one of ${QUOTE_PLAN_TIMES.map(t => JSON.stringify(t)).join(', ')} when it fits, else as said. servicePeriod: a warranty or service period, one of ${QUOTE_PLAN_SERVICE.filter(t => t !== 'None').map(t => JSON.stringify(t)).join(', ')} when it fits. notes: anything else they want on the quote.
+- Spoken numbers become digits: "two thousand four hundred" is 2400, "four fifty" for a price is 450.
+- Only what was said. Never guess, and never repeat a current line they didn't mention.`;
+}
+
+let quoteVoiceChanges = 0;
+function applyQuoteVoice(f) {
+  quoteVoiceChanges = 0;
+  const q = quoteState;
+  if (!q || isQuoteLocked()) return 0;
+  const clean = v => (typeof v === 'string' ? v.trim() : '');
+  const num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v == null ? '' : v).replace(/[$,\s]/g, '')); return Number.isFinite(n) && n >= 0 ? n : null; };
+  const lines = q.items.slice();   // the numbers the AI was shown
+  const lineAt = v => { const i = Math.round(Number(v)); return i >= 1 && i <= lines.length ? lines[i - 1] : null; };
+  const removed = new Set((Array.isArray(f.remove) ? f.remove : []).map(lineAt).filter(Boolean));
+  let n = 0, mainLine = false;
+  (Array.isArray(f.items) ? f.items : []).forEach(it => {
+    if (!it || typeof it !== 'object') return;
+    const price = num(it.price), qty = num(it.qty), unit = clean(it.unit);
+    const line = lineAt(it.line);
+    if (line && !removed.has(line)) {
+      if (qty) line.qty = qty;
+      if (unit) line.unit = unit;
+      if (price != null) { line.price = price; line.priceSet = true; }
+      if (qty || unit || price != null) n++;
+      return;
+    }
+    const desc = clean(it.description);
+    if (!desc) return;
+    const key = spokenItemKey(desc, unit);
+    const over = { desc, qty: qty || 1, unit: unit || (QUOTE_CATALOGUE[key] || QUOTE_CATALOGUE.custom).unit, source: 'Said on the quote' };
+    if (price != null) Object.assign(over, { price, priceSet: true });
+    q.items.push(newQuoteItem(key, over));
+    if (['bait_install', 'barrier_lm', 'barrier_job', 'retic_lm', 'physical_lm'].includes(key)) mainLine = true;
+    n++;
+  });
+  if (removed.size) { q.items = q.items.filter(it => !removed.has(it)); n += removed.size; }
+  // A spoken main treatment answers "which system do you want to quote?".
+  if (mainLine && q.systemChoice && !q.systemChoice.picked) q.systemChoice = null;
+  const exclusions = (q.exclusions || '').split('\n').map(l => l.trim()).filter(Boolean);
+  (Array.isArray(f.exclusions) ? f.exclusions : []).map(clean).filter(Boolean).forEach(e => {
+    if (!exclusions.some(o => o.toLowerCase().replace(/\.$/, '') === e.toLowerCase().replace(/\.$/, ''))) { exclusions.push(e.replace(/\.?$/, '.')); n++; }
+  });
+  q.exclusions = exclusions.join('\n');
+  if (clean(f.paymentTerms)) { q.paymentTerms = clean(f.paymentTerms); n++; }
+  if (clean(f.timeframe) || clean(f.servicePeriod)) {
+    const src = currentQuoteSource();
+    q.plan = q.plan || buildQuotePlan(src && (src.key === (currentReportId || 'draft') ? reportData : src.reportData));
+    if (q.plan) {
+      if (clean(f.timeframe)) { q.plan.time = spokenPlanChoice(f.timeframe, QUOTE_PLAN_TIMES); n++; }
+      if (clean(f.servicePeriod)) { q.plan.service = spokenPlanChoice(f.servicePeriod, QUOTE_PLAN_SERVICE); n++; }
+    }
+  }
+  if (clean(f.notes) && !(q.notes || '').includes(clean(f.notes))) { q.notes = [q.notes, clean(f.notes)].filter(Boolean).join('\n'); n++; }
+  if (!n) return 0;
+  quoteVoiceChanges = n;
+  renderQuoteEditor();
+  persistQuote();
+  document.getElementById('quoteWorkFold').open = true;
+  track('quote_said', { changes: n, lines: q.items.length });
+  return n;
+}
+
+function quoteVoiceDone(n) {
+  if (!n) return 'Nothing in that note changes the quote';
+  return `Quote updated (${n} change${n === 1 ? '' : 's'}). Check the lines and prices`;
+}
+
 // What the quote fixes, in a sentence or two for the client, from the
 // report's findings: live termites and where, past activity, live borers,
 // and the conditions that invite termites. Locations are as the inspector
@@ -1006,6 +1103,7 @@ function openQuoteFromReport() {
 }
 
 function closeQuote() {
+  cancelSheetVoice('quote');
   clearTimeout(quoteSaveTimer);
   if (quoteState) { persistQuote(); storeQuoteOnReport(quoteState, true); }
   // Forget it, so the next open reads the stored copy, which a report send
@@ -1044,6 +1142,7 @@ function currentQuoteSource() {
 }
 
 function onQuoteSourceChange() {
+  cancelSheetVoice('quote');
   if (quoteState) { clearTimeout(quoteSaveTimer); persistQuote(); }
   const src = currentQuoteSource();
   const editor = document.getElementById('quoteEditor');

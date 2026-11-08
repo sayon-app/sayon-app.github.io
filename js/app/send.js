@@ -210,6 +210,8 @@ function openSendReview() {
          <div class="send-review-add-email"><input class="job-input" id="sendReviewEmail" type="email" placeholder="client@email.com" autocomplete="off">
          <button class="agreement-banner-btn" onclick="addSendReviewEmail()">Add</button></div>`);
 
+  renderSendReviewCopy();
+
   const attach = [`<div class="send-review-file"><div><div class="send-review-file-name">Inspection report</div>` +
     `<div class="send-review-file-meta">${esc(ensureReportNumber())} · version ${reportVersion()}</div></div>` +
     `<button class="link-btn" onclick="previewSendFile(0)">Preview</button></div>`];
@@ -296,6 +298,111 @@ function addSendReviewEmail() {
   openSendReview();
 }
 
+// ── A COPY FOR THE AGENT OR SOLICITOR ──
+// On a pre-purchase job the buyer's agent, solicitor or conveyancer often
+// needs the report too. The check sheet takes one more address
+// (reportData.copyTo = { email, at }); once the client's email has gone,
+// SAYON sends that address the report on its own, never the quote, with a
+// short note saying whose report it is. reportData.copySent records it.
+// Through the phone's mail app there is one email, so the sheet says to add
+// the address to it. Only with the client's OK, which the sheet says.
+const COPY_EMAIL_RE = /^[^\s@<>,;"()]+@[^\s@<>,;"()]+\.[^\s@<>,;"()]+$/;
+function sendCopyTo() {
+  const c = reportData.copyTo;
+  return c && typeof c.email === 'string' && COPY_EMAIL_RE.test(c.email.trim()) ? c.email.trim() : '';
+}
+
+function renderSendReviewCopy() {
+  const wrap = document.getElementById('sendReviewCopy');
+  if (!wrap) return;
+  const esc = escapeHtml;
+  const copy = sendCopyTo();
+  const sample = isSampleJob(currentReportId);
+  if (sample) { wrap.innerHTML = ''; wrap.hidden = true; return; }
+  wrap.hidden = false;
+  const sent = reportData.copySent && reportData.copySent.to === copy ? ` Sent ${formatIssueDate(reportData.copySent.at)}.` : '';
+  if (copy) {
+    wrap.innerHTML = `<div class="send-copy-row"><div><div class="send-review-file-name">Copy of the report to</div>` +
+      `<div class="send-review-email">${esc(copy)}</div>` +
+      `<div class="send-review-file-meta">${directEmail ? 'The report only, not the quote, once the client\'s email has gone.' : 'Add this address to the email yourself.'}${sent}</div></div>` +
+      (isReportLocked() ? '' : `<button class="link-btn" onclick="removeSendReviewCopy()">Remove</button>`) + '</div>';
+    return;
+  }
+  if (isReportLocked()) { wrap.innerHTML = ''; wrap.hidden = true; return; }
+  wrap.innerHTML = `<button type="button" class="link-btn send-copy-open" onclick="openSendReviewCopy()">Also send the report to an agent or solicitor</button>` +
+    `<div class="send-copy-add" id="sendCopyAdd" hidden><div class="send-review-add-email"><input class="job-input" id="sendCopyEmail" type="email" placeholder="agent@email.com" autocomplete="off" aria-label="Agent or solicitor's email">` +
+    `<button class="agreement-banner-btn" onclick="addSendReviewCopy()">Add</button></div>` +
+    `<div class="send-review-file-meta">Only with your client's OK. They get the report, not the quote.</div></div>`;
+}
+
+function openSendReviewCopy() {
+  const add = document.getElementById('sendCopyAdd');
+  const btn = document.querySelector('#sendReviewCopy .send-copy-open');
+  if (add) add.hidden = false;
+  if (btn) btn.hidden = true;
+  const input = document.getElementById('sendCopyEmail');
+  if (input) input.focus();
+}
+
+function addSendReviewCopy() {
+  const value = (document.getElementById('sendCopyEmail').value || '').trim();
+  if (!COPY_EMAIL_RE.test(value)) { showToast("That email address doesn't look right", 'error'); return; }
+  if (value.toLowerCase() === (reportData.jobClientEmail || '').trim().toLowerCase()) { showToast('That\'s the client\'s own email', 'info'); return; }
+  reportData.copyTo = { email: value, at: Date.now() };
+  saveDraft();
+  if (currentReportId) saveCurrentReport(true);
+  renderSendReviewCopy();
+}
+
+function removeSendReviewCopy() {
+  delete reportData.copyTo;
+  saveDraft();
+  if (currentReportId) saveCurrentReport(true);
+  renderSendReviewCopy();
+}
+
+// The report on its own to the copy address, through the Worker. A failure
+// here never undoes the client's send: it says so, and the copy can be
+// forwarded from the business's own copy of the email.
+async function sendReportCopy(file, to) {
+  const company = getCompanyDetails();
+  const replyTo = (company.email || '').trim();
+  const client = document.getElementById('jobClient').value.trim();
+  const address = getFullAddress();
+  const signOff = document.getElementById('jobInspector').value.trim();
+  const body = [
+    'Hi,',
+    '',
+    `Please find attached a copy of the timber pest inspection report for ${address || 'the property'}${client ? `, sent to ${client} today at their request` : ', sent at the client\'s request'}.`,
+    '',
+    `If you have any questions, just reply to this email${company.phone ? ` or call us on ${company.phone}` : ''}.`,
+    '',
+    'Kind regards,',
+    ...[signOff, company.name].filter(Boolean),
+  ].join('\n');
+  try {
+    const content = (await blobToDataUrl(file.blob)).split(',')[1];
+    const res = await workerFetch('/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject: `Copy: timber pest inspection report — ${address || 'the property'}`, text: body, attachments: [{ filename: file.fname, content }], fromName: company.name || '', replyTo }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || 'Could not send from SAYON');
+    }
+    reportData.copySent = { to, at: Date.now() };
+    saveDraft();
+    showToast(`Sent to the client, and a copy of the report to ${to}`, 'success');
+    track('report_copy_sent');
+    return true;
+  } catch (e) {
+    if (!sendFailedForSignal(e)) reportError(e, 'send_report_copy');
+    showToast(`The client's email went, but the copy to ${to} didn't (${sendFailureReason(e)}). Forward it from your own copy`, 'error');
+    return false;
+  }
+}
+
 // The fix buttons on the check sheet. Each changes the report, then the
 // sheet is redrawn from the report as it now is.
 function fixSendGap(kind) { fixReportGap(kind, 'send'); }
@@ -376,8 +483,10 @@ async function confirmSendReview() {
       body: document.getElementById('sendReviewBody').value,
     });
     if (!sent || sendReview !== r) return;
+    const copy = sendCopyTo();
+    if (copy && directEmail && !isSampleJob(currentReportId)) await sendReportCopy(files[0], copy);
     closeSendReview();
-    track('report_sent', { documents: files.length, with_quote: !!r.quote, with_link: !!r.link });
+    track('report_sent', { documents: files.length, with_quote: !!r.quote, with_link: !!r.link, with_copy: !!copy });
     if (r.quote) markQuoteSent(r.quote);
     recordReportSent(r.report.fingerprint, r.report.version);
   } finally {

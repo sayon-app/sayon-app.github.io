@@ -1014,15 +1014,18 @@ function sheetVoiceKinds() {
     agreement: { box: 'agreementVoice', prompt: agreementVoicePrompt, apply: applyAgreementVoice },
     treatment: { box: 'trVoice', prompt: typeof treatmentVoicePrompt === 'function' ? treatmentVoicePrompt : null, apply: typeof applyTreatmentVoice === 'function' ? applyTreatmentVoice : null },
     bait: { box: 'bvVoice', prompt: typeof baitVoicePrompt === 'function' ? baitVoicePrompt : null, apply: typeof applyBaitVoice === 'function' ? applyBaitVoice : null },
+    quote: { box: 'quoteVoice', idle: 'Say the quote', prompt: typeof quoteVoicePrompt === 'function' ? quoteVoicePrompt : null, apply: typeof applyQuoteVoice === 'function' ? applyQuoteVoice : null, done: typeof quoteVoiceDone === 'function' ? quoteVoiceDone : null },
   };
 }
 
 function setSheetVoiceState(kind, state, text) {
-  const box = document.getElementById(sheetVoiceKinds()[kind].box);
+  const k = sheetVoiceKinds()[kind];
+  const box = document.getElementById(k.box);
   if (!box) return;
   box.dataset.state = state;
+  const idle = k.idle || 'Say it instead';
   const label = box.querySelector('.sheet-voice-label');
-  if (label) label.textContent = { idle: 'Say it instead', listening: 'Listening… tap to stop', hearing: 'Hearing it…', filling: 'Filling it in…' }[state] || 'Say it instead';
+  if (label) label.textContent = { idle, listening: 'Listening… tap to stop', hearing: 'Hearing it…', filling: 'Filling it in…' }[state] || idle;
   const btn = box.querySelector('.sheet-voice-btn');
   if (btn) btn.disabled = state === 'hearing' || state === 'filling';
   const said = box.querySelector('.sheet-voice-text');
@@ -1159,7 +1162,7 @@ async function sheetVoiceFill(kind, text) {
     saveTestEvent(kind, text, { fields: fields || {}, boxesFilled: n }, null, seconds());
     flushTestHeard(kind);
     setSheetVoiceState(kind, 'idle', text);
-    showToast(n ? `Filled in ${n} box${n === 1 ? '' : 'es'}. Check them before you save` : 'Nothing in that note fits these boxes', n ? 'success' : 'info');
+    showToast(k.done ? k.done(n) : n ? `Filled in ${n} box${n === 1 ? '' : 'es'}. Check them before you save` : 'Nothing in that note fits these boxes', n ? 'success' : 'info');
     track('sheet_voice_filled', { kind, boxes: n });
   } catch (e) {
     saveTestEvent(kind, text, null, e && e.status ? 'http_' + e.status : 'failed', seconds());

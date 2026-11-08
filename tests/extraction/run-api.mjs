@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..');
 
-// Keep in step with requestExtraction() in js/app.js.
+// Keep in step with requestExtraction() in js/app/extraction.js.
 const MODEL = 'claude-sonnet-5';
 const MAX_TOKENS = 16000;
 const EFFORT = 'medium';
@@ -38,7 +38,7 @@ const key = process.env.ANTHROPIC_API_KEY;
 if (!key) { console.error('ANTHROPIC_API_KEY is not set'); process.exit(2); }
 const runs = Number(runsArg) || 1;
 const tag = tagArg || 'api';
-const system = readTemplate('js/app.js', 'SYSTEM_PROMPT');
+const system = readTemplate('js/app/prompts.js', 'SYSTEM_PROMPT');
 const transcript = readFileSync(join(here, 'transcripts', `${id}.txt`), 'utf8').trim();
 const outDir = join(here, 'out', tag);
 mkdirSync(outDir, { recursive: true });

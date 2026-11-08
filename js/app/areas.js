@@ -884,15 +884,20 @@ function spotPhotoSection(kind, key) { return `spot-${kind}-${key}`; }
 // photosBySection['finding-<finding id>']; they print inside its card.
 function findingPhotoSection(id) { return `finding-${id}`; }
 
-// A strip of photos, each with its own details box, and an add button.
+// A strip of photos, each with its own details box, Describe (the AI's
+// suggested caption, PHOTO DESCRIPTION in extraction.js) and an add button.
 const PHOTO_ADD_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>';
 function spotPhotosHTML(section) {
   const photos = (reportData.photosBySection || {})[section] || [];
   const cards = photos.map(p => `<div class="spot-photo">
       <img data-photo-id="${p.id}" alt="Photo">
       <input class="photo-caption-input spot-photo-caption" type="text" placeholder="Add details…" value="${escapeHtml(p.caption || '')}"
-        oninput="updateSectionPhotoCaption('${p.id}','${section}',this.value)">
-      <button type="button" class="photo-remove-btn" onclick="removeSpotPhoto('${p.id}','${section}')">Remove</button>
+        data-caption-for="${p.id}" oninput="updateSectionPhotoCaption('${p.id}','${section}',this.value)">
+      <div class="photo-actions">
+        ${describeButtonHTML(p)}
+        <button type="button" class="photo-remove-btn" onclick="removeSpotPhoto('${p.id}','${section}')">Remove</button>
+      </div>
+      ${photoSuggestionHTML(p)}
     </div>`).join('');
   return `<div class="spot-photos" data-section="${section}">${cards}
     <button type="button" class="spot-photo-add" onclick="addSpotPhoto('${section}')">${PHOTO_ADD_ICON}Add photo</button></div>`;

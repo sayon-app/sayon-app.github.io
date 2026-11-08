@@ -4120,8 +4120,37 @@ body.ai-busy:has(#app[style*="flex"]) .ai-busy-bar { display: block; }
 .spot-photo { display: grid; grid-template-columns: 72px 1fr; grid-template-rows: auto auto; column-gap: 10px; row-gap: 4px; align-items: start; }
 .spot-photo img { grid-row: 1 / span 2; width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); }
 .spot-photo .photo-caption-input { width: 100%; }
-.spot-photo .photo-remove-btn { justify-self: start; }
 .spot-photos .spot-photo-add { align-self: flex-start; margin: 0; }
+/* Describe: the AI looks at the photo and suggests its caption, shown in a
+   box under the caption until the inspector taps Use or Not this. */
+.spot-photo .photo-actions { grid-column: 2; }
+.photo-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.photo-actions .photo-remove-btn, .photo-card-footer .photo-remove-btn { margin-left: auto; }
+/* A photo in a two-across grid takes the full width while its suggestion
+   waits, so the words have room. */
+.section-photo-card:has(> .section-photo-body > .photo-suggest:not([hidden])),
+.photo-card:has(> .photo-card-body > .photo-suggest:not([hidden])) { grid-column: 1 / -1; }
+.section-photo-card:has(> .section-photo-body > .photo-suggest:not([hidden])) img,
+.photo-card:has(> .photo-card-body > .photo-suggest:not([hidden])) img { height: 160px; }
+.photo-describe-btn { display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 0 11px; border: 1px solid var(--border); border-radius: 99px; background: var(--surface); color: var(--accent2); font: 650 calc(12.5px * var(--ts)) 'Inter', sans-serif; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.photo-describe-btn[hidden] { display: none; }
+.photo-describe-btn:active { background: var(--surface2); }
+.photo-describe-btn:focus-visible { outline: 3px solid rgba(var(--accent-rgb), 0.45); outline-offset: 2px; }
+.photo-describe-btn:disabled { color: var(--text3); cursor: progress; }
+.photo-describe-btn:disabled .icon { animation: dockSpin 1.4s linear infinite; }
+.photo-card-footer .photo-describe-btn { min-height: 30px; padding: 0 8px; font-size: calc(11px * var(--ts)); }
+.photo-suggest { grid-column: 1 / -1; padding: 9px 11px 10px; border: 1px solid rgba(var(--accent-rgb), 0.35); border-radius: 10px; background: rgba(var(--accent-rgb), 0.06); }
+.photo-suggest[hidden] { display: none; }
+.photo-card-body .photo-suggest { margin-bottom: 6px; }
+.photo-suggest-label { display: flex; align-items: center; gap: 5px; font-size: calc(11px * var(--ts)); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent2); }
+.photo-suggest-label .icon { width: 12px; height: 12px; }
+.photo-suggest-text { margin: 4px 0 8px; font-size: calc(14px * var(--ts)); line-height: 1.4; color: var(--text); }
+.photo-suggest-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.photo-suggest-use { min-height: 36px; padding: 0 16px; border: 0; border-radius: 99px; background: var(--accent); color: #FFFFFF; font: 650 calc(13px * var(--ts)) 'Inter', sans-serif; cursor: pointer; }
+.photo-suggest-use:active { transform: scale(0.97); }
+.photo-suggest-skip { min-height: 36px; padding: 0 10px; border: 0; background: none; color: var(--text2); font: 600 calc(13px * var(--ts)) 'Inter', sans-serif; cursor: pointer; }
+.photo-suggest-use:focus-visible, .photo-suggest-skip:focus-visible { outline: 3px solid rgba(var(--accent-rgb), 0.45); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .photo-describe-btn:disabled .icon { animation: none; } }
 .access-item-why.missing { color: var(--yellow-text); font-weight: 600; }
 .access-hint { margin-top: 6px; font-size: calc(12px * var(--ts)); color: var(--text3); line-height: 1.45; }
 .res-disclaimer { margin:0 14px 12px; padding:10px 14px; background:rgba(245,162,35,0.07); border-left:3px solid var(--yellow); border-radius:0 6px 6px 0; font-size: calc(12px * var(--ts)); color:var(--text2); line-height:1.6; }

@@ -11,6 +11,7 @@ calls:
 | `POST /stripe/create-checkout-session` | Upgrade buttons | Returns a Stripe Checkout link for `starter` (Solo), `pro` (Team, 2 to 9 inspectors) or `business` (10 to 200), with `seats` as the quantity for the last two. A business already paying is switched in place instead |
 | `POST /stripe/update-seats` | Billing › Change to N | Changes how many inspectors a Team or Business plan pays for; never fewer than are on the team or invited |
 | `POST /stripe/create-portal-session` | Manage button | Returns a Stripe Billing Portal link (card, invoices, cancel) |
+| `POST /stripe/delete-customer` | Delete my account (v10) | Deletes the owner's Stripe customer just before the account goes. Refuses with 409 `ACTIVE_SUBSCRIPTION` or `HAS_TEAM`, like the account deletion |
 | `POST /stripe/webhook` | Stripe | Updates the `subscriptions` row when someone pays, changes plan or cancels |
 | `POST /send-email` | Send, Email to client, Email certificate | Emails the PDFs to the client from the business through Resend, with a copy to the business; answers 501 until Resend is set up, and the app then uses the phone's mail app |
 | `GET /maps-key` | Street Address box | Returns the Google Maps browser key from the `GOOGLE_MAPS_KEY` secret, so address suggestions work; answers 501 until it's set, and the box stays plain text |

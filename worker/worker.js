@@ -4,7 +4,18 @@
  * The API keys are stored as Cloudflare secrets and never exposed to the
  * browser or public repo. See worker/README.md for setup and deploy steps.
  *
- * CHANGES FROM v9.8 -> v9.9:
+ * CHANGES FROM v9.9 -> v10:
+ * - POST /stripe/delete-customer: when the owner deletes their account,
+ *   the app calls this just before the account itself is deleted, and the
+ *   business's Stripe customer (name, email, saved card) is deleted too.
+ *   Stripe keeps the invoices and payments already made, for the tax
+ *   records. It refuses, deleting nothing, while a subscription could
+ *   still bill (checked in Stripe itself, not just our row) or other
+ *   people are still on the team, the same checks the account deletion
+ *   makes. A business with no Stripe customer answers deleted: false.
+ *   Nothing else changes.
+ *
+ * CHANGES FROM v9.8 -> v9.9 (also in this version):
  * - /send-email also sends an email with no PDFs, as long as it has a
  *   message: the app's re-inspection reminder. { check: true } answers
  *   textOnly: true so the app knows. Nothing else changes.
@@ -969,6 +980,32 @@ async function handleStripeRoute(pathname, request, user, env, origin) {
       // new number straight away.
       await syncSubscription(updated, env, businessId);
       return reply(200, { seats });
+    }
+
+    if (pathname === '/stripe/delete-customer') {
+      if (!sub.stripe_customer_id) return reply(200, { deleted: false });
+      // Deleting a customer cancels its subscriptions on the spot, so ask
+      // Stripe itself rather than trusting the row, which a late webhook
+      // could have left behind.
+      const live = await stripeRequest(env, 'GET', `/subscriptions?customer=${encodeURIComponent(sub.stripe_customer_id)}&status=all&limit=10`);
+      if ((live.data || []).some(s => ['active', 'trialing', 'past_due', 'unpaid', 'incomplete', 'paused'].includes(s.status))) {
+        return reply(409, { message: 'ACTIVE_SUBSCRIPTION' });
+      }
+      const others = await fetch(
+        `${SUPABASE_URL}/rest/v1/team_members?business_id=eq.${businessId}&user_id=neq.${user.id}&select=user_id&limit=1`,
+        { headers: serviceHeadersFor(env) }
+      );
+      if (!others.ok) return reply(500, { message: 'Could not check your team' });
+      if ((await others.json()).length) return reply(409, { message: 'HAS_TEAM' });
+      try {
+        await stripeRequest(env, 'DELETE', `/customers/${encodeURIComponent(sub.stripe_customer_id)}`);
+      } catch (err) {
+        if (err.status !== 404) throw err; // 404: already deleted in Stripe
+      }
+      // If the account deletion then fails, the business carries on without
+      // a billing account and choosing a plan makes a fresh customer.
+      await updateSubscriptionRow(`business_id=eq.${businessId}`, { stripe_customer_id: null }, env);
+      return reply(200, { deleted: true });
     }
 
     if (pathname === '/stripe/create-portal-session') {

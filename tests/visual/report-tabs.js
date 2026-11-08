@@ -85,10 +85,10 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
     const prompt = p.locator('#findingsFromAreas .area-finding-prompt').filter({ hasText: zone.name.toLowerCase() });
     check(await prompt.count() === 1, `Findings asks for the evidence in ${zone.name}`);
     await prompt.scrollIntoViewIfNeeded(); await prompt.screenshot({ path: `${OUT}/findings-prompt-light.png` });
-    await prompt.locator('.area-finding-add').click(); await p.waitForTimeout(400);
+    await prompt.locator('.area-finding-add', { hasText: 'Termites' }).click(); await p.waitForTimeout(400);
     hs = await heads();
     const loc = await p.evaluate(() => getFindings().map(f => f.activityLocation || ''));
-    check(loc.some(l => l.startsWith(zone.label)), `Add finding starts a finding at ${zone.name}: ` + JSON.stringify(loc));
+    check(loc.some(l => l.startsWith(zone.label)), `Termites starts a finding at ${zone.name}: ` + JSON.stringify(loc));
     // Moisture readings: add one, then its bin removes it.
     await p.evaluate(() => { goStep('conducive'); document.querySelectorAll('details.fgroup').forEach(d => d.open = true); }); await p.waitForTimeout(400);
     const rows = () => p.evaluate(() => getMoistureTable().length);

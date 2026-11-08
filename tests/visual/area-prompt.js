@@ -1,9 +1,11 @@
 // The "evidence found" prompt on Findings, when an area is marked evidence
-// found in Areas but no finding describes it yet. With an open finding (no
-// place or description yet) the prompt sits inside that card and asks
-// "Write it up here?"; only further areas get their own "Add finding" at
-// the top. Starts a fresh report with its one empty finding, marks areas
-// evidence found and taps through. Shoots the card with the prompt in it.
+// found in Areas but no finding describes it yet. With Termites out of
+// sight (a fresh report), the prompt asks "What was it?" at the top. Once
+// Termites is shown with an open finding (no place or description yet), the
+// prompt sits inside that card and asks "Write it up here?"; only further
+// areas get their own "What was it?" at the top. Starts a fresh report with
+// its one empty finding, marks areas evidence found and taps through. Shoots
+// the card with the prompt in it.
 // Prints what it checks; a FAIL line means a check failed.
 // node area-prompt.js <outDir> [w]  (serve the repo on :8765; see README.md)
 // MODES=light,dark adds dark shots.
@@ -54,8 +56,12 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
     await p.evaluate(() => document.body.classList.remove('dark-screen'));
   };
 
-  // One empty finding: the prompt is in it, not a second "Add finding".
+  // Termites out of sight: the prompt asks what it was, at the top.
   let s = await state();
+  check(s.findings.length === 1 && s.top.length === 1 && /interior\. What was it\?/.test(s.top[0]) && !s.inCard.some(Boolean), 'with Termites out of sight, the prompt asks what it was: ' + JSON.stringify(s));
+  // Termites brought in: the prompt is in its one empty finding, not a second one.
+  await p.locator('#findingsMore .findings-more-btn', { hasText: 'Termites' }).click(); await p.waitForTimeout(400);
+  s = await state();
   check(s.findings.length === 1 && !s.top.length && /interior/.test(s.inCard[0]) && /Write it up here/.test(s.inCard[0]), 'with the one empty finding, the prompt sits inside it: ' + JSON.stringify(s));
   // The quick fill can't answer "no termites" over the interior.
   const nf = await p.evaluate(() => ({ title: document.querySelector('#nothingFound-findings strong').textContent, fillsTermites: nothingFoundBlanks('findings').includes('termites') }));
@@ -71,10 +77,10 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   // A second area: it gets its own prompt at the top, which adds a finding.
   await mark(['interior', 'subfloor']); await p.waitForTimeout(400);
   s = await state();
-  check(/interior/.test(s.inCard[0]) && s.top.length === 1 && /subfloor too/.test(s.top[0]), 'a second area is offered at the top as another finding: ' + JSON.stringify(s));
-  await p.locator('#findingsFromAreas .area-finding-add').click(); await p.waitForTimeout(500);
+  check(/interior/.test(s.inCard[0]) && s.top.length === 1 && /subfloor too\. What was it\?/.test(s.top[0]), 'a second area is asked about at the top: ' + JSON.stringify(s));
+  await p.locator('#findingsFromAreas .area-finding-add', { hasText: 'Termites' }).click(); await p.waitForTimeout(500);
   s = await state();
-  check(s.findings.length === 2 && s.findings[0].loc === '' && /^Subfloor/.test(s.findings[1].loc) && /interior/.test(s.inCard[0]), 'its Add finding adds a second finding and leaves the first for the interior: ' + JSON.stringify(s));
+  check(s.findings.length === 2 && s.findings[0].loc === '' && /^Subfloor/.test(s.findings[1].loc) && /interior/.test(s.inCard[0]), 'its Termites adds a second finding and leaves the first for the interior: ' + JSON.stringify(s));
 
   // Folded Termites: the prompt moves to the top; unfolded, it's back.
   await p.evaluate(() => { document.getElementById('fg-termites').open = false; }); await p.waitForTimeout(300);

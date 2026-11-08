@@ -2996,8 +2996,8 @@ body.dark-screen .fold-tick { color: #000; }
 .signature-pad-wrap {
   position: relative;
   background: #fff;
-  border: 1px dashed var(--border);
-  border-radius: 6px;
+  border: 1.5px dashed var(--border2);
+  border-radius: 14px;
   height: 110px;
   overflow: hidden;
 }
@@ -3037,22 +3037,27 @@ body.dark-screen .fold-tick { color: #000; }
 }
 .signature-status.signed { color: var(--green); }
 
+/* Clear and Open agreement: plain buttons like the job page's. */
 .signature-clear-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: calc(12px * var(--ts));
-  font-weight: 600;
-  color: var(--text2);
-  background: var(--surface2);
+  gap: 7px;
+  font: 650 calc(13.5px * var(--ts)) 'Inter', sans-serif;
+  color: var(--text);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 99px;
-  padding: 0 14px;
+  border-radius: 12px;
+  padding: 0 16px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: border-color 0.15s, background 0.15s;
   min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
 }
-.signature-clear-btn:hover { border-color: var(--accent); color: var(--accent2); }
+.signature-clear-btn:hover { border-color: rgba(var(--accent-rgb), 0.5); }
+.signature-clear-btn:active { transform: scale(0.97); background: var(--surface2); }
+.signature-clear-btn:focus-visible { outline: 3px solid rgba(var(--accent-rgb), 0.45); outline-offset: 2px; }
+body.dark-screen .signature-clear-btn { background: var(--surface2); border-color: var(--border2); }
 
 /* Photo attachment grid */
 .photo-toolbar {
@@ -3360,21 +3365,22 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
   padding: 14px;
   background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 14px;
   animation: findingsReveal 0.35s ease;
 }
 .system-verify-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: calc(12.5px * var(--ts));
-  font-weight: 700;
+  font-size: calc(15px * var(--ts));
+  font-weight: 650;
+  letter-spacing: -0.01em;
   color: var(--text);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 .system-verify-header .icon { color: var(--accent2); }
 .system-verify-hint {
-  font-size: calc(11px * var(--ts));
+  font-size: calc(12.5px * var(--ts));
   color: var(--text2);
   line-height: 1.4;
   margin-bottom: 12px;
@@ -3417,93 +3423,99 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
   padding: 0 14px 4px;
 }
 
+/* A finding is a card like an area's: its head has an icon tile in the
+   colour of its activity, where it is, and the activity and its number
+   under that, with a bin to remove it. */
 .finding-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.05);
   overflow: hidden;
   animation: findingsReveal 0.3s ease;
 }
-
 .finding-card-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  background: var(--surface2);
+  gap: 14px;
+  min-height: 72px;
+  padding: 12px 6px 12px 12px;
   border-bottom: 1px solid var(--border);
-  gap: 10px;
 }
-
+.finding-head-active .area-tile { background: rgba(192,57,43,0.1); border-color: rgba(192,57,43,0.3); color: var(--risk); }
+.finding-head-inactive .area-tile { background: rgba(245,162,35,0.12); border-color: rgba(212,146,10,0.4); color: var(--yellow-text); }
+.finding-head-none .area-tile { background: var(--green-wash); border-color: var(--green-edge); color: var(--green); }
 .finding-card-label {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 3px;
   min-width: 0;
-  font-size: calc(15px * var(--ts));
-  font-weight: 700;
-  color: var(--text);
   flex: 1;
+  font-size: calc(15.5px * var(--ts));
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
-.finding-card-label small { font-size: calc(12px * var(--ts)); font-weight: 500; color: var(--text3); }
+.finding-card-label small { display: flex; flex-wrap: wrap; gap: 0 6px; font-size: calc(13.5px * var(--ts)); font-weight: 500; line-height: 1.35; letter-spacing: 0; color: var(--text3); }
 .finding-card-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-
-.finding-activity-chip {
-  font-size: calc(10.5px * var(--ts));
-  font-weight: 800;
-  padding: 3px 10px;
-  border-radius: 99px;
-  letter-spacing: 0.5px;
-  flex-shrink: 0;
-}
-.finding-activity-chip.ACTIVE   { background: rgba(192,57,43,0.15); color: var(--risk); }
-.finding-activity-chip.INACTIVE { background: rgba(255,182,72,0.15); color: var(--yellow-text); }
-.finding-activity-chip.NONE     { background: rgba(var(--green-rgb),0.12); color: var(--green); }
-.finding-activity-chip.unset    { background: var(--surface3); color: var(--text3); }
+.finding-act { font-weight: 600; }
+.finding-head-active .finding-act { color: var(--risk); }
+.finding-head-inactive .finding-act { color: var(--yellow-text); }
+.finding-head-none .finding-act { color: var(--green); }
+.finding-tile-num { width: calc(21px * var(--ts)); height: calc(21px * var(--ts)); right: -6px; bottom: -6px; background: var(--text3); font-size: calc(11px * var(--ts)); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.finding-head-active .finding-tile-num { background: var(--risk); }
+.finding-head-inactive .finding-tile-num { background: var(--yellow); }
+.finding-head-none .finding-tile-num { background: var(--green-fill); }
 
 .finding-remove-btn {
-  background: none;
-  border: none;
-  color: var(--text3);
-  cursor: pointer;
-  padding: 0;
-  font-size: calc(15px * var(--ts));
-  border-radius: 4px;
-  transition: color 0.15s;
   flex-shrink: 0;
   width: 44px;
   height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 12px;
+  color: var(--text3);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
 }
-.finding-remove-btn:hover { color: var(--risk); }
+.finding-remove-btn:hover, .finding-remove-btn:active { color: var(--risk); background: rgba(192,57,43,0.08); }
+.finding-remove-btn:focus-visible { outline: 3px solid rgba(var(--accent-rgb), 0.45); outline-offset: 0; }
 
 .finding-card-body { padding: 4px 0 6px; }
 
+/* Add another finding, borer finding or reading: a plain button with a
+   plus, like the job page's buttons. */
 .findings-add-btn {
   display: flex;
   align-items: center;
-  gap: 7px;
+  justify-content: center;
+  gap: 8px;
   margin: 6px 14px 14px;
-  padding: 10px 14px;
-  background: var(--surface2);
-  border: 1px dashed var(--border);
-  border-radius: 9px;
-  color: var(--text2);
-  font-size: calc(12px * var(--ts));
-  font-weight: 600;
-  cursor: pointer;
+  padding: 0 16px;
+  min-height: 48px;
   width: calc(100% - 28px);
-  transition: border-color 0.15s, color 0.15s;
-  min-height: 44px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--accent2);
+  font: 650 calc(14px * var(--ts)) 'Inter', sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, background 0.15s;
 }
-.findings-add-btn:hover { border-color: var(--accent); color: var(--accent2); }
+.findings-add-btn svg { flex: none; width: 16px; height: 16px; stroke-width: 2.4; }
+.findings-add-btn:hover { border-color: rgba(var(--accent-rgb), 0.5); }
+.findings-add-btn:active { transform: scale(0.98); background: var(--surface2); }
+.findings-add-btn:focus-visible { outline: 3px solid rgba(var(--accent-rgb), 0.45); outline-offset: 2px; }
 .findings-add-btn.at-cap { opacity: 0.4; cursor: not-allowed; }
 /* Borer finding cards sit inside the borers box, under the borer question. */
 #borerFindingsList { display: flex; flex-direction: column; gap: 10px; }
 .system-verify .borer-card .section-fields { padding: 14px 16px; }
-.borer-findings .findings-add-btn { margin: 10px 0 0; width: 100%; }
+.borer-findings .findings-add-btn, .system-verify .findings-add-btn { margin: 10px 0 0; width: 100%; }
 .borer-findings .findings-add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 /* "Nothing found" shortcut at the top of Findings and Conducive Conditions. */
 .nothing-found-btn {
@@ -3967,62 +3979,76 @@ body.ai-busy:has(#app[style*="flex"]) .ai-busy-bar { display: block; }
 
 /* ── SECTION PHOTO WIDGET ── */
 .section-photo-hint { font-size: calc(12px * var(--ts)); color: var(--text3); padding: 8px 12px 0; }
+/* A section's photo box, in the job page's look: a card whose head has a
+   photo tile, the title over the count, and Add photo as a plain button. */
 .section-photo-widget {
   margin: 8px 14px 4px;
-  border: 1px solid #B8CDE0;
-  border-radius: 10px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
   overflow: hidden;
-  box-shadow: inset 0 2px 4px rgba(0,40,80,0.04);
 }
 .section-photo-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 9px 12px;
-  background: var(--surface2);
+  gap: 8px 12px;
+  min-height: 64px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   user-select: none;
 }
 .section-photo-header-left {
-  display: flex;
-  flex-wrap: wrap;
+  flex: 1 1 150px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 1px;
   align-items: center;
-  gap: 2px 8px;
   min-width: 0;
-  font-size: calc(12px * var(--ts));
-  font-weight: 600;
-  color: var(--text2);
+  font-size: calc(15px * var(--ts));
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
-/* The icon stays beside its title; on a narrow phone the count goes under. */
-.section-photo-title { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
-.section-photo-header-left svg { flex: none; color: var(--accent2); }
+/* The title's icon becomes the tile, beside the title and the count. */
+.section-photo-title { display: contents; }
+.section-photo-header-left svg {
+  grid-row: 1 / span 2; width: 36px; height: 36px; padding: 9px; box-sizing: border-box;
+  border-radius: 10px; background: rgba(var(--accent-rgb), 0.1); color: var(--accent2);
+}
 .section-photo-count {
-  white-space: nowrap;
-  font-size: calc(12px * var(--ts));
+  font-size: calc(13px * var(--ts));
   font-weight: 500;
+  letter-spacing: 0;
   color: var(--text3);
 }
-.section-photo-add-btn {
-  display: flex;
+.section-photo-count:empty { display: none; }
+.section-photo-add-btn, .spot-photo-add {
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  white-space: nowrap;
+  gap: 7px;
   flex-shrink: 0;
-  padding: 6px 14px;
-  background: rgba(var(--accent-rgb),0.1);
-  border: 1px solid rgba(var(--accent-rgb),0.3);
-  border-radius: 6px;
-  color: var(--accent2);
-  font-family: 'Inter', sans-serif;
-  font-size: calc(12.5px * var(--ts));
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
   min-height: 44px;
+  padding: 0 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--accent2);
+  font: 650 calc(13.5px * var(--ts)) 'Inter', sans-serif;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, background 0.15s;
 }
-.section-photo-add-btn:hover { background: rgba(var(--accent-rgb),0.18); }
+.section-photo-add-btn svg, .spot-photo-add svg { flex: none; }
+.section-photo-add-btn:hover, .spot-photo-add:hover { border-color: rgba(var(--accent-rgb), 0.5); text-decoration: none; }
+.section-photo-add-btn:active, .spot-photo-add:active { transform: scale(0.97); background: var(--surface2); }
+.section-photo-add-btn:focus-visible, .spot-photo-add:focus-visible { outline: 3px solid rgba(var(--accent-rgb), 0.45); outline-offset: 2px; }
 .section-photo-add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .section-photo-grid {
   padding: 10px;
@@ -4095,7 +4121,7 @@ body.ai-busy:has(#app[style*="flex"]) .ai-busy-bar { display: block; }
 .spot-photo img { grid-row: 1 / span 2; width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); }
 .spot-photo .photo-caption-input { width: 100%; }
 .spot-photo .photo-remove-btn { justify-self: start; }
-.spot-photo-add { align-self: flex-start; font-size: calc(13px * var(--ts)); min-height: 32px; }
+.spot-photos .spot-photo-add { align-self: flex-start; margin: 0; }
 .access-item-why.missing { color: var(--yellow-text); font-weight: 600; }
 .access-hint { margin-top: 6px; font-size: calc(12px * var(--ts)); color: var(--text3); line-height: 1.45; }
 .res-disclaimer { margin:0 14px 12px; padding:10px 14px; background:rgba(245,162,35,0.07); border-left:3px solid var(--yellow); border-radius:0 6px 6px 0; font-size: calc(12px * var(--ts)); color:var(--text2); line-height:1.6; }
@@ -4186,13 +4212,26 @@ body.dark-screen .area-status-btn.status-na { background: rgba(147,163,179,0.2);
 .area-result-btn.result-clear { background: rgba(var(--green-rgb),0.12); border-color: rgb(var(--green-rgb)); color: var(--green); }
 .area-evidence { padding: 0 12px 10px; font-size: calc(12px * var(--ts)); color: var(--text2); line-height: 1.45; }
 .area-finding-prompts { display: flex; flex-direction: column; gap: 8px; padding: 10px 14px 0; }
-.area-finding-prompt { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface2); font-size: calc(13px * var(--ts)); color: var(--text2); line-height: 1.4; }
-.area-finding-prompt .link-btn { flex: none; }
+.area-finding-prompt { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 10px 10px 12px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); font-size: calc(13.5px * var(--ts)); line-height: 1.35; color: var(--text2); }
+.area-finding-prompt .area-tile { background: rgba(192,57,43,0.1); border-color: rgba(192,57,43,0.3); color: var(--risk); }
+.area-finding-text { flex: 1; min-width: 0; }
+.area-finding-text strong { color: var(--text); font-weight: 650; }
+.area-finding-prompt .area-finding-add { flex: none; }
+@media (max-width: 459px) { .area-finding-prompt { flex-wrap: wrap; } .area-finding-text { flex-basis: calc(100% - 68px); } .area-finding-prompt .area-finding-add { margin-left: 56px; } }
+body.dark-screen .area-finding-prompt .area-tile { background: rgba(255,90,79,0.12); border-color: rgba(255,90,79,0.35); }
+/* The same prompt inside the open finding card: "Write it up here?" */
+.finding-area-slot { margin: 10px 6px 0; background: rgba(192,57,43,0.05); border-color: rgba(192,57,43,0.28); }
+.finding-area-slot[hidden] { display: none; }
+.finding-area-slot .area-finding-add { min-width: 76px; justify-content: center; }
+body.dark-screen .finding-area-slot { background: rgba(255,90,79,0.07); border-color: rgba(255,90,79,0.3); }
 .area-evidence .link-btn { display: inline; margin-left: 4px; }
 .area-result-btn.result-found { background: rgba(192,57,43,0.12); border-color: var(--risk); color: var(--risk); }
-.moisture-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
-.moisture-row .photo-caption-input { flex: 1; min-width: 0; }
-.moisture-row .moisture-reading { flex: 0 0 80px; }
+/* A moisture reading: where, the reading and a bin, at field size. */
+.moisture-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.moisture-row .photo-caption-input { flex: 1; min-width: 0; min-height: 48px; margin: 0; padding: 10px 12px; border-radius: 12px; font-size: calc(16px * var(--ts)); }
+.moisture-row .moisture-reading { flex: 0 0 84px; text-align: center; font-variant-numeric: tabular-nums; }
+.moisture-row .photo-remove-btn { flex: none; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border-radius: 12px; color: var(--text3); text-decoration: none; }
+.moisture-row .photo-remove-btn:hover, .moisture-row .photo-remove-btn:active { color: var(--risk); background: rgba(192,57,43,0.08); text-decoration: none; }
 .high-risk-prompt {
   display: flex;
   align-items: flex-start;
@@ -4738,15 +4777,13 @@ body:not(.dark-screen) .report-section .section-header h3 .sec-num { color: rgb(
     font-size: calc(15px * var(--ts));
   }
 }
-/* Cards inside a section (findings, area rows, access groups) take the
-   same fading line under their heading. */
-body:not(.dark-screen) .finding-card-header,
+/* Cards inside a section (area rows, access groups) take the same fading
+   line under their heading. */
 body:not(.dark-screen) .obs-zone-panel[open] > .obs-zone-panel-header,
 body:not(.dark-screen) .access-group-head {
   border-bottom: 1px solid rgba(var(--glow),0.5);
   border-image: linear-gradient(90deg, rgba(var(--glow),0.75), rgba(var(--glow-hi),0.35) 50%, rgba(var(--glow-hi),0)) 1;
 }
-body:not(.dark-screen) .finding-card-header { background: linear-gradient(135deg, rgba(var(--glow),0.10), rgba(var(--glow),0) 70%), var(--surface2); }
 /* A picked answer glows in its own colour (red, amber, green or grey). */
 @supports (color: color-mix(in srgb, red 50%, transparent)) {
   body:not(.dark-screen) .choice-card:has(input:checked),
@@ -4996,11 +5033,6 @@ body:not(.dark-screen) .choice-card { transition: background-color 0.3s, border-
 #section-restrictions .access-spot svg { flex: none; color: var(--text3); }
 #section-restrictions .access-spot.empty svg { color: var(--accent2); }
 #section-restrictions .spot-photos { margin-top: 0; }
-#section-restrictions .spot-photo-add {
-  min-height: 44px; margin: 0; padding: 0 14px; display: inline-flex; align-items: center; gap: 7px;
-  border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--accent2);
-  font-weight: 650; text-decoration: none;
-}
 #section-restrictions .spot-photo img { border-radius: 10px; }
 @media (max-width: 359px) {
   #section-restrictions .access-item-head ~ .access-spot,
@@ -5010,7 +5042,11 @@ body:not(.dark-screen) .choice-card { transition: background-color 0.3s, border-
 body.dark-screen .access-item-partial .area-tile { background: rgba(255,176,0,0.12); border-color: rgba(255,176,0,0.35); }
 body.dark-screen .access-item-not .area-tile { background: rgba(255,90,79,0.12); border-color: rgba(255,90,79,0.35); }
 body.dark-screen #section-restrictions .access-group { box-shadow: none; }
-body.dark-screen #section-restrictions .spot-photo-add { background: var(--surface2); border-color: var(--border2); }
+body.dark-screen .spot-photo-add, body.dark-screen .section-photo-add-btn, body.dark-screen .findings-add-btn { background: var(--surface2); border-color: var(--border2); }
+body.dark-screen .finding-card { box-shadow: none; }
+body.dark-screen .finding-head-active .area-tile { background: rgba(255,90,79,0.12); border-color: rgba(255,90,79,0.35); }
+body.dark-screen .finding-head-inactive .area-tile { background: rgba(255,176,0,0.12); border-color: rgba(255,176,0,0.35); }
+body.dark-screen .finding-head-none .area-tile { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.35); }
 
 /* Dark screen: tinted tiles and buttons on the dark cards. */
 body.dark-screen #areaChecklist .obs-zone-panel { box-shadow: none; }
@@ -5635,7 +5671,17 @@ body:not(.dark-screen) .next-section-btn.pending:hover { background: rgba(var(--
 .fgroup-started .fgroup-count { background: rgba(255,182,72,0.1); color: var(--yellow-text); border-color: rgba(255,182,72,0.3); }
 .fgroup-done .fgroup-count { background: rgba(var(--green-rgb),0.1); color: var(--green); border-color: rgba(var(--green-rgb),0.3); }
 .fgroup-done .fgroup-count::before { content: '✓ '; }
+.fgroup-count:empty { display: none; }
 .fgroup-chev { flex-shrink: 0; color: var(--text3); transition: transform 0.2s ease; }
+/* Large text on a phone: the count goes under the title, so a short title
+   isn't run over by it. */
+@media (max-width: 459px) {
+  body.text-size-large .fgroup-head, body.text-size-xl .fgroup-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 10px; row-gap: 4px; }
+  body.text-size-large .fgroup-head > .fgroup-icon, body.text-size-xl .fgroup-head > .fgroup-icon { grid-row: 1 / span 2; }
+  body.text-size-large .fgroup-head > .fgroup-text, body.text-size-xl .fgroup-head > .fgroup-text { grid-column: 2; grid-row: 1; }
+  body.text-size-large .fgroup-head > .fgroup-count, body.text-size-xl .fgroup-head > .fgroup-count { grid-column: 2; grid-row: 2; justify-self: start; }
+  body.text-size-large .fgroup-head > .fgroup-chev, body.text-size-xl .fgroup-head > .fgroup-chev { grid-column: 3; grid-row: 1 / span 2; }
+}
 .fgroup[open] .fgroup-chev { transform: rotate(180deg); }
 .fgroup > .section-fields { padding-top: 2px; }
 .fgroup > :last-child { margin-bottom: 14px; }
@@ -5683,8 +5729,8 @@ body.dark-screen .report-section.grouped > details.fgroup { border-width: 2px; b
 .fgroup-hint { margin: 12px 12px 0; font-size: calc(12.5px * var(--ts)); line-height: 1.45; color: var(--text3); }
 .fgroup-hint + .section-fields { padding-top: 10px; }
 .report-section.grouped > details.fgroup > .findings-list { padding: 10px 8px 2px; }
-.report-section.grouped > details.fgroup > .findings-add-btn,
 .report-section.grouped > details.fgroup > .findings-none { margin-left: 8px; margin-right: 8px; width: auto; }
+.report-section.grouped > details.fgroup > .findings-add-btn { margin-left: 8px; margin-right: 8px; width: calc(100% - 16px); }
 .report-section.grouped > details.fgroup > .rec-lines { margin: 12px 12px 0; }
 .report-section.grouped > details.fgroup > .warn-note { margin: 0 12px 14px; }
 /* Sign-off: inspector details side by side, then the signature. */

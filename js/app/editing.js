@@ -480,8 +480,13 @@ function applyFieldCascade(key, value, el, prev) {
 }
 
 function commitEdit(el, key, value) {
-  if (key === 'borerActivity' && ['ACTIVE', 'INACTIVE'].includes(value) && !getBorerFindings().length) {
-    reportData.borerFindings.push({ id: genFindingId(), borerActivity: value });
+  untrackNoneFromAreas(key);
+  if (key === 'borerActivity' && ['ACTIVE', 'INACTIVE'].includes(value)) {
+    // Borers found: the first card is ready, and a lone card waiting on its
+    // activity (one started for an area) takes this answer.
+    const cards = getBorerFindings();
+    if (!cards.length) cards.push({ id: genFindingId(), borerActivity: value });
+    else if (cards.length === 1 && !cards[0].borerActivity) cards[0].borerActivity = value;
   }
   el.classList.remove('editing');
   el.innerHTML = ''; // clear input + actions bar before re-rendering
@@ -704,9 +709,11 @@ const FGROUP_CUSTOM = {
     const acts = list.map(f => f.termiteActivity).filter(Boolean);
     const live = acts.filter(a => a === 'ACTIVE').length, old = acts.filter(a => a === 'INACTIVE').length;
     const found = [live && `${live} active`, old && `${old} inactive`].filter(Boolean);
+    // The count is of termites found, so a card not answered yet doesn't
+    // read as "1 finding".
     return {
       done: list.length > 0 && acts.length === list.length, started: acts.length > 0,
-      count: list.length ? `${list.length} finding${list.length === 1 ? '' : 's'}` : '',
+      count: live + old ? `${live + old} finding${live + old === 1 ? '' : 's'}` : '',
       text: found.length ? 'Found: ' + found.join(', ') : acts.length ? 'No termites found' : '', concern: found.length > 0,
     };
   },
@@ -773,9 +780,14 @@ function foldAnsweredGroups(stepId) {
   });
 }
 
-// Opens any folded group around el, so a jump to a question can show it.
+// Opens any folded group around el, so a jump to a question can show it,
+// and brings in a Findings group that's out of sight.
 function openFieldGroups(el) {
   for (let n = el && el.parentElement; n; n = n.parentElement) {
+    if (n.matches && n.matches('details.fgroup[hidden]')) {
+      const g = FINDINGS_GROUPS.find(x => x.el === n.id);
+      if (g) revealFindingsGroup(g.id);
+    }
     if (n.matches && n.matches('details.fgroup') && !n.open) n.open = true;
   }
 }
@@ -857,6 +869,7 @@ function updateProgress() {
   syncDockJobs();
   renderDocStrips();
   syncNothingFoundButtons();
+  syncFindingsGroups();
 }
 
 // ── SIGNATURE PADS ──────────────────────────────────────────────────────

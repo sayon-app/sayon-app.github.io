@@ -3463,7 +3463,7 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 .finding-head-active .finding-act { color: var(--risk); }
 .finding-head-inactive .finding-act { color: var(--yellow-text); }
 .finding-head-none .finding-act { color: var(--green); }
-.finding-tile-num { width: calc(21px * var(--ts)); height: calc(21px * var(--ts)); right: -6px; bottom: -6px; background: var(--text3); font-size: calc(11px * var(--ts)); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.area-tile-badge.finding-tile-num { width: calc(21px * var(--ts)); height: calc(21px * var(--ts)); right: -6px; bottom: -6px; background: var(--text3); font-size: calc(11px * var(--ts)); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
 .finding-head-active .finding-tile-num { background: var(--risk); }
 .finding-head-inactive .finding-tile-num { background: var(--yellow); }
 .finding-head-none .finding-tile-num { background: var(--green-fill); }
@@ -4253,6 +4253,35 @@ body.dark-screen .area-finding-prompt .area-tile { background: rgba(255,90,79,0.
 .finding-area-slot[hidden] { display: none; }
 .finding-area-slot .area-finding-add { min-width: 76px; justify-content: center; }
 body.dark-screen .finding-area-slot { background: rgba(255,90,79,0.07); border-color: rgba(255,90,79,0.3); }
+/* "What was it?" under an area's evidence: termites, borers, rot or
+   delignification, two to a row on a phone. */
+.area-finding-prompt.has-picks { flex-wrap: wrap; }
+.area-finding-picks { flex-basis: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.area-finding-prompt .area-finding-picks .area-finding-add { margin: 0; justify-content: center; white-space: normal; text-align: center; line-height: 1.2; }
+.area-finding-prompt .area-finding-picks .area-finding-add { padding: 0 8px; }
+@media (min-width: 460px) { .area-finding-picks { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 359px) { body.text-size-xl .area-finding-picks { grid-template-columns: 1fr; } }
+/* Findings groups out of sight until something calls for them, and the
+   box that says what they hold, with a button to bring each in. */
+.report-section.grouped > details.fgroup[hidden] { display: none; }
+.findings-more {
+  margin: 10px 8px 0; padding: 14px 12px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 3px rgba(13,40,60,0.07);
+}
+.findings-more[hidden] { display: none; }
+.findings-more-state { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+.findings-more-icon {
+  flex: none; width: 40px; height: 40px; box-sizing: border-box; border-radius: 12px; display: grid; place-items: center;
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text3);
+}
+.findings-more-state.is-none .findings-more-icon { background: var(--green-wash); border-color: var(--green-edge); color: var(--green); }
+.findings-more-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.findings-more-text strong { font-size: calc(15px * var(--ts)); font-weight: 650; line-height: 1.3; letter-spacing: -0.01em; color: var(--text); }
+.findings-more-text small { font-size: calc(13px * var(--ts)); line-height: 1.4; color: var(--text3); }
+.findings-more-label { display: block; margin-bottom: 10px; font-size: calc(13px * var(--ts)); font-weight: 600; color: var(--text2); }
+.findings-more-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+body.dark-screen .findings-more { border-width: 2px; box-shadow: none; }
+body.dark-screen .findings-more-state.is-none .findings-more-icon { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.35); }
 .area-evidence .link-btn { display: inline; margin-left: 4px; }
 .area-result-btn.result-found { background: rgba(192,57,43,0.12); border-color: var(--risk); color: var(--risk); }
 /* A moisture reading: where, the reading and a bin, at field size. */

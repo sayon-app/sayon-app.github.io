@@ -207,6 +207,7 @@ function populateFields(data, transcript) {
     });
     incoming = accepted;
 
+    if (incoming.length) untrackNoneFromAreas('termites');
     if (incoming.length) {
       const combined = [...kept, ...incoming];
       reportData.findings = combined.slice(0, MAX_FINDINGS);
@@ -355,6 +356,7 @@ function populateFields(data, transcript) {
         else if (!val.toLowerCase().includes(have)) val = prev.replace(/[.;,\s]+$/, '') + '; ' + val;
       }
       reportData[key] = val;
+      untrackNoneFromAreas(key);
       rememberAiFill(key, own, transcript);
       // FIX: apply the same cross-field cascade manual edits get (reveal/
       // hide dependent fields, clear fields that are no longer valid) - see
@@ -644,8 +646,10 @@ function syncAllSelectCards() { Object.keys(SELECT_CARDS).forEach(syncSelectCard
 
 // A finding's head, in the look of an area's card: an icon tile in the
 // colour of its activity (red active, amber inactive, green nothing found,
-// grey not answered yet) with the finding's number on its corner, where it
-// is, and under that the activity in its colour.
+// grey not answered yet), where it is, and under that the activity in its
+// colour. The finding's number sits on the tile's corner only once its
+// activity is picked and there's more than one finding to tell apart: a
+// lone or unanswered card with a "1" on it read as "1 active".
 const FINDING_ICON = paths => `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
 const FINDING_ICONS = {
   termite: FINDING_ICON('<path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M9 7.13v-1a3 3 0 1 1 6 0v1"/><path d="M6 13H2M22 13h-4M6.53 9C4.6 8.8 3 7.1 3 5M21 5c0 2.1-1.6 3.8-3.5 4M3 21c0-2.1 1.7-3.9 3.8-4M17.2 17c2.1.1 3.8 1.9 3.8 4"/>'),
@@ -656,11 +660,11 @@ const FINDING_REMOVE_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fil
 function findingHeadHTML(icon, where, label, num, act, removeCall, removeLabel) {
   const state = act ? act.toLowerCase() : 'unset';
   const status = act ? FINDING_ACT_LABEL[act] || act : 'Not answered yet';
-  // The finding's number sits on the tile's corner; the title is where it
-  // is, or the number when that isn't known yet.
+  // The title is where it is, or the label when that isn't known yet. num
+  // is null when the corner number isn't shown (see above).
   where = String(where || '').replace(/[\s:;,–—-]+$/, '');
   return `<div class="finding-card-header finding-head-${state}">
-        <span class="area-tile finding-tile" aria-hidden="true">${icon}<span class="area-tile-badge finding-tile-num">${num}</span></span>
+        <span class="area-tile finding-tile" aria-hidden="true">${icon}${num ? `<span class="area-tile-badge finding-tile-num">${num}</span>` : ''}</span>
         <span class="finding-card-label"><span class="finding-card-title">${where ? escapeHtml(where) : label}</span>
           <small>${where ? `<span class="sr-only">${label}, </span>` : ''}<span class="finding-act">${status}</span></small></span>
         ${removeCall ? `<button type="button" class="finding-remove-btn" onclick="${removeCall}" title="${removeLabel}" aria-label="${removeLabel}">${FINDING_REMOVE_ICON}</button>` : ''}
@@ -685,7 +689,7 @@ function findingCardHTML(finding, index, total) {
 
   return `
     <div class="finding-card" id="finding-card-${id}">
-      ${findingHeadHTML(FINDING_ICONS.termite, finding.activityLocation, label, index + 1, act, total > 1 ? `removeFinding('${id}')` : '', 'Remove this finding')}
+      ${findingHeadHTML(FINDING_ICONS.termite, finding.activityLocation, label, act && total > 1 ? index + 1 : null, act, total > 1 ? `removeFinding('${id}')` : '', 'Remove this finding')}
       <div class="finding-card-body">
         <div class="area-finding-prompt finding-area-slot" hidden></div>
         <!-- Activity gate: the question every finding must answer -->
@@ -722,8 +726,9 @@ function renderFindingsUI() {
   const findings = getFindings();
   list.innerHTML = findings.map((f, i) => findingCardHTML(f, i, findings.length)).join('');
   hydrateSpotPhotos(list);
-  renderAreaFindingPrompts();
   renderBorerFindings();
+  syncFindingsGroups();
+  renderAreaFindingPrompts();
 
   if (addBtn) {
     const atCap = findings.length >= MAX_FINDINGS;
@@ -807,6 +812,7 @@ function commitFindingEdit(findingId, key, value, deferRender) {
   const finding = findAnyFinding(findingId);
   if (!finding) return;
   finding[key] = value || null;
+  if (key === 'termiteActivity' && !isBorerFinding(finding)) untrackNoneFromAreas('termites');
   if (isBorerFinding(finding)) syncBorerFromCards(key === 'borerActivity');
   if (key === 'species' && value) {
     setTimeout(() => triggerSpeciesIntelligence(value), 400);
@@ -957,6 +963,199 @@ function syncNothingFoundButtons() {
   });
 }
 
+// ── FINDINGS SHOWN WHEN PROMPTED ─────────────────────────────────────────
+// Findings shows only what the job calls for, so a clean house is a glance,
+// not a scroll. The timber pest groups (Termites, Borers, Timber decay) each
+// stay out of sight until something prompts them: an answer recorded there
+// (spoken or tapped), an area marked "evidence found" that the inspector
+// says was that pest, or the inspector adding it under "Found something?".
+// What's out of sight still reads in a box under them (none found, or not
+// answered yet), and the report prints only what's stored: "none found"
+// once the inspector or the Areas said so, "Not recorded" otherwise.
+// Previous treatment always shows: the Areas can't answer it, and the
+// report's summary asks it.
+// A group that's been shown stays shown while this report is open, so it
+// never vanishes under a tap on None.
+const FINDINGS_GROUPS = [
+  { id: 'termites', el: 'fg-termites', name: 'Termites' },
+  { id: 'borers', el: 'fg-borers', name: 'Borers' },
+  { id: 'decay', el: 'fg-decay', name: 'Timber decay' },
+];
+const findingsGroupsShown = new WeakMap(); // reportData → Set of group ids shown
+const FINDING_DETAIL_KEYS = ['species', 'damageDescription', 'activityLocation', 'timberAffected', 'nestLocated', 'structuralConcern'];
+
+function findingsGroupCalledFor(id) {
+  const has = k => !isBlankValue(reportData[k]);
+  if (id === 'termites') return (reportData.findings || []).some(f => f && (
+    FINDING_DETAIL_KEYS.some(k => !isBlankValue(f[k]))
+    || ['ACTIVE', 'INACTIVE'].includes(f.termiteActivity)
+    || (f.termiteActivity !== 'NONE' && ((reportData.photosBySection || {})[findingPhotoSection(f.id)] || []).length > 0)));
+  if (id === 'borers') return borersFound();
+  if (id === 'decay') return reportData.decayFound === 'YES' || reportData.delignification === 'YES'
+    || ['decayDetails', 'decayWhere', 'delignificationDetails', 'delignificationWhere'].some(has);
+  return false;
+}
+
+function findingsGroupShown(id) {
+  let shown = findingsGroupsShown.get(reportData);
+  if (!shown) findingsGroupsShown.set(reportData, shown = new Set());
+  if (!shown.has(id) && findingsGroupCalledFor(id)) shown.add(id);
+  return shown.has(id);
+}
+
+function syncFindingsGroups() {
+  FINDINGS_GROUPS.forEach(g => {
+    const el = document.getElementById(g.el);
+    if (el) el.hidden = !findingsGroupShown(g.id);
+  });
+  renderFindingsMore();
+}
+
+// Brings a group into Findings (without moving the screen).
+function revealFindingsGroup(id) {
+  findingsGroupShown(id);
+  findingsGroupsShown.get(reportData).add(id);
+  syncFindingsGroups();
+  return document.getElementById((FINDINGS_GROUPS.find(g => g.id === id) || {}).el);
+}
+
+// "Found something?": the group comes in open, and the screen goes to it.
+function showFindingsGroup(id, target) {
+  const el = revealFindingsGroup(id);
+  if (!el) return;
+  el.open = true;
+  if (id === 'termites') renderAreaFindingPrompts();
+  requestAnimationFrame(() => (target || el).scrollIntoView({ block: target ? 'center' : 'start', behavior: 'smooth' }));
+}
+
+// The box under the timber pest groups: what the ones out of sight hold,
+// and a button for each to bring it in.
+const FINDINGS_TICK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+const FINDINGS_DASH = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>';
+const joinWithOr = list => list.length < 2 ? (list[0] || '') : list.slice(0, -1).join(', ') + ' or ' + list[list.length - 1];
+
+function renderFindingsMore() {
+  const box = document.getElementById('findingsMore');
+  if (!box) return;
+  const hidden = FINDINGS_GROUPS.filter(g => !findingsGroupShown(g.id));
+  box.hidden = !hidden.length;
+  if (!hidden.length) { box.innerHTML = ''; return; }
+  const out = id => hidden.some(g => g.id === id);
+  const said = (k, none) => none.includes(reportData[k]);
+  // Each timber pest out of sight, and whether it's answered none.
+  const pests = [];
+  if (out('termites')) { const fs = reportData.findings || []; pests.push(['termites', fs.length > 0 && fs.every(f => f && f.termiteActivity === 'NONE')]); }
+  if (out('borers')) pests.push(['borers', said('borerActivity', ['NONE'])]);
+  if (out('decay')) pests.push(['rot', said('decayFound', ['NO', 'N/A'])], ['delignification', said('delignification', ['NO', 'N/A'])]);
+  const none = pests.filter(p => p[1]).map(p => p[0]), blank = pests.filter(p => !p[1]).map(p => p[0]);
+  const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+  let state = '';
+  if (blank.length) {
+    const btn = document.getElementById('nothingFound-findings');
+    const quick = btn && !btn.hidden ? `Tap “${btn.querySelector('strong').textContent}” at the top if there was nothing.` : '';
+    state = `<div class="findings-more-state is-blank"><span class="findings-more-icon">${FINDINGS_DASH}</span>
+      <span class="findings-more-text"><strong>Not answered yet: ${joinWithAnd(blank)}</strong>
+      ${none.length || quick ? `<small>${none.length ? `No ${joinWithOr(none)} found. ` : ''}${quick}</small>` : ''}</span></div>`;
+  } else if (none.length) {
+    const fromAreas = (reportData.noneFromAreas || []).length > 0;
+    state = `<div class="findings-more-state is-none"><span class="findings-more-icon">${FINDINGS_TICK}</span>
+      <span class="findings-more-text"><strong>No ${joinWithOr(none)} found</strong>
+      <small>${fromAreas ? 'Every area says nothing found, so the report prints these as none found.' : 'The report prints these as none found.'}</small></span></div>`;
+  }
+  const anyShown = hidden.length < FINDINGS_GROUPS.length;
+  box.innerHTML = `${state}<div class="findings-more-add"><span class="findings-more-label">${anyShown ? 'Found something else?' : 'Found something?'} Add it:</span>
+    <div class="findings-more-btns">${hidden.map(g => `<button type="button" class="spot-photo-add findings-more-btn" onclick="showFindingsGroup('${g.id}')">${AREA_PLUS_ICON}${cap(g.name)}</button>`).join('')}</div></div>`;
+}
+
+// When every area is marked and every area entered says "Nothing found",
+// the report already states "no visible evidence of timber pests" for each
+// of them, so termites, borers, rot and delignification are answered none
+// without a tap in Findings. Only blank answers are filled. The ones filled
+// this way are listed in reportData.noneFromAreas and taken back out if an
+// area stops saying nothing found; an answer the inspector gives or speaks
+// takes the key off the list, so it's never taken back.
+const NONE_FROM_AREAS = { borerActivity: 'NONE', decayFound: 'NO', delignification: 'NO' };
+function areasSayNothingFound() {
+  const zones = Object.keys(OBS_ZONES), results = reportData.areaResult || {};
+  const entered = zones.filter(areaWasEntered);
+  return entered.length > 0 && zones.every(z => areaStatusOf(z)) && entered.every(z => results[z] === 'CLEAR');
+}
+function untrackNoneFromAreas(key) {
+  const list = reportData.noneFromAreas;
+  if (!Array.isArray(list) || !list.includes(key)) return;
+  const left = list.filter(k => k !== key);
+  if (left.length) reportData.noneFromAreas = left; else delete reportData.noneFromAreas;
+}
+function syncNoneFromAreas() {
+  if (isReportLocked()) return;
+  const filled = new Set(Array.isArray(reportData.noneFromAreas) ? reportData.noneFromAreas : []);
+  const show = (key, val) => {
+    const el = document.getElementById('f-' + key);
+    if (!el) return;
+    if (val) renderField(el, key, val);
+    else { el.classList.remove('filled'); el.textContent = '—'; }
+  };
+  let changed = false;
+  if (areasSayNothingFound()) {
+    // Cards added and left empty go: the one left says no termites found.
+    // A card with a photo on it has been started, so it's left to answer.
+    const photoed = getFindings().some(f => ((reportData.photosBySection || {})[findingPhotoSection(f.id)] || []).length);
+    if (termitesUnanswered() && !photoed) { reportData.findings = [{ ...getFindings()[0], termiteActivity: 'NONE' }]; filled.add('termites'); changed = true; }
+    Object.entries(NONE_FROM_AREAS).forEach(([key, val]) => {
+      if (!isBlankValue(reportData[key])) return;
+      reportData[key] = val; filled.add(key); show(key, val); changed = true;
+    });
+  } else if (filled.size) {
+    const fs = getFindings();
+    if (filled.has('termites') && fs.length === 1 && fs[0].termiteActivity === 'NONE' && !FINDING_DETAIL_KEYS.some(k => !isBlankValue(fs[0][k]))) fs[0].termiteActivity = null;
+    Object.entries(NONE_FROM_AREAS).forEach(([key, val]) => {
+      if (filled.has(key) && reportData[key] === val) { delete reportData[key]; show(key, null); }
+    });
+    filled.clear(); changed = true;
+  }
+  if (filled.size) reportData.noneFromAreas = [...filled]; else delete reportData.noneFromAreas;
+  if (changed) renderFindingsUI();
+}
+
+// An area marked "evidence found", answered "Borers": a borer finding for
+// that area, ready under the borer question.
+function addBorerForArea(zoneId) {
+  const where = OBS_ZONES[zoneId].label.replace(/^The /, '');
+  const cards = getBorerFindings();
+  let card = cards.find(b => isBlankValue(b.location) && isBlankValue(b.description) && isBlankValue(b.timberAffected));
+  if (!card) {
+    if (cards.length >= MAX_BORER_FINDINGS) { showToast(`Only ${MAX_BORER_FINDINGS} borer findings fit in a report. Name ${where} in an existing one's location`, 'info'); return; }
+    card = { id: genFindingId(), borerActivity: null };
+    cards.push(card);
+  }
+  card.location = where + ': ';
+  if (!card.borerActivity && borersFound() && cards.length === 1) card.borerActivity = reportData.borerActivity;
+  syncBorerFromCards();
+  renderFindingsUI(); updateProgress(); saveDraft();
+  const n = getBorerFindings().indexOf(card) + 1;
+  showFindingsGroup('borers', borersFound() ? document.getElementById('finding-card-' + card.id) : document.getElementById('choices-borerActivity'));
+  showToast(borersFound()
+    ? `Borer finding ${n} is for the ${zoneName(zoneId).toLowerCase()}. ${card.borerActivity ? 'Add' : 'Pick Active or Inactive, then add'} what you saw`
+    : `Pick Active or Inactive for the borers. A finding for the ${zoneName(zoneId).toLowerCase()} is ready under it`, 'info');
+}
+
+// The same for rot or chemical delignification: answered yes, with the area
+// as where it was, and the screen on what was seen.
+function addDecayForArea(zoneId, kind) {
+  const [yesKey, whatKey, whereKey, label] = kind === 'delignification'
+    ? ['delignification', 'delignificationDetails', 'delignificationWhere', 'Chemical delignification']
+    : ['decayFound', 'decayDetails', 'decayWhere', 'Rot'];
+  const area = zoneName(zoneId);
+  revealFindingsGroup('decay');
+  if (reportData[yesKey] !== 'YES') commitEdit(document.getElementById('f-' + yesKey), yesKey, 'YES');
+  const where = reportData[whereKey];
+  if (isBlankValue(where)) commitEdit(document.getElementById('f-' + whereKey), whereKey, area);
+  else if (!textAreas(where).includes(zoneId)) commitEdit(document.getElementById('f-' + whereKey), whereKey, String(where).replace(/[.;,\s]+$/, '') + ', ' + area.toLowerCase());
+  renderFindingsUI();
+  showFindingsGroup('decay', document.getElementById('f-' + whatKey));
+  showToast(`${label} recorded in the ${area.toLowerCase()}. Add what you saw`, 'info');
+}
+
 // ── BORER FINDINGS ───────────────────────────────────────────────────────
 // reportData.borerFindings: one card per place borers were found, each
 // { id, borerActivity, borerType, location, timberAffected, description,
@@ -1031,13 +1230,13 @@ function removeBorerFinding(id) {
   } });
 }
 
-function borerCardHTML(b, index) {
+function borerCardHTML(b, index, all) {
   const id = b.id;
   const act = b.borerActivity;
   const fv = (key, hint) => `<div class="field-val${b[key] ? ' filled' : ''}" onclick="startFindingEdit('${id}','${key}','text')">${b[key] ? escapeHtml(b[key]) : '—'}</div>`;
   return `
     <div class="finding-card borer-card" id="finding-card-${id}">
-      ${findingHeadHTML(FINDING_ICONS.borer, b.location, `Borer finding ${index + 1}`, index + 1, act, `removeBorerFinding('${id}')`, 'Remove this borer finding')}
+      ${findingHeadHTML(FINDING_ICONS.borer, b.location, `Borer finding ${index + 1}`, act && all && all.length > 1 ? index + 1 : null, act, `removeBorerFinding('${id}')`, 'Remove this borer finding')}
       <div class="finding-card-body">
         <div class="findings-gate choice-panel${act ? '' : ' unset'}" role="radiogroup" aria-label="Borer activity here">
           <div class="field-label">Borer activity</div>

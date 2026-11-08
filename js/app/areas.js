@@ -253,31 +253,48 @@ function setAreaResult(zoneId, result) {
 }
 
 // Areas marked "evidence found" that nothing in Findings describes yet.
-// The first goes inside the open finding card, if there is one, so it
-// isn't offered as another finding beside an empty one. Any others sit at
-// the top of Findings, each adding a finding of its own.
-const AREA_PLUS_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>';
+// Each asks what it was (termites, borers, rot or delignification), and the
+// answer starts the write-up in the group it belongs to, bringing that group
+// into Findings. With Termites already shown and a finding in it that's
+// still open, the first area goes inside that card instead ("Write it up
+// here?"), so it isn't offered as another finding beside an empty one.
+const AREA_PLUS_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>'; // also "Found something?" (renderFindingsMore)
 function renderAreaFindingPrompts() {
   const el = document.getElementById('findingsFromAreas');
   if (!el) return;
-  document.querySelectorAll('.finding-area-slot').forEach(s => { s.innerHTML = ''; s.hidden = true; });
+  document.querySelectorAll('.finding-area-slot').forEach(s => { s.innerHTML = ''; s.hidden = true; delete s.dataset.areaPrompt; });
   let zones = areasEvidenceUnlinked();
-  const open = zones.length && openTermiteFinding();
+  const open = zones.length && findingsGroupShown('termites') && openTermiteFinding();
   // Not inside a folded Termites group, where it couldn't be seen.
   let slot = open && document.querySelector(`#finding-card-${open.id} .finding-area-slot`);
-  if (slot && slot.closest('details:not([open])')) slot = null;
+  if (slot && slot.closest('details:not([open]), details[hidden]')) slot = null;
   const tile = z => `<span class="area-tile" aria-hidden="true">${AREA_ICONS[z] || ''}</span>`;
   const where = z => 'the ' + zoneName(z).toLowerCase();
   if (slot) {
     const z = zones.shift();
     slot.innerHTML = `${tile(z)}<span class="area-finding-text">Evidence found in <strong>${where(z)}</strong>. Write it up here?</span>
       <button type="button" class="spot-photo-add area-finding-add" onclick="addFindingForArea('${z}')">Yes</button>`;
+    slot.dataset.areaPrompt = z;
     slot.hidden = false;
   }
-  el.innerHTML = zones.map(z => `<div class="area-finding-prompt">${tile(z)}
-      <span class="area-finding-text">Evidence found in <strong>${where(z)}</strong>${slot ? ' too. Describe it in another finding.' : '. Describe it here.'}</span>
-      <button type="button" class="spot-photo-add area-finding-add" onclick="addFindingForArea('${z}', ${slot ? 'true' : 'false'})">${AREA_PLUS_ICON}Add finding</button></div>`).join('');
+  const picks = z => [
+    ['Termites', `addFindingForArea('${z}', ${slot ? 'true' : 'false'})`],
+    ['Borers', `addBorerForArea('${z}')`],
+    ['Rot', `addDecayForArea('${z}', 'decay')`],
+    ['Delignification', `addDecayForArea('${z}', 'delignification')`],
+  ].map(([label, call]) => `<button type="button" class="spot-photo-add area-finding-add" onclick="${call}">${label}</button>`).join('');
+  el.innerHTML = zones.map(z => `<div class="area-finding-prompt has-picks" data-area-prompt="${z}">${tile(z)}
+      <span class="area-finding-text">Evidence found in <strong>${where(z)}</strong>${slot ? ' too' : ''}. What was it?</span>
+      <div class="area-finding-picks" role="group" aria-label="What was found in ${where(z)}">${picks(z)}</div></div>`).join('');
   el.hidden = !zones.length;
+}
+// From the check before sending: Findings, at the area's question.
+function showAreaFindingPrompt(zoneId) {
+  showSection('findings');
+  renderAreaFindingPrompts();
+  const prompt = document.querySelector(`[data-area-prompt="${zoneId}"]`);
+  if (!prompt) { addFindingForArea(zoneId); return; }
+  setTimeout(() => prompt.scrollIntoView({ block: 'center', behavior: 'smooth' }), 80);
 }
 // Unfolding Termites moves the first prompt back into the open finding.
 document.addEventListener('toggle', e => { if (e.target && e.target.id === 'fg-termites') renderAreaFindingPrompts(); }, true);
@@ -450,6 +467,7 @@ function areaSummary(zoneId, name) {
 }
 
 function syncObstructionData() {
+  syncNoneFromAreas();
   const notFull = areasNotFullyInspected();
   const reasons = reportData.areaReasons || {};
   reportData.obstructions = notFull.map(z => OBS_ZONES[z].label + (areaStatusOf(z) === 'PARTIAL' ? ' (inspected with limits)' : '')).join(', ');

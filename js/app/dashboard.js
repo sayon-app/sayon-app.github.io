@@ -957,7 +957,7 @@ function reportPrepGaps(from = 'send') {
   // "Nothing found" over an area a finding names: the report would contradict itself.
   Object.keys(OBS_ZONES).filter(z => areaResultOf(z) === 'CLEAR' && areaEvidence(z).length).forEach(z =>
     push('contradiction', `${zoneName(z)}: marked "nothing found", but ${areaEvidence(z)[0].replace(/ \(.*$/, '')} is there`, fixBtn('found:' + z, 'Mark evidence found')));
-  areasEvidenceUnlinked().forEach(z => push('evidence', `${zoneName(z)}: marked "evidence found", but no finding mentions it`, fixBtn('finding:' + z, 'Add finding')));
+  areasEvidenceUnlinked().forEach(z => push('evidence', `${zoneName(z)}: marked "evidence found", but no finding mentions it`, fixBtn('finding:' + z, 'Say what it was')));
   findingsMissingReferral().forEach(n => push('referral', `Finding ${n}: "refer to a builder or engineer?" isn't answered`));
   const pending = (reportData.pendingNotes || []).length;
   if (pending) push('pending', `${pending} voice note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);

@@ -1,4 +1,4 @@
-// SAYON app: AI extraction, learned corrections, test mode, waiting notes, extract summary, read-back, plate scan, insect ID.
+// SAYON app: AI extraction, learned corrections, test mode, waiting notes, extract summary, read-back, plate scan, insect ID, photo descriptions.
 // One of the js/app/ files, which share one global scope: they load as plain
 // scripts in the order index.html lists them, so a top-level name declared in
 // any of them can be used from the others once the page has loaded.
@@ -454,7 +454,9 @@ function saveTestNote(transcript, extraction, problem, seconds) {
 // server's version of a recording), word-fix and field-fix (a correction
 // the inspector made), talk-photo (a photo placed on a finding from speech),
 // plate-photo and photo-id (what the AI read from a photo, never the photo),
-// treatment-plan (the AI's plan for the quote).
+// photo-caption (Describe: the caption the AI suggested and the part of the
+// report the photo was in, never the photo), treatment-plan (the AI's plan
+// for the quote).
 function saveTestEvent(kind, transcript, data, problem, seconds) {
   if (!testModeOn()) return;
   const text = String(transcript == null ? '' : transcript).trim();
@@ -1054,41 +1056,10 @@ async function scanCompliancePlate(fromFile) {
   setAI('thinking', 'Reading the compliance plate…');
 
   try {
-    const res = await workerFetch('', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-5',
-        // Room for the model's thinking as well as the small JSON answer
-        // (see requestExtraction()).
-        max_tokens: 2000,
-        output_config: { effort: 'low' },
-        system: PLATE_SYSTEM_PROMPT,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-            { type: 'text', text: 'Read this termite management system durable notice and return the JSON described in your instructions.' },
-          ],
-        }],
-      }),
+    const parsed = await askAiAboutPhoto({
+      system: PLATE_SYSTEM_PROMPT, base64, mediaType, maxTokens: 2000, effort: 'low',
+      text: 'Read this termite management system durable notice and return the JSON described in your instructions.',
     });
-
-    const rawBody = await res.text();
-    let data;
-    try {
-      data = JSON.parse(rawBody);
-    } catch {
-      throw new Error(`HTTP ${res.status}: ${rawBody.slice(0, 200) || '(empty response)'}`);
-    }
-
-    if (!res.ok || data.error) {
-      const errMsg = data.error?.message || data.error?.type || `HTTP ${res.status}`;
-      throw new Error('API error: ' + errMsg);
-    }
-
-    const text = data.content.map(i => i.text || '').join('');
-    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
 
     saveTestEvent('plate-photo', 'Durable notice photo', { read: parsed });
     if (parsed.systemFound === 'YES') {
@@ -1146,6 +1117,68 @@ function pickImageFileAsBase64(useCamera) {
   });
 }
 
+
+// ── ASK THE AI ABOUT A PHOTO ────────────────────────────────────────────
+// One photo and an instruction to the AI; the answer comes back as the JSON
+// object the system prompt asks for. The plate scan, insect ID and Describe
+// all go through here. Throws with .noSignal when the phone can't reach the
+// AI, and with .status when the Worker refuses the call (sign-in, plan, the
+// month's AI allowance). Each call is one call against the plan's allowance.
+const AI_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+async function askAiAboutPhoto({ system, base64, mediaType, text, maxTokens, effort }) {
+  const noSignal = (msg) => Object.assign(new Error(msg), { noSignal: true });
+  if (!navigator.onLine) throw noSignal('no signal');
+  let res, rawBody;
+  try {
+    res = await workerFetch('', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        // Room for the model's thinking as well as the small JSON answer
+        // (see callExtraction()).
+        max_tokens: maxTokens,
+        output_config: { effort },
+        system,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: AI_IMAGE_TYPES.includes(mediaType) ? mediaType : 'image/jpeg', data: base64 } },
+            { type: 'text', text },
+          ],
+        }],
+      }),
+    });
+    rawBody = await res.text();
+  } catch (err) {
+    // fetch() only rejects when the request never got an answer.
+    throw noSignal(err && err.name === 'AbortError' ? 'no answer in time' : 'no connection');
+  }
+  // A refusal from the Worker is plain text, not JSON.
+  const refused = (msg) => Object.assign(new Error(msg), { status: res.status });
+  let data;
+  try {
+    data = JSON.parse(rawBody);
+  } catch {
+    throw refused(`HTTP ${res.status}: ${rawBody.slice(0, 200) || '(empty response)'}`);
+  }
+  if (!res.ok || data.error) {
+    throw refused('API error: ' + (data.error?.message || data.error?.type || `HTTP ${res.status}`));
+  }
+  const out = (data.content || []).map(i => i.text || '').join('');
+  const parsed = JSON.parse(out.replace(/```json|```/g, '').trim());
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('the answer was not a JSON object');
+  return parsed;
+}
+
+// A report photo as { base64, mediaType } for the AI, or null when the
+// image can't be found or read.
+async function photoForAi(photo) {
+  const image = await getPhotoImage(photo);
+  const match = /^data:([^;]+);base64,(.+)$/.exec(image ? await blobToDataUrl(image) : '');
+  return match ? { mediaType: match[1], base64: match[2] } : null;
+}
+
 // ── INSECT / SPECIES PHOTO ID ───────────────────────────────────────────
 // Analyses a photo the technician already attached via the normal Add
 // Photos flow (reportData.photos) — deliberately opt-in per photo, not
@@ -1161,51 +1194,17 @@ async function analyzeGalleryPhoto(photoId) {
   const btn = document.getElementById('analyzeBtn-' + photoId);
   if (btn && btn.disabled) return; // already running
 
-  const image = await getPhotoImage(photo);
-  const match = /^data:([^;]+);base64,(.+)$/.exec(image ? await blobToDataUrl(image) : '');
-  if (!match) { showToast('Could not read that photo', 'error'); return; }
-  const mediaType = match[1];
-  const base64 = match[2];
+  const image = await photoForAi(photo);
+  if (!image) { showToast('Could not read that photo', 'error'); return; }
 
-  if (btn) { btn.disabled = true; btn.textContent = 'Analysing…'; }
-  setAI('thinking', 'Analysing the photo…');
+  if (btn) { btn.disabled = true; btn.textContent = 'Identifying…'; }
+  setAI('thinking', 'Identifying the insect…');
 
   try {
-    const res = await workerFetch('', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-5',
-        // Room for the model's thinking as well as the small JSON answer
-        // (see requestExtraction()).
-        max_tokens: 4000,
-        output_config: { effort: 'medium' },
-        system: INSECT_ID_SYSTEM_PROMPT,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-            { type: 'text', text: 'Identify the insect or insect damage shown in this photo and return the JSON described in your instructions.' },
-          ],
-        }],
-      }),
+    const parsed = await askAiAboutPhoto({
+      system: INSECT_ID_SYSTEM_PROMPT, ...image, maxTokens: 4000, effort: 'medium',
+      text: 'Identify the insect or insect damage shown in this photo and return the JSON described in your instructions.',
     });
-
-    const rawBody = await res.text();
-    let data;
-    try {
-      data = JSON.parse(rawBody);
-    } catch {
-      throw new Error(`HTTP ${res.status}: ${rawBody.slice(0, 200) || '(empty response)'}`);
-    }
-
-    if (!res.ok || data.error) {
-      const errMsg = data.error?.message || data.error?.type || `HTTP ${res.status}`;
-      throw new Error('API error: ' + errMsg);
-    }
-
-    const text = data.content.map(i => i.text || '').join('');
-    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
 
     saveTestEvent('photo-id', photo.caption || 'Photo of an insect or damage', { read: parsed });
     if (parsed.identified === 'YES' && parsed.species) {
@@ -1232,4 +1231,184 @@ async function analyzeGalleryPhoto(photoId) {
   } finally {
     renderPhotoGrid(); // restores the button (re-render clears the disabled/label override above)
   }
+}
+
+// ── PHOTO DESCRIPTION ───────────────────────────────────────────────────
+// Describe on a report photo: the AI looks at the photo and suggests a
+// one-line caption (PHOTO_CAPTION_PROMPT). The suggestion shows under the
+// caption box until the inspector taps Use (Add to caption when there's
+// already one) or Not this; it never goes into the caption by itself.
+// It waits on the photo as p.suggested, so a redraw, another section or
+// the app being closed doesn't lose it, and it never prints.
+// One tap is one AI call against the plan's monthly allowance, the same as
+// a voice fill. That's why it isn't run on every photo as it's added: a
+// job's worth of photos would use up the allowance the voice fills need.
+const describingPhotos = new Set(); // ids of photos the AI is looking at
+const SPARKLE_ICON = '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/></svg>';
+
+// The photo and the box it's in: a key of photosBySection, or 'other' for
+// the Other photos section (reportData.photos).
+function findReportPhoto(id) {
+  for (const [section, list] of Object.entries(reportData.photosBySection || {})) {
+    const photo = (list || []).find(p => p.id === id);
+    if (photo) return { photo, section };
+  }
+  const photo = (reportData.photos || []).find(p => p.id === id);
+  return photo ? { photo, section: 'other' } : null;
+}
+
+// Where in the report the photo was added, in words, so the AI knows why
+// it was taken (never what's in it).
+const PHOTO_PLACE_NAMES = {
+  durable: 'Durable notice (the termite management system notice)', obstructions: 'Obstructions',
+  restrictions: 'Restricted access', findings: 'Termite and borer findings', conducive: 'Conducive conditions',
+  recommendations: 'Recommendations', other: 'Other photos',
+};
+function photoPlaceLabel(section) {
+  const spot = /^spot-(hindered|restricted)-(.+)$/.exec(section);
+  if (spot) {
+    const [, kind, key] = spot;
+    let where = key === '_other' ? 'another spot' : OBS_ZONES[key] ? zoneName(key) : 'an area';
+    try {
+      const exact = String(accessSpot(kind, key, accessZones(kind)) || '').trim();
+      if (exact) where += ` (${exact.slice(0, 120)})`;
+    } catch (e) {}
+    return (kind === 'restricted' ? 'Restricted access: ' : 'Obstructions: ') + where;
+  }
+  const finding = /^finding-(.+)$/.exec(section);
+  if (finding) {
+    const termite = (reportData.findings || []).find(f => f.id === finding[1]);
+    const borer = !termite && (reportData.borerFindings || []).find(b => b.id === finding[1]);
+    const where = String((termite ? termite.activityLocation : borer ? borer.location : '') || '').trim();
+    return (borer ? 'Borer finding' : 'Termite finding') + (where ? `, at ${where.slice(0, 120)}` : '');
+  }
+  return PHOTO_PLACE_NAMES[section] || 'Inspection photos';
+}
+
+// The AI's caption, tidied for the report. A severity word before what it
+// describes comes out ("extensive damage" reads "damage"); the prompt
+// forbids them and this is the backstop. Any other severity word, a
+// structural verdict or a risk rating means the suggestion isn't shown.
+const CAPTION_SEVERITY = '(?:minor|moderate|severe|extensive|significant|extreme)(?:ly)?';
+const CAPTION_NOT_ALLOWED = new RegExp(`\\b${CAPTION_SEVERITY}\\b|\\bstructurally\\b|\\bstructural (?:damage|failure|integrity|soundness)\\b|\\bunsound\\b|\\bcompromised\\b|\\bunsafe\\b|\\brisk\\b`, 'i');
+function cleanPhotoCaption(text) {
+  let t = typeof text === 'string' ? text : '';
+  t = t.replace(/\s+/g, ' ').trim().replace(/^["'“‘]+|["'”’]+$/g, '').trim();
+  t = t.replace(new RegExp(`\\b${CAPTION_SEVERITY}\\s+(?=[a-z])`, 'gi'), '').replace(/[\s.]+$/, '').trim();
+  if (!t || CAPTION_NOT_ALLOWED.test(t)) return '';
+  if (t.length > 160) t = t.slice(0, 160).replace(/\s+\S*$/, '');
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+// What the inspector reads when Describe can't give a suggestion.
+function photoAiProblem(err) {
+  if (err && err.noSignal) return 'No signal, so SAYON couldn\'t look at the photo. Tap Describe again once you\'re back in range';
+  if (err && err.status === 429) return 'This month\'s AI allowance is used up. Upgrade in Menu › Billing, or it comes back on the 1st';
+  if (err && [401, 402, 403].includes(err.status)) return extractionProblem(err);
+  return 'SAYON couldn\'t describe the photo. Try again';
+}
+
+// The Describe button and the suggestion box, drawn into each photo card
+// (spotPhotosHTML, renderSectionPhotoGrid, renderPhotoGrid).
+function describeButtonHTML(p) {
+  const busy = describingPhotos.has(p.id);
+  return `<button type="button" class="photo-describe-btn" data-describe-for="${p.id}" onclick="describePhoto('${p.id}')"
+    ${busy ? 'disabled aria-busy="true"' : ''}${p.suggested ? ' hidden' : ''}>${SPARKLE_ICON}<span>${busy ? 'Looking…' : 'Describe'}</span></button>`;
+}
+function photoSuggestionHTML(p) {
+  return `<div class="photo-suggest" data-suggest-for="${p.id}"${p.suggested ? '' : ' hidden'}>${p.suggested ? photoSuggestionInner(p) : ''}</div>`;
+}
+function photoSuggestionInner(p) {
+  const has = !!(p.caption || '').trim();
+  return `<div class="photo-suggest-label">${SPARKLE_ICON}SAYON suggests</div>
+    <div class="photo-suggest-text">${escapeHtml(p.suggested)}</div>
+    <div class="photo-suggest-actions">
+      <button type="button" class="photo-suggest-use" onclick="useSuggestedCaption('${p.id}')">${has ? 'Add to caption' : 'Use'}</button>
+      <button type="button" class="photo-suggest-skip" onclick="dismissSuggestedCaption('${p.id}')">Not this</button>
+    </div>`;
+}
+
+// Brings the photo's card up to date in place, wherever it's drawn, so a
+// caption being typed in another photo or field keeps its place.
+function updatePhotoAiUI(id) {
+  const found = findReportPhoto(id);
+  const p = found ? found.photo : { id };
+  const busy = describingPhotos.has(id);
+  document.querySelectorAll(`[data-describe-for="${id}"]`).forEach(btn => {
+    btn.disabled = busy;
+    btn.toggleAttribute('aria-busy', busy);
+    btn.hidden = !!p.suggested;
+    btn.querySelector('span').textContent = busy ? 'Looking…' : 'Describe';
+  });
+  document.querySelectorAll(`[data-suggest-for="${id}"]`).forEach(box => {
+    box.hidden = !p.suggested;
+    box.innerHTML = p.suggested ? photoSuggestionInner(p) : '';
+  });
+  document.querySelectorAll(`[data-caption-for="${id}"]`).forEach(input => {
+    if (input.value !== (p.caption || '')) input.value = p.caption || '';
+  });
+}
+
+async function describePhoto(id) {
+  if (describingPhotos.has(id)) return;
+  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  const found = findReportPhoto(id);
+  if (!found) return;
+  if (!navigator.onLine) { showToast(photoAiProblem({ noSignal: true }), 'info'); return; }
+  const target = reportData;
+  const started = Date.now();
+  describingPhotos.add(id);
+  updatePhotoAiUI(id);
+  try {
+    const image = await photoForAi(found.photo);
+    if (!image) { showToast('Couldn\'t open that photo to describe it', 'error'); return; }
+    const place = photoPlaceLabel(found.section);
+    const parsed = await askAiAboutPhoto({
+      system: PHOTO_CAPTION_PROMPT, ...image, maxTokens: 2000, effort: 'low',
+      text: `The inspector added this photo to: ${place}. Suggest its caption as your instructions describe.`,
+    });
+    const caption = cleanPhotoCaption(parsed.caption);
+    const unclear = typeof parsed.unclear === 'string' ? parsed.unclear.trim().replace(/[\s.]+$/, '') : '';
+    saveTestEvent('photo-caption', place, { caption: caption || null, said: parsed.caption || null, unclear: unclear || null });
+    track('photo_described', { seconds: Math.round((Date.now() - started) / 100) / 10, suggested: !!caption });
+    // Another job may have been opened while the AI looked.
+    const now = reportData === target && findReportPhoto(id);
+    if (!now) return;
+    if (caption) {
+      now.photo.suggested = caption;
+      saveDraft();
+    } else {
+      showToast(unclear ? `SAYON couldn't make this photo out (${unclear.slice(0, 60)}). Add the caption yourself` : 'SAYON couldn\'t suggest a caption for this photo. Add it yourself', 'info');
+    }
+  } catch (err) {
+    console.warn('Photo description failed:', err);
+    track('photo_describe_failed', { reason: err.noSignal ? 'no_signal' : err.status ? 'http_' + err.status : 'other' });
+    showToast(photoAiProblem(err), 'error');
+  } finally {
+    describingPhotos.delete(id);
+    updatePhotoAiUI(id);
+  }
+}
+
+// Use puts the suggestion in the caption, after any words already there;
+// the caption box stays editable as always.
+function useSuggestedCaption(id) {
+  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  const found = findReportPhoto(id);
+  if (!found || !found.photo.suggested) return;
+  const p = found.photo;
+  const before = (p.caption || '').trim();
+  p.caption = before ? `${before.replace(/[\s.,;:–—-]+$/, '')}. ${p.suggested}` : p.suggested;
+  delete p.suggested;
+  saveDraft();
+  updatePhotoAiUI(id);
+  track('photo_caption_used', { added: !!before });
+}
+
+function dismissSuggestedCaption(id) {
+  const found = findReportPhoto(id);
+  if (!found || !found.photo.suggested) return;
+  delete found.photo.suggested;
+  saveDraft();
+  updatePhotoAiUI(id);
 }

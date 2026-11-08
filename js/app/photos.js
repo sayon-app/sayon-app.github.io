@@ -471,7 +471,7 @@ function removeSectionPhoto(id, section, refresh) {
 function updateSectionPhotoCaption(id, section, value) {
   const photos = getSectionPhotos(section);
   const photo = photos.find(p => p.id === id);
-  if (photo) { photo.caption = value; saveDraft(); }
+  if (photo) { photo.caption = value; saveDraft(); if (photo.suggested) updatePhotoAiUI(id); }
 }
 
 function renderSectionPhotoGrid(section) {
@@ -492,14 +492,21 @@ function renderSectionPhotoGrid(section) {
     grid.innerHTML = '<div class="section-photo-empty">No photos added</div>';
     return;
   }
+  // The cover photo's caption is fixed ("Front of the property"), so it has
+  // no Describe.
+  const describe = section !== 'general';
   grid.innerHTML = photos.map(p => `
     <div class="section-photo-card">
       <img data-photo-id="${p.id}" alt="Photo">
       <div class="section-photo-body">
-        <input class="photo-caption-input" type="text" placeholder="Caption…"
+        <input class="photo-caption-input" type="text" placeholder="Caption…" data-caption-for="${p.id}"
                value="${escapeHtml(p.caption||'')}"
                oninput="updateSectionPhotoCaption('${p.id}','${section}',this.value)">
-        <button class="photo-remove-btn" onclick="removeSectionPhoto('${p.id}','${section}')">Remove</button>
+        ${describe ? photoSuggestionHTML(p) : ''}
+        <div class="photo-actions">
+          ${describe ? describeButtonHTML(p) : ''}
+          <button class="photo-remove-btn" onclick="removeSectionPhoto('${p.id}','${section}')">Remove</button>
+        </div>
       </div>
     </div>
   `).join('');
@@ -623,7 +630,7 @@ function removePhoto(id) {
 function updatePhotoCaption(id, value) {
   if (!reportData.photos) return;
   const photo = reportData.photos.find(p => p.id === id);
-  if (photo) { photo.caption = value; saveDraft(); }
+  if (photo) { photo.caption = value; saveDraft(); if (photo.suggested) updatePhotoAiUI(id); }
 }
 
 function renderPhotoGrid() {
@@ -650,11 +657,13 @@ function renderPhotoGrid() {
     <div class="photo-card">
       <img data-photo-id="${p.id}" alt="Inspection photo">
       <div class="photo-card-body">
-        <input class="photo-caption-input" type="text" placeholder="What does this show?"
+        <input class="photo-caption-input" type="text" placeholder="What does this show?" data-caption-for="${p.id}"
                value="${escapeHtml(p.caption || '')}"
                oninput="updatePhotoCaption('${p.id}', this.value)">
+        ${photoSuggestionHTML(p)}
         <div class="photo-card-footer">
-          <button class="photo-analyze-btn" id="analyzeBtn-${p.id}" onclick="analyzeGalleryPhoto('${p.id}')">Analyse</button>
+          ${describeButtonHTML(p)}
+          <button class="photo-analyze-btn" id="analyzeBtn-${p.id}" onclick="analyzeGalleryPhoto('${p.id}')">Insect ID</button>
           <button class="photo-remove-btn" onclick="removePhoto('${p.id}')">Remove</button>
         </div>
       </div>

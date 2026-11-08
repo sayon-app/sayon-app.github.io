@@ -143,7 +143,7 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
     check(!legal.draft && legal.lang === 'en-AU' && legal.bg !== 'rgb(10, 11, 13)' && !legal.menu, `${f}: no draft banner, en-AU, light, no old menu path, no placeholders`);
     // The version a new account ticks at sign-up must match the page.
     const pageVersion = Number(((await p.textContent('.updated')) || '').match(/Version (\d+)/)?.[1]);
-    const ticked = Number(fs.readFileSync(require('path').join(__dirname, '../../js/app.js'), 'utf8').match(new RegExp(`LEGAL_VERSIONS = \\{[^}]*${f.replace('.html', '')}: (\\d+)`))?.[1]);
+    const ticked = Number(fs.readFileSync(require('path').join(__dirname, '../../js/app/account.js'), 'utf8').match(new RegExp(`LEGAL_VERSIONS = \\{[^}]*${f.replace('.html', '')}: (\\d+)`))?.[1]);
     check(pageVersion && pageVersion === ticked, `${f}: sign-up records the page's version (page ${pageVersion}, sign-up ${ticked})`);
     await p.screenshot({ path: `${OUT}/6-${f.replace('.html', '')}.png` });
   }

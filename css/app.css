@@ -1871,7 +1871,7 @@ body.pocket-lock .voice-btn { user-select: none; -webkit-user-select: none; -web
   background: var(--accent);
   border-radius: 2px;
   height: 3px;
-  /* Height is set by driveWave() in js/app.js: it jumps as words are heard. */
+  /* Height is set by driveWave() in js/app/: it jumps as words are heard. */
 }
 
 .transcript-box {
@@ -2523,7 +2523,7 @@ body.dark-screen .warn-note.note-good { background: rgba(var(--green-rgb),0.12);
 .warn-note .icon { margin-top: 1px; }
 .warn-note.note-info { background: var(--surface2); border-color: var(--border); color: var(--text2); }
 
-/* Job completion (COMPLETED JOBS in js/app.js) */
+/* Job completion (COMPLETED JOBS in js/app/) */
 .issue-banner {
   margin: 0 0 12px;
   padding: 10px 12px;
@@ -3171,7 +3171,7 @@ body.dark-screen .signature-clear-btn { background: var(--surface2); border-colo
    arm's length in a subfloor or in full sun. Unpicked cards are steel
    outlines with a stripe in the colour they'll take; the picked card
    floods with it. Each card wraps a hidden native radio (see CHOICE CARDS
-   in js/app.js). */
+   in js/app/). */
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -3278,7 +3278,7 @@ body.large-touch .choice-card { min-height: 72px; }
 
 /* Short job-detail dropdowns (inspection type, state, payment) as card
    grids. The native <select> stays in the page, hidden, and keeps the
-   value; see SELECT CARDS in app.js. */
+   value; see SELECT CARDS in js/app/. */
 .select-cards-source { display: none !important; }
 .select-cards .choice-card { min-height: 65px; }
 .select-cards .choice-card-code { font-size: clamp(12px, 18cqi, calc(14px * var(--ts))); }
@@ -3900,7 +3900,7 @@ body.dark-screen .dash-card-act { border-top-color: var(--border2); background: 
 }
 
 /* AI working: a moving bar and a line of text under the report header, shown
-   while setAI('thinking') is on (see setAI in app.js). */
+   while setAI('thinking') is on (see setAI in js/app/). */
 .ai-busy-bar {
   display: none;
   position: fixed;
@@ -5740,7 +5740,7 @@ body.dark-screen .report-section.grouped > details.fgroup { border-width: 2px; b
 /* Other photos are optional, so they carry no status. */
 #sts-photos { display: none; }
 
-/* Say it instead: speak a sheet instead of typing it (SAY IT INSTEAD in app.js) */
+/* Say it instead: speak a sheet instead of typing it (SAY IT INSTEAD in js/app/) */
 .sheet-voice { margin: 10px 0 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border, rgba(0,0,0,0.1)); background: var(--surface2); }
 .sheet-voice-btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 999px; border: 1px solid var(--accent, #1a7f6e); background: transparent; color: var(--accent2, var(--accent)); font: inherit; font-size: calc(13px * var(--ts)); font-weight: 650; cursor: pointer; }
 .sheet-voice-btn:disabled { opacity: .6; cursor: default; }

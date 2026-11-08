@@ -1,7 +1,7 @@
 // ── TELEMETRY ─────────────────────────────────────────────────────────────
 // Sentry gets crashes and the failures the app catches; PostHog gets which
 // screens are opened and which steps are finished, so we can see where
-// inspectors get stuck. Loaded before js/app.js so errors while the app
+// inspectors get stuck. Loaded before the js/app/ files so errors while the app
 // starts are caught too.
 //
 // What leaves the phone: screen and step names, counts, timings, the

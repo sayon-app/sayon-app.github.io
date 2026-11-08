@@ -453,7 +453,7 @@ function saveBaitVisit() {
 
 // ── SAID INSTEAD OF TYPED ──
 // What the "Say it instead" button on the visit sends with the note (see SAY
-// IT INSTEAD in js/app.js). The stations on the sheet go with it, so "the
+// IT INSTEAD in js/app/). The stations on the sheet go with it, so "the
 // one by the shed" can find its number.
 function baitVoicePrompt() {
   const stations = (baitDraft ? baitDraft.stations : []).map(s => `${s.n}${s.where ? ` (${s.where})` : ''}`).join(', ') || 'none yet';

@@ -1,7 +1,7 @@
 // ── PHOTO MARKUP ──────────────────────────────────────────────────────────
 // Draw a circle, an arrow, a freehand line or a short label on a report
 // photo, so the client can see where the damage is. Opened from the photo
-// viewer's Mark up button (see PHOTO VIEWER in js/app.js).
+// viewer's Mark up button (see PHOTO VIEWER in js/app/).
 //
 // The marks are kept on the photo as shapes (p.markup), in coordinates from
 // 0 to 1 across the photo, so they can be changed later. The photo's stored

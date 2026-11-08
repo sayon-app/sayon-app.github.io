@@ -5,7 +5,7 @@
 // built on this phone from the business's own details and prices, so every
 // PDF looks like theirs, and each PDF is stamped SAMPLE (stampSamplePdf).
 //
-// It is an ordinary saved job with the id SAMPLE_JOB_ID (js/app.js), kept on
+// It is an ordinary saved job with the id SAMPLE_JOB_ID (js/app/), kept on
 // this phone only: it never goes to the account (supabaseSaveNow), the Due
 // list, a backup or the last-visit offer, and anything sent from it goes to
 // the business's own email, not a client (sampleJobSendTo). It's offered at

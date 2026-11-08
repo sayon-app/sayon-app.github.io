@@ -1,0 +1,1266 @@
+// SAYON app: Drawer, menu, bottom dock, this job, last visit, address suggestions, weather, standard, job info.
+// One of the js/app/ files, which share one global scope: they load as plain
+// scripts in the order index.html lists them, so a top-level name declared in
+// any of them can be used from the others once the page has loaded.
+
+// ── DRAWER & VOICE POPOVER ────────────────────────────────────────────────
+function toggleDrawer() {
+  const sidebar = document.getElementById('sidebarPanel');
+  const overlay = document.getElementById('drawerOverlay');
+  const isOpen = sidebar.classList.toggle('open');
+  if (isOpen) { showMenuPage(null); renderProfileMenu(); }
+  overlay.classList.toggle('open', isOpen);
+}
+
+// ── MENU ─────────────────────────────────────────────────────────────────
+// Full screen. It opens on a list of groups (This job, Jobs, Account, App);
+// tapping an item opens it as its own page, with Back to return to the list.
+// Each item is a drawer panel: its header is the list row, its body the page.
+function openMenuPage(panelId) {
+  if (!document.getElementById('sidebarPanel').classList.contains('open')) toggleDrawer();
+  showMenuPage(panelId);
+}
+
+function showMenuPage(panelId) {
+  const sidebar = document.getElementById('sidebarPanel');
+  const panel = panelId ? document.getElementById(panelId) : null;
+  sidebar.querySelectorAll('.menu-page-active').forEach(el => el.classList.remove('menu-page-active'));
+  if (panel) panel.classList.add('menu-page-active');
+  sidebar.classList.toggle('on-page', !!panel);
+  const title = panel && panel.querySelector('.panel-title');
+  document.getElementById('drawerTitle').textContent = title ? title.textContent : 'Menu';
+  document.getElementById('drawerBack').setAttribute('aria-label', panel ? 'Back to the menu' : 'Back to Jobs');
+  sidebar.querySelector('.drawer-scroll').scrollTop = 0;
+  // The plan can change in Stripe or with a different sign-in, so Billing
+  // always shows it fresh.
+  if (panelId === 'billingPanel') loadBillingStatus();
+  if (panelId === 'teamPanel') loadTeam();
+  if (panelId === 'pricesPanel') renderPriceBook();
+  if (panelId === 'chemicalsPanel') renderChemicalRegister();
+  if (panelId === 'settingsPanel') { restoreTestModeSetting(); renderLearnedList(); }
+  if (panel) track('screen_viewed', { screen: 'menu_' + panelId });
+}
+
+
+// ── BOTTOM DOCK ──────────────────────────────────────────────────────────
+// Jobs, the mic and This job. Jobs is every job (the account and settings
+// open from its top corner); This job is the open job's page, and each of
+// its documents (agreement, report, quote, treatment) opens a layer below
+// it. Each tab closes whatever is open, then opens its place. Which tab is
+// lit is css, read off the screens that are open. 'report', 'quote' and
+// 'menu' still work as places for the code that sends people there.
+function tabGo(to) {
+  const isOpen = id => document.getElementById(id).classList.contains('open');
+  syncDockJobs();
+  if (isOpen('voicePopover') && !isRecording) toggleVoicePopover();
+  if (to === 'quote') {
+    if (isOpen('quoteScreen')) return;
+    if (isOpen('sidebarPanel')) toggleDrawer();
+    if (isOpen('dashboardOverlay')) closeDashboard();
+    closeJobPage();
+    openQuoteFromReport();
+    return;
+  }
+  if (isOpen('quoteScreen')) {
+    closeQuote();
+    // A quote opened from the start menu goes back there; the tabs go to the app.
+    if (document.getElementById('app').style.display !== 'flex') openApp('inspect');
+  }
+  if (to === 'menu') { openAccountMenu(); return; }
+  if (isOpen('sidebarPanel')) toggleDrawer();
+  if (to === 'dashboard') {
+    closeJobPage();
+    if (isOpen('dashboardOverlay')) closeDashboardDetail(); else openDashboard();
+    return;
+  }
+  if (isOpen('dashboardOverlay')) closeDashboard();
+  if (to === 'job') openJobPage(); else closeJobPage();
+}
+
+// The account and settings, from the Jobs page's top corner. Back from the
+// menu's list returns to Jobs.
+function openAccountMenu() {
+  const isOpen = id => document.getElementById(id).classList.contains('open');
+  if (isOpen('quoteScreen')) { closeQuote(); if (document.getElementById('app').style.display !== 'flex') openApp('inspect'); }
+  if (isOpen('dashboardOverlay')) closeDashboard();
+  closeJobPage();
+  if (!isOpen('sidebarPanel')) toggleDrawer(); else showMenuPage(null);
+}
+function drawerBackTap() {
+  if (document.getElementById('sidebarPanel').classList.contains('on-page')) { showMenuPage(null); return; }
+  toggleDrawer();
+  openDashboard();
+}
+
+// ── THIS JOB ─────────────────────────────────────────────────────────────
+// The open job's page: where it's up to and the next step, then every
+// stage in the order a job runs, each opening its document, then the job's
+// details. Built from the same reading of a job as the dashboard's list.
+function currentJobSummary() {
+  saveOpenReportNow();
+  const quotes = getSavedQuotes();
+  const saved = currentReportId && getSavedReports().find(r => r.id === currentReportId);
+  // A job not saved yet (no address) still has a page, read off the open report.
+  const r = saved || { id: currentReportId || 'draft', address: getFullAddress(), client: (document.getElementById('jobClient') || {}).value || '',
+    completion: calculateCompletion(), reportData, quote: currentJobQuote() };
+  return dashboardJob(r, quotes);
+}
+
+function openJobPage() {
+  const overlay = document.getElementById('jobOverlay');
+  if (!overlay) return;
+  renderJobPage();
+  overlay.classList.add('open');
+  document.getElementById('jobPageBody').scrollTop = 0;
+  track('screen_viewed', { screen: 'job' });
+}
+
+function closeJobPage() {
+  const overlay = document.getElementById('jobOverlay');
+  if (!overlay || !overlay.classList.contains('open')) return;
+  overlay.classList.remove('open');
+  parkJobPanel();
+}
+
+function jobAgreementStep(d = reportData) {
+  const a = d.agreement;
+  const sent = !a && d.agreementRequest;
+  if (sent) return { label: 'Agreement', to: 'agreement', state: 'now', text: `Link sent${sent.signerName ? ' to ' + sent.signerName : ''}, waiting for them to sign` };
+  if (!a) return { label: 'Agreement', to: 'agreement', state: 'now', text: 'Not signed yet. Get it signed before you start' };
+  const how = a.method === 'onsite' ? 'Signed on site' : a.method === 'email' ? 'Signed by email' : a.method === 'paper' ? 'Signed on paper' : 'Signed';
+  return { label: 'Agreement', to: 'agreement', state: 'done', text: `${how}${a.signerName ? ' by ' + a.signerName : ''}` };
+}
+
+// A job's steps as its page shows them: the agreement first, then the
+// report, quote, the client's answer, treatment (and bait visits). Until
+// the agreement is signed, nothing after it is next.
+function jobPageSteps(j) {
+  const d = j.r.reportData || {};
+  const steps = [jobAgreementStep(d), ...j.steps.map(st => ({ ...st }))];
+  if (!d.agreement) steps.slice(1).forEach(st => { if (st.state === 'now') st.state = 'todo'; });
+  return steps;
+}
+
+// A step's line: the fuller wording for one that's done or still to come
+// (when, who, how much), and what a later step is waiting on.
+function jobStepLine(j, st) {
+  const who = (j.r.client || '').trim().split(/\s+/)[0];
+  if (st.to === 'report' && st.state !== 'done' && st.state !== 'skip' && !st.ready) return `${Math.round(j.r.completion || 0)}% filled in`;
+  if (st.to === 'quote' && j.total && st.state !== 'skip') return `${formatAUD(j.total).replace(/\.00$/, '')}${j.q && j.q.sentAt ? ', sent ' + dashDate(j.q.sentAt) : ', not sent yet'}`;
+  if (st.state === 'now' || st.state === 'bad' || st.state === 'skip' || !st.full) return st.text;
+  if (st.state === 'todo' && st.to === 'answer') return j.q && j.q.sentAt ? `Waiting on ${who || 'the client'}` : 'Once the quote is sent';
+  if (st.state === 'todo' && st.to === 'treatment') return quoteHasItems(j.q) && (quoteAnswerState(j.q) || {}).status === 'accepted' ? 'Accepted, not recorded yet' : 'Once the client accepts';
+  return st.full.replace(/ · /g, ', ');
+}
+
+// The steps as cards, each with its document's icon in the colour of where
+// it's up to. tap(st) is the step's onclick. Shared by the job page and the
+// job's sheet on the Jobs list.
+function jobStepsHTML(j, steps, tap) {
+  const tick = '<svg class="icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+  const stateWord = { done: 'done', now: 'next', todo: 'to come', skip: 'not needed', bad: 'declined' };
+  const chev = '<svg class="icon job-step-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
+  const pct = Math.round(j.r.completion || 0);
+  return `<ol class="job-steps">
+      ${steps.map((st, i) => {
+        const line = jobStepLine(j, st);
+        return `
+        <li class="${st.state}">
+          <button type="button" class="job-step" onclick="${tap(st)}" aria-label="${i + 1}. ${escapeHtml(st.label)}, ${stateWord[st.state] || ''}: ${escapeHtml(line)}">
+            <span class="job-tile ${st.state}" aria-hidden="true">${jobIcon(st.to, 20)}${st.state === 'done' ? `<span class="job-tile-tick">${tick}</span>` : ''}</span>
+            <span class="job-step-main">
+              <span class="job-step-label">${st.label}${st.state === 'now' ? '<span class="job-step-flag">Next</span>' : ''}</span>
+              <span class="job-step-text">${escapeHtml(line)}</span>
+              ${st.to === 'report' && st.state === 'now' && !st.ready ? `<span class="job-step-bar"><i style="width:${Math.max(4, Math.min(100, pct))}%"></i></span>` : ''}
+            </span>
+            ${chev}
+          </button>
+        </li>`; }).join('')}
+    </ol>`;
+}
+
+// The job page's icons: one per document, plus the hero's actions.
+const JOB_ICONS = {
+  agreement: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  report: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+  quote: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/>',
+  answer: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="m9 10 2 2 4-4"/>',
+  treatment: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
+  certificate: '<circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/>',
+  bait: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  jobpdf: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h8"/><path d="M8 17h5"/>',
+  details: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  tick: '<path d="M20 6 9 17l-5-5"/>',
+  phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  directions: '<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
+};
+function jobIcon(name, size) {
+  return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${JOB_ICONS[name] || JOB_ICONS.clock}</svg>`;
+}
+
+// The closed Job details line: the inspection type, the client's phone or
+// email, the order number.
+function jobDetailsSummary() {
+  const v = id => ((document.getElementById(id) || {}).value || '').trim();
+  return [(v('jobInspectionType') || '').split(' — ')[0], v('jobClientPhone') || v('jobClientEmail'), v('jobOrderId')].filter(Boolean).join(' · ');
+}
+
+function renderJobPage() {
+  const body = document.getElementById('jobPageBody');
+  if (!body) return;
+  parkJobPanel();
+  const j = currentJobSummary();
+  const addr = (j.r.address || '').trim();
+  // No street address yet: a new job, still being filled in.
+  const isNew = !(document.getElementById('jobAddress').value || '').trim();
+  const steps = jobPageSteps(j);
+  // Before the agreement is signed, that is the next step.
+  const next = !reportData.agreement && addr ? { status: 'Get the agreement signed', hint: 'The client signs it before the inspection starts.', next: { label: 'Open the agreement', to: 'agreement' } }
+    : j.finished && !reportData.jobPdfAt && typeof jobPdfSectionHTML === 'function' ? {
+        status: 'Finalise the job',
+        hint: j.onlyReportUnsent
+          ? 'Everything\'s done except sending the report. Email the job PDF and the report goes with it, or send the report on its own.'
+          : 'Everything\'s done' + (j.group === 'waiting' ? ' apart from the bait station checks' : '') + '. Put it all into one PDF for the client or your records.',
+        next: j.onlyReportUnsent && jobClientEmailOf() ? { label: `Finalise and email to ${(j.r.client || '').trim().split(/\s+/)[0] || 'the client'}`, to: 'jobpdf-email' } : { label: 'Finalise job', to: 'jobpdf' } }
+    : { status: j.status, hint: j.hint, next: j.next };
+  // Treatment recommended but the client isn't having a quote: skip it, and
+  // the treatment and bait steps with it.
+  const skipLink = j.status === 'Write the quote' ? '<button type="button" onclick="setClientNotGoingAhead(true)">Client isn\'t going ahead</button>'
+    : j.clientNotGoingAhead && !quoteHasItems(j.q) ? '<button type="button" onclick="setClientNotGoingAhead(false)">Write a quote after all</button>' : '';
+
+  const done = steps.filter(st => st.state === 'done' || st.state === 'skip').length;
+  // What the job is and when, over the address.
+  const type = (reportData.jobInspectionType || '').split(' — ')[0];
+  const when = reportData.jobInspectionDate ? new Date(reportData.jobInspectionDate + 'T00:00:00') : null;
+  const time = (reportData.jobInspectionTime || '').match(/^(\d{1,2}):(\d{2})/);
+  const eyebrow = [type,
+    when && !isNaN(when) ? when.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }) : '',
+    time ? `${(+time[1] % 12) || 12}:${time[2]} ${+time[1] < 12 ? 'am' : 'pm'}` : ''].filter(Boolean).join(' · ');
+  // One tap to ring, email or drive to the job.
+  const phone = ((document.getElementById('jobClientPhone') || {}).value || '').trim();
+  const email = typeof jobClientEmailOf === 'function' ? jobClientEmailOf() : (reportData.jobClientEmail || '').trim();
+  const actions = [
+    phone && `<a class="job-act" href="tel:${escapeHtml(phone.replace(/[^\d+]/g, ''))}">${jobIcon('phone', 18)}Call</a>`,
+    email && `<a class="job-act" href="mailto:${escapeHtml(email)}">${jobIcon('mail', 18)}Email</a>`,
+    addr && `<a class="job-act" href="https://maps.apple.com/?q=${encodeURIComponent(addr)}" target="_blank" rel="noopener">${jobIcon('directions', 18)}Directions</a>`,
+  ].filter(Boolean).join('');
+  const nextIcon = next.next ? (next.next.to.startsWith('jobpdf') ? 'jobpdf' : next.next.to) : j.group === 'done' && addr ? 'tick' : !addr ? 'details' : 'clock';
+  const chev = '<svg class="icon job-step-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
+  const group = (DASHBOARD_TABS.find(([k]) => k === j.group) || [, ''])[1];
+  // A redraw while the page is open keeps Job details as they were. A new
+  // job's details are the page itself: Property, Client and Booking cards.
+  const fold = document.getElementById('jobDetailsFold');
+  const detailsOpen = isNew || !!(fold && fold.open && document.getElementById('jobOverlay').classList.contains('open'));
+  document.getElementById('jobOverlay').classList.toggle('new-job', isNew);
+  const detailsHTML = `
+    <details class="job-details${isNew ? ' new' : ''}" id="jobDetailsFold"${detailsOpen ? ' open' : ''}>
+      <summary class="job-details-head" id="jobDetailsHead">
+        <span class="job-tile" aria-hidden="true">${jobIcon('details', 20)}</span>
+        <span class="job-step-main">
+          <span class="job-step-label">Job details</span>
+          <span class="job-step-text">${escapeHtml(jobDetailsSummary() || 'Address, client and booking')}</span>
+        </span>
+        ${chev}
+      </summary>
+      <div id="jobPageSlot"></div>
+    </details>`;
+  const stepsHTML = `
+    <div class="job-section-head">Job steps</div>
+    ${jobStepsHTML(j, steps, st => `jobGo('${st.to}')`)}`;
+  // A new job: what to fill in, the form, then the agreement as the next step.
+  if (isNew) {
+    body.innerHTML = `
+    <div class="job-hero new">
+      <div class="job-hero-eyebrow">${escapeHtml(eyebrow || new Date().toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }))}</div>
+      <h3 class="job-hero-addr">New job</h3>
+      <p class="job-hero-sub">Fill in the property and the client. The rest can wait.</p>
+      <p class="job-hero-tip"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v4"/></svg><span>Or tap the mic and say the address and the client's name.</span></p>
+    </div>
+    ${detailsHTML}
+    <section class="dash-next job-next job-next-new">
+      <div class="job-next-head">
+        <span class="job-tile now" aria-hidden="true">${jobIcon('agreement', 22)}</span>
+        <div>
+          <div class="dash-next-label">Next step</div>
+          <div class="dash-next-title">Get the agreement signed</div>
+        </div>
+      </div>
+      <p class="dash-next-hint">The client signs it before you start. Then tap the mic and talk through the inspection.</p>
+      <button type="button" class="dash-detail-primary" onclick="jobNewAgreement()">Open the agreement</button>
+      <div class="dash-detail-links"><button type="button" onclick="saveJobNow(true)">Save it for later</button></div>
+    </section>
+    ${stepsHTML}`;
+    document.getElementById('jobPageSlot').appendChild(document.getElementById('jobPanel'));
+    return;
+  }
+  body.innerHTML = `
+    ${isSampleJob(currentReportId) && typeof sampleJobNoteHTML === 'function' ? sampleJobNoteHTML() : ''}
+    <div class="job-hero ${j.group}">
+      ${addr ? `<div class="job-hero-top"><span class="dash-detail-chip ${j.group}">${group}</span><span class="job-hero-count">${done} of ${steps.length} done</span></div>` : ''}
+      ${eyebrow ? `<div class="job-hero-eyebrow">${escapeHtml(eyebrow)}</div>` : ''}
+      <h3 class="job-hero-addr">${escapeHtml(addr || 'New job')}</h3>
+      ${j.r.client ? `<p class="job-hero-sub">${escapeHtml(j.r.client)}</p>` : ''}
+      ${addr ? `<div class="job-progress" aria-hidden="true">${steps.map(st => `<i class="${st.state}"></i>`).join('')}</div>` : ''}
+      ${actions ? `<div class="job-acts">${actions}</div>` : ''}
+    </div>
+    <section class="dash-next job-next ${j.group}">
+      <div class="job-next-head">
+        <span class="job-tile ${j.group === 'done' && addr && !next.next ? 'done' : 'now'}" aria-hidden="true">${jobIcon(nextIcon, 22)}</span>
+        <div>
+          <div class="dash-next-label">${next.next ? 'Next step' : addr ? 'Where it\'s at' : 'Next step'}</div>
+          <div class="dash-next-title">${escapeHtml(next.status)}</div>
+        </div>
+      </div>
+      ${next.hint ? `<p class="dash-next-hint">${escapeHtml(next.hint)}</p>` : ''}
+      ${next.next ? `<button type="button" class="dash-detail-primary" onclick="jobGo('${next.next.to}')">${next.next.label}</button>` : ''}
+      ${skipLink ? `<div class="dash-detail-links">${skipLink}</div>` : ''}
+    </section>
+    ${stepsHTML}
+    ${typeof jobPdfSectionHTML === 'function' ? jobPdfSectionHTML() : ''}
+    ${detailsHTML}`;
+  const panel = document.getElementById('jobPanel');
+  if (panel) document.getElementById('jobPageSlot').appendChild(panel);
+}
+
+// Opens one of the open job's documents from its page (or from the strip
+// at the top of a document).
+function jobGo(to) {
+  if (to === 'jobpdf' || to === 'jobpdf-email') { makeJobPdf(to === 'jobpdf' ? 'save' : 'email'); return; }
+  closeJobPage();
+  if (document.getElementById('quoteScreen').classList.contains('open') && to !== 'quote' && to !== 'answer' && to !== 'treatment' && to !== 'certificate' && to !== 'bait') {
+    closeQuote();
+    if (document.getElementById('app').style.display !== 'flex') openApp('inspect');
+  }
+  if (to === 'job') { openJobPage(); return; }
+  if (to === 'details') { openJobPage(); const f = document.getElementById('jobDetailsFold'); if (f) f.open = true; document.getElementById('jobDetailsHead')?.scrollIntoView({ block: 'start' }); return; }
+  if (to === 'agreement') { openAgreementSheet(); return; }
+  if (to === 'report') return;
+  if (!document.getElementById('quoteScreen').classList.contains('open')) openQuoteFromReport();
+  if (to === 'treatment') openTreatmentRecord();
+  if (to === 'bait') {
+    const card = document.getElementById('qpBait');
+    if (card) card.scrollIntoView({ block: 'center' });
+    // Nothing recorded yet, or a check due: straight onto the sheet.
+    const b = typeof baitProgram === 'function' ? baitProgram(quoteState) : null;
+    if (b && !b.finished && !(b.last && !b.last.sentAt) && (b.dueNow || !b.visits.length || !card)) openBaitVisit();
+  }
+  if (to === 'answer' || to === 'certificate') {
+    const step = document.getElementById('qgStep3');
+    if (step) step.scrollIntoView({ block: 'center' });
+  }
+  // The certificate's Email button, lit so it's the obvious next tap.
+  if (to === 'certificate') {
+    ensureJsPDFLoaded().catch(() => {});
+    const btn = document.querySelector('#quoteAnswer .qp-cert-email');
+    if (btn) { btn.scrollIntoView({ block: 'center' }); btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 2400); }
+  }
+}
+
+// A new job's next step: the agreement, once there's an address to put on it.
+function jobNewAgreement() {
+  if (!document.getElementById('jobAddress').value.trim()) { askForJobAddress(); return; }
+  jobGo('agreement');
+}
+
+function askForJobAddress() {
+  showToast('Type the property address first', 'error');
+  const el = document.getElementById('jobAddress');
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.focus({ preventScroll: true });
+}
+
+// Save from the job's details. later: a job booked ahead, so it goes to the
+// Jobs list to come back to on the day.
+function saveJobNow(later) {
+  if (!document.getElementById('jobAddress').value.trim()) { askForJobAddress(); return; }
+  if (!saveCurrentReport(true)) return;
+  showToast(later ? 'Saved to your jobs' : 'Job saved', 'success');
+  if (later) tabGo('dashboard'); else refreshDashboardIfOpen();
+}
+
+// The strip at the top of the report and the quote: back to the job's page,
+// then its documents, the one on show lit. Treatment joins once the client
+// has accepted (or once it's recorded), Bait visits once stations are in.
+function renderDocStrips() {
+  if (typeof quoteHasItems !== 'function') return; // js/quote.js not loaded yet
+  const q = currentJobQuote();
+  const accepted = quoteHasItems(q) && (quoteAnswerState(q) || {}).status === 'accepted';
+  const docs = [['agreement', 'Agreement', !!reportData.agreement], ['report', 'Report'], ['quote', 'Quote', quoteHasItems(q)]];
+  if (accepted || q && q.treatment) docs.push(['treatment', 'Treatment', !!q.treatment]);
+  if (typeof baitInstalled === 'function' && baitInstalled(q)) docs.push(['bait', 'Bait visits', !!(baitProgram(q) || {}).finished]);
+  document.querySelectorAll('.doc-strip').forEach(strip => {
+    const here = strip.dataset.doc;
+    strip.innerHTML = `<button type="button" class="doc-chip doc-chip-job" onclick="jobGo('job')"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Job</button>`
+      + docs.map(([to, label, done]) => `<button type="button" class="doc-chip${to === here ? ' here' : ''}${done ? ' done' : ''}" ${to === here ? 'aria-current="page"' : `onclick="jobGo('${to}')"`}>${label}</button>`).join('');
+  });
+}
+
+// What the dock's tabs show about the job. This job: how much of the
+// report's required answers are in, as a number, a tick once it's done.
+function syncDockReport(pct, locked) {
+  const badge = document.getElementById('tabReportRing');
+  if (!badge) return;
+  const done = locked || pct >= 100;
+  const n = Math.max(0, Math.min(99, Math.round(pct || 0)));
+  badge.querySelector('.tab-progress-pct').textContent = n + '%';
+  badge.classList.toggle('done', done);
+  badge.classList.toggle('empty', !done && !n);
+  badge.closest('.tab').setAttribute('aria-label', done ? 'This job, report done' : `This job, report ${n}% filled in`);
+}
+
+// Dashboard: how many jobs need the inspector. Quote: a dot in the colour of
+// where this job's quote is up to. Read from storage, so it waits for a
+// quiet moment instead of running on every keystroke.
+let dockJobsTimer = 0;
+function syncDockJobs() {
+  clearTimeout(dockJobsTimer);
+  dockJobsTimer = setTimeout(() => {
+    try {
+      const quotes = getSavedQuotes();
+      const need = getSavedReports().map(r => dashboardJob(r, quotes)).filter(j => j.group === 'todo').length;
+      const count = document.getElementById('tabJobsCount');
+      if (count) {
+        count.textContent = need > 9 ? '9+' : String(need);
+        count.hidden = !need;
+        count.closest('.tab').setAttribute('aria-label', need ? `Dashboard, ${need} job${need === 1 ? '' : 's'} need you` : 'Dashboard');
+      }
+      const dot = document.getElementById('tabQuoteDot');
+      if (dot) {
+        const q = currentJobQuote();
+        const [label, tone] = quoteHasItems(q) ? quoteStatusPill(q) : [];
+        dot.hidden = !label;
+        dot.className = 'tab-dot-badge' + (tone === 'wait' || tone === 'good' || tone === 'bad' ? ' ' + tone : '');
+        dot.closest('.tab').setAttribute('aria-label', label ? `Quote, ${label}` : 'Quote');
+      }
+    } catch (e) { /* the dock's hints are extras; never let them break a save */ }
+  }, 400);
+}
+
+// The mic is for the report: from anywhere else it goes to the report and
+// opens the voice panel there.
+function tabMic() {
+  // While it listens, Talk reads Stop: a tap stops the recording.
+  if (isRecording) { toggleRecording(); return; }
+  const onReport = document.getElementById('app').style.display === 'flex'
+    && !['quoteScreen', 'sidebarPanel', 'dashboardOverlay', 'jobOverlay'].some(id => document.getElementById(id).classList.contains('open'));
+  if (!onReport) {
+    tabGo('report');
+    if (!document.getElementById('voicePopover').classList.contains('open')) toggleVoicePopover();
+    return;
+  }
+  toggleVoicePopover();
+}
+
+function toggleVoicePopover() {
+  if (isReportLocked()) return;
+  const popover = document.getElementById('voicePopover');
+  const fab = document.getElementById('micFab');
+  const isOpen = popover.classList.toggle('open');
+  fab.classList.toggle('open', isOpen);
+  updateVoiceHud();
+  showTestModeBadge();
+  if (isOpen) updateTalkPhotoButton();
+
+  // If closing while in notes-dictation mode, reset to default
+  if (!isOpen && activeNotesTargetKey) {
+    resetVoicePopoverToDefault();
+  }
+
+  // Stop any active recording when closing
+  if (!isOpen && isRecording) {
+    stopRecording();
+  }
+}
+
+function initMobileView() {
+  // No-op: layout is now responsive via drawer + popover for all screen sizes
+}
+
+function getFullAddress() {
+  return formatAddress(
+    document.getElementById('jobAddress').value.trim(),
+    document.getElementById('jobSuburb').value.trim(),
+    document.getElementById('jobState').value.trim(),
+    document.getElementById('jobPostcode').value.trim());
+}
+
+// An Australian phone number spaced the way it's written here: mobiles
+// 0412 345 678, landlines 02 1234 5678, 1300/1800 numbers 1300 123 456,
+// 13 numbers 13 12 34. +61 becomes a leading 0. Anything else (an
+// overseas number, an extension) is left as typed.
+function formatPhoneAU(value) {
+  const raw = String(value || '').trim();
+  let d = raw.replace(/[^\d+]/g, '');
+  if (/^\+?61\d{9}$/.test(d)) d = '0' + d.replace(/^\+?61/, '');
+  if (/\D/.test(d)) return raw;
+  if (/^04\d{8}$/.test(d) || /^1[38]00\d{6}$/.test(d)) return d.replace(/^(\d{4})(\d{3})(\d{3})$/, '$1 $2 $3');
+  if (/^0[2378]\d{8}$/.test(d)) return d.replace(/^(\d{2})(\d{4})(\d{4})$/, '$1 $2 $3');
+  if (/^13\d{4}$/.test(d)) return d.replace(/^(\d{2})(\d{2})(\d{2})$/, '$1 $2 $3');
+  return raw;
+}
+function tidyPhoneInput(el) {
+  const v = formatPhoneAU(el.value);
+  if (v !== el.value) { el.value = v; el.dispatchEvent(new Event('input')); }
+}
+
+// A file-name part from free text: letters, digits and underscores only,
+// cut at a word end. "7 Banksia Drive, Epping NSW 2121" gives
+// "7_Banksia_Drive_Epping_NSW_2121", not "7_Banksia_Drive,_Epping_N".
+function fileNamePart(text, max = 40) {
+  let s = String(text || '').replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '');
+  if (s.length > max) { s = s.slice(0, max + 1); const cut = s.lastIndexOf('_'); s = cut > max / 2 ? s.slice(0, cut) : s.slice(0, max); }
+  return s.replace(/_+$/, '');
+}
+
+function formatAddress(street, suburb, state, postcode) {
+  const line2 = [suburb, [state, postcode].filter(Boolean).join(' ')].filter(Boolean).join(' ');
+  return [street, line2].filter(Boolean).join(', ');
+}
+
+function updateJob() {
+  const addr = getFullAddress();
+  const headerJob = document.getElementById('headerJob');
+  headerJob.textContent = addr || 'No job loaded';
+  headerJob.classList.toggle('has-job', !!addr);
+  document.getElementById('reportSubtitle').textContent = addr
+    ? `${addr} · Speak to populate fields`
+    : 'Enter job details and speak to populate fields';
+
+  const summary = document.getElementById('jobPanelSummary');
+  if (summary) {
+    const client = document.getElementById('jobClient').value.trim();
+    const parts = [addr, client].filter(Boolean);
+    summary.textContent = parts.length ? parts.join(' · ') : 'No job set';
+  }
+
+  // The job's page shows the address as it's typed into its details.
+  const heroAddr = document.querySelector('#jobOverlay.open .job-hero-addr');
+  if (heroAddr) heroAddr.textContent = addr || 'New job';
+
+  syncAllSelectCards();
+  renderLastVisitBanner();
+  saveDraft();
+}
+
+// ── LAST VISIT ──────────────────────────────────────────────────────────
+// An address this account has inspected before. The inspector can start
+// from that report: the property details that don't change from year to
+// year are copied in, the known termite history is written from what was
+// found then, and a sheet shows what changed since. Nothing about this
+// visit's findings is copied: those are inspected afresh.
+//   reportData.lastVisit = { id, date, copied }   once started from
+//   reportData.lastVisitDismissed = <id>          when the inspector said not now
+const LAST_VISIT_KEYS = ['structureType', 'height', 'wallConstruction', 'roofType', 'floorType', 'facadeDirection', 'constructionEra',
+  'siteSurroundings', 'siteSlope', 'existingSystem', 'existingSystemOther', 'standard', 'toolsUsed'];
+
+// "7 Banksia Dr, Epping" and "7 Banksia Drive EPPING" are the same place.
+function addressKey(street, suburb) {
+  const norm = v => String(v || '').toLowerCase()
+    .replace(/[^a-z0-9/ ]+/g, ' ')
+    .replace(/\b(unit|apartment|apt|flat|lot|shop|suite)\s+/g, '')
+    .replace(/\b(street|st|road|rd|avenue|ave|av|drive|dr|dve|place|pl|court|ct|crescent|cres|cr|parade|pde|lane|ln|highway|hwy|boulevard|bvd|blvd|terrace|tce|close|cl|way|circuit|cct|grove|gr|esplanade|esp|square|sq)\b/g, '')
+    .replace(/\s+/g, ' ').trim();
+  const a = norm(street), b = norm(suburb);
+  return a && b ? `${a}|${b}` : '';
+}
+
+function previousVisitFor() {
+  const key = addressKey(document.getElementById('jobAddress').value, document.getElementById('jobSuburb').value);
+  if (!key) return null;
+  const list = getSavedReports().filter(r => r && r.id !== currentReportId && !isSampleJob(r) && r.reportData && addressKey(r.jobAddress, r.jobSuburb) === key);
+  if (!list.length) return null;
+  // A completed report over a draft, then the most recent.
+  list.sort((a, b) => ((b.reportData.issue ? 1 : 0) - (a.reportData.issue ? 1 : 0)) || ((b.savedAt || 0) - (a.savedAt || 0)));
+  return list[0];
+}
+
+function visitDate(entry) {
+  const rd = entry.reportData || {};
+  return (rd.issue && rd.issue.completedAt) || (rd.agreement && rd.agreement.inspectionDate && new Date(rd.agreement.inspectionDate + 'T00:00:00').getTime()) || entry.savedAt || Date.now();
+}
+
+// The answers a client asks about, from any report, for last time against now.
+function visitFacts(rd) {
+  rd = rd || {};
+  const fs = (rd.findings || []).filter(f => f && f.termiteActivity);
+  const where = list => list.map(f => f.activityLocation).filter(Boolean).join('; ');
+  const live = fs.filter(f => f.termiteActivity === 'ACTIVE'), old = fs.filter(f => f.termiteActivity === 'INACTIVE');
+  const conducive = conduciveConditions(rd);
+  const conduciveAnswered = ['waterLeaks', 'timberSoil', 'weepHoles', 'antCapping', 'slabEdge', 'subfloorVentilation', 'mouldSeen', 'siteDrainage', 'subfloorDrainage', 'nonDurableTimber'].some(k => !isBlankValue(rd[k]));
+  const yn = v => ({ YES: 'Yes', NO: 'No' })[v] || '';
+  return [
+    ['Live termites', live.length ? `Yes: ${where(live) || 'see findings'}` : fs.length ? 'No' : ''],
+    ['Workings or damage', old.length ? `Yes: ${where(old) || 'see findings'}` : fs.length ? 'No' : ''],
+    ['Borers', { ACTIVE: 'Active', INACTIVE: 'Old damage', NONE: 'No' }[rd.borerActivity] || ''],
+    ['Wood decay', yn(rd.decayFound)],
+    ['Conducive conditions', conducive.length ? conducive.join('; ').replace(/^./, c => c.toUpperCase()) : conduciveAnswered ? 'None' : ''],
+    ['Termite management system', rd.existingSystem || ''],
+    ['Treatment recommended', yn(rd.treatmentRecommended)],
+    ['Risk of termite attack', rd.riskLevel || ''],
+    ['Next inspection', rd.inspectionFrequency || ''],
+  ];
+}
+
+// What the last report found, in the words the Termite History field uses.
+function termiteHistoryFrom(entry) {
+  const rd = entry.reportData || {};
+  const when = formatIssueDate(visitDate(entry));
+  const fs = (rd.findings || []).filter(f => f && f.termiteActivity);
+  const live = fs.filter(f => f.termiteActivity === 'ACTIVE'), old = fs.filter(f => f.termiteActivity === 'INACTIVE');
+  const where = list => joinPlaces(list.map(f => bracketText(f.activityLocation)).filter(Boolean).slice(0, 2), true);
+  const t = entry.quote && entry.quote.treatment;
+  const treatedOn = t && t.date ? formatIssueDate(new Date(t.date + 'T00:00:00')) : '';
+  if (treatedOn) return `Treated before (${treatedOn}, after our inspection on ${when}${live.length ? `: live termites, ${where(live)}` : ''})`;
+  if (live.length) return `Termites reported before (our inspection on ${when}: live termites, ${where(live)})`;
+  if (old.length) return `Termites reported before (our inspection on ${when}: workings or damage, ${where(old)})`;
+  if (fs.length) return `None known (our inspection on ${when} found no termite activity)`;
+  return '';
+}
+
+function renderLastVisitBanner() {
+  const banner = document.getElementById('lastVisitBanner');
+  if (!banner) return;
+  const text = document.getElementById('lastVisitText');
+  const btn = document.getElementById('lastVisitBtn');
+  const skip = document.getElementById('lastVisitSkip');
+  const started = reportData.lastVisit;
+  const prev = started ? null : previousVisitFor();
+  if (started) {
+    banner.hidden = false;
+    text.textContent = `Started from the ${formatIssueDate(started.date)} inspection here.`;
+    btn.textContent = 'What changed';
+    skip.hidden = true;
+  } else if (prev && reportData.lastVisitDismissed !== prev.id) {
+    banner.hidden = false;
+    text.textContent = `Inspected here before, on ${formatIssueDate(visitDate(prev))}.`;
+    btn.textContent = 'Start from it';
+    skip.hidden = false;
+  } else banner.hidden = true;
+}
+
+function lastVisitAction() {
+  if (reportData.lastVisit) openLastVisitChanges();
+  else startFromLastVisit();
+}
+
+function dismissLastVisit() {
+  const prev = previousVisitFor();
+  if (prev) reportData.lastVisitDismissed = prev.id;
+  saveDraft();
+  renderLastVisitBanner();
+}
+
+// Copies what doesn't change about the property, and only into blank
+// fields, so nothing the inspector has already said is overwritten.
+function startFromLastVisit() {
+  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  const prev = previousVisitFor();
+  if (!prev) { renderLastVisitBanner(); return; }
+  const pr = prev.reportData || {};
+  let copied = 0;
+  const put = (k, v) => {
+    reportData[k] = v;
+    const el = document.getElementById('f-' + k);
+    if (el) renderField(el, k, v);
+    copied++;
+  };
+  LAST_VISIT_KEYS.forEach(k => { if (isBlankValue(reportData[k]) && !isBlankValue(pr[k])) put(k, pr[k]); });
+  const history = termiteHistoryFrom(prev);
+  if (history && isBlankValue(reportData.termiteHistory)) put('termiteHistory', history);
+  reportData.lastVisit = { id: prev.id, date: visitDate(prev), copied };
+  delete reportData.lastVisitDismissed;
+  updateProgress();
+  checkAsbestosFlag();
+  checkSystemVerify();
+  saveDraft();
+  renderLastVisitBanner();
+  showToast(copied ? `${copied} detail${copied === 1 ? '' : 's'} copied from the ${formatIssueDate(visitDate(prev))} inspection. Check them as you go` : 'Nothing to copy from the last report', copied ? 'success' : 'info');
+  track('last_visit_started', { copied });
+}
+
+// Last time against now, the answers a client asks about first.
+function openLastVisitChanges() {
+  const lv = reportData.lastVisit;
+  const prev = lv && getSavedReports().find(r => r.id === lv.id);
+  if (!prev) { showToast('The earlier report is no longer on this phone', 'info'); return; }
+  const esc = escapeHtml;
+  const rows = visitFacts(prev.reportData).map(([label, before], i) => {
+    const now = visitFacts(reportData)[i][1];
+    // Marked only once this visit has an answer: a blank isn't a change yet.
+    const changed = !!before && !!now && before !== now;
+    return `<div class="last-visit-row${changed ? ' changed' : ''}"><div class="last-visit-label">${esc(label)}</div>` +
+      `<div class="last-visit-cols"><div><small>Last time</small>${esc(before || 'Not recorded')}</div><div><small>Now</small>${esc(now || 'Not yet')}</div></div></div>`;
+  });
+  document.getElementById('lastVisitSheetSub').textContent =
+    `Inspected ${formatIssueDate(visitDate(prev))}${prev.inspector ? ` by ${prev.inspector}` : ''}. ${lv.copied ? `${lv.copied} property detail${lv.copied === 1 ? '' : 's'} were copied from it.` : ''}`;
+  document.getElementById('lastVisitRows').innerHTML = rows.join('');
+  document.getElementById('lastVisitOverlay').classList.add('open');
+  track('screen_viewed', { screen: 'last_visit_changes' });
+}
+function closeLastVisitChanges() { document.getElementById('lastVisitOverlay').classList.remove('open'); }
+
+// ── ADDRESS SUGGESTIONS ──────────────────────────────────────────────────
+// As the street address is typed, real addresses are listed under it; tapping
+// one fills street, suburb, state and postcode. lookupAddresses() is the only
+// part that talks to an address service. Offline or on any error the list
+// just stays empty and the fields work as plain text boxes.
+const AU_STATES = { 'new south wales': 'NSW', 'victoria': 'VIC', 'queensland': 'QLD', 'western australia': 'WA',
+  'south australia': 'SA', 'tasmania': 'TAS', 'australian capital territory': 'ACT', 'northern territory': 'NT' };
+function auStateCode(name) {
+  const n = String(name || '').trim();
+  return AU_STATES[n.toLowerCase()] || (Object.values(AU_STATES).includes(n.toUpperCase()) ? n.toUpperCase() : '');
+}
+
+// Google Places, through the Maps JavaScript API. The key comes from the
+// Worker's GOOGLE_MAPS_KEY secret, which keeps it out of this public repo; it
+// only works from the SAYON site addresses set on it in Google Cloud (HTTP
+// referrer restriction), and only for Maps JavaScript and Places. Until the
+// secret is set there are no suggestions and the boxes work as plain text.
+let googleMapsKey = null; // a promise of the key, '' when there is none
+function getGoogleMapsKey() {
+  if (!googleMapsKey) {
+    googleMapsKey = workerFetch('/maps-key', { method: 'GET' }).then(async res => {
+      if (res.ok) return (await res.json()).key || '';
+      if (![404, 405, 501].includes(res.status)) googleMapsKey = null; // ask again later
+      return '';
+    }).catch(() => { googleMapsKey = null; return ''; });
+  }
+  return googleMapsKey;
+}
+let googlePlacesLib = null;
+let addressSessionToken = null;
+function loadGooglePlaces(key) {
+  if (googlePlacesLib) return googlePlacesLib;
+  googlePlacesLib = new Promise((resolve, reject) => {
+    window.__sayonMapsReady = () => resolve();
+    const sc = document.createElement('script');
+    sc.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key)
+      + '&loading=async&callback=__sayonMapsReady';
+    sc.async = true;
+    sc.onerror = () => { googlePlacesLib = null; reject(new Error('Maps did not load')); };
+    document.head.appendChild(sc);
+  }).then(() => google.maps.importLibrary('places'));
+  return googlePlacesLib;
+}
+
+// Resolves [{ label, area, prediction }] for the typed text.
+async function lookupAddresses(query) {
+  const key = await getGoogleMapsKey();
+  if (!key) return [];
+  const places = await loadGooglePlaces(key);
+  if (!addressSessionToken) addressSessionToken = new places.AutocompleteSessionToken();
+  const { suggestions } = await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+    input: query, includedRegionCodes: ['au'], sessionToken: addressSessionToken,
+  });
+  return (suggestions || []).map(s => s.placePrediction).filter(Boolean).map(p => ({
+    label: p.mainText ? p.mainText.text : p.text.text,
+    area: p.secondaryText ? p.secondaryText.text : '',
+    prediction: p,
+  }));
+}
+
+// The picked suggestion's street, suburb, state and postcode.
+async function addressParts(prediction) {
+  const place = prediction.toPlace();
+  await place.fetchFields({ fields: ['addressComponents', 'location'] });
+  addressSessionToken = null; // a pick ends the billing session
+  const part = (type, short) => {
+    const c = (place.addressComponents || []).find(x => (x.types || []).includes(type));
+    return c ? (short ? c.shortText : c.longText) : '';
+  };
+  const unit = part('subpremise', true);
+  const number = part('street_number', true);
+  return {
+    street: [unit && number ? unit + '/' + number : number, part('route')].filter(Boolean).join(' '),
+    suburb: part('locality') || part('sublocality') || part('postal_town'),
+    state: auStateCode(part('administrative_area_level_1', true)),
+    postcode: part('postal_code', true),
+    location: place.location ? { lat: place.location.lat(), lng: place.location.lng() } : null,
+  };
+}
+
+let addressSuggestTimer = null;
+let addressSuggestions = [];
+function onAddressTyped(value) {
+  clearTimeout(addressSuggestTimer);
+  delete reportData.siteLocation; // a typed address has no map point
+  const q = String(value || '').trim();
+  if (q.length < 4 || !navigator.onLine) { hideAddressSuggestions(); return; }
+  addressSuggestTimer = setTimeout(async () => {
+    try {
+      const list = await lookupAddresses(q);
+      if (document.getElementById('jobAddress').value.trim() !== q) return; // typed on since
+      showAddressSuggestions(list);
+    } catch (e) {
+      hideAddressSuggestions();
+    }
+  }, 300);
+}
+
+function showAddressSuggestions(list) {
+  const box = document.getElementById('addrSuggest');
+  if (!box) return;
+  addressSuggestions = list;
+  if (!list.length) { hideAddressSuggestions(); return; }
+  box.innerHTML = list.map((a, i) => `<button type="button" class="addr-suggest-item" role="option"
+      onmousedown="event.preventDefault()" onclick="pickAddressSuggestion(${i})">
+      <span class="addr-suggest-street">${escapeHtml(a.label)}</span>
+      <span class="addr-suggest-area">${escapeHtml(a.area)}</span>
+    </button>`).join('') + '<div class="addr-suggest-credit">Powered by Google</div>';
+  box.classList.add('open');
+}
+
+function hideAddressSuggestions() {
+  const box = document.getElementById('addrSuggest');
+  if (box) { box.classList.remove('open'); box.innerHTML = ''; }
+}
+
+async function pickAddressSuggestion(i) {
+  const pick = addressSuggestions[i];
+  hideAddressSuggestions();
+  if (!pick) return;
+  let a;
+  try { a = await addressParts(pick.prediction); }
+  catch (e) { showToast('Could not fetch that address, type it in instead', 'error'); return; }
+  const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+  set('jobAddress', a.street);
+  set('jobSuburb', a.suburb);
+  set('jobState', a.state);
+  set('jobPostcode', a.postcode);
+  if (a.location) reportData.siteLocation = a.location;
+  updateJob();
+  if (a.location && inspectionIsToday()) fillWeather({ quiet: true });
+}
+
+// The state a postcode belongs to, by Australia Post's ranges, or ''.
+function stateForPostcode(pc) {
+  if (!/^\d{4}$/.test(pc || '')) return '';
+  const n = +pc;
+  if ((n >= 200 && n <= 299) || (n >= 2600 && n <= 2618) || (n >= 2900 && n <= 2920)) return 'ACT';
+  if (n >= 800 && n <= 999) return 'NT';
+  if (n >= 1000 && n <= 2999) return 'NSW';
+  if ((n >= 3000 && n <= 3999) || (n >= 8000 && n <= 8999)) return 'VIC';
+  if ((n >= 4000 && n <= 4999) || (n >= 9000 && n <= 9999)) return 'QLD';
+  if (n >= 5000 && n <= 5999) return 'SA';
+  if (n >= 6000 && n <= 6999) return 'WA';
+  if (n >= 7000 && n <= 7999) return 'TAS';
+  return '';
+}
+
+// A typed postcode fills in the state: when none is picked yet, or the
+// picked one came from an earlier postcode. A state tapped by hand stays.
+function onPostcodeTyped(el) {
+  const digits = el.value.replace(/\D/g, '').slice(0, 4);
+  if (digits !== el.value) el.value = digits;
+  const st = stateForPostcode(digits);
+  const sel = document.getElementById('jobState');
+  if (st && sel && (!sel.value || sel.value === sel.dataset.auto)) { sel.value = st; sel.dataset.auto = st; }
+  updateJob();
+}
+
+// ── WEATHER ON THE DAY ───────────────────────────────────────────────────
+// Temperature, humidity and the last 24 hours of rain at the property, from
+// the Worker's /weather route (Google's Weather API). Picking the address on
+// the day of the inspection fills the empty ones quietly; "Fill from today's
+// weather" fills them all, from the picked address or else the phone's
+// location. The inspector can still edit every value.
+function inspectionIsToday() {
+  const d = (document.getElementById('jobInspectionDate') || {}).value || reportData.jobInspectionDate;
+  return !d || d === todayIsoDate();
+}
+
+// Google's condition type as one of the report's Weather Conditions choices.
+function weatherConditionsFrom(type) {
+  const t = String(type || '');
+  if (!t) return null;
+  if (/HEAVY|THUNDER|^RAIN$|WIND_AND_RAIN/.test(t)) return 'Heavy rain';
+  if (/RAIN|SHOWER|DRIZZLE/.test(t)) return 'Light rain';
+  if (/WIND/.test(t)) return 'Windy';
+  if (/CLEAR|PARTLY_CLOUDY/.test(t)) return 'Fine and dry';
+  if (/CLOUDY/.test(t)) return 'Overcast';
+  return null;
+}
+
+function phoneLocation() {
+  if (!navigator.geolocation) return Promise.resolve(null);
+  return new Promise(resolve => navigator.geolocation.getCurrentPosition(
+    p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+    () => resolve(null),
+    { timeout: 10000, maximumAge: 600000 }));
+}
+
+// quiet: the automatic fill after an address pick. It fills only empty
+// fields, never asks for the phone's location and shows no messages.
+async function fillWeather({ quiet = false } = {}) {
+  const btn = document.getElementById('weatherFillBtn');
+  const say = (msg, kind) => { if (!quiet) showToast(msg, kind); };
+  if (btn) { btn.disabled = true; btn.textContent = 'Getting the weather…'; }
+  try {
+    const loc = reportData.siteLocation || (quiet ? null : await phoneLocation());
+    if (!loc) { say('Pick the address from the list, or allow location, to get the weather', 'info'); return; }
+    const res = await workerFetch(`/weather?lat=${loc.lat.toFixed(4)}&lng=${loc.lng.toFixed(4)}`, { method: 'GET' });
+    if (res.status === 501) { say("Weather isn't set up yet, so enter it by hand", 'info'); return; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const w = await res.json();
+    // The button refreshes what the weather filled before, but never a
+    // reading the inspector dictated or typed: 65% said on site beats 74%
+    // from the nearest station.
+    const filled = reportData.weatherFilled || (reportData.weatherFilled = {});
+    let kept = 0, changed = 0;
+    const set = (key, val, always) => {
+      if (val === null || val === undefined) return;
+      const cur = reportData[key];
+      if (cur && !(always && cur === filled[key])) { if (always && cur !== val) kept++; return; }
+      reportData[key] = val;
+      filled[key] = val;
+      changed++;
+      const el = document.getElementById('f-' + key);
+      if (el) renderField(el, key, val);
+    };
+    const num = n => typeof n === 'number' && Number.isFinite(n);
+    set('weatherConditions', weatherConditionsFrom(w.type), false);
+    set('temperature', num(w.tempC) ? Math.round(w.tempC) + '°C' : null, !quiet);
+    set('humidity', num(w.humidity) ? Math.round(w.humidity) + '%' : null, !quiet);
+    set('rainLast24h', num(w.rain24h) ? (w.rain24h > 0 ? Math.round(w.rain24h * 10) / 10 + ' mm' : 'None') : null, !quiet);
+    updateProgress();
+    saveDraft();
+    if (changed) say(kept ? "Weather filled in. Readings you'd already entered were kept" : 'Weather filled in. Tap a value to change it', 'success');
+    else say(kept ? "Kept the readings you'd already entered. Clear one to fill it from the weather" : 'Weather is already filled in', 'info');
+  } catch (e) {
+    say("Couldn't get the weather, so enter it by hand", 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "Fill from today's weather"; }
+  }
+}
+
+// ── APPLICABLE STANDARD ──────────────────────────────────────────────────
+// (updateStandard() removed — dead code, no #standardSelect element exists
+// and nothing called it; setStandard() below is the real active path)
+
+function setStandard(val, fromHeader = false) {
+  reportData.standard = val;
+
+  const el = document.getElementById('f-standard');
+  if (el) renderField(el, 'standard', val);
+
+  if (!fromHeader) {
+    const sel = document.getElementById('standardSelect');
+    if (sel) sel.value = val;
+  }
+
+  updateProgress();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PERSISTENCE — SAVED REPORTS (localStorage)
+// ══════════════════════════════════════════════════════════════════════════
+// FIX: this used to be a single flat key shared by every signed-in account on
+// a device, the same bug class as the old COMPANY_KEY. The original design
+// dealt with that by WIPING this key on every sign-in/sign-out of a
+// different user and relying on supabaseSyncOnOpen() to pull that account's
+// reports back down from the cloud. That works eventually, but
+// saveCurrentReport() pushes to the cloud in the background (non-blocking) -
+// so switching accounts again within a few seconds of saving, before that
+// background push has actually landed in Supabase, meant switching BACK
+// showed the just-saved report as gone (confirmed live: saved "12 New
+// street" on one account, switched away and back, and the dashboard dropped
+// back from 5 jobs to 4 - the report never left the cloud, the LOCAL cache
+// had just been wiped and the resync raced the still-in-flight save).
+// Scoping this per-account like COMPANY_KEY removes the race entirely: each
+// account reads its own key, which is never touched by another account
+// switching in, so a just-saved report is there instantly with no network
+// round trip needed to reappear.
+const STORAGE_KEY = 'korva_saved_reports'; // legacy flat key, pre-multi-tenant - kept only for one-time migration below
+const DRAFT_KEY = 'korva_draft';
+let currentReportId = null;
+
+// The made-up job a new inspector can tap through (js/sample-job.js). It
+// stays on this phone: never synced, backed up, listed as due or offered as
+// a last visit, and its emails go to the business, not a client.
+const SAMPLE_JOB_ID = 'sample_job';
+function isSampleJob(idOrEntry) {
+  const id = idOrEntry && typeof idOrEntry === 'object' ? idOrEntry.id : idOrEntry;
+  return id === SAMPLE_JOB_ID;
+}
+
+function reportsStorageKey() {
+  return (authUser && authUser.id) ? `korva_saved_reports_${authUser.id}` : STORAGE_KEY;
+}
+
+// One-time migration: whoever happens to be the first to sign in after this
+// fix inherits whatever was sitting in the old shared flat key (there's no
+// reliable way to tell which account it "belonged" to, but it was a single
+// shared key before multi-tenant scoping existed, so there was only ever
+// meant to be one real account's data in it on a given device). Consumes
+// the legacy key so it's only ever handed out once.
+function migrateLegacySavedReports() {
+  if (!authUser || !authUser.id) return;
+  const perUserKey = reportsStorageKey();
+  try {
+    if (localStorage.getItem(perUserKey)) return; // this account already has its own
+    const legacy = localStorage.getItem(STORAGE_KEY);
+    if (!legacy) return;
+    localStorage.setItem(perUserKey, legacy);
+    localStorage.removeItem(STORAGE_KEY);
+  } catch(e) {}
+}
+
+// ── JOB INFO ─────────────────────────────────────────────────────────────
+// Per-report job tracking fields — saved into reportData and draft.
+// Invoice no., referral source and payment status were dropped from the
+// screen (nothing printed or used them); older reports keep their values.
+const JOB_INFO_FIELDS = ['jobOrderId','jobInspectionType','jobInspectionDate','jobInspectionTime',
+                          'jobFee','jobClientPhone','jobClientEmail','jobNotes'];
+
+function saveJobInfo() {
+  JOB_INFO_FIELDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) reportData[id] = el.value;
+  });
+  syncAllSelectCards();
+  saveDraft();
+}
+
+// The inspection type decides which Australian Standard the report follows:
+// a pre-purchase inspection is reported under AS 4349.3, an inspection of
+// the owner's existing home under AS 3660.2.
+const INSPECTION_TYPE_STANDARD = {
+  'Pre-Purchase — Timber Pest': 'AS 4349.3-2010',
+  'Pre-Purchase — Combined Building & Pest': 'AS 4349.3-2010',
+  'Annual — Existing Building': 'AS 3660.2-2017',
+};
+// Whether this job is a pre-purchase inspection. The inspection type decides;
+// only a report with no type falls back to the standard it cites. The cover
+// label, the agreement wording and the "not for buying or selling" notice all
+// use this, so an insurance or legal job citing AS 4349.3 is never labelled
+// pre-purchase.
+// The report's title follows its standard: AS 4349.3 is a timber pest
+// inspection (termites, borers, decay, delignification), AS 3660.2 and the
+// rest a termite inspection.
+function reportKindTitle() {
+  const timberPest = isPrePurchaseJob() || /^AS 4349\.3/.test(reportData.standard || '');
+  return timberPest ? 'Timber Pest Inspection Report' : 'Termite Inspection Report';
+}
+
+function isPrePurchaseJob() {
+  const type = reportData.jobInspectionType || '';
+  if (type) return /pre-purchase/i.test(type);
+  return (reportData.standard || '') === 'AS 4349.3-2010';
+}
+
+function onInspectionTypeChange() {
+  saveJobInfo();
+  const std = INSPECTION_TYPE_STANDARD[document.getElementById('jobInspectionType').value];
+  if (std && std !== reportData.standard) {
+    setStandard(std);
+    showToast(`Report will follow ${std}`, 'info');
+  }
+}
+
+function loadJobInfo() {
+  // Older reports kept the fee only on the signed agreement.
+  if (!reportData.jobFee && reportData.agreement && reportData.agreement.fee) reportData.jobFee = reportData.agreement.fee;
+  // The agreement carries the inspection date too.
+  if (!reportData.jobInspectionDate && reportData.agreement && reportData.agreement.inspectionDate) reportData.jobInspectionDate = reportData.agreement.inspectionDate;
+  JOB_INFO_FIELDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && reportData[id] !== undefined) el.value = reportData[id];
+  });
+  syncAllSelectCards();
+}
+
+function clearJobInfo() {
+  JOB_INFO_FIELDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+    delete reportData[id];
+  });
+  syncAllSelectCards();
+}
+// Stored separately from report data, per-business, used on every report.
+//
+// FIX: this used to be a single flat key shared by every signed-in business on
+// a device ('korva_company' with no business id in it at all). On a shared
+// device - or simply the same browser the developer used while building the
+// app - whichever business saved its letterhead details first (here, the
+// original "Baz Pest Co" account) kept showing for every OTHER business that
+// signed in afterwards on that same browser, including inside their generated
+// PDF reports (getCompanyDetails() feeds the report cover/letterhead directly).
+// Scoping the key by authBusiness.id gives each signed-in business its own
+// independent record, so switching accounts can never leak one business's
+// name/licence/phone/ABN/logo into another business's reports.
+const COMPANY_KEY = 'korva_company'; // legacy flat key, pre-multi-tenant - kept only for one-time migration below
+
+function companyStorageKey(business = authBusiness) {
+  return (business && business.id) ? `korva_company_${business.id}` : COMPANY_KEY;
+}
+
+// One-time migration for accounts that already had data under the old flat
+// key before this fix shipped. We only claim it for the business whose name
+// matches what was actually stored there - otherwise we'd be guessing which
+// business the legacy blob belongs to, and a wrong guess would just recreate
+// the same cross-account leak this fix is meant to close. If nothing matches,
+// the legacy blob is simply left in place, unused, which is harmless.
+function migrateLegacyCompanyDetails() {
+  if (!authBusiness || !authBusiness.id) return;
+  const perBizKey = companyStorageKey();
+  try {
+    if (localStorage.getItem(perBizKey)) return; // this business already has its own record
+    const legacy = localStorage.getItem(COMPANY_KEY);
+    if (!legacy) return;
+    const d = JSON.parse(legacy);
+    if (d && d.name && authBusiness.name &&
+        d.name.trim().toLowerCase() === authBusiness.name.trim().toLowerCase()) {
+      localStorage.setItem(perBizKey, legacy);
+    }
+  } catch(e) {}
+}
+
+// Every change to the company details goes through here, so the account
+// copy knows which is newer (see js/business-sync.js). False if the phone
+// couldn't store it.
+function storeCompanyDetails(details) {
+  details.updatedAt = Date.now();
+  try { localStorage.setItem(companyStorageKey(), JSON.stringify(details)); }
+  catch (e) { return false; }
+  scheduleBusinessSync();
+  return true;
+}
+
+// Business details a client-facing PDF should carry, by what's missing.
+function companyDetailGaps() {
+  const c = getCompanyDetails();
+  return [['name', 'business name'], ['licence', 'licence number'], ['abn', 'ABN'], ['phone', 'phone number']]
+    .filter(([k]) => !(c[k] || '').trim()).map(([, label]) => label);
+}
+function joinWithAnd(list) {
+  return list.length < 2 ? (list[0] || '') : list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
+}
+
+// The name an email or text greets the client by: the first name ("Hi
+// Jo,"), "Mr Smith" for "Mr John Smith", "Jo and Sam" for "Jo & Sam Lee",
+// and nothing for a business or a bare initial, so the message opens "Hi,"
+// instead of "Hi Mr," or "Hi Harbour,". A name typed all in lower or
+// upper case gets its capitals.
+const GREETING_TITLE = /^(mr|mrs|ms|miss|mx|dr|prof|sir|dame|rev)\.?$/i;
+const GREETING_BUSINESS = /\b(pty|ltd|limited|inc|corp|co|company|strata|owners|corporation|council|trust|trustees?|estate|realty|property|properties|management|managers|agency|agents|partners|group|holdings|services|church|school|club|association|the)\b/i;
+function greetingName(name) {
+  const fix = w => w === w.toLowerCase() || w === w.toUpperCase()
+    ? w.toLowerCase().replace(/(^|[-'’])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()) : w;
+  const words = String(name || '').replace(/[.,]+$/, '').trim().split(/\s+/).filter(Boolean);
+  if (!words.length || GREETING_BUSINESS.test(words.join(' '))) return '';
+  const and = i => words[i] === '&' || /^and$/i.test(words[i]);
+  if (GREETING_TITLE.test(words[0])) {
+    const title = w => fix(w.replace(/\.$/, ''));
+    // "Mr & Mrs Smith": both titles and the surname.
+    if (words.length > 3 && and(1) && GREETING_TITLE.test(words[2])) return `${title(words[0])} and ${title(words[2])} ${fix(words[words.length - 1])}`;
+    const last = words[words.length - 1];
+    return words.length > 1 && !and(words.length - 1) && !GREETING_TITLE.test(last) ? `${title(words[0])} ${fix(last)}` : '';
+  }
+  const first = words[0];
+  if (/^\p{L}\.?$/u.test(first)) return '';
+  // "Jo & Sam Lee", "Jo Lee and Sam Ng": both first names.
+  const join = words.findIndex((w, i) => i > 0 && and(i));
+  if (join > 0 && words[join + 1] && !GREETING_TITLE.test(words[join + 1])) return `${fix(first)} and ${fix(words[join + 1])}`;
+  return fix(first);
+}
+
+// The inspector's words placed inside a sentence, used by the report, the
+// quote and the certificate.
+// lowerFirst: the first letter lower-cased ("Garage door" reads "garage
+// door"), unless the first word looks like a name or an abbreviation
+// ("NSW", "Smith St", "John's shed").
+function lowerFirst(text) {
+  const t = String(text || '').trim();
+  const [first = '', second = ''] = t.split(/\s+/);
+  if (!/^[A-Z][a-z]/.test(first) || /'s\b/.test(first) || /^[A-Z]/.test(second)) return t;
+  return t.charAt(0).toLowerCase() + t.slice(1);
+}
+// bracketText: words to set inside brackets, with no brackets of their own
+// ("Fungal decay (wet rot)" becomes "Fungal decay, wet rot") and no full
+// stop or comma at the end.
+function bracketText(text) {
+  return String(text || '').trim().replace(/\s*\(([^()]*)\)/g, ', $1').replace(/[()]/g, '').replace(/[.;,\s]+$/, '').replace(/^[,\s]+/, '');
+}
+// inBrackets: " (words)" ready to follow a phrase, or '' when there are none.
+function inBrackets(text) {
+  const t = lowerFirst(bracketText(text));
+  return t ? ` (${t})` : '';
+}
+// joinPlaces: places one after another with semicolons. The first keeps its
+// capital unless lowerAll; the rest are lower-cased, so the list reads as one
+// sentence: "Rear deck; garage door; front stump".
+function joinPlaces(list, lowerAll) {
+  return list.map(t => String(t || '').trim().replace(/[.;,]+$/, '')).filter(Boolean)
+    .map((t, i) => i || lowerAll ? lowerFirst(t) : t).join('; ');
+}
+
+function getCompanyDetails() {
+  try {
+    const stored = localStorage.getItem(companyStorageKey());
+    return stored ? JSON.parse(stored) : {};
+  } catch(e) { return {}; }
+}
+
+const LOGO_MAX_DIMENSION = 240;
+
+function handleCompanyLogoUpload(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    showToast('Choose an image file', 'error');
+    input.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onerror = () => showToast('Could not read that file', 'error');
+  reader.onload = () => {
+    const img = new Image();
+    img.onerror = () => showToast('Could not read that image', 'error');
+    img.onload = () => {
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (w > LOGO_MAX_DIMENSION || h > LOGO_MAX_DIMENSION) {
+        if (w >= h) { h = Math.round(h * (LOGO_MAX_DIMENSION / w)); w = LOGO_MAX_DIMENSION; }
+        else { w = Math.round(w * (LOGO_MAX_DIMENSION / h)); h = LOGO_MAX_DIMENSION; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/png');
+      // Saved with the rest of the form (saveBusinessForm)
+      businessFormLogo = { logo: dataUrl, logoWidth: w, logoHeight: h };
+      renderCompanyLogoPreview(dataUrl);
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function removeCompanyLogo() {
+  businessFormLogo = null;
+  renderCompanyLogoPreview(null);
+}
+
+function renderCompanyLogoPreview(dataUrl) {
+  const preview = document.getElementById('companyLogoPreview');
+  const removeBtn = document.getElementById('companyLogoRemoveBtn');
+  if (!preview) return;
+  if (dataUrl) {
+    preview.innerHTML = '';
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.alt = 'Company logo';
+    preview.appendChild(img);
+    if (removeBtn) removeBtn.style.display = '';
+  } else {
+    preview.innerHTML = '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.5-3.5a2 2 0 0 0-2.8 0L5 21"/></svg>';
+    if (removeBtn) removeBtn.style.display = 'none';
+  }
+}
+// Reports save to localStorage first (instant) then sync to Supabase in the
+// background. The app works fully offline — Supabase is backup/cloud copy.
+const SUPABASE_URL  = 'https://bmjgvogxutwyeklxxeao.supabase.co';
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtamd2b2d4dXR3eWVrbHh4ZWFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0NTczMTEsImV4cCI6MjEwNTAzMzMxMX0.Ov8xGhDMuAbUcWy7zbCiS01D6QCrlhDYxza3Fzls83U';

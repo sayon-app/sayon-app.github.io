@@ -6284,3 +6284,10 @@ button.drawer-help { width: 100%; font-family: inherit; text-align: left; cursor
 .talkback-actions .link-btn, #talkBackClose { min-height: 40px; font-size: calc(14px * var(--ts)); font-weight: 700; }
 .talkback-actions .link-btn:disabled { opacity: 0.4; }
 @media (prefers-reduced-motion: reduce) { .talkback[data-state="listening"] .talkback-state::before { animation: none; } }
+
+/* A copy of the report for the agent or solicitor, on the check sheet (js/app/send.js) */
+.send-review-copy { margin: -4px 0 4px; }
+.send-review-copy[hidden], .send-copy-add[hidden], .send-copy-open[hidden] { display: none; }
+.send-copy-open { min-height: 40px; padding: 0; font-size: calc(13.5px * var(--ts)); font-weight: 700; color: var(--accent2); text-align: left; }
+.send-copy-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); }
+.send-copy-add .send-review-file-meta { margin-top: 6px; }

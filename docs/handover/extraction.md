@@ -33,7 +33,7 @@ Read this before you touch voice capture, transcript cleanup, `SYSTEM_PROMPT` or
 - **`correctKnownMishearings`**: `1702–1741`, 17 regex replacements. Its only call site is `2099`, on final Web Speech or native results. The server transcript (`2040`) and typed edits (`2201`) skip it.
 - **`TRANSCRIPTION_VOCAB`**: `1750–1756`. It is only used as the Whisper `initial_prompt` (`1977–1981`, worker `839–850`).
 - **Learned corrections** (LEARNED CORRECTIONS in `js/app.js`, added 30 Oct 2026): per business, stored in `korva_learned_<businessId>` and synced in `businesses.settings.learned` (the owner's phone writes; copies are merged, not newest-wins). A field the AI filled and the inspector changed is kept with the sentence it came from (`reportData.aiFilled`). A few words changed in the transcript box become a word fix. Both go to extraction as a second system block (`learnedPromptBlock`), and word fixes join the Whisper hint. A word fix made twice is applied to every transcript (`applyLearnedWordFixes`, the end of `correctKnownMishearings`). Inspectors see and remove them in Settings > Voice. Read `settings.learned` to find fixes worth adding for everyone.
-- **Narrow prompts**: `PLATE_SYSTEM_PROMPT` `1215–1231` (2,087 chars) and `INSECT_ID_SYSTEM_PROMPT` `1239–1270` (2,602 chars).
+- **Narrow prompts**: `PLATE_SYSTEM_PROMPT` `1215–1231` (2,087 chars) and `INSECT_ID_SYSTEM_PROMPT` `1239–1270` (2,602 chars). Since the split they live in `js/app/prompts.js`, with `PHOTO_CAPTION_PROMPT` (Describe on a report photo, added 8 Nov 2026). All three photo calls go through `askAiAboutPhoto` in `js/app/extraction.js`.
 
 ## 2. The request
 

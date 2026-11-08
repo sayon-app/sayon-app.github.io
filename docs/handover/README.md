@@ -82,7 +82,7 @@ For an AI model taking over this repo with no context. Last checked 2026-10-05: 
 - **No App Store:** it stays a web app.
 
 ### Voice and extraction traps (details in `extraction.md`)
-- Thinking counts toward `max_tokens`. Extraction sends `claude-sonnet-5`, `output_config.effort: 'medium'`, `max_tokens: 16000` and a 120 s timeout (`EXTRACTION_TIMEOUT_MS`); at the old 4096 and default high effort, whole-house notes came back "too long". Other AI calls: transcript cleanup (low, 8000), compliance plate scan (low, 2000), species photo ID (medium, 4000).
+- Thinking counts toward `max_tokens`. Extraction sends `claude-sonnet-5`, `output_config.effort: 'medium'`, `max_tokens: 16000` and a 120 s timeout (`EXTRACTION_TIMEOUT_MS`); at the old 4096 and default high effort, whole-house notes came back "too long". Other AI calls: transcript cleanup (low, 8000), compliance plate scan (low, 2000), species photo ID (medium, 4000), photo Describe (low, 2000).
 - The Worker forces `claude-sonnet-5` (`ALLOWED_MODEL`) and clamps `max_tokens` to 16000 (`MAX_TOKENS_CEILING`) whatever the app asks. Trying another model or a bigger budget is a Worker change baz must paste.
 - No fallback that guesses. A failed AI call leaves the note in `pendingNotes` with the reason shown. The offline word-matcher (`offlineExtract`) filled reports with wrong data; PR #70 removed it.
 - No fuzzy brand-name matching on the phone: the one PR #70 removed turned "termites" into Termimesh and "external" into Exterra. Misplaced brand names are left to `SYSTEM_PROMPT`; `correctKnownMishearings()` holds only narrow fixes for mishearings seen more than once.

@@ -2,7 +2,7 @@
 
 For an AI model taking over this repo with no context. Last checked 2026-10-05: the live app is `korva-v51` (check with `git show origin/live:service-worker.js | grep "CACHE_VERSION ="`).
 
-- Claude Code loads `CLAUDE.md` (repo root) by itself. It has the file map, the `js/app.js` section banners, the short rules and the test setup. `docs/` is **not** loaded by itself, so your brief must send you here.
+- Claude Code loads `CLAUDE.md` (repo root) by itself. It has the file map, the `js/app/` files and their section banners, the short rules and the test setup. `docs/` is **not** loaded by itself, so your brief must send you here.
 - Read this file, then `docs/handover/state.md`, then only the doc your task needs (section 7).
 - If `README.md` says to deploy with a PR from `main` into `live` or mentions Capacitor/iOS, or `worker/README.md` says "live v6 Worker", those lines are out of date: this file wins. Older code comments that put app code in `index.html` or name `korva-worker-with-stripe.js` (now `worker/worker.js`) are stale too.
 - On any conflict, follow the code. Between docs, follow the one with the later `git log -1 --format=%cd -- <file>` and fix the stale one in your PR.
@@ -134,7 +134,7 @@ Live versus `main` (after `git fetch origin`):
 
 ## 6. Working on a budget (you're the expensive model)
 
-- Jump to code; never read `js/app.js` (about 9,200 lines) whole. `grep -n "AI EXTRACTION" js/app.js`, then read that line range. Leave off the "── ": six banners `CLAUDE.md` lists don't have it.
+- Jump to code; never read a whole `js/app/` file (they run to 1,900 lines). `grep -rn "AI EXTRACTION" js/app/`, then read that line range. Leave off the "── ": some banners `CLAUDE.md` lists don't have it.
 - Hand mechanical work (bench runs, Playwright, screenshots, broad searches) to a cheaper subagent where you can choose its model. Give it the exact commands and say what to report back.
 - Don't re-check what `state.md` marks as reviewed or live unless your brief says to.
 - Three jobs were set aside for you; your brief names which:

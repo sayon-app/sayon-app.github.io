@@ -1,6 +1,6 @@
 # Extraction test bench
 
-Checks how well `SYSTEM_PROMPT` (js/app.js) turns an inspector's dictation into report fields. Each case is a transcript plus an answer key; `score.mjs` marks an answer against the key.
+Checks how well `SYSTEM_PROMPT` (js/app/prompts.js) turns an inspector's dictation into report fields. Each case is a transcript plus an answer key; `score.mjs` marks an answer against the key.
 
 ## What's here
 
@@ -79,7 +79,7 @@ Browser check (not a scorer): `multi-note.playwright.js`, see the header of that
 Notes on the runners:
 - `eval-workflow.js` scores only the two house tests unless you pass `cases: [...]` with every case id you want. All 38: `drainage-treatment`, `house-test-1`, `house-test-2`, `slab-barrier`, `skirting-active`, `subfloor-followup`, `borers-rot`, `rambling-nest`, `car-test-full`, `car-test-clean`, `car-test-invasive`, `phone-full-job`, `locked-bedroom`, `fence-workings`, `borer-only`, `decay-and-leak`, `existing-baiting`, `old-damage-treated`, `limited-scope`, `deck-schedorhinotermes`, `piers-paving-pool`, `queenslander-stumps`, `townhouse-strata`, `rural-sheds`, `backwards-order`, `numbers-and-corrections`, `clear-but-conducive`, `wet-day-partial`, `three-spots-nest`, `site-conditions-tools`, `garbled-kordon`, `subfloor-all-clear`, `verdict-and-severity`, `chatter-and-asides`, `negation-traps`, `roofvoid-only`, `live-script-one-note`, `live-script-take-two`.
 - To score an older prompt on new cases (a baseline), check that commit out in a separate `git worktree`, copy the new transcripts and keys into it, and point `args.repo` at the worktree.
-- Both runners read `SYSTEM_PROMPT` as plain text from `js/app.js`. Keep it a template literal with no `${}`; `run-api.mjs` refuses one that has it, and the workflow's agents would read the raw `${…}`.
+- Both runners read `SYSTEM_PROMPT` as plain text from `js/app/prompts.js`. Keep it a template literal with no `${}`; `run-api.mjs` refuses one that has it, and the workflow's agents would read the raw `${…}`.
 - An answer that isn't valid JSON counts as failing every check for that run, because the app can't use it either.
 - `BASELINE.md` holds the scores of the prompt as it was when the bench was added. Add a row there for every prompt change you measure.
 

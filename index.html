@@ -528,7 +528,7 @@
 </div>
 
 <!-- NEW ADDRESS: shows at the old address once the site has moved (see
-     ADDRESS MOVE in js/app.js). -->
+     ADDRESS MOVE in js/app/). -->
 <div class="page-sheet-overlay did-it-send-overlay" id="moveOverlay">
   <div class="did-it-send" role="alertdialog" aria-modal="true" aria-labelledby="moveTitle" aria-describedby="moveText">
     <div class="did-it-send-title" id="moveTitle">SAYON has a new address</div>
@@ -1550,18 +1550,18 @@
       <div class="report-body edit-mode" id="reportBody" data-step="property">
 
         <!-- Job completion: sent, complete, locked, amending (see COMPLETED
-             JOBS in js/app.js) -->
+             JOBS in js/app/) -->
         <div class="issue-banner" id="issueBanner" style="display:none"></div>
 
         <!-- Pre-inspection agreement: signed before the job (see the
-             PRE-INSPECTION AGREEMENT block in js/app.js) -->
+             PRE-INSPECTION AGREEMENT block in js/app/) -->
         <div class="agreement-banner" id="agreementBanner">
           <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg>
           <span class="agreement-banner-text" id="agreementBannerText">Pre-inspection agreement not signed yet</span>
           <button class="agreement-banner-btn" id="agreementBannerBtn" onclick="openAgreementSheet()">Get it signed</button>
         </div>
 
-        <!-- Last visit: an address this account has inspected before (LAST VISIT in js/app.js) -->
+        <!-- Last visit: an address this account has inspected before (LAST VISIT in js/app/) -->
         <div class="agreement-banner last-visit-banner" id="lastVisitBanner" hidden>
           <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></svg>
           <span class="agreement-banner-text" id="lastVisitText"></span>
@@ -1782,7 +1782,7 @@
             </div>
 
             <!-- Voice notes still write the free text here; Section 5 shows it
-                 on each area's row (ACCESS SPOTS in js/app.js). -->
+                 on each area's row (ACCESS SPOTS in js/app/). -->
             <div hidden>
               <div class="field-val" id="f-hinderedAreas">—</div>
               <div class="field-val" id="f-noAccessAreas">—</div>
@@ -2288,7 +2288,7 @@
       <span id="voiceBtnText">Tap to speak</span>
     </button>
     <!-- A photo taken while talking lands on the finding being described
-         once the note is filled in (see PHOTOS WHILE TALKING in js/app.js). -->
+         once the note is filled in (see PHOTOS WHILE TALKING in js/app/). -->
     <button type="button" class="voice-photo-btn" id="voicePhotoBtn" onclick="takePhotoWhileTalking()">
       <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
       <span id="voicePhotoBtnText">Photo of what you're describing</span>
@@ -2306,7 +2306,7 @@
 
     <!-- Ready-made sentences for when speaking isn't practical (a noisy roof
          void). A tap adds the sentence to the note; Extract reads it like
-         dictation. See QUICK PHRASES in js/app.js. -->
+         dictation. See QUICK PHRASES in js/app/. -->
     <details class="quick-phrases" id="quickPhrases">
       <summary>Quick phrases (when you can't talk)</summary>
       <div id="quickPhrasesList"></div>
@@ -2351,7 +2351,7 @@
     </div>
 
     <!-- Notes dictated with no signal, waiting to be sent to the AI.
-         See the NO-SIGNAL QUEUE in js/app.js. -->
+         See the NO-SIGNAL QUEUE in js/app/. -->
     <div class="pending-notes-bar" id="pendingNotesBar" style="display:none">
       <div class="pending-notes-head">
         <span class="pending-notes-text" id="pendingNotesText"></span>
@@ -2377,7 +2377,7 @@
     </div>
   </div><!-- /voicePopover -->
 
-<!-- PHOTO VIEWER: any photo, full screen and zoomable (see PHOTO VIEWER in js/app.js) -->
+<!-- PHOTO VIEWER: any photo, full screen and zoomable (see PHOTO VIEWER in js/app/) -->
 <div class="photo-viewer" id="photoViewer" role="dialog" aria-modal="true" aria-label="Photo" hidden>
   <div class="photo-viewer-bar">
     <span class="photo-viewer-info" id="photoViewerInfo"></span>
@@ -2420,7 +2420,7 @@
 </div>
 
 <!-- PRE-INSPECTION AGREEMENT SHEET -->
-<!-- COMPASS: opened from Orientation (see COMPASS in js/app.js) -->
+<!-- COMPASS: opened from Orientation (see COMPASS in js/app/) -->
 <div class="page-sheet-overlay" id="compassOverlay">
   <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="compassTitle">
     <div class="page-sheet-header">
@@ -2469,7 +2469,7 @@
         <p class="agr-lede">Fill in the job, read the agreement through with the client, then they sign on this screen.</p>
       </div>
       <!-- Sent for the client to sign on their own phone: waiting on them.
-           See REMOTE SIGNING in js/app.js. -->
+           See REMOTE SIGNING in js/app/. -->
       <div class="agr-remote" id="agreementRemote" hidden>
         <div class="agr-remote-text" id="agreementRemoteText"></div>
         <div class="agr-remote-btns">
@@ -2641,7 +2641,7 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<!-- Voice HUD: screen-edge border while listening or extracting (VOICE HUD in js/app.js) -->
+<!-- Voice HUD: screen-edge border while listening or extracting (VOICE HUD in js/app/) -->
 <div class="voice-hud" aria-hidden="true"></div>
 
 </div><!-- /body -->
@@ -2650,9 +2650,27 @@
 <!-- Error tracking and usage steps, first so they see the app start (TELEMETRY in js/telemetry.js) -->
 <script src="js/vendor/sentry-11.4.0.min.js"></script>
 <script src="js/telemetry.js"></script>
-<script src="js/app.js"></script>
+<!-- The app: plain scripts that share one global scope, loaded in this order -->
+<script src="js/app/state.js"></script>
+<script src="js/app/areas.js"></script>
+<script src="js/app/talk-photos.js"></script>
+<script src="js/app/species.js"></script>
+<script src="js/app/prompts.js"></script>
+<script src="js/app/shell.js"></script>
+<script src="js/app/voice.js"></script>
+<script src="js/app/extraction.js"></script>
+<script src="js/app/fields.js"></script>
+<script src="js/app/editing.js"></script>
+<script src="js/app/agreement.js"></script>
+<script src="js/app/photos.js"></script>
+<script src="js/app/job.js"></script>
+<script src="js/app/account.js"></script>
+<script src="js/app/sync.js"></script>
+<script src="js/app/dashboard.js"></script>
+<script src="js/app/send.js"></script>
+<script src="js/app/pdf.js"></script>
 <script src="js/photo-markup.js"></script>
-<!-- Quote builder: uses js/app.js globals (reportData, getSavedReports, jsPDF…) -->
+<!-- Quote builder: uses the js/app/ globals (reportData, getSavedReports, jsPDF…) -->
 <script src="js/quote.js"></script>
 <script src="js/price-book.js"></script>
 <script src="js/chemicals.js"></script>

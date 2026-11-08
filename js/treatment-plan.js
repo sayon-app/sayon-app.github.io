@@ -20,7 +20,7 @@
 // Loaded after js/quote.js and uses its globals (quoteState, newQuoteItem,
 // QUOTE_CATALOGUE, QUOTE_SYSTEM_LABELS, QUOTE_PLAN_TIMES, QUOTE_PLAN_SERVICE,
 // renderQuotePlan, renderQuoteItems, scheduleQuoteSave, quotePlanReport,
-// currentQuoteSource, isQuoteLocked) and js/app.js's (workerFetch,
+// currentQuoteSource, isQuoteLocked) and the js/app/ files' (workerFetch,
 // escapeHtml, showToast, sha256Hex, stableJson, track, authSession).
 // ══════════════════════════════════════════════════════════════════════════
 

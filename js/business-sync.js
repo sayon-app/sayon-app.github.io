@@ -9,7 +9,7 @@
 // The owner's phone writes them; the team only reads (see
 // supabase/business-settings.sql). Company details and prices each go by
 // their own time, newest wins. What SAYON learned from corrections (see
-// LEARNED CORRECTIONS in app.js) is put together from both copies instead,
+// LEARNED CORRECTIONS in js/app/) is put together from both copies instead,
 // so a correction made on either side is kept. Anything else already in settings (such as
 // the old invoice counter, invoiceSeq) is kept as it is.
 const BUSINESS_SYNC_DELAY_MS = 1500;

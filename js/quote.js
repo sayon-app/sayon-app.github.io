@@ -4,7 +4,7 @@
 // recommendations into an editable treatment quote, and exports it as a PDF in
 // the same visual style as the inspection report.
 //
-// Loaded after js/app.js and relies on its globals:
+// Loaded after the js/app/ files and relies on their globals:
 // appInitialised, currentReportId, authUser, authBusiness, DRAFT_KEY,
 // flushDraftSave, getSavedReports, setSavedReports, supabaseSave,
 // getCompanyDetails, formatAddress, jsPDF, ensureJsPDFLoaded, PDF_COLORS,
@@ -195,7 +195,7 @@ function scheduleQuoteSave() {
   quoteSaveTimer = setTimeout(persistQuote, 400);
 }
 // The app is being put away or closed: a change still waiting on the timer
-// is saved now (saveBeforeLeaving in js/app.js).
+// is saved now (saveBeforeLeaving in js/app/).
 function flushQuoteSave() {
   if (!quoteSaveTimer) return;
   clearTimeout(quoteSaveTimer);
@@ -473,7 +473,7 @@ function buildQuoteItemsFromReport(rd, system) {
 
 // ── SPOKEN QUOTE ──
 // What the inspector dictated for the quote (reportData.quoteSpoken, filled
-// by mergeSpokenQuote in js/app.js). Its lines replace the ones the builder
+// by mergeSpokenQuote in js/app/). Its lines replace the ones the builder
 // would guess from the report, at the prices said; a line said with no
 // price starts at the usual rate. Each line is matched to a catalogue line
 // where it plainly is one, so the price is remembered for next time.
@@ -605,7 +605,7 @@ function quoteProblem(q) {
 }
 
 // A report detail set in brackets mid-sentence: "Fungal decay (wet rot)."
-// reads as " (fungal decay, wet rot)" (inBrackets, js/app.js).
+// reads as " (fungal decay, wet rot)" (inBrackets, js/app/).
 function buildQuoteExclusions(rd) {
   rd = rd || {};
   const out = [];
@@ -1728,7 +1728,7 @@ function rememberQuotePrices(q) {
 // ── SENT AND LOCKED ─────────────────────────────────────────────────────────
 // A quote records when it went to the client and a hash of what it said, so
 // the job can only be completed once the client has the current quote (see
-// COMPLETED JOBS in js/app.js). Once the job is complete the quote is locked
+// COMPLETED JOBS in js/app/). Once the job is complete the quote is locked
 // with its report until the job is amended.
 function quoteHasItems(q) { return !!(q && q.items && q.items.length); }
 function quoteContentHash(q) {

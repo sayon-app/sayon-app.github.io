@@ -500,7 +500,7 @@ function closeTreatmentRecord() {
 
 // ── SAID INSTEAD OF TYPED ──
 // What the "Say it instead" button on the record sends with the
-// technician's note (see SAY IT INSTEAD in js/app.js).
+// technician's note (see SAY IT INSTEAD in js/app/).
 function treatmentVoicePrompt() {
   const methods = Object.entries(TREATMENT_METHODS).map(([k, m]) => `"${k}" (${m.label})`).join(', ');
   return `You fill in a termite treatment record for SAYON, an app for Australian timber pest technicians. The user message is what the technician said about a treatment they did, and the date today. Return ONLY a JSON object, no markdown, with these keys, each null unless the technician said it:

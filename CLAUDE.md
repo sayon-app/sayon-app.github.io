@@ -4,14 +4,14 @@ A voice-to-report PWA for Australian timber pest inspectors. The chain is: pre-i
 
 **New to this repo, or starting a larger task? Read `docs/handover/README.md` first.** It covers the owner, what's live, the go-live recipe and the traps, and points to the rest.
 
-Read only the files your task needs. `js/app.js` is about 9,200 lines, so jump to a section with `grep -n "SECTION NAME" js/app.js` instead of reading it whole.
+Read only the files your task needs. The app's own code is split into 18 files in `js/app/` (150 to 1,900 lines each), so find the file and the section with `grep -rn "SECTION NAME" js/app/` and read that range instead of whole files.
 
 ## File map
 
 | File | What's in it |
 |---|---|
 | `index.html` | Every screen and overlay: splash, sign-in, platform menu, report (sections 1–7 + sign-off), drawer menu pages, quote screen and sheets |
-| `js/app.js` | The report app and everything shared (see sections below) |
+| `js/app/*.js` | The report app and everything shared, in 18 files (see below) |
 | `js/quote.js` | Quote builder, the client's answer and the quote PDF |
 | `js/price-book.js` | Your prices: the business's own price for every quote line, set in onboarding and Menu › Your prices. Same store as the prices remembered from quotes (`quotePriceMemory`) |
 | `js/photo-markup.js` | Mark up a report photo (circle, arrow, draw, label) from the photo viewer |
@@ -22,7 +22,7 @@ Read only the files your task needs. `js/app.js` is about 9,200 lines, so jump t
 | `js/chemicals.js` | Chemical register (Menu › Chemical register): products, label and SDS links, each label use with its rate. The treatment record's product picker fills the active, rate and life from it. Once a week each APVMA No. is checked against the APVMA's list of registered products on data.gov.au, and a product that has dropped off is flagged |
 | `js/job-pack.js` | The job PDF: every document from the job joined behind a contents page, and the job page's Finalise step. Joins pages with pdf-lib (`js/vendor`) |
 | `js/business-sync.js` | Syncs company details and quote prices to Supabase `businesses.settings` |
-| `js/sample-job.js` | The sample job: a finished, made-up job (agreement to certificate) offered at the end of sign-up, on an empty Jobs list and in the menu. Built on the phone at the business's own prices; id `sample_job` (`isSampleJob` in `js/app.js`) keeps it out of the account, Due list, backups and last visits, sends its emails to the business, and `stampSamplePdf` marks its PDFs SAMPLE |
+| `js/sample-job.js` | The sample job: a finished, made-up job (agreement to certificate) offered at the end of sign-up, on an empty Jobs list and in the menu. Built on the phone at the business's own prices; id `sample_job` (`isSampleJob` in `js/app/`) keeps it out of the account, Due list, backups and last visits, sends its emails to the business, and `stampSamplePdf` marks its PDFs SAMPLE |
 | `css/app.css`, `css/quote.css` | Styles |
 | `service-worker.js` | Offline cache. **Bump `CACHE_VERSION` (korva-vNN) whenever cached files change** |
 | `worker/worker.js` | Cloudflare Worker `korva`: AI proxy, `/transcribe`, Stripe, `/send-email`. Pasted into Cloudflare by hand |
@@ -32,16 +32,30 @@ Read only the files your task needs. `js/app.js` is about 9,200 lines, so jump t
 | `docs/handover/` | Handover docs: start-here guide, current state, extraction and report-wording maps, a sample report PDF |
 | `tests/extraction/` | Extraction test bench: real transcripts (made-up address), answer keys, scorer and runners |
 
-## `js/app.js` sections (grep the banner text)
+## `js/app/` files (grep the banner text)
 
-- **Voice:** VOICE, NATIVE SPEECH RECOGNITION ADAPTER, AI TRANSCRIPT CLEANUP, HANDS-FREE MODE, EXPERIMENTAL AUDIO CAPTURE
-- **Extraction:** AI EXTRACTION (`SYSTEM_PROMPT`), WAITING NOTES
-- **Report:** FIELD RENDERING, MULTI-FINDING ENGINE, COMPASS, MOISTURE METER READINGS, OBSTRUCTION ZONE SELECTOR, SPECIES INTELLIGENCE DATABASE
-- **Jobs:** PRE-INSPECTION AGREEMENT, PHOTO ATTACHMENTS, SIGNATURE PADS, COMPLETED JOBS
-- **Account:** AUTH STATE, SIGN IN, BILLING / STRIPE, BUSINESS LOAD, DELETE MY ACCOUNT
-- **Data:** PERSISTENCE — SAVED REPORTS, SUPABASE REPORT SYNC, DATA EXPORT / IMPORT
-- **Screens:** DASHBOARD, MENU, ACCESSIBILITY SETTINGS
-- **Output:** PDF GENERATION, SEND TO CLIENT
+They are plain scripts, not modules: every top-level name is shared across all of them and the later files (`js/quote.js` and the rest). They load in the order `index.html` lists them, which is the order below and the order of the old single `js/app.js`. A top-level statement that runs while the page loads (not inside a function or an event handler) can only use names from its own file or an earlier one; a function called later can use anything. A new file goes in `index.html` and `service-worker.js`'s `APP_SHELL`.
+
+| File | What's in it |
+|---|---|
+| `state.js` | STATE (shared `let`s such as `reportData`), onboarding, YOUR BUSINESS |
+| `areas.js` | Areas inspected, OBSTRUCTION ZONE SELECTOR, hindered and restricted access, ACCESS SPOTS and their photos |
+| `talk-photos.js` | PHOTOS WHILE TALKING |
+| `species.js` | SPECIES INTELLIGENCE DATABASE (`SPECIES_DB`, `lookupSpecies`) |
+| `prompts.js` | `SECTIONS`, `REQUIRED_FIELDS`, `SYSTEM_PROMPT`, the plate scan and insect ID prompts |
+| `shell.js` | APP UPDATES, ADDRESS MOVE, SPLASH, PLATFORM NAVIGATION, keyboard access |
+| `voice.js` | FIELD NOTES, NATIVE SPEECH RECOGNITION ADAPTER, VOICE, AI TRANSCRIPT CLEANUP, EXPERIMENTAL AUDIO CAPTURE, WHISPER LISTENING, QUICK PHRASES, VOICE HUD |
+| `extraction.js` | AI EXTRACTION, LEARNED CORRECTIONS, TEST MODE, WAITING NOTES, EXTRACT SUMMARY, SPOKEN READ-BACK, COMPLIANCE PLATE SCAN, INSECT / SPECIES PHOTO ID |
+| `fields.js` | FIELD RENDERING, MULTI-FINDING ENGINE, CHOICE CARDS, SELECT CARDS, BORER FINDINGS, COMPASS, MOISTURE METER READINGS |
+| `editing.js` | EDITING, REPORT STEPS, PROGRESS, SIGNATURE PADS, SAY IT INSTEAD |
+| `agreement.js` | PRE-INSPECTION AGREEMENT, REMOTE SIGNING |
+| `photos.js` | PHOTO ATTACHMENTS, photo store, PHOTO VIEWER, SECTION-AWARE PHOTO SYSTEM, READY-MADE RECOMMENDATIONS |
+| `job.js` | DRAWER, MENU, BOTTOM DOCK, THIS JOB, LAST VISIT, ADDRESS SUGGESTIONS, WEATHER, APPLICABLE STANDARD, JOB INFO, PERSISTENCE — SAVED REPORTS |
+| `account.js` | AUTH STATE, BILLING / STRIPE, SIGN UP / IN / OUT, PASSWORD RESET, DELETE MY ACCOUNT, YOUR TEAM, BUSINESS LOAD, ENTER APP, SESSION RESTORE |
+| `sync.js` | SUPABASE REPORT SYNC, SYNC BETWEEN DEVICES, SYNC / SAVE STATUS INDICATOR, OLDER JOBS, DATA EXPORT / IMPORT, ACCESSIBILITY SETTINGS |
+| `dashboard.js` | DASHBOARD, STATUS / TOAST, COMPLETED JOBS, GAPS BEFORE YOU LEAVE |
+| `send.js` | SEND TO CLIENT, CHECK BEFORE SENDING |
+| `pdf.js` | jsPDF loading (`ensureJsPDFLoaded`), SHARED PDF PIECES, the inspection report PDF (`buildReportPdf`) |
 
 ## Rules that aren't obvious from the code
 

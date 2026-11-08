@@ -493,11 +493,16 @@ function areaEvidence(zoneId) {
 }
 // Areas marked "evidence found" with nothing recorded that names them.
 function areasEvidenceUnlinked() { return Object.keys(OBS_ZONES).filter(z => areaResultOf(z) === 'FOUND' && !areaEvidence(z).length); }
-// Adds a termite finding for an area, reusing the empty first card.
-function addFindingForArea(zoneId) {
+// The termite finding an area's evidence can go into: the first one that
+// doesn't say where it is or what was seen yet, and isn't "nothing found".
+function openTermiteFinding() {
+  return getFindings().find(x => x.termiteActivity !== 'NONE' && isBlankValue(x.activityLocation) && isBlankValue(x.damageDescription));
+}
+// Starts the write-up for an area: in the open finding, or a new one when
+// there isn't one (or `fresh`, when the open one is kept for another area).
+function addFindingForArea(zoneId, fresh) {
   const where = OBS_ZONES[zoneId].label.replace(/^The /, '');
-  const findings = getFindings();
-  let f = findings.find(x => !x.termiteActivity && isBlankValue(x.activityLocation) && isBlankValue(x.damageDescription));
+  let f = fresh ? null : openTermiteFinding();
   if (!f) {
     const before = getFindings().length;
     addFinding();
@@ -507,7 +512,11 @@ function addFindingForArea(zoneId) {
   f.activityLocation = where + ': ';
   renderFindingsUI(); saveDraft();
   showSection('findings');
-  showToast(`Finding ${getFindings().indexOf(f) + 1} started for ${where}. Fill in where and what you saw`, 'info');
+  const card = document.getElementById('finding-card-' + f.id);
+  const group = card && card.closest('details');
+  if (group && !group.open) group.open = true;
+  if (card) requestAnimationFrame(() => card.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+  showToast(`Finding ${getFindings().indexOf(f) + 1} is for the ${zoneName(zoneId).toLowerCase()}. ${f.termiteActivity ? 'Add' : 'Pick Active or Inactive, then add'} where exactly and what you saw`, 'info');
 }
 
 function areasMissingResult() { return Object.keys(OBS_ZONES).filter(z => areaWasEntered(z) && !areaResultOf(z)); }
@@ -518,20 +527,35 @@ function setAreaResult(zoneId, result) {
   syncObstructionData();
 }
 
-// Areas marked "evidence found" that nothing in Findings describes yet,
-// shown at the top of Findings as the next thing to write up.
+// Areas marked "evidence found" that nothing in Findings describes yet.
+// The first goes inside the open finding card, if there is one, so it
+// isn't offered as another finding beside an empty one. Any others sit at
+// the top of Findings, each adding a finding of its own.
+const AREA_PLUS_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>';
 function renderAreaFindingPrompts() {
   const el = document.getElementById('findingsFromAreas');
   if (!el) return;
-  const zones = areasEvidenceUnlinked();
-  el.innerHTML = zones.map(z => {
-    const where = 'the ' + zoneName(z).toLowerCase();
-    return `<div class="area-finding-prompt"><span class="area-tile" aria-hidden="true">${AREA_ICONS[z] || ''}</span>
-      <span class="area-finding-text">Evidence found in <strong>${where}</strong>. Describe it here.</span>
-      <button type="button" class="spot-photo-add area-finding-add" onclick="addFindingForArea('${z}')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>Add finding</button></div>`;
-  }).join('');
+  document.querySelectorAll('.finding-area-slot').forEach(s => { s.innerHTML = ''; s.hidden = true; });
+  let zones = areasEvidenceUnlinked();
+  const open = zones.length && openTermiteFinding();
+  // Not inside a folded Termites group, where it couldn't be seen.
+  let slot = open && document.querySelector(`#finding-card-${open.id} .finding-area-slot`);
+  if (slot && slot.closest('details:not([open])')) slot = null;
+  const tile = z => `<span class="area-tile" aria-hidden="true">${AREA_ICONS[z] || ''}</span>`;
+  const where = z => 'the ' + zoneName(z).toLowerCase();
+  if (slot) {
+    const z = zones.shift();
+    slot.innerHTML = `${tile(z)}<span class="area-finding-text">Evidence found in <strong>${where(z)}</strong>. Write it up here?</span>
+      <button type="button" class="spot-photo-add area-finding-add" onclick="addFindingForArea('${z}')">Yes</button>`;
+    slot.hidden = false;
+  }
+  el.innerHTML = zones.map(z => `<div class="area-finding-prompt">${tile(z)}
+      <span class="area-finding-text">Evidence found in <strong>${where(z)}</strong>${slot ? ' too. Describe it in another finding.' : '. Describe it here.'}</span>
+      <button type="button" class="spot-photo-add area-finding-add" onclick="addFindingForArea('${z}', ${slot ? 'true' : 'false'})">${AREA_PLUS_ICON}Add finding</button></div>`).join('');
   el.hidden = !zones.length;
 }
+// Unfolding Termites moves the first prompt back into the open finding.
+document.addEventListener('toggle', e => { if (e.target && e.target.id === 'fg-termites') renderAreaFindingPrompts(); }, true);
 // An area a finding (or the borer, decay or delignification details) names
 // is marked "evidence found", not "nothing found": the report would
 // otherwise say "no visible evidence" over a finding in that area.
@@ -5650,6 +5674,7 @@ function findingHeadHTML(icon, where, label, num, act, removeCall, removeLabel) 
   const status = act ? FINDING_ACT_LABEL[act] || act : 'Not answered yet';
   // The finding's number sits on the tile's corner; the title is where it
   // is, or the number when that isn't known yet.
+  where = String(where || '').replace(/[\s:;,–—-]+$/, '');
   return `<div class="finding-card-header finding-head-${state}">
         <span class="area-tile finding-tile" aria-hidden="true">${icon}<span class="area-tile-badge finding-tile-num">${num}</span></span>
         <span class="finding-card-label"><span class="finding-card-title">${where ? escapeHtml(where) : label}</span>
@@ -5678,6 +5703,7 @@ function findingCardHTML(finding, index, total) {
     <div class="finding-card" id="finding-card-${id}">
       ${findingHeadHTML(FINDING_ICONS.termite, finding.activityLocation, label, index + 1, act, total > 1 ? `removeFinding('${id}')` : '', 'Remove this finding')}
       <div class="finding-card-body">
+        <div class="area-finding-prompt finding-area-slot" hidden></div>
         <!-- Activity gate: the question every finding must answer -->
         <div class="findings-gate choice-panel${act ? '' : ' unset'}" role="radiogroup" aria-label="Termite activity status">
           <div class="field-label">Termite activity status</div>
@@ -5887,7 +5913,8 @@ const termitesUnanswered = () => !(reportData.findings || []).some(f => f && fin
 
 function nothingFoundBlanks(section) {
   const blanks = Object.keys(nothingFoundAnswers(section)).filter(k => isBlankValue(reportData[k]) && document.getElementById('f-' + k));
-  if (section === 'findings' && termitesUnanswered()) blanks.unshift('termites');
+  // Not over an area marked "evidence found" that isn't written up yet.
+  if (section === 'findings' && termitesUnanswered() && !areasEvidenceUnlinked().length) blanks.unshift('termites');
   return blanks;
 }
 
@@ -5937,7 +5964,7 @@ function syncNothingFoundButtons() {
     if (!btn) return;
     btn.hidden = !nothingFoundBlanks(section).length;
     const somethingFound = section === 'findings'
-      ? (reportData.findings || []).some(f => f && ['ACTIVE', 'INACTIVE'].includes(f.termiteActivity)) || borersFound() || reportData.decayFound === 'YES' || reportData.delignification === 'YES'
+      ? (reportData.findings || []).some(f => f && ['ACTIVE', 'INACTIVE'].includes(f.termiteActivity)) || borersFound() || reportData.decayFound === 'YES' || reportData.delignification === 'YES' || Object.keys(OBS_ZONES).some(z => areaResultOf(z) === 'FOUND')
       : reportData.waterLeaks === 'YES' || Object.entries(CONDUCIVE_CLEAN).some(([k, clean]) => !isBlankValue(reportData[k]) && ![clean, 'N/A'].includes(reportData[k]) && !(k === 'weepHoles' && reportData[k] === 'NONE'));
     const title = btn.querySelector('strong');
     if (title) title.textContent = section === 'findings'

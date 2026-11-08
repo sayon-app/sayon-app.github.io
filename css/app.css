@@ -6265,3 +6265,22 @@ body.dark-screen .chem-rate-val.none { color: var(--yellow); }
 .dash-sample-text { margin: 6px 0 14px; font-size: calc(14px * var(--ts)); line-height: 1.55; color: var(--text2); text-wrap: pretty; }
 .dash-sample.fade-in { animation: dashFade 0.22s ease-out; }
 button.drawer-help { width: 100%; font-family: inherit; text-align: left; cursor: pointer; }
+
+/* ── TALK IT THROUGH: the after-note questions, asked aloud (js/app/talk-back.js) ── */
+.talkback-start { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--accent, #1a7f6e); background: transparent; color: var(--accent2, var(--accent)); font: inherit; font-size: calc(14px * var(--ts)); font-weight: 700; cursor: pointer; }
+.talkback { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--accent-edge, var(--border)); background: var(--accent-wash, var(--surface2)); }
+.talkback[hidden], .talkback-start[hidden], #extractReadBackBtn[hidden] { display: none; }
+.talkback-state { font-size: calc(12px * var(--ts)); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent2, var(--accent)); }
+.talkback[data-state="listening"] .talkback-state::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--red, #d33); vertical-align: 1px; animation: talkbackDot 1.2s ease-in-out infinite; }
+@keyframes talkbackDot { 50% { opacity: 0.3; } }
+.talkback-q { font-size: calc(16px * var(--ts)); font-weight: 700; line-height: 1.4; color: var(--text); }
+.talkback-heard { font-size: calc(13px * var(--ts)); color: var(--text2); font-style: italic; }
+.talkback-heard[hidden] { display: none; }
+.talkback-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.talkback-opts:empty { display: none; }
+.talkback-opt { min-height: 44px; padding: 8px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; font-size: calc(14px * var(--ts)); font-weight: 650; cursor: pointer; }
+.talkback-actions { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.talkback-actions[hidden], #talkBackClose[hidden] { display: none; }
+.talkback-actions .link-btn, #talkBackClose { min-height: 40px; font-size: calc(14px * var(--ts)); font-weight: 700; }
+.talkback-actions .link-btn:disabled { opacity: 0.4; }
+@media (prefers-reduced-motion: reduce) { .talkback[data-state="listening"] .talkback-state::before { animation: none; } }

@@ -8,7 +8,8 @@
 // Areas unable to be inspected: with nothing limited, one box in place of the
 // cards, Recheck later and Invasive, and an invasive "no" when every area was
 // clear. Advice: treatment type after a yes, the second opinion once there's a
-// treatment, and the common recommendations that fit the report first.
+// treatment, and the common recommendations that fit the report first. Quote:
+// the treatment plan waits for a line.
 // node e2e.js <outDir>  (serve the repo on :8765; jsPDF from tests/visual/setup.sh)
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2] || '/tmp/fit-fields'; fs.mkdirSync(OUT, { recursive: true });
@@ -198,6 +199,21 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   v = await advice();
   check(v.lines.length === 12 && !v.lines.some(l => /more$/.test(l)), 'More shows every line');
   await p.locator('#section-recommendations').screenshot({ path: `${OUT}/6-advice.png` });
+
+  // 12. Quote: no treatment, no lines: no second opinion, no treatment plan to set out.
+  await edit('treatmentRecommended', 'NO'); await p.waitForTimeout(200);
+  await p.evaluate(() => openQuoteFromReport()); await p.waitForTimeout(900);
+  const quote = () => p.evaluate(() => ({
+    items: quoteState.items.length,
+    ai: document.getElementById('quoteAiPlan').style.display !== 'none',
+    plan: !document.getElementById('quotePlanFold').hidden,
+  }));
+  let qs = await quote();
+  check(qs.items === 0 && !qs.ai && !qs.plan, `no treatment and no lines: no second opinion, no plan (${JSON.stringify(qs)})`);
+  await p.evaluate(() => addQuoteItem()); await p.waitForTimeout(300);
+  qs = await quote();
+  check(qs.items === 1 && qs.plan, 'a line added: the treatment plan shows');
+  await p.screenshot({ path: `${OUT}/7-quote.png` });
 
   check(errs.length === 0, `no page errors ${errs.join(' | ')}`);
   await b.close();

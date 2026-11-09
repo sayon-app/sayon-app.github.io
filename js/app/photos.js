@@ -590,13 +590,11 @@ function openMoreRecLines() {
   renderRecLines();
 }
 
-// The second opinion compares a treatment, so it waits for one.
+// The second opinion compares a treatment, so it waits for one, as its
+// card on the quote does (reportNeedsPlan).
 function syncRecLines() {
   const link = document.getElementById('tpReportLink');
-  if (link) {
-    const type = String(reportData.treatmentType || '').trim();
-    link.hidden = reportData.treatmentRecommended !== 'YES' && (!type || type === 'No treatment required at this time');
-  }
+  if (link) link.hidden = !reportNeedsPlan(reportData);
   const el = document.getElementById('recLines');
   if (el && el._fits !== JSON.stringify(recLinesShown().first.map(l => l[0]))) renderRecLines();
 }

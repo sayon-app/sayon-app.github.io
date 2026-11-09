@@ -7,7 +7,7 @@ As of 2026-10-05, about 10:50 UTC, with the job-chain table and the Supabase row
 - Claude Code auto-loads `CLAUDE.md` (file map, deploy rules, stored keys, testing), not this file. `CLAUDE.md` points to `docs/handover/README.md`, which sends you here second.
 - Check this file against reality before you rely on it:
   - `git fetch origin && git diff --stat origin/live origin/main`. On 2026-10-05 it listed only `CLAUDE.md`, `terms.html`, `privacy.html`, `supabase/delete-account.sql`, 2 lines each in `index.html` and `css/app.css` and 1 in `js/app.js` (all from `8b4a13b`), plus `docs/` and `tests/` once merged. Anything else is unreleased work.
-  - `git show origin/live:service-worker.js | grep CACHE_VERSION` should print `korva-v272` (go-live PR #379, 2026-11-09: say the quote at the end of Talk it through). Once the go-live that takes Talk it through out is merged, `korva-v273`.
+  - `git show origin/live:service-worker.js | grep CACHE_VERSION` should print `korva-v273` (go-live PR #380, 2026-11-09: Talk it through taken out).
   - Open PRs: `gh api repos/sayon-app/sayon-app.github.io/pulls`. (`gh pr list/view` use GraphQL, which is blocked in Claude Code sessions.)
   - Live Worker code: Cloudflare connector `workers_get_worker_code`, script `korva`. No Cloudflare connector? Ask baz to paste the live code. Never assume it matches `worker/worker.js`.
 - **This repo is public.** Never commit or post secrets or API keys (they live only as Cloudflare secrets), Stripe ids, the owner's personal or business details, or real client or house details. The Worker URL, Supabase URL and Supabase anon key are in `js/app.js` on purpose; the service-role key must never appear outside Cloudflare.

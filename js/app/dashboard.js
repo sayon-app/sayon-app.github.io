@@ -651,7 +651,7 @@ function showToast(msg, type = 'default', action) {
 
   t._shownAt = Date.now();
   // Errors, and toasts with a button to press, stay up longer.
-  t._timeout = setTimeout(() => t.classList.remove('show'), (type === 'error' || action) ? 6000 : 2800);
+  t._timeout = setTimeout(() => t.classList.remove('show'), (action && action.ms) || ((type === 'error' || action) ? 6000 : 2800));
 }
 
 function dismissToast() {

@@ -1498,6 +1498,13 @@
         <span class="job-panel-summary">See a finished job</span>
       </button>
 
+      <!-- Report a problem (js/crash-guard.js): goes straight to the SAYON team. -->
+      <button type="button" class="panel-label drawer-help" onclick="openProblemReport()">
+        <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+        <span class="panel-title">Report a problem</span>
+        <span class="job-panel-summary">Tell the SAYON team</span>
+      </button>
+
       <!-- Help: one real address, the same one the legal pages give. -->
       <a class="panel-label drawer-help" href="mailto:sayon.application@gmail.com?subject=SAYON%20help">
         <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
@@ -2595,6 +2602,29 @@
   </div>
 </div>
 
+<!-- REPORT A PROBLEM (js/crash-guard.js) -->
+<div class="page-sheet-overlay" id="problemOverlay" onclick="if(event.target===this)closeProblemReport()">
+  <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="problemTitle">
+    <div class="page-sheet-header">
+      <span class="page-sheet-title" id="problemTitle">Report a problem</span>
+      <button class="voice-popover-close" onclick="closeProblemReport()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+    </div>
+    <div class="page-sheet-body">
+      <p class="problem-intro" id="problemIntro"></p>
+      <label class="send-review-label" for="problemMessage">What happened?</label>
+      <textarea class="job-input problem-message" id="problemMessage" rows="5" placeholder="e.g. I was adding a photo to the subfloor and the app froze, then closed"></textarea>
+      <label class="problem-include"><input type="checkbox" id="problemIncludeDetails" checked> Send the technical details too</label>
+      <details class="sheet-more problem-details-wrap">
+        <summary>What the technical details are</summary>
+        <p class="problem-details-note">The phone and app version, where you were in the app, and any errors it kept. Never client names, addresses, report text or photos.</p>
+        <pre class="problem-details" id="problemDetails"></pre>
+      </details>
+      <button class="extract-btn" id="problemSendBtn" onclick="sendProblemReport()">Send to SAYON</button>
+      <button class="link-btn send-review-cancel" onclick="closeProblemReport()">Not now</button>
+    </div>
+  </div>
+</div>
+
 <!-- CHECK BEFORE SENDING -->
 <div class="page-sheet-overlay" id="sendReviewOverlay">
   <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="sendReviewTitle">
@@ -2666,6 +2696,7 @@
 <!-- Error tracking and usage steps, first so they see the app start (TELEMETRY in js/telemetry.js) -->
 <script src="js/vendor/sentry-11.4.0.min.js"></script>
 <script src="js/telemetry.js"></script>
+<script src="js/crash-guard.js"></script>
 <!-- The app: plain scripts that share one global scope, loaded in this order -->
 <script src="js/app/state.js"></script>
 <script src="js/app/areas.js"></script>

@@ -975,7 +975,7 @@ function initSignaturePads() {
   }
   const agreementCanvas = document.getElementById('agreementSigCanvas');
   if (agreementCanvas) {
-    agreementSignaturePad = createSignaturePad(agreementCanvas, document.getElementById('agreementSigPlaceholder'), updateAgreementSignButton);
+    agreementSignaturePad = createSignaturePad(agreementCanvas, document.getElementById('agreementSigPlaceholder'), () => { updateAgreementSignButton(); unsavedSheetChanged(); });
   }
 }
 

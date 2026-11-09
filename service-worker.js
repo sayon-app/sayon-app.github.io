@@ -54,6 +54,7 @@ const APP_SHELL = [
   './js/business-sync.js',
   './js/sample-job.js',
   './js/telemetry.js',
+  './js/crash-guard.js',
   './js/vendor/sentry-11.4.0.min.js',
   './manifest.json',
   './icon-192.png?v=3',

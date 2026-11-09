@@ -2961,6 +2961,16 @@ body.dark-screen .fold-tick { color: #000; }
 .send-review-gaps .send-review-label { margin-top: 0; color: var(--yellow-text); }
 .send-review-body { resize: vertical; font-size: calc(13px * var(--ts)); line-height: 1.5; }
 .send-review-cancel { align-self: center; margin-top: 2px; }
+
+/* Report a problem (js/crash-guard.js) */
+#problemOverlay .page-sheet-body { display: flex; flex-direction: column; gap: 10px; }
+.problem-intro { margin: 0; font-size: calc(13.5px * var(--ts)); line-height: 1.5; color: var(--text2); }
+.problem-message { resize: vertical; font-size: calc(14px * var(--ts)); line-height: 1.5; }
+.problem-include { display: flex; align-items: center; gap: 8px; font-size: calc(13px * var(--ts)); color: var(--text); }
+.problem-include input { width: 18px; height: 18px; accent-color: var(--accent); }
+.problem-details-wrap > summary { font-size: calc(12.5px * var(--ts)); }
+.problem-details-note { margin: 6px 0; font-size: calc(12px * var(--ts)); color: var(--text3); line-height: 1.45; }
+.problem-details { margin: 0; max-height: 200px; overflow: auto; padding: 8px 10px; border-radius: 8px; background: var(--surface2, rgba(127,127,127,0.08)); font-size: calc(11px * var(--ts)); line-height: 1.45; white-space: pre-wrap; word-break: break-word; color: var(--text2); }
 .signoff-agreement { font-size: calc(12px * var(--ts)); color: var(--text3); line-height: 1.5; }
 .signoff-agreement.signed { color: var(--green); font-weight: 600; }
 .link-btn {

@@ -477,10 +477,13 @@ function applyFieldCascade(key, value, el, prev) {
       }
     }
   }
+
+  // Questions that fit the house, and "where" boxes that follow an answer.
+  syncFitFields();
 }
 
 function commitEdit(el, key, value) {
-  untrackNoneFromAreas(key);
+  untrackAutoAnswers(key);
   if (key === 'borerActivity' && ['ACTIVE', 'INACTIVE'].includes(value)) {
     // Borers found: the first card is ready, and a lone card waiting on its
     // activity (one started for an area) takes this answer.

@@ -356,7 +356,7 @@ function populateFields(data, transcript) {
         else if (!val.toLowerCase().includes(have)) val = prev.replace(/[.;,\s]+$/, '') + '; ' + val;
       }
       reportData[key] = val;
-      untrackNoneFromAreas(key);
+      untrackAutoAnswers(key);
       rememberAiFill(key, own, transcript);
       // FIX: apply the same cross-field cascade manual edits get (reveal/
       // hide dependent fields, clear fields that are no longer valid) - see
@@ -521,15 +521,18 @@ function buildChoiceCards() {
   });
 }
 
-// A detail box only shows while its question could need one: a "no" answer
-// hides it, unless something was already written there.
+// A detail box only shows once its question calls for one: not while the
+// question is blank, and not after a "no", unless something was already
+// written there (so nothing is ever hidden with words in it).
 const DETAIL_FIELD_FOR = {
+  hardLandscaping: ['zone25mmVisible', ['NO', 'N/A']],
+  softLandscaping: ['zone75mmVisible', ['NO', 'N/A']],
   decayFound: ['decayDetails', ['NO', 'N/A']],
   delignification: ['delignificationDetails', ['NO', 'N/A']],
   previousTreatment: ['previousTreatmentDetails', ['NO', 'N/A']],
   nonDurableTimber: ['nonDurableTimberDetails', ['NO', 'N/A']],
-  mouldSeen: ['mouldWhere', ['NO']],
-  antCapping: ['antCappingDetails', ['INTACT']],
+  mouldSeen: ['mouldWhere', ['NO', 'N/A']],
+  antCapping: ['antCappingDetails', ['INTACT', 'N/A']],
   timberSoil: ['timberSoilDetails', ['NO', 'N/A']],
 };
 
@@ -551,7 +554,7 @@ function syncDetailField(key) {
   [detailKey, ...(MORE_DETAIL_FIELDS[key] || [])].forEach(k => {
     const field = document.getElementById('f-' + k)?.closest('.field');
     if (!field) return;
-    const hide = noAnswers.includes(reportData[key]) && !String(reportData[k] || '').trim();
+    const hide = (isBlankValue(reportData[key]) || noAnswers.includes(reportData[key])) && !String(reportData[k] || '').trim();
     field.style.display = hide ? 'none' : '';
   });
   // A What and Where row under a question hides with its last box.
@@ -1117,6 +1120,71 @@ function syncNoneFromAreas() {
   if (changed) renderFindingsUI();
 }
 
+// ── WHAT FITS THIS HOUSE ─────────────────────────────────────────────────
+// The Findings rule for Conducive: a question that doesn't fit the house
+// stays out of sight and is answered for the inspector. Slab edge needs a
+// slab, weep holes need brick or masonry walls, and subfloor drainage,
+// ventilation and ant capping need a subfloor. Once the floor type, the
+// walls or the Subfloor area say the house hasn't got one, the question
+// goes and is answered N/A, which the report prints. Only blank answers are
+// filled; those keys are in reportData.naFromHouse and are taken back out
+// when the house changes, unless the inspector or a note has answered them
+// since (untrackAutoAnswers). A question holding any other answer stays on
+// screen, and while the floor or walls are unknown every question shows.
+const HOUSE_FIT = { slabEdge: 'slab', weepHoles: 'masonry', subfloorDrainage: 'subfloor', subfloorVentilation: 'subfloor', antCapping: 'subfloor' };
+
+// true, false, or null when the report doesn't say.
+function houseHas() {
+  const floor = String(reportData.floorType || '').toLowerCase().trim();
+  const walls = String(reportData.wallConstruction || '').toLowerCase().trim();
+  let slab = null, subfloor = null, masonry = null;
+  if (floor && !/^other\b|mixed|unknown|not sure/.test(floor)) {
+    slab = /slab/.test(floor);
+    subfloor = /timber|stump|suspended|pier|elevated|bearer|joist/.test(floor);
+    if (!slab && !subfloor) slab = subfloor = null;   // a floor it can't place
+  }
+  if (subfloor === null) {
+    const area = areaStatusOf('subfloor');
+    if (area) subfloor = area !== 'NA';
+  }
+  const brick = /brick|masonry|render|block|hebel|stone/.test(walls);
+  const clad = /weatherboard|fibro|cement sheet|cladding|timber|vinyl|metal/.test(walls);
+  if (walls && brick !== clad) masonry = brick;
+  return { slab, subfloor, masonry };
+}
+
+function untrackAutoAnswers(key) {
+  untrackNoneFromAreas(key);
+  const list = reportData.naFromHouse;
+  if (!Array.isArray(list) || !list.includes(key)) return;
+  const left = list.filter(k => k !== key);
+  if (left.length) reportData.naFromHouse = left; else delete reportData.naFromHouse;
+}
+
+function showFitField(key, show) {
+  const field = document.getElementById('f-' + key)?.closest('.field');
+  if (field) field.style.display = show ? '' : 'none';
+}
+
+function syncFitFields() {
+  const has = houseHas();
+  const filled = new Set(Array.isArray(reportData.naFromHouse) ? reportData.naFromHouse : []);
+  const locked = isReportLocked();
+  Object.entries(HOUSE_FIT).forEach(([key, need]) => {
+    const el = document.getElementById('f-' + key);
+    const fits = has[need] !== false;
+    if (!locked && !fits && isBlankValue(reportData[key])) {
+      reportData[key] = 'N/A'; filled.add(key);
+      if (el) renderField(el, key, 'N/A');
+    } else if (!locked && fits && filled.has(key)) {
+      filled.delete(key);
+      if (reportData[key] === 'N/A') { delete reportData[key]; if (el) { el.classList.remove('filled'); el.textContent = '—'; } }
+    }
+    showFitField(key, fits || !['N/A', '', null, undefined].includes(reportData[key]));
+  });
+  if (!locked) { if (filled.size) reportData.naFromHouse = [...filled]; else delete reportData.naFromHouse; }
+}
+
 // An area marked "evidence found", answered "Borers": a borer finding for
 // that area, ready under the borer question.
 function addBorerForArea(zoneId) {
@@ -1379,9 +1447,13 @@ function checkSystemVerify() {
 
   const hasSystem = hasIdentifiedSystem(reportData.existingSystem);
   block.style.display = hasSystem ? 'block' : 'none';
-  // No system found: no name to give, unless one was typed already.
+  // The name only once there's a system to name, unless one was typed
+  // already; the durable notice photo goes once "no system" is answered,
+  // unless a photo of one is already there.
   const nameField = document.getElementById('f-existingSystemOther')?.closest('.field');
-  if (nameField) nameField.style.display = !hasSystem && !isBlankValue(reportData.existingSystem) && isBlankValue(reportData.existingSystemOther) ? 'none' : '';
+  if (nameField) nameField.style.display = !hasSystem && isBlankValue(reportData.existingSystemOther) ? 'none' : '';
+  const durable = document.getElementById('durablePhotoWidget');
+  if (durable) durable.style.display = !hasSystem && !isBlankValue(reportData.existingSystem) && !((reportData.photosBySection || {}).durable || []).length ? 'none' : '';
   if (!hasSystem) return;
 
   const flag = document.getElementById('systemVerifyFlag');

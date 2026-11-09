@@ -468,6 +468,7 @@ function areaSummary(zoneId, name) {
 
 function syncObstructionData() {
   syncNoneFromAreas();
+  syncFitFields();   // the Subfloor area says whether there's a subfloor
   const notFull = areasNotFullyInspected();
   const reasons = reportData.areaReasons || {};
   reportData.obstructions = notFull.map(z => OBS_ZONES[z].label + (areaStatusOf(z) === 'PARTIAL' ? ' (inspected with limits)' : '')).join(', ');

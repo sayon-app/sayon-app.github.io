@@ -468,10 +468,10 @@ function applyFieldCascade(key, value, el, prev) {
   if (key === 'treatmentRecommended') {
     const typeEl = document.getElementById('f-treatmentType');
     if (value === 'NO') {
-      reportData.treatmentType = 'No treatment required at this time';
-      if (typeEl) { typeEl.textContent = 'No treatment required at this time'; typeEl.classList.add('filled'); }
+      reportData.treatmentType = NO_TREATMENT_TYPE;
+      if (typeEl) { typeEl.textContent = NO_TREATMENT_TYPE; typeEl.classList.add('filled'); }
     } else if (value === 'YES') {
-      if (reportData.treatmentType === 'No treatment required at this time') {
+      if (reportData.treatmentType === NO_TREATMENT_TYPE) {
         reportData.treatmentType = '';
         if (typeEl) { typeEl.textContent = '—'; typeEl.classList.remove('filled'); }
       }

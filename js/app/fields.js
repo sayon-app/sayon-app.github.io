@@ -525,10 +525,11 @@ function buildChoiceCards() {
 // question is blank, and not after a "no", unless something was already
 // written there (so nothing is ever hidden with words in it). A third entry
 // lists what the app itself writes there, which doesn't count as words: a
-// "no" to treatment fills the type with "No treatment required at this
-// time" (applyFieldCascade), which the report prints.
+// "no" to treatment fills the type with NO_TREATMENT_TYPE
+// (applyFieldCascade), which the report prints.
+const NO_TREATMENT_TYPE = 'No treatment required at this time';
 const DETAIL_FIELD_FOR = {
-  treatmentRecommended: ['treatmentType', ['NO', 'N/A'], ['No treatment required at this time']],
+  treatmentRecommended: ['treatmentType', ['NO', 'N/A'], [NO_TREATMENT_TYPE]],
   hardLandscaping: ['zone25mmVisible', ['NO', 'N/A']],
   softLandscaping: ['zone75mmVisible', ['NO', 'N/A']],
   decayFound: ['decayDetails', ['NO', 'N/A']],

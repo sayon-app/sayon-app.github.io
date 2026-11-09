@@ -189,14 +189,14 @@ let shotN = 0;
   // 10. Certificate.
   await p.evaluate(() => window.scrollTo(0, 0)); await shot('quote-after-treatment');
   em = emails.length;
-  await tap(p.getByRole('button', { name: /Email certificate to/i }), 'Email certificate'); await p.waitForTimeout(2000); await shot('cert-1');
+  await tap(p.locator('#quoteAnswer .qp-cert-email'), 'Email certificate'); await p.waitForTimeout(2000); await shot('cert-1');
   if (await p.locator('#sendReviewOverlay.open').count()) { await tap(p.locator('#sendReviewBtn'), 'certificate send confirm'); }
   await p.waitForTimeout(5000); await shot('cert-sent');
   const certMail = emails.slice(em);
   console.log('certificate: emails', certMail.map(e => e.subject + ' -> ' + e.to + ' [' + (e.attachments || []).map(a => a.filename) + ']'), 'toasts', await toasts());
   check(certMail.length === 1 && (certMail[0].attachments || []).length === 1, 'certificate emailed with its PDF');
   dl = downloads.length;
-  await tap(p.getByRole('button', { name: /^Certificate PDF$/i }), 'Certificate PDF'); await p.waitForTimeout(3000);
+  await tap(p.locator('#quoteAnswer .qp-cert-actions button', { hasText: /^PDF$/ }), 'Certificate PDF'); await p.waitForTimeout(3000);
   console.log('certificate pdf:', downloads.slice(dl));
   // Save every PDF that went out, to look at.
   for (const e of emails) for (const a of (e.attachments || [])) if (a.content) fs.writeFileSync(`${OUT}/${a.filename}`, Buffer.from(a.content, 'base64'));

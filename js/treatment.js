@@ -251,29 +251,28 @@ function renderTreatmentBlock(q) {
     return `<button class="quote-btn primary quote-step-btn" onclick="openTreatmentRecord()">Record the treatment</button>`;
   }
   const many = installedSystems(t).length > 0;
-  const docs = many ? 'certificates' : 'certificate';
   const who = (q.client || '').trim();
+  const first = who.split(/\s+/)[0];
   const to = quoteClientEmail(q);
+  const given = certificateGiven(q);
+  // One line: where it goes, or when it went.
+  const status = q.certificateSentAt ? `Emailed ${formatIssueDate(q.certificateSentAt)}${who ? ` to ${who}` : ''}`
+    : q.certificateHandedAt ? `Given${who ? ` to ${who}` : ''} in person ${formatIssueDate(q.certificateHandedAt)}`
+    : to ? `Goes to ${to}` : 'Not sent yet';
   return `<div class="quote-step">
       <div><strong>Treatment recorded</strong>: done on ${escapeHtml(formatAnswerDate(t.date))}${t.technician ? ` by ${escapeHtml(t.technician)}` : ''}</div>
       ${t.nextInspection ? `<div class="quote-answer-note">Next inspection due ${escapeHtml(formatAnswerDate(t.nextInspection))}</div>` : ''}
     </div>
-    <div class="qp-cert ${certificateGiven(q) ? 'sent' : ''}">
+    <div class="qp-cert ${given ? 'sent' : ''}">
       <div class="qp-cert-title">${many ? 'Treatment and installation certificates' : 'Treatment certificate'}</div>
-      <p class="qp-cert-text">${q.certificateSentAt
-        ? `Emailed ${escapeHtml(formatIssueDate(q.certificateSentAt))}${who ? ` to ${escapeHtml(who)}` : ''}.`
-        : q.certificateHandedAt
-        ? `Given${who ? ` to ${escapeHtml(who)}` : ''} in person ${escapeHtml(formatIssueDate(q.certificateHandedAt))}.`
-        : `The PDF${many ? 's' : ''} that record${many ? '' : 's'} what was applied and where, for ${who ? escapeHtml(who) + '\'s' : 'the client\'s'} records. Emailing ${many ? 'them' : 'it'}, or handing ${many ? 'them' : 'it'} over, finishes the job.`}</p>
-      ${to && !certificateGiven(q) ? `<p class="qp-cert-to">Goes to ${escapeHtml(to)}</p>` : ''}
+      <p class="qp-cert-text">${escapeHtml(status)}</p>
       ${treatmentSourceReport().propertyState === 'QLD' ? '<div class="quote-answer-note">In Queensland, email alone isn\'t enough: also hand the client a printed copy, or leave one in their letterbox.</div>' : ''}
-      <div class="quote-step-actions">
-        <button class="quote-btn ${certificateGiven(q) ? '' : 'primary'} qp-cert-email" onclick="emailTreatmentCertificate()">${q.certificateSentAt ? 'Email again' : q.certificateHandedAt ? 'Email a copy' : `Email ${docs}${who ? ' to ' + escapeHtml(who.split(' ')[0]) : ''}`}</button>
-        ${certificateGiven(q) ? '' : '<button class="quote-link-btn" onclick="markCertificateHanded()">Given in person</button>'}
-        <button class="quote-link-btn" onclick="downloadTreatmentCertificate()">Certificate PDF</button>
-        ${many ? '<button class="quote-link-btn" onclick="downloadTreatmentCertificate(true)">Installation certificate PDF</button>' : ''}
-        <button class="quote-link-btn" onclick="openTreatmentRecord()">Edit treatment</button>
+      <div class="qp-cert-actions">
+        <button class="${given ? 'quote-link-btn' : 'quote-btn primary'} qp-cert-email" onclick="emailTreatmentCertificate()">${q.certificateSentAt ? 'Email again' : q.certificateHandedAt ? 'Email a copy' : `Email${first ? ' to ' + escapeHtml(first) : ''}`}</button>
+        <button class="quote-link-btn" onclick="downloadTreatmentCertificate()">PDF</button>
+        <button class="quote-link-btn" onclick="openTreatmentRecord()">Edit</button>
       </div>
+      ${given ? '' : `<button class="qp-cert-handed" onclick="markCertificateHanded()">Handed ${many ? 'them' : 'it'} over in person? <span>Mark as given</span></button>`}
     </div>${typeof renderBaitBlock === 'function' ? renderBaitBlock(q) : ''}`;
 }
 
@@ -838,16 +837,25 @@ function saveTreatmentRecord() {
 }
 
 // ── CERTIFICATE PDF ──
-function downloadTreatmentCertificate(install = false) {
+// The card's PDF button: the treatment certificate, with the installation
+// certificate joined behind it when a system went in.
+function downloadTreatmentCertificate() {
   const q = quoteState;
   if (!q || !q.treatment) return;
-  const name = install ? 'Certificate of installation' : 'Treatment certificate';
+  const both = installedSystems(q.treatment).length > 0;
+  const name = both ? 'Treatment and installation certificates' : 'Treatment certificate';
   ensureJsPDFLoaded()
-    .then(() => buildTreatmentCertificatePDF(q, { install }))
-    .then(({ blob, fname }) => { track('certificate_pdf_made', { install }); return deliverPdfBlob(blob, fname, {
+    .then(async () => {
+      const cert = await buildTreatmentCertificatePDF(q);
+      if (!both) return cert;
+      const lib = await ensurePdfLibLoaded();
+      const joined = await joinPdfs(lib, [cert.blob, (await buildTreatmentCertificatePDF(q, { install: true })).blob]);
+      return { blob: new Blob([await joined.save()], { type: 'application/pdf' }), fname: cert.fname.replace('_Treatment_Certificate_', '_Certificates_') };
+    })
+    .then(({ blob, fname }) => { track('certificate_pdf_made', { install: both }); return deliverPdfBlob(blob, fname, {
       title: name,
       text: `${name} — ${q.address || 'Property'}`,
-      readyToast: 'Certificate ready. Choose where to save or send it',
+      readyToast: `Certificate${both ? 's' : ''} ready. Choose where to save or send ${both ? 'them' : 'it'}`,
     }); })
     .catch(e => {
       console.error('Certificate PDF failed:', e);

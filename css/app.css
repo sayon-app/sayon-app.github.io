@@ -2894,8 +2894,6 @@ body:not(.dark-screen) .sheet-folds .job-input { background: var(--surface); bor
 body:not(.dark-screen) .sheet-folds .job-input:hover { border-color: #A9BACB; }
 body.dark-screen .sheet-folds .job-input { background: var(--bg); border-color: var(--border2); }
 .sheet-folds .job-input::placeholder { color: #6B7C8E; }
-body:not(.dark-screen) .sheet-secs > .sheet-voice { background: var(--accent-wash); border-color: var(--accent-edge); }
-body:not(.dark-screen) .sheet-secs > .sheet-voice .sheet-voice-hint { color: var(--text2); }
 body.dark-screen .sheet-folds .job-input::placeholder { color: #75879A; }
 .sheet-folds .sheet-more { border-color: var(--border2); }
 /* A finished fold (the treatment record's, the quote's) shows a green tick
@@ -5617,8 +5615,12 @@ body.dark-screen .finish-next-btn.primary small, body.dark-screen .finish-next-b
 .qp-cert.sent { border-color: var(--border); }
 .qp-cert-title { font-size: calc(13.5px * var(--ts)); font-weight: 700; color: var(--text); }
 .qp-cert-text { margin: 3px 0 0; font-size: calc(13px * var(--ts)); line-height: 1.5; color: var(--text2); }
-.qp-cert-to { margin: 6px 0 0; font-size: calc(12.5px * var(--ts)); font-weight: 600; color: var(--text3); }
-.qp-cert .quote-step-actions { margin-top: 10px; }
+.qp-cert .quote-step-actions, .qp-cert .qp-cert-actions { margin-top: 10px; }
+.qp-cert-actions .qp-cert-email { flex: 1 1 auto; }
+/* Given in person: a quiet line under the buttons, still a full-size tap. */
+.qp-cert-handed { display: block; min-height: 44px; margin: 2px 0 -8px; padding: 0; border: none; background: none; cursor: pointer;
+  font: 500 calc(12.5px * var(--ts)) 'Inter', sans-serif; color: var(--text3); text-align: left; }
+.qp-cert-handed span { font-weight: 650; color: var(--accent2); }
 .qp-cert-email.flash { animation: qp-flash 0.8s ease-in-out 3; }
 @keyframes qp-flash { 50% { box-shadow: 0 0 0 6px rgba(var(--accent-rgb), 0.3); } }
 @media (prefers-reduced-motion: reduce) { .qp-cert-email.flash { animation: none; } }
@@ -5799,16 +5801,27 @@ body.dark-screen .report-section.grouped > details.fgroup { border-width: 2px; b
 /* Other photos are optional, so they carry no status. */
 #sts-photos { display: none; }
 
-/* Say it instead: speak a sheet instead of typing it (SAY IT INSTEAD in js/app/) */
-.sheet-voice { margin: 10px 0 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border, rgba(0,0,0,0.1)); background: var(--surface2); }
-.sheet-voice-btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 999px; border: 1px solid var(--accent, #1a7f6e); background: transparent; color: var(--accent2, var(--accent)); font: inherit; font-size: calc(13px * var(--ts)); font-weight: 650; cursor: pointer; }
-.sheet-voice-btn:disabled { opacity: .6; cursor: default; }
-.sheet-voice[data-state="listening"] .sheet-voice-btn { background: var(--accent, #1a7f6e); color: #fff; animation: sheetVoicePulse 1.4s ease-in-out infinite; }
-@keyframes sheetVoicePulse { 50% { box-shadow: 0 0 0 6px rgba(var(--accent-deep-rgb),0.18); } }
-.sheet-voice-hint { margin: 8px 0 0; font-size: calc(11.5px * var(--ts)); line-height: 1.5; color: var(--text3); }
-.sheet-voice-text { margin: 8px 0 0; font-size: calc(12.5px * var(--ts)); line-height: 1.5; color: var(--text); white-space: pre-wrap; }
-.sheet-voice[data-state="listening"] .sheet-voice-hint { display: none; }
-@media (prefers-reduced-motion: reduce) { .sheet-voice[data-state="listening"] .sheet-voice-btn { animation: none; } }
+/* Say it instead: speak a sheet instead of typing it (SAY IT INSTEAD in js/app/).
+   One quiet row: a small mic disc, the words, and the example under them
+   in grey. The whole row is the button (its ::after covers the box). */
+.sheet-voice { position: relative; margin: 10px 0 12px; padding: 6px 12px 8px 6px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); transition: border-color 0.2s, background-color 0.2s; }
+.sheet-voice:hover { border-color: var(--border2); }
+.sheet-voice-btn { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; font-size: calc(14px * var(--ts)); font-weight: 650; text-align: left; cursor: pointer; }
+.sheet-voice-btn::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+.sheet-voice-btn:focus-visible { outline: none; }
+.sheet-voice:has(.sheet-voice-btn:focus-visible) { box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.35); }
+.sheet-voice-btn svg { flex: none; width: 16px; height: 16px; padding: 10px; box-sizing: content-box; border-radius: 50%; background: rgba(var(--accent-rgb), 0.12); color: var(--accent2); transition: background 0.2s, color 0.2s; }
+.sheet-voice-btn:disabled { opacity: 1; cursor: default; color: var(--text2); }
+.sheet-voice-hint { margin: -4px 0 0 46px; font-size: calc(12px * var(--ts)); line-height: 1.45; color: var(--text3);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.sheet-voice-text { margin: 2px 0 2px 46px; font-size: calc(13px * var(--ts)); line-height: 1.5; color: var(--text); white-space: pre-wrap; }
+.sheet-voice[data-state="listening"] { border-color: rgba(215,38,30,0.45); }
+.sheet-voice[data-state="listening"] .sheet-voice-btn svg { background: #D7261E; color: #fff; animation: sheetVoicePulse 1.4s ease-in-out infinite; }
+.sheet-voice[data-state="hearing"] .sheet-voice-btn svg, .sheet-voice[data-state="filling"] .sheet-voice-btn svg { background: var(--accent-grad, var(--accent)); color: #fff; }
+@keyframes sheetVoicePulse { 50% { box-shadow: 0 0 0 6px rgba(215,38,30,0.18); } }
+.sheet-voice[data-state="listening"] .sheet-voice-hint, .sheet-voice[data-state="hearing"] .sheet-voice-hint, .sheet-voice[data-state="filling"] .sheet-voice-hint { display: none; }
+@media (prefers-reduced-motion: reduce) { .sheet-voice[data-state="listening"] .sheet-voice-btn svg { animation: none; } }
+body.dark-screen .sheet-voice { background: var(--surface2); }
 
 /* ── LAST VISIT: an address inspected before ── */
 body:not(.dark-screen) .agreement-banner.last-visit-banner, .agreement-banner.last-visit-banner { border-color: var(--accent-edge); background: var(--accent-wash); color: var(--accent2); box-shadow: none; }
@@ -5974,9 +5987,19 @@ body:not(.dark-screen) .job-page #jobPanel { border-color: transparent; box-shad
 .job-pdf-head + * { margin-top: 12px; }
 .job-pdf-list { margin-left: 58px; padding: 0; list-style: none; }
 .job-pdf-list li { border-top: 1px solid var(--border); }
-.job-pdf .job-pdf-note { margin-left: 58px; }
 .job-pdf .dash-detail-links { margin-left: 58px; }
 .job-pdf .dash-detail-links button { min-height: 48px; }
+.job-pdf .dash-detail-links button.primary { border-color: transparent; background: var(--accent-grad); color: #fff; }
+.job-pdf.made .job-step-label { color: var(--green); }
+/* What went in, folded under the buttons. */
+.job-pdf-more { margin: 4px 0 -6px 58px; }
+.job-pdf-more > summary { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; list-style: none;
+  font-size: calc(13px * var(--ts)); font-weight: 600; color: var(--text3); }
+.job-pdf-more > summary::-webkit-details-marker { display: none; }
+.job-pdf-more > summary::after { content: ''; width: 7px; height: 7px; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg) translate(-2px, -2px); transition: transform 0.2s; }
+.job-pdf-more[open] > summary::after { transform: rotate(-135deg) translate(-2px, -2px); }
+.job-pdf-more .job-pdf-list { margin: 0 0 8px; }
+.job-pdf-more .job-pdf-note { margin: 0 0 12px; font-size: calc(12.5px * var(--ts)); }
 
 .job-details { margin-top: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); overflow: hidden; }
 .job-details-head { list-style: none; border: none; border-radius: 0; background: transparent; }
@@ -6275,3 +6298,51 @@ button.drawer-help { width: 100%; font-family: inherit; text-align: left; cursor
 .send-copy-open { min-height: 40px; padding: 0; font-size: calc(13.5px * var(--ts)); font-weight: 700; color: var(--accent2); text-align: left; }
 .send-copy-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); }
 .send-copy-add .send-review-file-meta { margin-top: 6px; }
+
+/* ── VOICE CAPTURE, DOCKED ──
+   The voice panel sits on the dock, as wide as the screen and only as tall
+   as it needs, so the report stays readable above it. While it listens it
+   shrinks to the speak button and the last few lines heard; the page
+   behind isn't dimmed (it still can't be tapped). The mic and the photo
+   button share a row; the sound bars take the close button's place. */
+#voicePopover {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-content: start;
+  width: min(560px, calc(100vw - 16px)); max-width: none;
+  bottom: calc(var(--tabbar-h) + 6px);
+  padding: 10px 12px 12px; border-radius: 18px;
+  max-height: min(62dvh, calc(100dvh - var(--tabbar-h) - 26px - env(safe-area-inset-top, 0px)));
+}
+#voicePopover > * { grid-column: 1 / -1; min-width: 0; }
+#voicePopover > .voice-popover-header { grid-row: 1; min-height: 32px; padding: 0; border: 0; }
+#voicePopover .voice-popover-title { min-width: 0; font-size: calc(13.5px * var(--ts)); }
+#voicePopoverTitleText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#voicePopover .voice-popover-close { margin: -6px -6px -6px 0; }
+#voicePopover > .waveform { grid-row: 1; grid-column: 2; align-self: center; height: 22px; margin-right: 4px; }
+#voicePopover > .voice-btn { grid-column: 1; min-height: 52px; padding: 6px 12px; gap: 12px; border-radius: 14px; font-size: calc(14px * var(--ts)); }
+body:not(.dark-screen) #voicePopover .voice-btn .mic-svg { width: 20px; height: 20px; padding: 8px; }
+#voicePopover > .voice-photo-btn { grid-column: 2; position: relative; width: 52px; min-height: 52px; margin: 0; padding: 0; border-radius: 14px; }
+#voicePopover .voice-photo-btn svg { width: 20px; height: 20px; }
+#voicePopover .voice-photo-btn[data-count]:not([data-count=""])::after {
+  content: attr(data-count); position: absolute; top: -5px; right: -5px; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box;
+  border-radius: 99px; background: var(--accent); color: #fff; font-size: calc(11px * var(--ts)); font-weight: 800; line-height: 20px; text-align: center;
+}
+#voicePopover > .transcript-box { min-height: 0; max-height: min(24dvh, 170px); padding: 10px 12px; border-radius: 12px; font-size: calc(14px * var(--ts)); line-height: 1.5; }
+#voicePopover > .transcript-box:not(.active) { font-size: calc(13px * var(--ts)); }
+#voicePopover > .transcript-done { margin: 0; max-height: 4.6em; }
+#voicePopover > .quick-phrases { order: 1; margin: -6px 0 -10px; }
+#voicePopover .quick-phrases summary { font-size: calc(12.5px * var(--ts)); color: var(--text3); }
+#voicePopover > .extract-btn { min-height: 48px; }
+body.large-touch #voicePopover > .extract-btn { min-height: 56px; }
+/* Nothing to fill in yet: no greyed-out button taking a row. */
+#voicePopover > .transcript-box:not(.active) ~ .extract-btn:disabled { display: none; }
+#voicePopover > .ai-bar { order: 2; justify-content: center; padding: 0; border: 0; background: transparent; font-size: calc(11.5px * var(--ts)); color: var(--text3); }
+/* Listening: the speak button and the newest lines, nothing else. */
+body.pocket-lock #voicePopover > .transcript-done,
+body.pocket-lock #voicePopover > .quick-phrases,
+body.pocket-lock #voicePopover > .extract-btn,
+body.pocket-lock #voicePopover > .ai-bar { display: none; }
+body.pocket-lock #voicePopover > .transcript-box { max-height: 4.6em; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.2em); mask-image: linear-gradient(to bottom, transparent 0, #000 1.2em); }
+/* Clear of the dock's red timer while it listens. */
+body[data-voice="listening"] #voicePopover { bottom: calc(var(--tabbar-h) + 40px); }
+.pocket-shield { background: transparent; }
+.pocket-shield span { padding: 6px 12px; font-size: calc(12px * var(--ts)); opacity: 0.92; }

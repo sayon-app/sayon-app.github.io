@@ -956,8 +956,6 @@ function startRecording() {
   const useWhisper = canUseWhisperListening();
   if (!SR && !useWhisper) { showToast('Speech recognition isn\'t supported here. Tap the transcript box to type instead', 'error'); return; }
   track('dictation_started');
-  // The mic tap lets the after-note questions speak later (Talk it through).
-  if (typeof primeTalkBackSpeech === 'function') primeTalkBackSpeech();
 
   lowConfidenceFlagged = false;
   const warnEl0 = document.getElementById('lowConfidenceWarning');

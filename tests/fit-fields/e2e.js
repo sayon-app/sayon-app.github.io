@@ -9,7 +9,7 @@
 // cards, Recheck later and Invasive, and an invasive "no" when every area was
 // clear. Advice: treatment type after a yes, the second opinion once there's a
 // treatment, and the common recommendations that fit the report first. Quote:
-// the treatment plan waits for a line.
+// the treatment plan waits for a line of work (not an inspection on its own).
 // node e2e.js <outDir>  (serve the repo on :8765; jsPDF from tests/visual/setup.sh)
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2] || '/tmp/fit-fields'; fs.mkdirSync(OUT, { recursive: true });
@@ -210,9 +210,13 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   }));
   let qs = await quote();
   check(qs.items === 0 && !qs.ai && !qs.plan, `no treatment and no lines: no second opinion, no plan (${JSON.stringify(qs)})`);
+  await p.evaluate(() => { quoteState.items.push(newQuoteItem('invasive')); quoteState.plan = { we: 'Treat the perimeter', owner: '', time: '', service: '', inspections: 'Every 12 months' }; renderQuoteItems(); }); await p.waitForTimeout(300);
+  qs = await quote();
+  const inv = await p.evaluate(() => ({ note: quoteFoldNotes(quoteState).plan, link: quoteLinkDoc(quoteState).plan }));
+  check(qs.items === 1 && !qs.plan && inv.note === '' && !inv.link.we.length && !inv.link.inspections, `an invasive inspection on its own: no plan shown, counted or sent (${JSON.stringify(inv)})`);
   await p.evaluate(() => addQuoteItem()); await p.waitForTimeout(300);
   qs = await quote();
-  check(qs.items === 1 && qs.plan, 'a line added: the treatment plan shows');
+  check(qs.items === 2 && qs.plan, 'a line of work added: the treatment plan shows');
   await p.screenshot({ path: `${OUT}/7-quote.png` });
 
   check(errs.length === 0, `no page errors ${errs.join(' | ')}`);

@@ -124,6 +124,8 @@ const emails = [];
   await shot('5-voice-idle');
   await p.evaluate(() => {
     setPocketLock(true); isRecording = true; updateVoiceHud();
+    document.getElementById('voiceBtn').classList.add('recording'); document.getElementById('voiceBtnText').textContent = 'Recording… tap to stop';
+    document.getElementById('waveform').classList.add('show');
     const box = document.getElementById('transcriptBox');
     box.textContent = 'Weather is fine and sunny. Single storey brick veneer on a concrete slab, built around 1985. Subfloor not applicable. Roof void accessed through the manhole in the hallway, insulation batts restricted the eaves.';
     box.classList.add('active');
@@ -136,7 +138,7 @@ const emails = [];
   check(scrolled <= 2, 'the newest words are in sight');
   check(v.shieldBg === 'rgba(0, 0, 0, 0)', 'the report behind isn\'t dimmed while listening');
   await shot('6-voice-listening');
-  await p.evaluate(() => { setPocketLock(false); isRecording = false; updateVoiceHud(); });
+  await p.evaluate(() => stopRecording());
 
   check(!errs.length, 'no page errors: ' + errs.join(' | '));
   await b.close();

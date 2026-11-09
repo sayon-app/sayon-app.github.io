@@ -222,7 +222,7 @@ function reportNeedsPlan(rd) {
   rd = rd || {};
   const findings = Array.isArray(rd.findings) ? rd.findings : [];
   return findings.some(f => f && (f.termiteActivity === 'ACTIVE' || f.termiteActivity === 'INACTIVE')) ||
-    rd.treatmentRecommended === 'YES' || !!(rd.treatmentType || '').trim();
+    rd.treatmentRecommended === 'YES' || !['', NO_TREATMENT_TYPE].includes((rd.treatmentType || '').trim());
 }
 
 function treatmentPlanHash(rd, address) {

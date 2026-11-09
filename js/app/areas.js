@@ -468,6 +468,7 @@ function areaSummary(zoneId, name) {
 
 function syncObstructionData() {
   syncNoneFromAreas();
+  syncFitFields();   // the Subfloor area says whether there's a subfloor
   const notFull = areasNotFullyInspected();
   const reasons = reportData.areaReasons || {};
   reportData.obstructions = notFull.map(z => OBS_ZONES[z].label + (areaStatusOf(z) === 'PARTIAL' ? ' (inspected with limits)' : '')).join(', ');
@@ -853,6 +854,96 @@ function renderAccessSummary() {
     hint.textContent = isBlankValue(reportData.highRiskAreas) && fallback ? `Left blank, the report lists: ${fallback}` : '';
     hint.hidden = !hint.textContent;
   }
+  syncAccessGroups();
+}
+
+// ── WHAT THE ACCESS SECTION CALLS FOR ────────────────────────────────────
+// The Findings rule for Section 5. The obstruction and restricted access
+// cards and their warning show only once there's a limit to list: an area
+// inspected with limits or not inspected, or a spot or reason spoken that
+// the report prints. Recheck later waits for a limited area too, and
+// Invasive for a limited area, an area marked "evidence found" or a termite
+// finding. Either comes in when it holds an answer, or when the inspector
+// adds it. What's out of sight reads in one box (#accessMore) with a button
+// for each, and the report prints only what's stored: "None" once every area
+// is marked, and an invasive inspection "NO" only when the Areas answered it
+// (every area inspected without limits and nothing found, syncNoneFromAreas)
+// or the inspector did. A group that's been shown stays shown while this
+// report is open.
+const ACCESS_GROUPS = [
+  { id: 'recheck', el: 'fg-recheck', name: 'High risk area' },
+  { id: 'invasive', el: 'fg-invasive', name: 'Invasive inspection' },
+];
+const accessGroupsShown = new WeakMap(); // reportData → Set of group ids shown
+
+function accessGroupCalledFor(id) {
+  const limited = areasNotFullyInspected().length > 0;
+  if (id === 'recheck') return limited || !isBlankValue(reportData.highRiskAreas);
+  if (id === 'invasive') {
+    const fromAreas = (reportData.noneFromAreas || []).includes('invasiveInspection');
+    return limited || !isBlankValue(reportData.invasiveInspectionDetails)
+      || (!isBlankValue(reportData.invasiveInspection) && !fromAreas)
+      || Object.values(reportData.areaResult || {}).includes('FOUND')
+      || findingsGroupCalledFor('termites');
+  }
+  return false;
+}
+
+function accessGroupShown(id) {
+  let shown = accessGroupsShown.get(reportData);
+  if (!shown) accessGroupsShown.set(reportData, shown = new Set());
+  if (!shown.has(id) && accessGroupCalledFor(id)) shown.add(id);
+  return shown.has(id);
+}
+
+// Brings a group into Section 5 (without moving the screen).
+function revealAccessGroup(id) {
+  accessGroupShown(id);
+  accessGroupsShown.get(reportData).add(id);
+  syncAccessGroups();
+  return document.getElementById((ACCESS_GROUPS.find(g => g.id === id) || {}).el);
+}
+
+// "Add it": the group comes in open, and the screen goes to it.
+function showAccessGroup(id) {
+  const el = revealAccessGroup(id);
+  if (!el) return;
+  el.open = true;
+  requestAnimationFrame(() => el.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+}
+
+function syncAccessGroups() {
+  const box = document.getElementById('accessMore');
+  if (!box) return;
+  const acc = accessLimits();
+  const anyLimit = acc.hindered.length > 0 || acc.restricted.length > 0;
+  const fields = document.getElementById('accessFields');
+  if (fields) fields.style.display = anyLimit ? '' : 'none';
+  ACCESS_GROUPS.forEach(g => {
+    const el = document.getElementById(g.el);
+    if (el) el.hidden = !accessGroupShown(g.id);
+  });
+  const hidden = ACCESS_GROUPS.filter(g => !accessGroupShown(g.id));
+  let state = '';
+  if (!anyLimit) {
+    // What the report prints for the ones out of sight.
+    const none = ['obstructions', 'restricted access'];
+    if (hidden.some(g => g.id === 'recheck') && !acc.highRisk) none.push('high risk areas');
+    const invasiveOut = hidden.some(g => g.id === 'invasive');
+    const invasive = !invasiveOut ? '' : reportData.invasiveInspection === 'NO' ? ' No invasive inspection is recommended.' : '';
+    state = acc.allMarked
+      ? `<div class="findings-more-state is-none"><span class="findings-more-icon">${FINDINGS_TICK}</span>
+        <span class="findings-more-text"><strong>Every area inspected without limits</strong>
+        <small>The report prints none for ${joinWithAnd(none)}.${invasive}</small></span></div>`
+      : `<div class="findings-more-state is-blank"><span class="findings-more-icon">${FINDINGS_DASH}</span>
+        <span class="findings-more-text"><strong>Fills in from the areas</strong>
+        <small>Mark every area above. One inspected with limits or not inspected comes here with its reasons. <button type="button" class="link-btn" onclick="document.getElementById('section-obstructions').scrollIntoView({ behavior: 'smooth', block: 'start' })">Back to the areas</button></small></span></div>`;
+  }
+  const add = hidden.length ? `<div class="findings-more-add"><span class="findings-more-label">Need to add one? Add it:</span>
+    <div class="findings-more-btns">${hidden.map(g => `<button type="button" class="spot-photo-add findings-more-btn" onclick="showAccessGroup('${g.id}')">${AREA_PLUS_ICON}${g.name}</button>`).join('')}</div></div>` : '';
+  const html = state + add;
+  box.hidden = !html;
+  if (box._html !== html) { box.innerHTML = html; box._html = html; }  // not under a tap
 }
 
 // Every access limit the report prints, as [label, text] rows: hindered

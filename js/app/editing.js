@@ -468,19 +468,22 @@ function applyFieldCascade(key, value, el, prev) {
   if (key === 'treatmentRecommended') {
     const typeEl = document.getElementById('f-treatmentType');
     if (value === 'NO') {
-      reportData.treatmentType = 'No treatment required at this time';
-      if (typeEl) { typeEl.textContent = 'No treatment required at this time'; typeEl.classList.add('filled'); }
+      reportData.treatmentType = NO_TREATMENT_TYPE;
+      if (typeEl) { typeEl.textContent = NO_TREATMENT_TYPE; typeEl.classList.add('filled'); }
     } else if (value === 'YES') {
-      if (reportData.treatmentType === 'No treatment required at this time') {
+      if (reportData.treatmentType === NO_TREATMENT_TYPE) {
         reportData.treatmentType = '';
         if (typeEl) { typeEl.textContent = '—'; typeEl.classList.remove('filled'); }
       }
     }
   }
+
+  // Questions that fit the house, and "where" boxes that follow an answer.
+  syncFitFields();
 }
 
 function commitEdit(el, key, value) {
-  untrackNoneFromAreas(key);
+  untrackAutoAnswers(key);
   if (key === 'borerActivity' && ['ACTIVE', 'INACTIVE'].includes(value)) {
     // Borers found: the first card is ready, and a lone card waiting on its
     // activity (one started for an area) takes this answer.
@@ -781,12 +784,14 @@ function foldAnsweredGroups(stepId) {
 }
 
 // Opens any folded group around el, so a jump to a question can show it,
-// and brings in a Findings group that's out of sight.
+// and brings in a Findings or Section 5 group that's out of sight.
 function openFieldGroups(el) {
   for (let n = el && el.parentElement; n; n = n.parentElement) {
     if (n.matches && n.matches('details.fgroup[hidden]')) {
       const g = FINDINGS_GROUPS.find(x => x.el === n.id);
       if (g) revealFindingsGroup(g.id);
+      const a = ACCESS_GROUPS.find(x => x.el === n.id);
+      if (a) revealAccessGroup(a.id);
     }
     if (n.matches && n.matches('details.fgroup') && !n.open) n.open = true;
   }
@@ -870,6 +875,8 @@ function updateProgress() {
   renderDocStrips();
   syncNothingFoundButtons();
   syncFindingsGroups();
+  syncAccessGroups();
+  syncRecLines();
 }
 
 // ── SIGNATURE PADS ──────────────────────────────────────────────────────

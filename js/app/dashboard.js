@@ -697,7 +697,7 @@ else installToastScreenWatch();
 //   reportData.amending      { reason, startedAt } - unlocked for an amendment
 //   reportData.noQuoteNeeded true when the job needs no quote
 // The quote's own sent state lives on the quote (see SENT AND LOCKED in js/quote.js).
-const ISSUE_META_KEYS = ['reportNumber', 'sent', 'issue', 'issueHistory', 'amending', 'pendingNotes', 'noQuoteNeeded', 'noteText', 'heardNotes', 'weatherFilled', 'jobPdfAt', 'jobPdfSentAt', 'copyTo', 'copySent'];
+const ISSUE_META_KEYS = ['reportNumber', 'sent', 'issue', 'issueHistory', 'amending', 'pendingNotes', 'noQuoteNeeded', 'noteText', 'heardNotes', 'weatherFilled', 'naFromHouse', 'jobPdfAt', 'jobPdfSentAt', 'copyTo', 'copySent'];
 const ISSUE_SECTION_NAMES = { job:'Job details', quote:'Quote', property:'Property', obstructions:'Areas inspected', restrictions:'Areas unable to be inspected',
   findings:'Findings', conducive:'Conducive', recommendations:'Recommendations', photos:'Photos', signoff:'Sign-off' };
 

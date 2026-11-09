@@ -784,12 +784,14 @@ function foldAnsweredGroups(stepId) {
 }
 
 // Opens any folded group around el, so a jump to a question can show it,
-// and brings in a Findings group that's out of sight.
+// and brings in a Findings or Section 5 group that's out of sight.
 function openFieldGroups(el) {
   for (let n = el && el.parentElement; n; n = n.parentElement) {
     if (n.matches && n.matches('details.fgroup[hidden]')) {
       const g = FINDINGS_GROUPS.find(x => x.el === n.id);
       if (g) revealFindingsGroup(g.id);
+      const a = ACCESS_GROUPS.find(x => x.el === n.id);
+      if (a) revealAccessGroup(a.id);
     }
     if (n.matches && n.matches('details.fgroup') && !n.open) n.open = true;
   }
@@ -873,6 +875,8 @@ function updateProgress() {
   renderDocStrips();
   syncNothingFoundButtons();
   syncFindingsGroups();
+  syncAccessGroups();
+  syncRecLines();
 }
 
 // ── SIGNATURE PADS ──────────────────────────────────────────────────────

@@ -523,8 +523,12 @@ function buildChoiceCards() {
 
 // A detail box only shows once its question calls for one: not while the
 // question is blank, and not after a "no", unless something was already
-// written there (so nothing is ever hidden with words in it).
+// written there (so nothing is ever hidden with words in it). A third entry
+// lists what the app itself writes there, which doesn't count as words: a
+// "no" to treatment fills the type with "No treatment required at this
+// time" (applyFieldCascade), which the report prints.
 const DETAIL_FIELD_FOR = {
+  treatmentRecommended: ['treatmentType', ['NO', 'N/A'], ['No treatment required at this time']],
   hardLandscaping: ['zone25mmVisible', ['NO', 'N/A']],
   softLandscaping: ['zone75mmVisible', ['NO', 'N/A']],
   decayFound: ['decayDetails', ['NO', 'N/A']],
@@ -549,12 +553,13 @@ const whatWhere = (what, where) => {
 };
 
 function syncDetailField(key) {
-  const [detailKey, noAnswers] = DETAIL_FIELD_FOR[key] || [];
+  const [detailKey, noAnswers, filled = []] = DETAIL_FIELD_FOR[key] || [];
   if (!detailKey) return;
   [detailKey, ...(MORE_DETAIL_FIELDS[key] || [])].forEach(k => {
     const field = document.getElementById('f-' + k)?.closest('.field');
     if (!field) return;
-    const hide = (isBlankValue(reportData[key]) || noAnswers.includes(reportData[key])) && !String(reportData[k] || '').trim();
+    const words = String(reportData[k] || '').trim();
+    const hide = (isBlankValue(reportData[key]) || noAnswers.includes(reportData[key])) && (!words || filled.includes(words));
     field.style.display = hide ? 'none' : '';
   });
   // A What and Where row under a question hides with its last box.
@@ -1078,6 +1083,9 @@ function renderFindingsMore() {
 // area stops saying nothing found; an answer the inspector gives or speaks
 // takes the key off the list, so it's never taken back.
 const NONE_FROM_AREAS = { borerActivity: 'NONE', decayFound: 'NO', delignification: 'NO' };
+// An invasive inspection is answered no the same way, but only while every
+// area was also inspected without limits (Section 5 hides it then).
+const NONE_FROM_CLEAR_AREAS = { invasiveInspection: 'NO' };
 function areasSayNothingFound() {
   const zones = Object.keys(OBS_ZONES), results = reportData.areaResult || {};
   const entered = zones.filter(areaWasEntered);
@@ -1099,23 +1107,31 @@ function syncNoneFromAreas() {
     else { el.classList.remove('filled'); el.textContent = '—'; }
   };
   let changed = false;
-  if (areasSayNothingFound()) {
+  const clear = areasSayNothingFound();
+  const want = !clear ? {} : areasNotFullyInspected().length ? NONE_FROM_AREAS : { ...NONE_FROM_AREAS, ...NONE_FROM_CLEAR_AREAS };
+  if (clear) {
     // Cards added and left empty go: the one left says no termites found.
     // A card with a photo on it has been started, so it's left to answer.
     const photoed = getFindings().some(f => ((reportData.photosBySection || {})[findingPhotoSection(f.id)] || []).length);
     if (termitesUnanswered() && !photoed) { reportData.findings = [{ ...getFindings()[0], termiteActivity: 'NONE' }]; filled.add('termites'); changed = true; }
-    Object.entries(NONE_FROM_AREAS).forEach(([key, val]) => {
+    Object.entries(want).forEach(([key, val]) => {
       if (!isBlankValue(reportData[key])) return;
       reportData[key] = val; filled.add(key); show(key, val); changed = true;
     });
-  } else if (filled.size) {
-    const fs = getFindings();
-    if (filled.has('termites') && fs.length === 1 && fs[0].termiteActivity === 'NONE' && !FINDING_DETAIL_KEYS.some(k => !isBlankValue(fs[0][k]))) fs[0].termiteActivity = null;
-    Object.entries(NONE_FROM_AREAS).forEach(([key, val]) => {
-      if (filled.has(key) && reportData[key] === val) { delete reportData[key]; show(key, null); }
-    });
-    filled.clear(); changed = true;
   }
+  // What the Areas no longer say is taken back, if it's still as filled.
+  const auto = { ...NONE_FROM_AREAS, ...NONE_FROM_CLEAR_AREAS };
+  [...filled].forEach(key => {
+    if (key === 'termites') {
+      if (clear) return;
+      const fs = getFindings();
+      if (fs.length === 1 && fs[0].termiteActivity === 'NONE' && !FINDING_DETAIL_KEYS.some(k => !isBlankValue(fs[0][k]))) fs[0].termiteActivity = null;
+    } else {
+      if (key in want) return;
+      if (reportData[key] === auto[key]) { delete reportData[key]; show(key, null); }
+    }
+    filled.delete(key); changed = true;
+  });
   if (filled.size) reportData.noneFromAreas = [...filled]; else delete reportData.noneFromAreas;
   if (changed) renderFindingsUI();
 }
@@ -1413,6 +1429,7 @@ function goToHighRiskAreas() {
   showSection('obstructions');
   setTimeout(() => {
     const el = document.getElementById('f-highRiskAreas');
+    if (el) openFieldGroups(el);
     if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); startEdit(el, 'highRiskAreas', 'text'); }
   }, 300);
 }

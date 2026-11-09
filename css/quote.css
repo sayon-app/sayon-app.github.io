@@ -779,6 +779,7 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-system-choice { background:
 .tp-again .quote-btn { width: 100%; flex: none; }
 .tp-foot { margin-top: 8px; font-size: calc(11.5px * var(--ts)); color: var(--text3); }
 .tp-report-link { display: flex; align-items: center; gap: 12px; width: calc(100% - 28px); margin: 4px 14px 14px; padding: 12px 14px; min-height: 44px; text-align: left; border-radius: 12px; border: 1px dashed rgba(var(--accent-rgb),0.45); background: transparent; color: var(--text); font: inherit; cursor: pointer; }
+.tp-report-link[hidden] { display: none; }
 .tp-report-link .icon { flex-shrink: 0; color: var(--accent); }
 .tp-report-link span { display: flex; flex-direction: column; gap: 2px; }
 .tp-report-link strong { font-size: calc(14px * var(--ts)); }

@@ -334,6 +334,7 @@ function openTreatmentRecord() {
   onTreatmentNoticeChange();
   document.getElementById('trNext').value = t.nextInspection || '';
   document.getElementById('trNotes').value = t.notes || '';
+  if (!q.treatment) fillTreatmentRatesFromRegister();
   cancelSheetVoice('treatment');
   document.getElementById('treatmentOverlay').classList.add('open');
   if (!treatmentPad) {
@@ -536,7 +537,7 @@ function applyTreatmentVoice(f) {
       const on = said.includes(box.dataset.key);
       if (box.checked !== on) { box.checked = on; n++; }
       if (on && box.closest('#trMethodsMore')) document.getElementById('trMethodsMore').open = true;
-      onTreatmentMethodToggle(box);
+      onTreatmentMethodToggle(box, true);
       const qty = document.querySelector(`#trMethods [data-qty="${box.dataset.key}"]`);
       const q = on && f.methods[box.dataset.key] && Number(f.methods[box.dataset.key].qty);
       if (qty && q > 0 && qty.value !== String(q)) { qty.value = String(q); n++; }
@@ -558,15 +559,17 @@ function applyTreatmentVoice(f) {
     });
     renderTreatmentProducts(rows.length ? rows : [{}]);
   }
+  n += fillTreatmentRatesFromRegister();
   updateTreatmentSaveBtn();
   renderTreatmentFolds(true);
   if (n) unsavedSheetChanged();
   return n;
 }
 
-function onTreatmentMethodToggle(box) {
+function onTreatmentMethodToggle(box, quiet) {
   const qty = document.querySelector(`#trMethods [data-qty="${box.dataset.key}"]`);
   if (qty) qty.hidden = !box.checked;
+  if (box.checked && !quiet) fillTreatmentRatesFromRegister();
   updateTreatmentSaveBtn();
 }
 
@@ -626,7 +629,7 @@ function renderTreatmentProducts(products) {
       </div>
       <div class="job-field">
         <div class="job-field-label">Where applied</div>
-        <input class="job-input" data-f="where" value="${esc(p.where || '')}" placeholder="e.g. Trenched and rodded around the perimeter">
+        <input class="job-input" data-f="where" value="${esc(p.where || '')}" placeholder="e.g. Trenched and rodded around the perimeter" onchange="fillTreatmentRatesFromRegister()">
       </div>
       ${products.length > 1 ? `<button class="quote-link-btn" onclick="removeTreatmentProduct(${i})">Remove product</button>` : ''}
     </div>`).join('');
@@ -734,6 +737,64 @@ function onTreatmentRateInput(inp) {
   row.querySelector('.treat-keep-rate').hidden = !(use && !use.rate && inp.value.trim() && canEditBusiness());
 }
 
+// ── THE RATE FROM THE REGISTER ──
+// A product from the chemical register with no rate yet takes it from the
+// label's use that fits what was done: the methods ticked, then the words
+// on where it went. One use fits: it's picked, as if tapped. Several fit
+// with the same mix (Termidor around the perimeter and under the slab): the
+// mix goes in and the use is left to pick. A rate already there is never
+// replaced, and a saved record is only filled when it's edited.
+const TREAT_METHOD_USES = { barrier: ['Soil treatment'], retic: ['Reticulation system'], bait: ['Bait', 'Termite attractant'],
+  physical: ['Physical barrier'], direct: ['Foam', 'Dust'], nest: ['Nest treatment', 'Foam', 'Dust'], topup: ['Soil treatment', 'Reticulation system', 'Bait'] };
+const TREAT_USE_PLACES = [
+  [/perimeter|trench|footings?|external walls?|around the (house|home|building)/i, /perimeter/i],
+  [/under (the )?slab|through the slab|slab drill|drill(ed|ing)? (through )?(the )?(slab|floor)/i, /under the slab/i],
+  [/\bpaths?\b|paving|patio|driveway|apron/i, /paths/i],
+  [/sub-? ?floor|\bpiers?\b|\bstumps?\b/i, /subfloor/i],
+  [/foam|workings|cavit/i, /workings|cavit/i],
+  [/above[- ]?ground/i, /above-ground/i],
+  [/in[- ]?ground/i, /in-ground/i],
+  [/\bnests?\b/i, /nest/i],
+];
+// The product's own "where" decides the place; Areas treated only when it says none.
+function treatmentUsesThatFit(chem, methods, where, areas = '') {
+  let fits = (chem.uses || []).filter(u => u.rate);
+  const kinds = methods.flatMap(k => TREAT_METHOD_USES[k] || []);
+  if (kinds.length) fits = fits.filter(u => kinds.includes(u.method));
+  const placesIn = text => TREAT_USE_PLACES.filter(([said]) => said.test(text)).map(([, surface]) => surface);
+  const places = placesIn(where).length ? placesIn(where) : placesIn(areas);
+  const placed = fits.filter(u => places.some(re => re.test(u.surface || '')));
+  return placed.length ? placed : fits;
+}
+function fillTreatmentRatesFromRegister() {
+  if (typeof findChemical !== 'function') return 0;
+  const methods = [...document.querySelectorAll('#trMethods input[type=checkbox]:checked')].map(b => b.dataset.key);
+  const rows = [...document.querySelectorAll('#trProducts .treat-product')];
+  // Areas treated speaks for the product only when there's one.
+  const areas = rows.length === 1 ? (document.getElementById('trAreas') || {}).value || '' : '';
+  let n = 0;
+  rows.forEach(row => {
+    const rate = row.querySelector('[data-f="rate"]'), sel = row.querySelector('[data-f="useId"]');
+    if (!rate || !sel || sel.value) return;
+    const chem = findChemical(row.querySelector('[data-f="name"]').value);
+    if (!chem) return;
+    // Empty, or only the mix this filled in before (it can now become the whole use).
+    const had = rate.value.trim();
+    if (had && !(chem.uses || []).some(u => String(u.rate || '').trim() === had)) return;
+    const fits = treatmentUsesThatFit(chem, methods, row.querySelector('[data-f="where"]').value, areas);
+    if (fits.length === 1) { sel.value = fits[0].id; onTreatmentUse(sel); n++; return; }
+    const same = k => fits.length > 1 && fits.every(u => String(u[k] || '').trim() === String(fits[0][k] || '').trim());
+    if (!same('rate') || had) return;
+    rate.value = fits[0].rate.trim(); rate.dataset.filled = '1';
+    const life = row.querySelector('[data-f="life"]');
+    if (fits[0].life && same('life') && !life.value.trim()) { life.value = fits[0].life; life.dataset.filled = '1'; }
+    const active = row.querySelector('[data-f="active"]');
+    if (chem.active && !active.value.trim()) active.value = chem.active;
+    n++;
+  });
+  return n;
+}
+
 function keepTreatmentRate(btn) {
   const row = btn.closest('.treat-product');
   const { chem, use } = treatmentRowChemical(row);
@@ -758,6 +819,7 @@ function onTreatmentProductName(inp) {
     // One use on the label: it's the one.
     const sel = useWrap.querySelector('[data-f="useId"]');
     if (sel && chem.uses.length === 1) { sel.value = chem.uses[0].id; onTreatmentUse(sel); }
+    else fillTreatmentRatesFromRegister();
   }
   const name = chem ? chem.name : Object.keys(TREATMENT_PRODUCTS).find(p => p.toLowerCase() === inp.value.trim().toLowerCase());
   const known = chem && chem.active ? chem.active : name && TREATMENT_PRODUCTS[name];

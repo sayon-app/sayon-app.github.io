@@ -370,7 +370,7 @@ async function buildReportPdf() {
     'AS 3660.2-2017': 'Existing Buildings',
     'AS 3660.3-2014': 'Assessment Criteria',
     'AS 4349.1-2007': 'Building Inspections',
-    'AS 4349.3-2010': 'Pre-Purchase Timber Pest',
+    'AS 4349.3-2010': 'Timber Pest Inspections',
   };
   const standard = reportData.standard || 'AS 3660.2-2017';
   const standardName = STANDARD_NAMES[standard] || '';
@@ -1700,7 +1700,7 @@ async function buildReportPdf() {
     + 'The inspecting company and inspector accept no responsibility or liability to any party other than the named client for any loss, damage, or expense arising from reliance on the contents of this report.');
 
   tcHeading('9. Recommended Re-inspection Frequency');
-  tcPara("Annual timber pest inspections are the minimum recommended frequency under AS 3660.2-2017 in the absence of an installed termite management system. Where elevated risk factors are present — including proximity to bushland or trees, prior termite history at the property, high-moisture conditions in the subfloor or roof void, the presence of timber-to-soil contact, or susceptible construction materials — a six-monthly re-inspection interval is recommended. Where an existing termite management system is installed and verified, the re-inspection frequency specified by the system installer and manufacturer should be followed. Failure to maintain regular inspection intervals may affect the terms of any system warranty in place.");
+  tcPara("AS 3660.2-2017 recommends a timber pest inspection at least every 12 months, whether or not a termite management system is installed. Where elevated risk factors are present — including proximity to bushland or trees, prior termite history at the property, high-moisture conditions in the subfloor or roof void, the presence of timber-to-soil contact, or susceptible construction materials — a six-monthly re-inspection interval is recommended. Where a termite management system is installed, follow its installer's or manufacturer's inspection interval where it asks for inspections more often than every 12 months. Failure to maintain regular inspection intervals may affect the terms of any system warranty in place.");
 
   tcHeading('10. Applicable Standards and Legislation');
   tcPara(`This inspection and report have been prepared with reference to ${standard} and, where applicable, the AEPMA (Australian Environmental Pest Managers Association) Code of Practice for Timber Pest Inspections. Termite management recommendations refer to AS 3660.2-2017 (Termite Management — In and Around Existing Buildings and Structures). Where the property is newly constructed or has been subject to recent building work, the termite management provisions of the National Construction Code (NCC) and AS 3660.1-2014 (Termite Management — New Building Work) may also apply. State and Territory legislation may impose requirements additional to those set out in this Standard. This report is not a safety inspection, does not constitute advice regarding compliance with any building code or regulation, and is not a certificate of compliance under any legislation.`);

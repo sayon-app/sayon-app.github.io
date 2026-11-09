@@ -12,7 +12,7 @@
 // report, and gives the client a treatment certificate PDF.
 //
 // The certificate carries what AS 3660.2 asks for (including a site plan),
-// the wording of the durable notice (AS 3660.1, NCC 3.1.4.4: system, date,
+// the wording of the durable notice (AS 3660.1, NCC 2022 Housing Provisions 3.4.3: system, date,
 // chemical life per label, future inspections), and the state treatment
 // records: NSW Pesticides Regulation cl 36,
 // QLD pest control advice, VIC licence record keeping and WA treatment
@@ -1050,7 +1050,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   const drawn = sitePlanHasContent(t.plan);
 
   // ── DURABLE NOTICE AND SITE PLAN ── The wording on the notice itself
-  // (AS 3660.1, NCC 3.1.4.4) in a grid, with a hand-drawn plan beside it
+  // (AS 3660.1, NCC 2022 Housing Provisions 3.4.3) in a grid, with a hand-drawn plan beside it
   // when there's no drawn one.
   const sketch = !drawn && t.sketch;
   section(sketch ? 'DURABLE NOTICE AND SITE PLAN' : 'DURABLE NOTICE');

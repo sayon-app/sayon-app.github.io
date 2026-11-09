@@ -525,6 +525,7 @@ function renderReportWidgets() {
   renderAllSectionPhotoGrids();
   renderAreaChecklist();
   renderMoistureTable();
+  syncFitFields();
   renderPendingNotes();
   renderIssueState();
 }

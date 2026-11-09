@@ -824,6 +824,14 @@ function quotePlanReport() {
 
 // One line for the folded row: what's set, and what's still to choose.
 // What the plan still needs, as a short note, or '' once it's done.
+// The treatment plan sets out how the work goes, so it waits for a line of
+// work: an inspection on its own (follow-up or invasive) has no plan. Out of
+// sight, it doesn't print or go on the client's page either.
+const QUOTE_INSPECTION_KEYS = ['followup', 'invasive'];
+function quotePlanShown(q) {
+  return !!q && (q.items || []).some(it => !QUOTE_INSPECTION_KEYS.includes(it.key));
+}
+
 function quotePlanNote(q) {
   const p = q && q.plan;
   return !p ? 'Add a plan' : !p.time ? 'Set the time on site' : !p.service ? 'Set the service period' : '';
@@ -1237,7 +1245,7 @@ function quoteFoldNotes(q) {
   return {
     details: !(q.client || '').trim() ? "Add the client's name" : !(q.clientEmail || '').trim() ? "Add the client's email" : '',
     work: !n ? 'Add a line' : starting ? `Check ${starting === 1 ? 'one price' : starting + ' prices'}` : '',
-    plan: n ? quotePlanNote(q) : '',   // no plan to set out until there's work
+    plan: quotePlanShown(q) ? quotePlanNote(q) : '',
     terms: !(q.paymentTerms || '').trim() ? 'Add payment terms' : '',
   };
 }
@@ -1419,9 +1427,8 @@ function renderQuoteWorkSummary() {
   const n = q.items.length;
   setFoldNote(document.getElementById('quoteWorkFold'), sub, quoteFoldNotes(q).work);
   document.getElementById('quoteWorkTotal').textContent = n ? formatAUD(quoteTotals(q).total) : '';
-  // The treatment plan sets out how the work goes, so it waits for a line.
   const planFold = document.getElementById('quotePlanFold');
-  if (planFold) planFold.hidden = !n;
+  if (planFold) planFold.hidden = !quotePlanShown(q);
 }
 
 // Explains the amber tag, only while a line still has one.
@@ -1989,7 +1996,7 @@ function quoteLinkDoc(q, files) {
   const totals = quoteTotals(q);
   const issued = quoteIssuedAt(q);
   const validDays = parseInt(q.validDays, 10) || 30;
-  const plan = q.plan || {};
+  const plan = (quotePlanShown(q) && q.plan) || {};
   const lines = v => (v || '').split('\n').map(s => s.trim()).filter(Boolean);
   return {
     kind: 'quote', company: company.name || '', phone: company.phone || '', email: company.email || '',
@@ -2366,7 +2373,7 @@ function buildQuotePDF(q) {
 
   let sectionNum = 2;
   // ── 2. TREATMENT PLAN ──
-  const plan = q.plan || {};
+  const plan = (quotePlanShown(q) && q.plan) || {};
   const planLines = v => (v || '').split('\n').map(s => s.trim()).filter(Boolean);
   const we = planLines(plan.we), owner = planLines(plan.owner);
   const facts = [['TIME ON SITE', plan.time], ['FREE SERVICE PERIOD', plan.service], ['INSPECTIONS AFTER', repairPlanInspections(plan.inspections)]]

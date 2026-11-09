@@ -318,7 +318,7 @@ function renderJobPage() {
       ${skipLink ? `<div class="dash-detail-links">${skipLink}</div>` : ''}
     </section>
     ${stepsHTML}
-    ${typeof jobPdfSectionHTML === 'function' ? jobPdfSectionHTML() : ''}
+    ${typeof jobPdfSectionHTML === 'function' ? jobPdfSectionHTML(j) : ''}
     ${detailsHTML}`;
   const panel = document.getElementById('jobPanel');
   if (panel) document.getElementById('jobPageSlot').appendChild(panel);

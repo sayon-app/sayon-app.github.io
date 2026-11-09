@@ -1149,6 +1149,15 @@ function setPocketLock(on) {
 }
 document.getElementById('pocketShield')?.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 
+// The note box keeps its newest words in sight: while listening only a few
+// lines show. Left alone while the inspector is typing in it.
+(() => {
+  const box = document.getElementById('transcriptBox');
+  if (!box || typeof MutationObserver !== 'function') return;
+  new MutationObserver(() => { if (document.activeElement !== box) box.scrollTop = box.scrollHeight; })
+    .observe(box, { childList: true, characterData: true, subtree: true });
+})();
+
 // The screen stays on while recording: a phone that locks itself in a
 // pocket stops hearing, because the browser drops the mic.
 let screenWakeLock = null;

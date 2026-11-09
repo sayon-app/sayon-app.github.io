@@ -306,7 +306,7 @@
         <!-- SAY THE QUOTE (js/quote.js): speak lines, prices and terms instead of typing -->
         <div class="sheet-voice quote-voice" id="quoteVoice" data-state="idle">
           <button type="button" class="sheet-voice-btn" onclick="sayQuote()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg><span class="sheet-voice-label">Say the quote</span></button>
-          <p class="sheet-voice-hint">e.g. "Baiting system, 12 stations. Monitoring for a year at 480. Take off the follow-up inspection. 50% deposit to book, half a day." A line you don't price starts at your usual price.</p>
+          <p class="sheet-voice-hint">e.g. "Baiting system, 12 stations, monitoring for a year at 480, 50% deposit."</p>
           <p class="sheet-voice-text" hidden></p>
         </div>
 
@@ -578,7 +578,7 @@
     <div class="page-sheet-body sheet-secs">
       <div class="sheet-voice" id="trVoice" data-state="idle">
         <button type="button" class="sheet-voice-btn" onclick="toggleSheetVoice('treatment')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg><span class="sheet-voice-label">Say it instead</span></button>
-        <p class="sheet-voice-hint">e.g. "Done today, 8 till 11:30, fine and 22. Trenched and rodded the perimeter, 48 metres of Termidor, foam at the porch post. No access under the rear deck. New notice in the meter box."</p>
+        <p class="sheet-voice-hint">e.g. "Done today, 8 till 11:30. Trenched and rodded the perimeter, 48 metres of Termidor."</p>
         <p class="sheet-voice-text" hidden></p>
       </div>
       <div class="sheet-folds">
@@ -864,7 +864,7 @@
     <div class="page-sheet-body sheet-secs">
       <div class="sheet-voice" id="bvVoice" data-state="idle">
         <button type="button" class="sheet-voice-btn" onclick="toggleSheetVoice('bait')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg><span class="sheet-voice-label">Say it instead</span></button>
-        <p class="sheet-voice-hint">e.g. "1 to 5 clear. 6 active, added two cartridges. 7's lid was off, replaced it. Rest are clear. Exterra, batch 4471. Back in 4 weeks."</p>
+        <p class="sheet-voice-hint">e.g. "1 to 5 clear. 6 active, added two cartridges. Rest are clear. Back in 4 weeks."</p>
         <p class="sheet-voice-text" hidden></p>
       </div>
       <div class="sheet-folds">
@@ -2306,7 +2306,7 @@
          once the note is filled in (see PHOTOS WHILE TALKING in js/app/). -->
     <button type="button" class="voice-photo-btn" id="voicePhotoBtn" onclick="takePhotoWhileTalking()">
       <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-      <span id="voicePhotoBtnText">Photo of what you're describing</span>
+      <span id="voicePhotoBtnText" class="sr-only">Photo of what you're describing</span>
     </button>
     <input type="file" id="talkPhotoInput" accept="image/*" capture="environment" multiple style="display:none" onchange="handleTalkPhotoFiles(this)">
 

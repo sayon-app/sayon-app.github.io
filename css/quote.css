@@ -226,8 +226,8 @@ body.dark-screen .treat-product { background: var(--surface2); border-color: var
 .bait-visit-main { color: var(--text); }
 .bait-visit-sent { margin-top: 2px; font-size: calc(12.5px * var(--ts)); color: var(--yellow-text); font-weight: 600; }
 .bait-visit-sent.sent { color: var(--text3); font-weight: 500; }
-.bait-visit-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 8px; }
-.bait-visit-actions .quote-btn { min-height: 40px; padding: 8px 14px; font-size: calc(13.5px * var(--ts)); }
+.bait-visit-actions, .qp-cert-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 8px; }
+.bait-visit-actions .quote-btn, .qp-cert-actions .quote-btn { min-height: 40px; padding: 8px 14px; font-size: calc(13.5px * var(--ts)); }
 .bait-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 10px; }
 .bait-rest-btn { width: auto; flex: none; min-height: 40px; padding: 8px 14px; font-size: calc(13.5px * var(--ts)); }
 .bait-count-btn { width: auto; flex: none; align-self: flex-end; min-height: 48px; }
@@ -787,5 +787,3 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-system-choice { background:
 
 /* Say the quote: the spoken-quote box at the top of the editor (js/quote.js) */
 #quoteEditor > .quote-voice { margin: 0 0 12px; }
-body:not(.dark-screen) #quoteEditor > .quote-voice { background: var(--accent-wash); border-color: var(--accent-edge); }
-body:not(.dark-screen) #quoteEditor > .quote-voice .sheet-voice-hint { color: var(--text2); }

@@ -65,6 +65,7 @@ function updateTalkPhotoButton() {
   if (!btn || !label) return;
   const n = talkPhotosWaiting().length;
   btn.classList.toggle('has-photos', n > 0);
+  btn.dataset.count = n ? String(n) : '';
   label.textContent = n ? `${n} photo${n === 1 ? '' : 's'} waiting for the fill · take another` : 'Photo of what you\'re describing';
 }
 

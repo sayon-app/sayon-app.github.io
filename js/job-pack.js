@@ -20,6 +20,17 @@ function ensurePdfLibLoaded() {
   });
 }
 
+// The pages of each PDF (a Blob, its bytes or a loaded PDFDocument), one
+// after another, as one new PDFDocument. Also joins the two certificates.
+async function joinPdfs(lib, pdfs) {
+  const out = await lib.PDFDocument.create();
+  for (const p of pdfs) {
+    const src = p instanceof lib.PDFDocument ? p : await lib.PDFDocument.load(p instanceof Blob ? await p.arrayBuffer() : p);
+    (await out.copyPages(src, src.getPageIndices())).forEach(page => out.addPage(page));
+  }
+  return out;
+}
+
 // Where the job PDF is emailed: the job's email, else the quote's.
 function jobClientEmailOf() {
   return (reportData.jobClientEmail || (currentJobQuote() || {}).clientEmail || '').trim();
@@ -30,30 +41,30 @@ function jobReportReady() {
   return !!(reportData.issue || reportData.sent || reportData.pdfAt || calculateCompletion() >= 100);
 }
 
-// The parts of the job PDF, in order: { title, note, build() → { blob, fname } }.
+// The parts of the job PDF, in order: { kind, title, note, build() → { blob, fname } }.
 function jobPdfParts() {
   const q = currentJobQuote();
   const parts = [];
   const a = reportData.agreement;
-  if (a) parts.push({ title: 'Pre-inspection agreement', note: `Signed${a.signerName ? ' by ' + a.signerName : ''}, ${formatAgreementSignedAt(a.signedAt)}`,
+  if (a) parts.push({ kind: 'agreement', title: 'Pre-inspection agreement', note: `Signed${a.signerName ? ' by ' + a.signerName : ''}, ${formatAgreementSignedAt(a.signedAt)}`,
     build: () => buildAgreementPdf(a) });
   if (jobReportReady()) {
     const sent = reportData.sent ? `sent ${formatIssueDate(reportData.sent.at)}` : 'not sent yet';
-    parts.push({ title: reportKindTitle().replace(/ \w/g, w => w.toLowerCase()), note: `Report ${ensureReportNumber()}, version ${reportVersion()}, ${sent}`, report: true, build: () => buildReportPdf() });
+    parts.push({ kind: 'report', title: reportKindTitle().replace(/ \w/g, w => w.toLowerCase()), note: `Report ${ensureReportNumber()}, version ${reportVersion()}, ${sent}`, report: true, build: () => buildReportPdf() });
   }
   if (quoteHasItems(q)) {
     const ans = quoteAnswerState(q);
     const how = !ans ? (q.sentAt ? `sent ${formatIssueDate(q.sentAt)}, no answer yet` : 'not sent yet')
       : ans.status === 'accepted' ? `accepted ${formatAnswerDate(ans.date)}${ans.by ? ' by ' + ans.by : ''}` : `declined ${formatAnswerDate(ans.date)}`;
-    parts.push({ title: `Quote ${q.number || ''}`.trim(), note: `${formatAUD(quoteTotals(q).total)}, ${how}`, build: () => buildQuotePDF(q) });
+    parts.push({ kind: 'quote', title: `Quote ${q.number || ''}`.trim(), note: `${formatAUD(quoteTotals(q).total)}, ${how}`, build: () => buildQuotePDF(q) });
   }
   if (q && q.treatment) {
     const t = q.treatment;
-    parts.push({ title: 'Treatment certificate', note: `Treated ${formatAnswerDate(t.date)}${t.technician ? ' by ' + t.technician : ''}`, build: () => buildTreatmentCertificatePDF(q) });
-    if (installedSystems(t).length) parts.push({ title: 'Certificate of installation', note: installedSystems(t).map(k => (TREATMENT_METHODS[k] || {}).label || k).join(', '), build: () => buildTreatmentCertificatePDF(q, { install: true }) });
+    parts.push({ kind: 'cert', title: 'Treatment certificate', note: `Treated ${formatAnswerDate(t.date)}${t.technician ? ' by ' + t.technician : ''}`, build: () => buildTreatmentCertificatePDF(q) });
+    if (installedSystems(t).length) parts.push({ kind: 'cert', title: 'Certificate of installation', note: installedSystems(t).map(k => (TREATMENT_METHODS[k] || {}).label || k).join(', '), build: () => buildTreatmentCertificatePDF(q, { install: true }) });
   }
   if (q && typeof baitVisitsOf === 'function') baitVisitsOf(q).forEach(v => {
-    parts.push({ title: `Bait station visit, ${formatAnswerDate(v.date)}`, note: baitVisitShort(v), build: () => buildBaitVisitPDF(q, v) });
+    parts.push({ kind: 'bait', title: `Bait station visit, ${formatAnswerDate(v.date)}`, note: baitVisitShort(v), build: () => buildBaitVisitPDF(q, v) });
   });
   return parts;
 }
@@ -123,11 +134,7 @@ async function buildJobPdf() {
   }
   drawPdfDocFooters(doc, `Job file${company.name ? `  ·  ${company.name}` : ''}`);
 
-  const out = await lib.PDFDocument.create();
-  const cover = await lib.PDFDocument.load(doc.output('arraybuffer'));
-  for (const src of [cover, ...built.map(b => b.src)]) {
-    (await out.copyPages(src, src.getPageIndices())).forEach(p => out.addPage(p));
-  }
+  const out = await joinPdfs(lib, [await lib.PDFDocument.load(doc.output('arraybuffer')), ...built.map(b => b.src)]);
   out.setTitle(`Job file · ${address || 'Property'}`);
   if (company.name) out.setAuthor(company.name);
   const bytes = await out.save();
@@ -180,29 +187,52 @@ function renderJobPdfButtons(busy) {
   document.querySelectorAll('.job-pdf-btn').forEach(b => { b.disabled = !!busy; if (busy && b.dataset.busy) b.textContent = b.dataset.busy; });
 }
 
-// The job page's section: what goes in, and the buttons.
-function jobPdfSectionHTML() {
+// What's in it, in a few words: "Agreement, report, quote, 2 certificates
+// and a bait visit report".
+function jobPdfContentsLine(parts) {
+  const n = kind => parts.filter(p => p.kind === kind).length;
+  const words = [n('agreement') && 'agreement', n('report') && 'report', n('quote') && 'quote',
+    n('cert') && (n('cert') > 1 ? `${n('cert')} certificates` : 'certificate'),
+    n('bait') && (n('bait') > 1 ? `${n('bait')} bait visit reports` : 'a bait visit report')].filter(Boolean);
+  const line = words.length > 1 ? words.slice(0, -1).join(', ') + ' and ' + words[words.length - 1] : words.join('');
+  return line.charAt(0).toUpperCase() + line.slice(1);
+}
+
+// The job page's last card: finalising the job into one PDF. Once it's
+// made it reads as done, with what went in folded away.
+function jobPdfSectionHTML(j) {
   if (!getFullAddress()) return '';
-  const head = (line) => `<div class="job-pdf-head">
-        <span class="job-tile${reportData.jobPdfAt ? ' done' : ''}" aria-hidden="true">${typeof jobIcon === 'function' ? jobIcon('jobpdf', 20) : ''}</span>
-        <span class="job-step-main"><span class="job-step-label">Job PDF</span><span class="job-step-text">${escapeHtml(line)}</span></span>
+  const madeAt = reportData.jobPdfAt;
+  const tick = '<span class="job-tile-tick"><svg class="icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>';
+  const head = (label, line) => `<div class="job-pdf-head">
+        <span class="job-tile${madeAt ? ' done' : ''}" aria-hidden="true">${typeof jobIcon === 'function' ? jobIcon('jobpdf', 20) : ''}${madeAt ? tick : ''}</span>
+        <span class="job-step-main"><span class="job-step-label">${label}</span><span class="job-step-text">${escapeHtml(line)}</span></span>
       </div>`;
-  // Until the report is finished the section says so in one line, rather than hiding.
+  // Until the report is finished the card says so in one line, rather than hiding.
   if (!jobReportReady()) return `
-    <section class="job-pdf waiting">${head(`Every document from the job in one PDF. Ready once the report is finished (${calculateCompletion()}% filled in).`)}</section>`;
+    <section class="job-pdf waiting">${head('Finalise the job', `Once the report is finished (${calculateCompletion()}% filled in), every document from the job goes into one PDF.`)}</section>`;
+  j = j || currentJobSummary();
   const parts = jobPdfParts();
-  const who = ((document.getElementById('jobClient') || {}).value || '').trim().split(/\s+/)[0];
+  const client = ((document.getElementById('jobClient') || {}).value || '').trim();
+  const who = client.split(/\s+/)[0];
   const email = jobClientEmailOf();
-  const made = reportData.jobPdfAt ? `Made ${formatIssueDate(reportData.jobPdfAt)}${reportData.jobPdfSentAt ? `, emailed ${formatIssueDate(reportData.jobPdfSentAt)}` : ''}. Make it again to take in anything new.` : '';
+  const contents = jobPdfContentsLine(parts);
+  const label = madeAt ? 'Job finalised' : j.finished ? 'Ready to finalise' : 'Finalise the job';
+  const line = !madeAt ? `${contents}${j.finished ? '' : ' so far'}, in one PDF.`
+    : reportData.jobPdfSentAt ? `Emailed${client ? ' to ' + client : ''} ${formatIssueDate(reportData.jobPdfSentAt)}. ${contents}.`
+    : `Saved ${formatIssueDate(madeAt)}. ${contents}.`;
+  const sample = isSampleJob(currentReportId);
   return `
-    <section class="job-pdf">
-      ${head('Everything from this job in one PDF, with a contents page. Each part still has its own PDF too.')}
-      <ol class="job-pdf-list">${parts.map(p => `<li><strong>${escapeHtml(p.title)}</strong><span>${escapeHtml(p.note || '')}</span></li>`).join('')}</ol>
-      ${jobPdfSkipped() ? `<p class="job-pdf-note">${escapeHtml(jobPdfSkipped())}</p>` : ''}
-      ${made ? `<p class="job-pdf-note">${escapeHtml(made)}</p>` : ''}
+    <section class="job-pdf${madeAt ? ' made' : ''}">
+      ${head(label, line)}
       <div class="dash-detail-links">
+        ${email ? `<button type="button" class="job-pdf-btn${madeAt ? '' : ' primary'}" data-busy="Making it…" onclick="makeJobPdf('email')">${sample ? 'Email it to me' : reportData.jobPdfSentAt ? 'Email again' : `Email${who ? ' to ' + escapeHtml(who) : ''}`}</button>` : ''}
         <button type="button" class="job-pdf-btn" data-busy="Making it…" onclick="makeJobPdf('save')">Save PDF</button>
-        ${email ? `<button type="button" class="job-pdf-btn" data-busy="Making it…" onclick="makeJobPdf('email')">${isSampleJob(currentReportId) ? 'Email it to me' : `Email${who ? ' to ' + escapeHtml(who) : ''}`}</button>` : ''}
       </div>
+      <details class="job-pdf-more">
+        <summary>What's in it</summary>
+        <ol class="job-pdf-list">${parts.map(p => `<li><strong>${escapeHtml(p.title)}</strong><span>${escapeHtml(p.note || '')}</span></li>`).join('')}</ol>
+        <p class="job-pdf-note">${jobPdfSkipped() ? escapeHtml(jobPdfSkipped()) + ' ' : ''}A contents page goes first, and each part still has its own PDF. Make it again to take in anything new.</p>
+      </details>
     </section>`;
 }

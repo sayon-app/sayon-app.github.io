@@ -680,7 +680,7 @@ async function runFill({ whileRecording = false } = {}) {
   if (extracted && whileRecording) {
     const n = countExtractFilled(before);
     if (n) showToast(`Filled ${n} field${n !== 1 ? 's' : ''}. Still listening`, 'info');
-  } else if (extracted) showExtractSummary(before, { talk: true });
+  } else if (extracted) showExtractSummary(before);
   return extracted;
 }
 
@@ -876,8 +876,7 @@ let extractSummaryBlanks = [];
 let extractSummaryBefore = null;   // the snapshot the sheet counts from, kept so a fix can redraw it
 let extractSummaryFilledCount = 0;
 
-// opts.talk: a note was just filled, so Talk it through may start on its own.
-function showExtractSummary(before, opts) {
+function showExtractSummary(before) {
   const overlay = document.getElementById('extractSummaryOverlay');
   if (!overlay) return;
   extractSummaryBefore = before || extractSummaryBefore || extractSnapshot();
@@ -898,11 +897,6 @@ function showExtractSummary(before, opts) {
   const readBtn = document.getElementById('extractReadBackBtn');
   if (readBtn) { readBtn.hidden = !('speechSynthesis' in window); readBtn.textContent = 'Read it back'; }
   overlay.classList.add('open');
-  if (typeof talkBackRender === 'function') {
-    talkBackRender(talkBack && talkBack.done ? 'done' : undefined);
-    if (opts && opts.talk && talkBack && talkBack.done) stopTalkBack(true);
-    if (opts && opts.talk && !talkBack && talkBackAuto()) setTimeout(() => { if (overlay.classList.contains('open')) startTalkBack(true); }, 500);
-  }
   if (testModeOn()) {
     try { saveTestEvent('fill-summary', readBackText(), { filled: n, blanks: extractSummaryBlanks.map(b => b.label), gaps: gaps.map(g => g.text) }); } catch (e) { /* testing never gets in the way */ }
   }
@@ -912,7 +906,6 @@ function closeExtractSummary() {
   const overlay = document.getElementById('extractSummaryOverlay');
   if (overlay) overlay.classList.remove('open');
   stopReadBack();
-  if (typeof stopTalkBack === 'function') stopTalkBack(true);
 }
 
 // ── SPOKEN READ-BACK ────────────────────────────────────────────────────

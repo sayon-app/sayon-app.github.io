@@ -219,7 +219,6 @@ function openApp(appName) {
     enableKeyboardActivation();
     restoreA11ySettings();
     restoreAudioCaptureSetting();
-    restoreTalkBackSetting();
     loadJobInfo();
     if (restored) lastLocalSaveAt = Date.now();
     updateSyncStatus();

@@ -1436,13 +1436,6 @@
           <div class="settings-group-title">Voice</div>
           <div class="settings-row">
             <div class="settings-row-text">
-              <div class="settings-row-title">Ask me after each note</div>
-              <div class="settings-row-desc">Once a dictated note has filled the report, SAYON asks out loud what's still blank, like a builder referral or an area's status, and you answer out loud. Say skip, undo, repeat or stop at any time.</div>
-            </div>
-            <button type="button" class="toggle-switch" id="toggleTalkBack" onclick="toggleTalkBackAutoSetting()" aria-label="Ask me after each note"></button>
-          </div>
-          <div class="settings-row">
-            <div class="settings-row-text">
               <div class="settings-row-title">Second transcription (experimental)</div>
               <div class="settings-row-desc">Also sends the recording to a more accurate transcription service and shows its version for you to check. Nothing changes unless you apply it. Off by default while it's tried on more phones.</div>
             </div>
@@ -2632,27 +2625,12 @@
     </div>
     <div class="page-sheet-body">
       <div class="extract-summary-filled" id="extractSummaryFilled"></div>
-      <!-- TALK IT THROUGH (js/app/talk-back.js): the questions below, asked aloud -->
-      <div class="talkback" id="talkBack" hidden aria-live="polite">
-        <div class="talkback-state" id="talkBackState">Speaking…</div>
-        <div class="talkback-q" id="talkBackQ"></div>
-        <div class="talkback-heard" id="talkBackHeard" hidden></div>
-        <div class="talkback-opts" id="talkBackOpts"></div>
-        <div class="talkback-actions" id="talkBackActions">
-          <button type="button" class="link-btn" onclick="talkBackCommand('repeat')">Repeat</button>
-          <button type="button" class="link-btn" onclick="talkBackCommand('skip')">Skip</button>
-          <button type="button" class="link-btn" id="talkBackUndo" onclick="talkBackCommand('undo')">Undo</button>
-          <button type="button" class="link-btn" onclick="stopTalkBack()">Stop</button>
-        </div>
-        <button type="button" class="link-btn" id="talkBackClose" onclick="stopTalkBack(true)" hidden>Close</button>
-      </div>
       <div class="extract-summary-label" id="extractSummaryBlankLabel">Left blank</div>
       <div class="extract-summary-list" id="extractSummaryBlanks"></div>
       <div class="extract-summary-label">Before you leave</div>
       <div class="extract-summary-gaps" id="extractSummaryGaps"></div>
       <div class="extract-summary-actions">
         <button class="extract-btn" onclick="closeExtractSummary()">Done</button>
-        <button class="talkback-start" id="extractTalkBtn" onclick="startTalkBack()" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>Talk it through</button>
         <button class="link-btn extract-readback-btn" id="extractReadBackBtn" onclick="toggleReadBack()" hidden>Read it back</button>
       </div>
     </div>
@@ -2693,7 +2671,6 @@
 <script src="js/app/shell.js"></script>
 <script src="js/app/voice.js"></script>
 <script src="js/app/extraction.js"></script>
-<script src="js/app/talk-back.js"></script>
 <script src="js/app/fields.js"></script>
 <script src="js/app/editing.js"></script>
 <script src="js/app/agreement.js"></script>

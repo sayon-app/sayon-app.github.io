@@ -4,14 +4,14 @@ A voice-to-report PWA for Australian timber pest inspectors. The chain is: pre-i
 
 **New to this repo, or starting a larger task? Read `docs/handover/README.md` first.** It covers the owner, what's live, the go-live recipe and the traps, and points to the rest.
 
-Read only the files your task needs. The app's own code is split into 19 files in `js/app/` (150 to 1,900 lines each), so find the file and the section with `grep -rn "SECTION NAME" js/app/` and read that range instead of whole files.
+Read only the files your task needs. The app's own code is split into 18 files in `js/app/` (150 to 1,900 lines each), so find the file and the section with `grep -rn "SECTION NAME" js/app/` and read that range instead of whole files.
 
 ## File map
 
 | File | What's in it |
 |---|---|
 | `index.html` | Every screen and overlay: splash, sign-in, platform menu, report (sections 1–7 + sign-off), drawer menu pages, quote screen and sheets |
-| `js/app/*.js` | The report app and everything shared, in 19 files (see below) |
+| `js/app/*.js` | The report app and everything shared, in 18 files (see below) |
 | `js/quote.js` | Quote builder, the client's answer and the quote PDF |
 | `js/price-book.js` | Your prices: the business's own price for every quote line, set in onboarding and Menu › Your prices. Same store as the prices remembered from quotes (`quotePriceMemory`) |
 | `js/photo-markup.js` | Mark up a report photo (circle, arrow, draw, label) from the photo viewer |
@@ -46,7 +46,6 @@ They are plain scripts, not modules: every top-level name is shared across all o
 | `shell.js` | APP UPDATES, ADDRESS MOVE, SPLASH, PLATFORM NAVIGATION, keyboard access |
 | `voice.js` | FIELD NOTES, NATIVE SPEECH RECOGNITION ADAPTER, VOICE, AI TRANSCRIPT CLEANUP, EXPERIMENTAL AUDIO CAPTURE, WHISPER LISTENING, QUICK PHRASES, VOICE HUD |
 | `extraction.js` | AI EXTRACTION, LEARNED CORRECTIONS, TEST MODE, WAITING NOTES, EXTRACT SUMMARY, SPOKEN READ-BACK, COMPLIANCE PLATE SCAN, INSECT / SPECIES PHOTO ID, ASK THE AI ABOUT A PHOTO (`askAiAboutPhoto`, shared by the photo calls), PHOTO DESCRIPTION (Describe: the AI's suggested photo caption) |
-| `talk-back.js` | TALK IT THROUGH: after a note is filled, the gaps asked aloud and answered out loud (referral, areas, building, system, notice, moisture, slab edge, risk); then "Do you want to say the quote now?" for a job that needs work and has no quote; Settings › Voice › Ask me after each note |
 | `fields.js` | FIELD RENDERING, MULTI-FINDING ENGINE, CHOICE CARDS, SELECT CARDS, BORER FINDINGS, COMPASS, MOISTURE METER READINGS |
 | `editing.js` | EDITING, REPORT STEPS, PROGRESS, SIGNATURE PADS, SAY IT INSTEAD |
 | `agreement.js` | PRE-INSPECTION AGREEMENT, REMOTE SIGNING |

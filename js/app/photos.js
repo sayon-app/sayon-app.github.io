@@ -552,12 +552,64 @@ const REC_LINES = [
 
 function getRecLines() { return Array.isArray(reportData.recLines) ? reportData.recLines : []; }
 
+// The Findings rule for Advice: the lines that fit what the report says come
+// first, with any already added, and the rest wait under More. While the
+// report says nothing they'd follow from, every line shows. Each test reads
+// answers only, so a line never comes or goes with the inspector's words.
+const REC_LINE_FITS = {
+  maintain: rd => hasIdentifiedSystem(rd.existingSystem),
+  warranty: rd => hasIdentifiedSystem(rd.existingSystem),
+  expired: rd => hasIdentifiedSystem(rd.existingSystem),
+  install: rd => (!isBlankValue(rd.existingSystem) && !hasIdentifiedSystem(rd.existingSystem)) || rd.treatmentRecommended === 'YES',
+  zone: rd => rd.slabEdge === 'OBSTRUCTED' || rd.weepHoles === 'BRIDGED' || rd.zone25mmVisible === 'NO' || rd.zone75mmVisible === 'NO',
+  debris: rd => rd.timberSoil === 'YES' || rd.nonDurableTimber === 'YES',
+  drainage: rd => rd.waterLeaks === 'YES' || rd.siteDrainage === 'POOR' || rd.subfloorDrainage === 'POOR',
+  plumber: rd => rd.waterLeaks === 'YES' || rd.moistureReadings === 'YES',
+  ventilation: rd => rd.subfloorVentilation === 'POOR' || rd.mouldSeen === 'YES',
+  stumps: rd => /tree|bush|reserve|rural/i.test(rd.siteSurroundings || ''),
+  declined: rd => rd.treatmentRecommended === 'YES',
+};
+const REC_LINE_KEYS = ['existingSystem', 'treatmentRecommended', 'slabEdge', 'weepHoles', 'timberSoil', 'nonDurableTimber', 'waterLeaks', 'siteDrainage', 'moistureReadings', 'subfloorVentilation', 'mouldSeen', 'siteSurroundings'];
+const recLinesOpened = new WeakSet(); // reports whose More was tapped
+const recLinesSeen = new WeakMap();   // report → ids shown, which stay shown (never gone under a tap)
+
+function recLinesShown() {
+  const have = new Set(getRecLines().map(l => l.id));
+  const known = REC_LINE_KEYS.some(k => !isBlankValue(reportData[k]));
+  if (!known || recLinesOpened.has(reportData)) return { first: REC_LINES, more: [] };
+  let seen = recLinesSeen.get(reportData);
+  if (!seen) recLinesSeen.set(reportData, seen = new Set());
+  const fits = ([id]) => seen.has(id) || have.has(id) || (REC_LINE_FITS[id] && REC_LINE_FITS[id](reportData));
+  const first = REC_LINES.filter(fits);
+  first.forEach(([id]) => seen.add(id));
+  return { first, more: REC_LINES.filter(l => !fits(l)) };
+}
+
+function openMoreRecLines() {
+  recLinesOpened.add(reportData);
+  renderRecLines();
+}
+
+// The second opinion compares a treatment, so it waits for one.
+function syncRecLines() {
+  const link = document.getElementById('tpReportLink');
+  if (link) {
+    const type = String(reportData.treatmentType || '').trim();
+    link.hidden = reportData.treatmentRecommended !== 'YES' && (!type || type === 'No treatment required at this time');
+  }
+  const el = document.getElementById('recLines');
+  if (el && el._fits !== JSON.stringify(recLinesShown().first.map(l => l[0]))) renderRecLines();
+}
+
 function renderRecLines() {
   const el = document.getElementById('recLines');
   if (!el) return;
   const have = new Set(getRecLines().map(l => l.id));
-  el.innerHTML = REC_LINES.map(([id, label]) =>
-    `<button type="button" class="rec-line${have.has(id) ? ' on' : ''}" aria-pressed="${have.has(id)}" onclick="toggleRecLine('${id}')">${escapeHtml(label)}</button>`).join('');
+  const { first, more } = recLinesShown();
+  el._fits = JSON.stringify(first.map(l => l[0]));
+  el.innerHTML = first.map(([id, label]) =>
+    `<button type="button" class="rec-line${have.has(id) ? ' on' : ''}" aria-pressed="${have.has(id)}" onclick="toggleRecLine('${id}')">${escapeHtml(label)}</button>`).join('')
+    + (more.length ? `<button type="button" class="rec-line rec-line-more" onclick="openMoreRecLines()">${more.length} more</button>` : '');
   const added = document.getElementById('recLinesAdded');
   if (added) {
     added.innerHTML = getRecLines().map(l => `<li>${escapeHtml(l.text)}</li>`).join('');

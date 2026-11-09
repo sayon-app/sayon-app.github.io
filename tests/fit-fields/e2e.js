@@ -5,6 +5,10 @@
 // changes. "Where" boxes show only after the answer that calls for them, the
 // system name only once there's a system, the 25 mm and 75 mm zone checks only
 // after landscaping is a yes. The report prints the N/A answers.
+// Areas unable to be inspected: with nothing limited, one box in place of the
+// cards, Recheck later and Invasive, and an invasive "no" when every area was
+// clear. Advice: treatment type after a yes, the second opinion once there's a
+// treatment, and the common recommendations that fit the report first.
 // node e2e.js <outDir>  (serve the repo on :8765; jsPDF from tests/visual/setup.sh)
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2] || '/tmp/fit-fields'; fs.mkdirSync(OUT, { recursive: true });
@@ -138,6 +142,62 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
     return doc ? 'built' : 'none';
   }).catch(e => 'error ' + e.message);
   console.log('   pdf:', pdfText);
+
+  // 10. Areas unable to be inspected: nothing limited, one box; a limit brings the cards and groups in.
+  await p.evaluate(() => { resetReportState(); goStep('areas'); }); await p.waitForTimeout(300);
+  const access = () => p.evaluate(() => ({
+    fields: document.getElementById('accessFields').style.display !== 'none',
+    more: !document.getElementById('accessMore').hidden,
+    text: document.getElementById('accessMore').innerText.replace(/\s+/g, ' '),
+    recheck: !document.getElementById('fg-recheck').hidden,
+    invasive: !document.getElementById('fg-invasive').hidden,
+    inv: reportData.invasiveInspection ?? null,
+  }));
+  let a = await access();
+  check(!a.fields && a.more && !a.recheck && !a.invasive && /Fills in from the areas/.test(a.text), `areas not marked: one box, groups out of sight (${a.text})`);
+  await p.evaluate(() => { markRemainingAreasInspected(); markRemainingAreasClear(); }); await p.waitForTimeout(200);
+  a = await access();
+  check(!a.fields && /Every area inspected without limits/.test(a.text) && a.inv === 'NO' && /No invasive inspection/.test(a.text), `every area clear: invasive answered no, said in the box (${a.text})`);
+  await p.locator('#section-restrictions').screenshot({ path: `${OUT}/5-areas-clear.png` });
+  await p.evaluate(() => setAreaStatus('roofvoid', 'NOT')); await p.waitForTimeout(200);
+  a = await access();
+  check(a.fields && !a.more && a.recheck && a.invasive && a.inv === null, 'roof void not inspected: cards, recheck and invasive in, the invasive no taken back');
+  await p.evaluate(() => setAreaStatus('roofvoid', 'INSPECTED')); await p.waitForTimeout(200);
+  a = await access();
+  check(a.recheck && a.invasive && !a.fields, 'groups once shown stay shown; the cards go with the limit');
+  await p.evaluate(() => { resetReportState(); goStep('areas'); markRemainingAreasInspected(); markRemainingAreasClear(); }); await p.waitForTimeout(200);
+  await p.evaluate(() => showAccessGroup('invasive')); await p.waitForTimeout(200);
+  a = await access();
+  check(a.invasive && !a.recheck, '"Add it" brings in invasive on its own');
+  const pdfInv = await p.evaluate(() => reportData.invasiveInspection);
+  check(pdfInv === 'NO', 'the invasive no is stored, so the report prints it');
+
+  // 11. Advice: treatment type after a yes; second opinion with a treatment; lines that fit first.
+  await p.evaluate(() => { resetReportState(); goStep('recommendations'); }); await p.waitForTimeout(300);
+  const advice = () => p.evaluate(() => ({
+    type: document.getElementById('f-treatmentType').closest('.field').style.display !== 'none',
+    tt: reportData.treatmentType ?? null,
+    link: !document.getElementById('tpReportLink').hidden,
+    lines: [...document.querySelectorAll('#recLines .rec-line')].map(x => x.textContent.trim()),
+  }));
+  let v = await advice();
+  check(!v.type && !v.link && v.lines.length === 12, `nothing known: no type box, no second opinion, every line (${v.lines.length})`);
+  await edit('existingSystem', 'No System Found'); await edit('waterLeaks', 'YES'); await p.waitForTimeout(200);
+  v = await advice();
+  check(v.lines.join('|') === 'Install a system|Keep water away|Plumber for moisture|9 more', `no system and a leak: the lines that fit, then more (${v.lines.join('|')})`);
+  await edit('treatmentRecommended', 'NO'); await p.waitForTimeout(200);
+  v = await advice();
+  check(!v.type && v.tt === 'No treatment required at this time' && !v.link, 'no treatment: type filled and out of sight, no second opinion');
+  await edit('treatmentRecommended', 'YES'); await p.waitForTimeout(200);
+  v = await advice();
+  check(v.type && v.tt === '' && v.link && v.lines.includes('Client declined for now'), 'treatment yes: type box and second opinion show');
+  await p.evaluate(() => { toggleRecLine('plumber'); toggleRecLine('install'); toggleRecLine('install'); }); await p.waitForTimeout(100);
+  v = await advice();
+  check(v.lines.includes('Install a system') && v.lines.includes('Plumber for moisture'), 'a line taken off again stays where it was');
+  await p.evaluate(() => openMoreRecLines()); await p.waitForTimeout(100);
+  v = await advice();
+  check(v.lines.length === 12 && !v.lines.some(l => /more$/.test(l)), 'More shows every line');
+  await p.locator('#section-recommendations').screenshot({ path: `${OUT}/6-advice.png` });
 
   check(errs.length === 0, `no page errors ${errs.join(' | ')}`);
   await b.close();

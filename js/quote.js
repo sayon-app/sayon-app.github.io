@@ -1237,7 +1237,7 @@ function quoteFoldNotes(q) {
   return {
     details: !(q.client || '').trim() ? "Add the client's name" : !(q.clientEmail || '').trim() ? "Add the client's email" : '',
     work: !n ? 'Add a line' : starting ? `Check ${starting === 1 ? 'one price' : starting + ' prices'}` : '',
-    plan: quotePlanNote(q),
+    plan: n ? quotePlanNote(q) : '',   // no plan to set out until there's work
     terms: !(q.paymentTerms || '').trim() ? 'Add payment terms' : '',
   };
 }
@@ -1419,6 +1419,9 @@ function renderQuoteWorkSummary() {
   const n = q.items.length;
   setFoldNote(document.getElementById('quoteWorkFold'), sub, quoteFoldNotes(q).work);
   document.getElementById('quoteWorkTotal').textContent = n ? formatAUD(quoteTotals(q).total) : '';
+  // The treatment plan sets out how the work goes, so it waits for a line.
+  const planFold = document.getElementById('quotePlanFold');
+  if (planFold) planFold.hidden = !n;
 }
 
 // Explains the amber tag, only while a line still has one.

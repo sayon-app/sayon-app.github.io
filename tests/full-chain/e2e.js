@@ -100,8 +100,10 @@ let shotN = 0;
   if (await p.evaluate(() => document.getElementById('agreementOverlay').classList.contains('open'))) await tap(p.locator('#agreementOverlay .voice-popover-close'), 'close agreement');
 
   // 4. A typed note, filled by the canned AI.
+  // One tap opens the panel listening; a tap on the record button stops it, to type instead.
   await tap(p.locator('#micFab'), 'mic'); await p.waitForTimeout(1000); await shot('voice-open');
   console.log('after mic: popover open', await p.evaluate(() => document.getElementById('voicePopover').className), 'toasts', await toasts());
+  if (await p.evaluate(() => isRecording)) { await tap(p.locator('#voiceBtn'), 'stop listening'); await p.waitForTimeout(600); }
   await tap(p.locator('#transcriptBox'), 'transcript box');
   await p.keyboard.type('Pre-purchase single storey double brick house. Live termites in the gum tree out the back, about 15 metres from the house. Old workings on the rear bearer in the subfloor. Moisture 28 percent in the back room. Risk high.', { delay: 2 });
   await shot('note-typed');

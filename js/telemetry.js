@@ -152,7 +152,23 @@ const telemetryDeviceProps = telemetryDevice();
 
 // Records one step. Props must be names, counts, timings or yes/no, never
 // anything the inspector typed or said.
+// The last screen opened and the last few step names, kept on the phone
+// whether or not telemetry is on, for a problem report (js/crash-guard.js).
+let lastScreenViewed = '';
+let recentSteps = readJSONPref('korva_recent_steps');
+function rememberStep(event, props) {
+  if (event === 'screen_viewed' && props.screen) lastScreenViewed = props.screen;
+  if (event.startsWith('$')) return;
+  recentSteps.push(event === 'screen_viewed' && props.screen ? 'screen:' + props.screen : event);
+  if (recentSteps.length > 15) recentSteps.splice(0, recentSteps.length - 15);
+  writeTelemetryPref('korva_recent_steps', JSON.stringify(recentSteps));
+}
+function readJSONPref(key) {
+  try { const v = JSON.parse(readTelemetryPref(key) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+
 function track(event, props = {}) {
+  rememberStep(event, props);
   if (!telemetryEnabled) return;
   // Steps taken on the sample job are marked, so they can be left out of
   // counts of real work (reports sent, quotes sent).

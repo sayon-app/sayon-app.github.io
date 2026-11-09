@@ -1007,14 +1007,15 @@ function restoreSignaturePads() {
 // ── SAY IT INSTEAD ──────────────────────────────────────────────────────
 // The agreement and the treatment record can be spoken as well as typed:
 // a "Say it instead" button at the top of each sheet records one note,
-// Whisper hears it (or the phone's own speech when Whisper can't be
-// reached), and a short AI call fills the sheet's boxes from it. Every box
+// Whisper hears it phrase by phrase (or the phone's own speech when Whisper
+// can't be reached), "Stop Sayon" or a tap ends it, and a short AI call
+// fills the sheet's boxes from it. Every box
 // stays editable, and a box the note doesn't mention is left as it was.
 // SHEET_VOICE[kind] = { box, prompt(), apply(fields) }; the prompts live
 // with their sheets (agreement below, treatment in js/treatment.js, bait
 // station visits in js/bait.js).
 const SHEET_VOICE_MAX_MS = 180000;
-let sheetVoice = null;   // { kind, recorder, stream, chunks, recognition, text, timer }
+let sheetVoice = null;   // { kind, text, timer } and either { sink, queue } (Whisper) or { recognition, finals }
 
 function sheetVoiceKinds() {
   return {
@@ -1032,7 +1033,7 @@ function setSheetVoiceState(kind, state, text) {
   box.dataset.state = state;
   const idle = k.idle || 'Say it instead';
   const label = box.querySelector('.sheet-voice-label');
-  if (label) label.textContent = { idle, listening: 'Listening… tap to stop', hearing: 'Hearing it…', filling: 'Filling it in…' }[state] || idle;
+  if (label) label.textContent = { idle, listening: 'Listening… say "stop Sayon" or tap', hearing: 'Hearing it…', filling: 'Filling it in…' }[state] || idle;
   const btn = box.querySelector('.sheet-voice-btn');
   if (btn) btn.disabled = state === 'hearing' || state === 'filling';
   const said = box.querySelector('.sheet-voice-text');
@@ -1044,34 +1045,53 @@ function toggleSheetVoice(kind) {
   if (isRecording) { showToast('Stop the report recording first', 'error'); return; }
   if (!navigator.onLine) { showToast('Needs a signal to fill it in. Type it for now', 'error'); return; }
   if (!authSession?.access_token) { showToast('Sign in first', 'error'); return; }
-  const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
-  if (!isNative && !whisperOff && isAudioCaptureSupported()) startSheetRecorder(kind);
+  if (canUseWhisperListening()) startSheetRecorder(kind);
   else startSheetRecognition(kind);
 }
 
-async function startSheetRecorder(kind) {
-  sheetVoice = { kind, chunks: [] };
+// Online, the Say box listens the way the report does: each phrase goes to
+// Whisper at a pause and its words show under the button as they come, so
+// "Stop Sayon" can end it hands-free, the same as on the report.
+function startSheetRecorder(kind) {
+  const v = sheetVoice = { kind, queue: [], text: '' };
   setSheetVoiceState(kind, 'listening', '');
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-    if (!sheetVoice || sheetVoice.kind !== kind) { stream.getTracks().forEach(t => t.stop()); return; }
-    const type = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
-    const recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
-    recorder.ondataavailable = e => { if (e.data && e.data.size) sheetVoice && sheetVoice.chunks.push(e.data); };
-    recorder.onstop = () => {
-      stream.getTracks().forEach(t => t.stop());
-      const v = sheetVoice;
-      if (!v) return;
-      const blob = new Blob(v.chunks, { type: recorder.mimeType || 'audio/webm' });
-      sheetVoiceHear(kind, blob);
-    };
-    Object.assign(sheetVoice, { stream, recorder, timer: setTimeout(stopSheetVoice, SHEET_VOICE_MAX_MS) });
-    recorder.start(1000);
-  } catch (e) {
+  v.sink = {
+    queue: v.queue,
+    live: () => sheetVoice === v && !v.stopping,
+    context: () => v.text,
+    pending: () => { if (sheetVoice === v && !v.stopping) setSheetVoiceState(kind, 'listening', v.text + (v.queue.length ? '…' : '')); },
+    apply: () => sheetPhrasesIn(v),
+    // Whisper gave up on a phrase: like the report, the phone's own speech
+    // is used from the next listen on.
+    failed: status => { whisperOff = true; showToast(status === 429 ? 'This month\'s AI fills are used up. The last few words were missed' : 'The last few words were missed. Say them again, or type them', 'info'); },
+  };
+  // Started inside the tap, before any await, so an iPhone lets it record.
+  startWhisperListening(v.sink).catch(() => false).then(ok => {
+    if (ok) { if (sheetVoice === v && !v.stopping) v.timer = setTimeout(stopSheetVoice, SHEET_VOICE_MAX_MS); return; }
+    if (sheetVoice !== v) return;
     sheetVoice = null;
     setSheetVoiceState(kind, 'idle');
     showToast('Microphone not allowed. Check the microphone permission', 'error');
+  });
+}
+
+// Whisper's phrases, in the order spoken. "Stop Sayon" ends the listening;
+// once every phrase is back the words fill the sheet.
+function sheetPhrasesIn(v) {
+  if (v.cancelled) return;
+  while (v.queue.length && v.queue[0].done) {
+    let text = correctKnownMishearings((v.queue.shift().text || '').trim());
+    if (!text || WHISPER_NOISE_RE.test(text) || v.heardStop) continue;
+    const stopAt = text.search(VOICE_STOP_LIVE_RE);
+    if (stopAt >= 0) text = text.slice(0, stopAt).trim();
+    if (text) v.text = (v.text + ' ' + text).trim();
+    if (stopAt >= 0) { v.heardStop = true; playTone(440, 200, 0.2); stopSheetVoice(); }
   }
+  if (!v.stopping) { v.sink.pending(); return; }
+  if (v.queue.length || !v.released || v.finished) return;
+  v.finished = true;
+  if (sheetVoice === v) sheetVoice = null;
+  sheetVoiceFill(v.kind, v.text);
 }
 
 function startSheetRecognition(kind) {
@@ -1088,7 +1108,11 @@ function startSheetRecognition(kind) {
       else interim += e.results[i][0].transcript;
     }
     sheetVoice.text = (sheetVoice.finals + interim).trim();
+    // "Stop Sayon" ends it, as on the report.
+    const stopAt = sheetVoice.text.search(VOICE_STOP_LIVE_RE);
+    if (stopAt >= 0) sheetVoice.text = sheetVoice.text.slice(0, stopAt).trim();
     setSheetVoiceState(kind, 'listening', sheetVoice.text);
+    if (stopAt >= 0 && !sheetVoice.stopping) { playTone(440, 200, 0.2); stopSheetVoice(); }
   };
   recognition.onerror = () => {};
   recognition.onend = () => {
@@ -1103,9 +1127,15 @@ function startSheetRecognition(kind) {
 
 function stopSheetVoice() {
   const v = sheetVoice;
-  if (!v) return;
+  if (!v || v.stopping) return;
   clearTimeout(v.timer);
-  if (v.recorder) { if (v.recorder.state !== 'inactive') v.recorder.stop(); return; }
+  if (v.sink) {
+    // The last phrase is still sent; it fills once every phrase is back.
+    v.stopping = true;
+    setSheetVoiceState(v.kind, 'hearing', v.text);
+    stopWhisperListening().then(() => { v.released = true; sheetPhrasesIn(v); });
+    return;
+  }
   if (v.recognition) { v.stopping = true; try { v.recognition.stop(); } catch (e) { sheetVoice = null; sheetVoiceFill(v.kind, v.text); } }
 }
 
@@ -1115,30 +1145,9 @@ function cancelSheetVoice(kind) {
   if (!v || v.kind !== kind) { setSheetVoiceState(kind, 'idle', ''); return; }
   sheetVoice = null;
   clearTimeout(v.timer);
-  try { if (v.recorder && v.recorder.state !== 'inactive') { v.recorder.onstop = null; v.recorder.stop(); } } catch (e) {}
-  if (v.stream) v.stream.getTracks().forEach(t => t.stop());
+  if (v.sink) { v.cancelled = true; if (!v.stopping) stopWhisperListening(); }
   try { if (v.recognition) { v.recognition.onend = null; v.recognition.abort(); } } catch (e) {}
   setSheetVoiceState(kind, 'idle', '');
-}
-
-async function sheetVoiceHear(kind, blob) {
-  sheetVoice = null;
-  setSheetVoiceState(kind, 'hearing');
-  try {
-    const form = new FormData();
-    const ext = blob.type.includes('mp4') ? 'mp4' : blob.type.includes('ogg') ? 'ogg' : 'webm';
-    form.append('audio', blob, `note.${ext}`);
-    form.append('initial_prompt', buildTranscriptionVocabHint().slice(-1000));
-    const res = await workerFetch('/transcribe', { method: 'POST', body: form });
-    if (res.status === 502 && /no text/i.test(await res.clone().text().catch(() => ''))) { setSheetVoiceState(kind, 'idle', ''); showToast('Didn\'t catch anything. Try again closer to the phone', 'info'); return; }
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    const text = correctKnownMishearings(typeof data?.transcript === 'string' ? data.transcript.trim() : '');
-    sheetVoiceFill(kind, text);
-  } catch (e) {
-    setSheetVoiceState(kind, 'idle', '');
-    showToast('Couldn\'t hear that one. Try again, or type it', 'error');
-  }
 }
 
 async function sheetVoiceFill(kind, text) {

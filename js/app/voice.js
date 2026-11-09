@@ -765,7 +765,10 @@ function whisperShowPending() {
 }
 
 // Returns true when Whisper listening started; false means use Web Speech.
-async function startWhisperListening() {
+// sink: where the phrases go when it isn't the report's note box (a Say box
+// passes { queue, live(), context(), pending(), apply(), failed(status) });
+// the report's own listening passes none.
+async function startWhisperListening(sink = null) {
   const Ctx = window.AudioContext || window.webkitAudioContext;
   // Made inside the tap, before any await, so iPhone lets it run.
   const ctx = new Ctx();
@@ -777,7 +780,7 @@ async function startWhisperListening() {
     console.warn('Whisper listening: no mic stream, using the phone\'s speech instead:', err && err.message);
     return false;
   }
-  if (!isRecording) { stream.getTracks().forEach(t => t.stop()); try { ctx.close(); } catch (e) {} return true; }
+  if (sink ? !sink.live() : !isRecording) { stream.getTracks().forEach(t => t.stop()); try { ctx.close(); } catch (e) {} return true; }
   try { await ctx.resume(); } catch (e) {}
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 1024;
@@ -785,7 +788,7 @@ async function startWhisperListening() {
   const s = whisper = {
     ctx, stream, analyser, buf: new Float32Array(analyser.fftSize),
     recorder: null, chunks: [], startedAt: 0, speechMs: 0, quietMs: 0,
-    floor: 0.01, epoch: voiceJobEpoch, timer: null,
+    floor: 0.01, epoch: voiceJobEpoch, timer: null, sink,
   };
   whisperNewSegment(s);
   s.timer = setInterval(() => whisperTick(s), WHISPER_POLL_MS);
@@ -815,7 +818,7 @@ function whisperTick(s) {
     s.quietMs += WHISPER_POLL_MS;
     s.floor = s.floor * 0.95 + rms * 0.05; // follows the background noise
   }
-  if (s.speechMs >= WHISPER_MIN_SPEECH_MS && s.speechMs < WHISPER_MIN_SPEECH_MS + WHISPER_POLL_MS) whisperShowPending();
+  if (s.speechMs >= WHISPER_MIN_SPEECH_MS && s.speechMs < WHISPER_MIN_SPEECH_MS + WHISPER_POLL_MS) (s.sink ? s.sink.pending() : whisperShowPending());
   const age = Date.now() - s.startedAt;
   // Someone reading straight through barely pauses, so a long phrase ends
   // at the next breath rather than being cut mid-word at the limit.
@@ -829,33 +832,33 @@ function whisperCutSegment(s, last) {
   const rec = s.recorder, chunks = s.chunks, hadSpeech = s.speechMs >= WHISPER_MIN_SPEECH_MS;
   if (!rec) return Promise.resolve();
   if (!last) whisperNewSegment(s);
-  const entry = hadSpeech ? { text: null, done: false, epoch: s.epoch } : null;
-  if (entry) whisperQueue.push(entry);
+  const entry = hadSpeech ? { text: null, done: false, epoch: s.epoch, sink: s.sink } : null;
+  if (entry) (s.sink ? s.sink.queue : whisperQueue).push(entry);
   const finished = new Promise(resolve => {
     rec.onstop = () => resolve(chunks.length ? new Blob(chunks, { type: rec.mimeType || 'audio/mp4' }) : null);
     try { rec.stop(); } catch (e) { resolve(null); }
   });
   if (!entry) return finished;
-  whisperShowPending();
+  if (s.sink) s.sink.pending(); else whisperShowPending();
   return finished.then(blob => whisperSend(entry, blob, 0));
 }
 
 async function whisperSend(entry, blob, tries) {
-  if (!blob) { entry.done = true; whisperApply(); return; }
+  if (!blob) { entry.done = true; whisperDone(entry); return; }
   try {
     const form = new FormData();
     const ext = blob.type.includes('mp4') ? 'mp4' : blob.type.includes('ogg') ? 'ogg' : 'webm';
     form.append('audio', blob, `phrase.${ext}`);
     // The words just before help Whisper with the next phrase.
-    const context = currentTranscript.trim().slice(-300);
+    const context = (entry.sink ? entry.sink.context() : currentTranscript).trim().slice(-300);
     form.append('initial_prompt', (buildTranscriptionVocabHint() + ' Say "Stop Sayon" to finish.' + (context ? ' ' + context : '')).slice(-1000));
     const res = await workerFetch('/transcribe', { method: 'POST', body: form });
-    if (res.status === 502 && /no text/i.test(await res.text().catch(() => ''))) { entry.text = ''; entry.done = true; whisperApply(); return; } // nothing heard
+    if (res.status === 502 && /no text/i.test(await res.text().catch(() => ''))) { entry.text = ''; entry.done = true; whisperDone(entry); return; } // nothing heard
     if (!res.ok) { const err = new Error('HTTP ' + res.status); err.status = res.status; throw err; }
     const data = await res.json();
     entry.text = typeof data?.transcript === 'string' ? data.transcript.trim() : '';
     entry.done = true;
-    whisperApply();
+    whisperDone(entry);
   } catch (err) {
     const status = err && err.status;
     if (!status && tries < 20) {
@@ -874,10 +877,16 @@ async function whisperSend(entry, blob, tries) {
     }
     console.warn('Whisper listening failed, using the phone\'s speech instead:', err && err.message);
     entry.text = ''; entry.done = true;
-    whisperApply();
+    whisperDone(entry);
     // The phrase that failed is lost, so say so: the inspector can repeat it.
+    if (entry.sink) { entry.sink.failed(status); return; }
     whisperFallBack(status === 429 ? 'This month\'s AI fills are used up. The last few words were missed, so say them again' : 'The last few words were missed. Say them again, the phone\'s own speech is listening now');
   }
+}
+
+// A phrase back from Whisper goes to whoever was listening for it.
+function whisperDone(entry) {
+  if (entry.sink) entry.sink.apply(); else whisperApply();
 }
 
 // Adds finished phrases to the transcript in the order they were spoken.
@@ -958,6 +967,7 @@ function driveWave(on) {
 }
 
 function startRecording() {
+  if (typeof sheetVoice !== 'undefined' && sheetVoice) { showToast('Finish the Say box first', 'error'); return; }
   const SR = getSpeechRecognitionCtor();
   const useWhisper = canUseWhisperListening();
   if (!SR && !useWhisper) { showToast('Speech recognition isn\'t supported here. Tap the transcript box to type instead', 'error'); return; }

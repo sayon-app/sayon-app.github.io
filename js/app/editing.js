@@ -846,13 +846,16 @@ function updateProgress() {
     if (!dot) return;
     const states = st.sections.map(s => secState[s]).filter(Boolean);
     const counted = st.id === 'finish' ? states.slice(1) : states; // other photos are optional
-    dot.className = counted.every(v => v === 'done') ? 'tab-dot done' : states.some(v => v !== 'empty') ? 'tab-dot partial' : 'tab-dot';
+    // A report marked done (or a completed job) ticks every step: the
+    // inspector has said it's finished, so nothing reads as half done.
+    dot.className = isReportDone() || counted.every(v => v === 'done') ? 'tab-dot done' : states.some(v => v !== 'empty') ? 'tab-dot partial' : 'tab-dot';
   });
   renderFieldGroups();
 
   // A completed (locked) job reads Complete whatever the count says.
   const locked = isReportLocked();
-  const pct = locked ? 100 : Math.round((filled / total) * 100);
+  const done = isReportDone();
+  const pct = locked || done ? 100 : Math.round((filled / total) * 100);
   document.getElementById('progressFill').style.width = pct + '%';
   document.getElementById('generateBtn').disabled = filled === 0 && !locked;
   document.getElementById('shareBtn').disabled = filled === 0 && !locked;
@@ -864,23 +867,95 @@ function updateProgress() {
     const offset = circumference - (pct / 100) * circumference;
     ringFill.style.strokeDashoffset = offset;
     ringFill.classList.toggle('complete', pct === 100);
-    ringText.textContent = locked ? '✓' : pct + '%';
+    ringText.textContent = locked || done ? '✓' : pct + '%';
     const wrap = ringFill.closest('.progress-ring-wrap');
     if (wrap) {
-      wrap.classList.toggle('locked', locked);
-      wrap.title = locked ? 'Job complete' : `Report ${pct}% complete (required fields)`;
+      wrap.classList.toggle('locked', locked || done);
+      wrap.title = locked ? 'Job complete' : done ? 'Report done' : `Report ${pct}% complete (required fields)`;
       wrap.setAttribute('aria-label', wrap.title);
     }
     const label = document.getElementById('progressRingLabel');
-    if (label) label.style.display = locked ? '' : 'none';
+    if (label) { label.style.display = locked || done ? '' : 'none'; label.textContent = locked ? 'Complete' : 'Done'; }
   }
-  syncDockReport(pct, locked);
+  renderFinishNext();
+  renderReportJobCard();
+  syncDockReport(pct, locked || done);
   syncDockJobs();
   renderDocStrips();
   syncNothingFoundButtons();
   syncFindingsGroups();
   syncAccessGroups();
   syncRecLines();
+}
+
+// ── REPORT DONE ───────────────────────────────────────────────────────────
+// The inspector says the report is finished: reportData.doneAt. Every step
+// then reads done, the header and the dock show a tick, and the job moves
+// on to the quote or sending. It's a mark, not a lock: the report can still
+// be changed, and "Keep working on it" takes the mark off. Sending or
+// completing the job counts as done too.
+function isReportDone() {
+  return !!(reportData.doneAt || reportData.sent || reportData.issue);
+}
+
+function setReportDone(on) {
+  if (isReportLocked()) return;
+  if (on) reportData.doneAt = Date.now(); else delete reportData.doneAt;
+  if (document.getElementById('jobAddress').value.trim()) saveCurrentReport(true); else saveDraft();
+  updateProgress();
+  if (on) {
+    showToast('Report done', 'success');
+    track('report_marked_done', {});
+    const next = document.getElementById('finishNext');
+    if (next) next.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+}
+
+// The Finish step's end: Report done until it's ticked, then one big
+// button for the next step (the quote while the report recommends a
+// treatment and there's none yet, else sending) and the rest quiet.
+function renderFinishNext() {
+  const doneBtn = document.getElementById('reportDoneBtn');
+  if (!doneBtn || typeof quoteHasItems !== 'function') return;
+  const done = isReportDone(), locked = isReportLocked();
+  const q = currentJobQuote(), hasQuote = quoteHasItems(q);
+  const wantsQuote = reportData.treatmentRecommended === 'YES' && !reportData.noQuoteNeeded;
+  const sent = reportData.sent;
+  doneBtn.hidden = done;
+  document.getElementById('finishDone').hidden = !done;
+  const at = reportData.doneAt || (reportData.issue && reportData.issue.completedAt) || (sent && sent.at);
+  document.getElementById('finishDoneWhen').textContent = locked ? 'Job complete and locked' : sent ? `Sent ${formatIssueDate(sent.at)}` : at ? `Ticked off ${formatIssueDate(at)}` : '';
+  // Only a plain mark comes off; a sent or completed report stays done.
+  document.getElementById('finishDoneUndo').hidden = !reportData.doneAt || !!sent || !!reportData.issue;
+  document.getElementById('finishNextLabel').hidden = !done;
+  const quoteBtn = document.getElementById('finishQuoteBtn');
+  const shareBtn = document.getElementById('shareBtn');
+  quoteBtn.hidden = !done || !(hasQuote || wantsQuote);
+  shareBtn.hidden = !done;
+  document.getElementById('finishQuoteTitle').textContent = hasQuote ? 'Open the quote' : 'Write the quote';
+  document.getElementById('finishQuoteSub').textContent = hasQuote ? (q.sentAt ? 'Sent ' + formatIssueDate(q.sentAt) : 'Check it before it goes') : 'Starts from what the report found';
+  document.getElementById('shareTitle').textContent = sent ? 'Send it again' : 'Send to client';
+  document.getElementById('shareSub').textContent = sent ? 'Only if something changed since it went' : hasQuote ? 'Check the report, then email it with the quote' : 'Check the report, then email it';
+  // One big button: the quote first when it's still to write, else Send.
+  // Once it has gone, nothing shouts.
+  const quoteFirst = wantsQuote && !hasQuote;
+  quoteBtn.classList.toggle('primary', done && quoteFirst);
+  shareBtn.classList.toggle('primary', done && !quoteFirst && !sent);
+  if (quoteFirst) quoteBtn.after(shareBtn); else shareBtn.after(quoteBtn);
+}
+
+// The Property step's Job details card: the address and client, then the
+// inspection type, day and time. A tap goes back to edit them.
+function renderReportJobCard() {
+  const sub = document.getElementById('reportJobSub');
+  if (!sub) return;
+  const v = id => ((document.getElementById(id) || {}).value || '').trim();
+  const when = v('jobInspectionDate') ? new Date(v('jobInspectionDate') + 'T00:00:00') : null;
+  const line1 = [getFullAddress(), v('jobClient')].filter(Boolean).join(' · ');
+  const line2 = [v('jobInspectionType').split(' — ')[0],
+    when && !isNaN(when) ? when.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }) : '',
+    v('jobInspectionTime') ? formatClockTime(v('jobInspectionTime')) : ''].filter(Boolean).join(' · ');
+  sub.textContent = [line1, line2].filter(Boolean).join('\n') || 'Add the address, client and booking';
 }
 
 // ── SIGNATURE PADS ──────────────────────────────────────────────────────

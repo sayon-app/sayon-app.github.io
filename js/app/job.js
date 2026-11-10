@@ -238,8 +238,9 @@ function renderJobPage() {
   // No street address yet: a new job, still being filled in.
   const isNew = !(document.getElementById('jobAddress').value || '').trim();
   const steps = jobPageSteps(j);
-  // Before the agreement is signed, that is the next step.
-  const next = !reportData.agreement && addr ? { status: 'Get the agreement signed', hint: 'The client signs it before the inspection starts.', next: { label: 'Open the agreement', to: 'agreement' } }
+  // Before the agreement is signed, that is the next step. Once its link
+  // has gone, the job is waiting on the client and the card says so.
+  const next = !reportData.agreement && addr ? agreementNext(reportData, j.r.client)
     : j.finished && !reportData.jobPdfAt && typeof jobPdfSectionHTML === 'function' ? {
         status: 'Finalise the job',
         hint: j.onlyReportUnsent
@@ -251,6 +252,8 @@ function renderJobPage() {
   // the treatment and bait steps with it.
   const skipLink = j.status === 'Write the quote' ? '<button type="button" onclick="setClientNotGoingAhead(true)">Client isn\'t going ahead</button>'
     : j.clientNotGoingAhead && !quoteHasItems(j.q) ? '<button type="button" onclick="setClientNotGoingAhead(false)">Write a quote after all</button>' : '';
+  // Waiting on the client to sign: ask now instead of opening the agreement to find out.
+  const waitLinks = next.sent ? '<button type="button" onclick="checkAgreementLink(true)">Check now</button><button type="button" onclick="sendAgreementLinkOn()">Send again</button>' : '';
 
   const done = steps.filter(st => st.state === 'done' || st.state === 'skip').length;
   // What the job is and when, over the address.
@@ -332,17 +335,17 @@ function renderJobPage() {
       ${addr ? `<div class="job-progress" aria-hidden="true">${steps.map(st => `<i class="${st.state}"></i>`).join('')}</div>` : ''}
       ${actions ? `<div class="job-acts">${actions}</div>` : ''}
     </div>
-    <section class="dash-next job-next ${j.group}">
+    <section class="dash-next job-next ${next.sent ? 'waiting' : j.group}">
       <div class="job-next-head">
         <span class="job-tile ${j.group === 'done' && addr && !next.next ? 'done' : 'now'}" aria-hidden="true">${jobIcon(nextIcon, 22)}</span>
         <div>
-          <div class="dash-next-label">${next.next ? 'Next step' : addr ? 'Where it\'s at' : 'Next step'}</div>
+          <div class="dash-next-label">${next.next && !next.sent ? 'Next step' : addr ? 'Where it\'s at' : 'Next step'}</div>
           <div class="dash-next-title">${escapeHtml(next.status)}</div>
         </div>
       </div>
       ${next.hint ? `<p class="dash-next-hint">${escapeHtml(next.hint)}</p>` : ''}
       ${next.next ? `<button type="button" class="dash-detail-primary" onclick="jobGo('${next.next.to}')">${next.next.label}</button>` : ''}
-      ${skipLink ? `<div class="dash-detail-links">${skipLink}</div>` : ''}
+      ${waitLinks || skipLink ? `<div class="dash-detail-links">${waitLinks || skipLink}</div>` : ''}
     </section>
     ${stepsHTML}
     ${typeof jobPdfSectionHTML === 'function' ? jobPdfSectionHTML(j) : ''}
@@ -455,7 +458,7 @@ function syncDockReport(pct, locked) {
   badge.closest('.tab').setAttribute('aria-label', done ? 'This job, report done' : `This job, report ${n}% filled in`);
 }
 
-// Dashboard: how many jobs need the inspector. Quote: a dot in the colour of
+// Jobs: how many need the inspector today. Quote: a dot in the colour of
 // where this job's quote is up to. Read from storage, so it waits for a
 // quiet moment instead of running on every keystroke.
 let dockJobsTimer = 0;
@@ -464,12 +467,13 @@ function syncDockJobs() {
   dockJobsTimer = setTimeout(() => {
     try {
       const quotes = getSavedQuotes();
-      const need = getSavedReports().map(r => dashboardJob(r, quotes)).filter(j => j.group === 'todo').length;
+      // The number in the Jobs headline: today's, not what's booked for later.
+      const need = jobsNeedingYou(getSavedReports().map(r => dashboardJob(r, quotes))).today;
       const count = document.getElementById('tabJobsCount');
       if (count) {
         count.textContent = need > 9 ? '9+' : String(need);
         count.hidden = !need;
-        count.closest('.tab').setAttribute('aria-label', need ? `Dashboard, ${need} job${need === 1 ? '' : 's'} need you` : 'Dashboard');
+        count.closest('.tab').setAttribute('aria-label', need ? `Jobs, ${need} need${need === 1 ? 's' : ''} you today` : 'Jobs');
       }
       const dot = document.getElementById('tabQuoteDot');
       if (dot) {
@@ -490,6 +494,15 @@ function syncDockJobs() {
 function tabMic() {
   // While it listens, Talk reads Stop: a tap stops the recording.
   if (isRecording) { toggleRecording(); return; }
+  // From Jobs or the menu, the mic is for the job the dock names beside
+  // it. A report that's already done isn't added to by a stray tap: the
+  // job opens instead, and the report is one more tap for whoever means it.
+  if (['dashboardOverlay', 'sidebarPanel'].some(id => document.getElementById(id).classList.contains('open')) && isReportDone()) {
+    const street = document.getElementById('jobAddress').value.trim();
+    tabGo('job');
+    showToast(`The report for ${street || 'this job'} is done, so the mic didn't start`, 'info', { label: 'Open report', run: () => tabGo('report') });
+    return;
+  }
   const popover = document.getElementById('voicePopover');
   const onReport = document.getElementById('app').style.display === 'flex'
     && !['quoteScreen', 'sidebarPanel', 'dashboardOverlay', 'jobOverlay'].some(id => document.getElementById(id).classList.contains('open'));
@@ -571,6 +584,9 @@ function updateJob() {
   const headerJob = document.getElementById('headerJob');
   headerJob.textContent = addr || 'No job loaded';
   headerJob.classList.toggle('has-job', !!addr);
+  // The dock names the open job by its street while Jobs or the menu is on show.
+  const street = document.getElementById('tabJobStreet');
+  if (street) street.textContent = document.getElementById('jobAddress').value.trim();
   if (typeof renderReportJobCard === 'function') renderReportJobCard();
   document.getElementById('reportSubtitle').textContent = addr
     ? `${addr} · Speak to populate fields`

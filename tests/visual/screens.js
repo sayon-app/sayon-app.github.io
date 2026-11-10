@@ -55,7 +55,6 @@ const probe = () => {
       ['20-drawer', 'openAccountMenu()', 'toggleDrawer()'],
       ['20b-job', "tabGo('job')", "tabGo('report')"],
       ['21-job-panel', "toggleDrawer(); openMenuPage('jobPanel')", "showMenuPage(null); toggleDrawer()"],
-      ['22-saved', "toggleDrawer(); openMenuPage('savedPanel')", "showMenuPage(null); toggleDrawer()"],
       ['23-settings', "toggleDrawer(); openMenuPage('settingsPanel')", "showMenuPage(null); toggleDrawer()"],
       ['24-billing', "toggleDrawer(); openMenuPage('billingPanel')", "showMenuPage(null); toggleDrawer()"],
       ['25-agreement', 'openAgreementSheet()', 'closeAgreementSheet()'],

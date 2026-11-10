@@ -59,6 +59,8 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 
 `tests/visual/jobs-list.js <outDir> [width]` builds a business with six made-up jobs at different stages (a report under way, one to quote, a quote waiting, one accepted, one treated, one declined) and shoots each tab, a job's sheet and a brand-new business's empty list. `MODES=light,dark` adds dark. Before and after shots are in `docs/screenshots/jobs-list/`.
 
+`tests/jobs-list/e2e.js <outDir>` checks what the list says: the headline counts today's jobs (and says what's booked for later and which re-inspections are overdue), To do runs earlier, today, coming up with a booking's time on its card, an agreement whose link is out says when it went and who it waits on, opening Jobs asks about every link that's out in one request and a signed agreement or answered quote moves its job, a clash copy and a job the account doesn't hold are tagged, the dock names the open job by its street on Jobs and its mic won't record into a finished report, and deleting says "Job deleted".
+
 ## New job
 
 `tests/visual/new-job.js <outDir> [width]` taps New job on the Jobs list and types a job in by hand, checking on the way: the job page opens empty with the address ready to type and today's date, the page shows the address as it's typed, a postcode fills in the state (but not over one picked by hand), Open the agreement with no address asks for one, Save it for later puts the job on the Jobs list, and once saved the job page leads with the agreement. It shoots the empty page, the filled-in page, the Jobs list and the saved job's page. `MODES=light,dark` adds dark shots of the empty page. Before and after shots are in `docs/screenshots/new-job/`.

@@ -20,6 +20,7 @@ function openDashboard() {
     const fallback = ['waiting', 'done'].find(g => dashboardJobs.some(j => j.group === g));
     if (fallback) setDashboardTab(fallback);
   }
+  checkLinksOut();
 }
 
 // Opens the open job's details, on its page.
@@ -28,8 +29,19 @@ function openJobDetails() {
   jobGo('details');
 }
 
+// A job changed somewhere else (a save, a sync, a delete, a client's
+// answer): the list and the headline are read again. The tab and what's
+// typed in the search box stay as they are.
 function refreshDashboardIfOpen() {
-  if (document.getElementById('dashboardOverlay').classList.contains('open')) renderDashboard();
+  if (!document.getElementById('dashboardOverlay').classList.contains('open')) return;
+  if (!document.getElementById('dashboardJobs')) { renderDashboard(); return; }
+  readDashboardJobs();
+  renderDashboardJobs();
+}
+// The same, with the dock's count of jobs that need the inspector.
+function refreshJobsList() {
+  refreshDashboardIfOpen();
+  syncDockJobs();
 }
 
 function closeDashboard() {
@@ -53,12 +65,28 @@ function parkJobPanel() {
   if (panel && home && panel.parentNode !== home) home.appendChild(panel);
 }
 
-// The day a job belongs to: its inspection date, else when it was saved.
+// When a job is: its inspection date, at the time it's booked for, else
+// when it was saved.
 function dashboardJobTime(r) {
   const d = r.reportData || {};
   const iso = d.jobInspectionDate || (d.agreement && d.agreement.inspectionDate);
   const t = iso ? new Date(iso + 'T00:00:00').getTime() : NaN;
-  return isNaN(t) ? r.savedAt : t;
+  if (isNaN(t)) return r.savedAt;
+  const at = /^(\d{1,2}):(\d{2})/.exec(String(d.jobInspectionTime || ''));
+  return t + (at ? (+at[1] * 60 + +at[2]) * 60000 : 0);
+}
+// How many days from today a time is: 0 today, 1 tomorrow, -1 yesterday.
+function dashDaysAway(ts) {
+  const day = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  return Math.round((day(ts) - day(Date.now())) / 864e5);
+}
+// The jobs that are the inspector's move, split the way the headline and
+// the dock count them: today's (with anything still open from an earlier
+// day) and those booked for a later day.
+function jobsNeedingYou(jobs) {
+  const todo = jobs.filter(j => j.group === 'todo');
+  const later = todo.filter(j => dashDaysAway(j.time) > 0).length;
+  return { today: todo.length - later, later };
 }
 
 const dashDate = (ts) => new Date(ts).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
@@ -209,8 +237,7 @@ function setDashboardTab(tab) {
 // When a job is, as an inspector says it: Today, Yesterday, Tomorrow, the
 // weekday within the week, else the date.
 function dashWhen(ts) {
-  const day = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
-  const n = Math.round((day(ts) - day(Date.now())) / 864e5);
+  const n = dashDaysAway(ts);
   if (n === 0) return 'Today';
   if (n === -1) return 'Yesterday';
   if (n === 1) return 'Tomorrow';
@@ -218,13 +245,34 @@ function dashWhen(ts) {
   return dashDate(ts);
 }
 
-// A job's next step on the Jobs list and its sheet. Before the report's
-// under way, the agreement comes first, as on the job page.
+// Before the report's under way, the agreement comes first. Once its link
+// has gone, the job is waiting on the client and says so, with the day it
+// went (sent: true).
+function agreementNext(d, client) {
+  const sent = !d.agreement && d.agreementRequest;
+  if (!sent) return { status: 'Get the agreement signed', hint: 'The client signs it before the inspection starts.', next: { label: 'Open the agreement', to: 'agreement' } };
+  const who = String(sent.signerName || client || '').trim().split(/\s+/)[0] || 'the client';
+  return { status: `Agreement sent ${dashDate(sent.emailedAt || sent.sentAt)}, waiting on ${who}`, sent: true,
+    hint: 'It shows as signed here once they sign. They can still sign on this phone instead.',
+    next: { label: 'Open the agreement', to: 'agreement' } };
+}
+
+// A job's next step on the Jobs list, as on the job page: the agreement
+// first, until it's signed.
 function dashNext(j) {
   const d = j.r.reportData || {};
   return j.group === 'todo' && !d.agreement && j.status === 'Finish the report'
-    ? { status: 'Get the agreement signed', hint: 'The client signs it before the inspection starts.', next: { label: 'Open the agreement', to: 'agreement' } }
+    ? agreementNext(d, j.r.client)
     : { status: j.status, hint: j.hint, next: j.next };
+}
+
+// The day in the card's corner. A booking still to come carries its time
+// ("Tomorrow 9am"), once the job has one.
+function dashCardWhen(j) {
+  const day = dashWhen(j.time);
+  const at = /^(\d{1,2}):(\d{2})/.exec(String((j.r.reportData || {}).jobInspectionTime || ''));
+  if (!at || j.group !== 'todo' || dashDaysAway(j.time) < 0) return day;
+  return `${day} ${(+at[1] % 12) || 12}${at[2] === '00' ? '' : ':' + at[2]}${+at[1] < 12 ? 'am' : 'pm'}`;
 }
 
 // One job on the Jobs list: the street big and the suburb under it, the
@@ -240,12 +288,18 @@ function dashCardHTML(j) {
   const suburb = cut > 0 ? addr.slice(cut + 2) : '';
   const next = dashNext(j);
   const declined = j.group === 'done' && /declined|not going ahead/i.test(j.status);
-  const tile = j.group === 'todo' ? ['now', next.next ? next.next.to : 'report']
+  const tile = j.group === 'todo' ? [next.sent ? 'wait' : 'now', next.next ? next.next.to : 'report']
     : j.group === 'waiting' ? ['wait', 'clock'] : declined ? ['', 'answer'] : ['done', 'tick'];
-  const sub = [j.r.client, j.group !== 'todo' ? j.status : ''].filter(Boolean);
+  // The client, then where the job is up to, which stays in one piece when
+  // the line is too long for the card.
+  const sub = [j.r.client ? `<span>${escapeHtml(j.r.client)}</span>` : '', j.group !== 'todo' ? `<span class="dash-card-status">${escapeHtml(j.status)}</span>` : ''].join('');
   const act = next.next && j.group === 'todo' ? next.status : next.next ? next.next.label : '';
+  // Two cards for one address after a sync clash: the one from this phone
+  // says so. A job the account doesn't hold yet says that too.
   const tags = (id === currentReportId ? '<span class="dash-card-tag">This job</span>' : '')
-    + (isSampleJob(j.r) ? '<span class="dash-card-tag sample">Sample</span>' : '');
+    + (isSampleJob(j.r) ? '<span class="dash-card-tag sample">Sample</span>' : '')
+    + (j.r.conflictCopy ? '<span class="dash-card-tag warn">Copy from this phone</span>' : '')
+    + (leftOffAccount(j.r) ? '<span class="dash-card-tag warn">Not in your account yet</span>' : '');
   const arrow = '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
   return `
     <div class="dash-card ${j.group}${declined ? ' declined' : ''}">
@@ -254,15 +308,15 @@ function dashCardHTML(j) {
         <span class="dash-card-text">
           <span class="dash-card-street">${escapeHtml(street)}</span>
           ${suburb ? `<span class="dash-card-suburb">${escapeHtml(suburb)}</span>` : ''}
-          ${sub.length || tags ? `<span class="dash-card-sub">${tags}${sub.length ? `<span>${sub.map(escapeHtml).join(' · ')}</span>` : ''}</span>` : ''}
+          ${sub || tags ? `<span class="dash-card-sub">${tags}${sub}</span>` : ''}
         </span>
         <span class="dash-card-end">
-          <span class="dash-card-when">${dashWhen(j.time)}</span>
+          <span class="dash-card-when">${dashCardWhen(j)}</span>
           ${j.total ? `<span class="dash-card-total">${formatAUD(j.total).replace(/\.00$/, '')}</span>` : ''}
         </span>
         <span class="dash-card-progress" aria-hidden="true">${steps.map(st => `<i class="${st.state}"></i>`).join('')}</span>
       </button>
-      ${act ? `<button type="button" class="dash-card-act" onclick="openDashboardJob('${id}', '${next.next.to}')"><span>${escapeHtml(act)}</span>${arrow}</button>` : ''}
+      ${act ? `<button type="button" class="dash-card-act${next.sent ? ' wait' : ''}" onclick="openDashboardJob('${id}', '${next.next.to}')"><span>${escapeHtml(act)}</span>${arrow}</button>` : ''}
     </div>`;
 }
 
@@ -277,25 +331,42 @@ function startNewJob() {
   if (addr) addr.focus({ preventScroll: true });
 }
 
+// Every saved job, read as the list shows it, and the headline over them:
+// how many need the inspector today, then what's booked for later and any
+// re-inspections that are overdue, which opens the Due tab.
+function readDashboardJobs() {
+  const quotes = getSavedQuotes();
+  dashboardJobs = getSavedReports().map(r => dashboardJob(r, quotes)).sort((a, b) => b.time - a.time);
+  const body = document.getElementById('dashboardBody');
+  // Nothing saved at all: no tabs or search, just the way in.
+  if (body) body.classList.toggle('no-jobs', !dashboardJobs.length);
+  const title = document.getElementById('dashboardLead');
+  if (!title) return;
+  const need = jobsNeedingYou(dashboardJobs);
+  // The sample alone isn't work done: a new business still has no jobs.
+  title.innerHTML = !dashboardJobs.some(j => !isSampleJob(j.r)) ? 'No jobs yet.'
+    : need.today ? `<b>${need.today} job${need.today === 1 ? '' : 's'}</b> need${need.today === 1 ? 's' : ''} you today.`
+    : need.later ? 'Nothing needs you today.'
+    : 'You\'re all caught up.';
+  const overdue = typeof reinspectionsDue === 'function' ? reinspectionsDue().filter(it => it.overdue).length : 0;
+  const more = document.getElementById('dashboardMore');
+  more.innerHTML = [
+    need.later ? `<span>${need.later} booked for later</span>` : '',
+    overdue ? `<button type="button" onclick="setDashboardTab('due')">${overdue} re-inspection${overdue === 1 ? '' : 's'} overdue</button>` : '',
+  ].filter(Boolean).join('<i aria-hidden="true">·</i>');
+  more.hidden = !more.innerHTML;
+}
+
 function renderDashboard() {
   const body = document.getElementById('dashboardBody');
   if (!body) return;
   parkJobPanel();
-  const quotes = getSavedQuotes();
-  dashboardJobs = getSavedReports().map(r => dashboardJob(r, quotes)).sort((a, b) => b.time - a.time);
-  const need = dashboardJobs.filter(j => j.group === 'todo').length;
   const today = new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
-  // The sample alone isn't work done: a new business still has no jobs.
-  const lead = !dashboardJobs.some(j => !isSampleJob(j.r)) ? 'No jobs yet.'
-    : need ? `<b>${need} job${need === 1 ? '' : 's'}</b> need${need === 1 ? 's' : ''} you today.`
-    : 'You\'re all caught up.';
-
-  // Nothing saved at all: no tabs or search, just the way in.
-  body.classList.toggle('no-jobs', !dashboardJobs.length);
   body.innerHTML = `
     <div class="dash-hero">
       <span class="dash-hero-date">${today}</span>
-      <p class="dash-hero-title">${lead}</p>
+      <p class="dash-hero-title" id="dashboardLead"></p>
+      <p class="dash-hero-more" id="dashboardMore" hidden></p>
     </div>
     <div class="dash-tabs" id="dashboardTabs" role="tablist">
       ${DASHBOARD_TABS.map(([key, label]) => `<button type="button" role="tab" class="dash-tab" data-tab="${key}" onclick="setDashboardTab('${key}')">${label} <span></span></button>`).join('')}
@@ -307,6 +378,7 @@ function renderDashboard() {
     </label>
     <div id="dashboardJobs"></div>
   `;
+  readDashboardJobs();
   renderDashboardJobs();
 }
 
@@ -325,6 +397,20 @@ function renderDashboardJobs(fade) {
   const shown = dashboardJobs.filter(j => query
     ? [j.r.address, j.r.client, j.r.jobSuburb, j.r.jobPostcode].filter(Boolean).join(' ').toLowerCase().includes(query)
     : dashboardTab === 'all' || j.group === dashboardTab);
+  // To do runs the way the week does: anything still open from an earlier
+  // day, then today, then what's booked for later, each in the order it
+  // comes. The other lists (and a search) are newest first.
+  const byDay = dashboardTab === 'todo' && !query;
+  if (byDay) shown.sort((a, b) => a.time - b.time);
+  const part = j => { const n = dashDaysAway(j.time); return n < 0 ? 'Still open from earlier' : n ? 'Coming up' : 'Today'; };
+  const parted = byDay && new Set(shown.map(part)).size > 1;
+  const cards = shown.map((j, i) => (parted && (!i || part(shown[i - 1]) !== part(j)) ? `<h3 class="dash-part">${part(j)}</h3>` : '') + dashCardHTML(j)).join('');
+  // Finished jobs taken off a full phone are still in the account: the
+  // line sits where they'd be looked for, under Done and under a search.
+  const parked = getArchivedReportIds().length;
+  const parkedNote = parked && (query || dashboardTab === 'done' || !dashboardJobs.length)
+    ? `<p class="dash-parked">${parked} older job${parked === 1 ? ' is' : 's are'} kept in your account only. <button type="button" class="link-btn" onclick="restoreArchivedReports()">Bring ${parked === 1 ? 'it' : 'them'} back</button></p>`
+    : '';
 
   const tabs = document.getElementById('dashboardTabs');
   if (tabs) {
@@ -348,9 +434,9 @@ function renderDashboardJobs(fade) {
     : !dashboardJobs.length ? 'Your jobs will show up here once you save a report.'
     : { todo: 'Nothing to do right now.', waiting: 'Nothing is waiting on a client.', done: 'No finished jobs yet.' }[dashboardTab];
   if (dashboardTab === 'due' && !query && typeof renderReinspectionList === 'function') { wrap.innerHTML = renderReinspectionList(fade); return; }
-  wrap.innerHTML = shown.length ? `
+  wrap.innerHTML = (shown.length ? `
     <div class="dash-cards${fade ? ' fade-in' : ''}">
-      ${shown.map(dashCardHTML).join('')}
+      ${cards}
     </div>` : !query && !dashboardJobs.length ? `
     <div class="dash-start${fade ? ' fade-in' : ''}">
       <span class="job-tile now" aria-hidden="true">${jobIcon('details', 22)}</span>
@@ -362,7 +448,7 @@ function renderDashboardJobs(fade) {
       <p class="dash-sample-title">Or see a finished job first</p>
       <p class="dash-sample-text">A made-up job from start to finish, with your business on every page: the agreement, report, quote, the client's signed answer and the treatment certificate.</p>
       <button type="button" class="dash-sample-btn" onclick="openSampleJob('jobs')">See a sample job</button>
-    </div>` : ''}` : `<p class="dash-none${fade ? ' fade-in' : ''}">${empty}</p>`;
+    </div>` : ''}` : `<p class="dash-none${fade ? ' fade-in' : ''}">${empty}</p>`) + parkedNote;
 }
 
 // The sheet over the list: the Due tab's properties (js/reinspection.js).
@@ -381,75 +467,46 @@ function openDashboardJob(id, to) {
   jobGo(to, 'jobs');
 }
 
-const SAVED_EMPTY_HTML = `<div class="empty-state">
-    <p>No saved reports yet. A report saves itself here once it has an address.</p>
-    <button class="job-action-btn" onclick="toggleDrawer()">Back to the report</button>
-  </div>`;
-
-function renderSavedList() {
-  const list = document.getElementById('savedList');
-  const allReports = getSavedReports();
-  const summary = document.getElementById('savedPanelSummary');
-
-  const archived = getArchivedReportIds().length;
-  const archivedNote = archived
-    ? `<div class="saved-archived">${archived} older job${archived === 1 ? ' is' : 's are'} kept in your account only. <button class="link-btn" onclick="restoreArchivedReports()">Bring ${archived === 1 ? 'it' : 'them'} back</button></div>`
-    : '';
-  if (allReports.length === 0) {
-    list.innerHTML = SAVED_EMPTY_HTML + archivedNote;
-    if (summary) summary.textContent = 'None saved';
-    return;
-  }
-
-  if (summary) summary.textContent = `${allReports.length} saved`;
-
-  const searchEl = document.getElementById('savedSearchInput');
-  const query = searchEl ? searchEl.value.trim().toLowerCase() : '';
-
-  let reports = allReports;
-  if (query) {
-    reports = allReports.filter(r => {
-      const haystack = [r.address, r.client, r.jobSuburb, r.jobPostcode, r.inspector]
-        .filter(Boolean).join(' ').toLowerCase();
-      return haystack.includes(query);
+// ── LINKS OUT ─────────────────────────────────────────────────────────────
+// Every link a client hasn't answered yet (an agreement to sign, a quote
+// to accept or decline) is read back in one request when Jobs opens, so
+// nobody has to open each job to find out. One that came back moves its
+// job on the list and says so.
+const LINKS_CHECK_MS = 60000;
+let linksCheckedAt = 0;
+function linksOut() {
+  const quotes = getSavedQuotes();
+  const out = [];
+  getSavedReports().forEach(r => {
+    const d = r.reportData || {};
+    const street = String(r.address || '').split(', ')[0];
+    if (d.agreementRequest && d.agreementRequest.id && !d.agreement) out.push({ id: d.agreementRequest.id, kind: 'agreement', reportId: r.id, street });
+    const q = quotes[r.id];
+    if (q && q.linkRequest && q.linkRequest.id && !q.answer) out.push({ id: q.linkRequest.id, kind: 'quote', reportId: r.id, street });
+  });
+  return out;
+}
+async function checkLinksOut() {
+  if (!authSession || !navigator.onLine || Date.now() - linksCheckedAt < LINKS_CHECK_MS) return;
+  const out = linksOut();
+  if (!out.length) return;
+  linksCheckedAt = Date.now();
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/sign_requests?id=in.(${out.map(l => encodeURIComponent(l.id)).join(',')})&select=id,status,signer_name,signature,signed_at,note`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    const back = [];
+    out.forEach(l => {
+      const row = rows.find(x => x.id === l.id);
+      if (!row) return;
+      const said = l.kind === 'quote' ? takeQuoteLinkAnswer(l.reportId, row) : takeSignedAgreement(l.reportId, row);
+      if (said) back.push({ id: l.reportId, said: `${said} for ${l.street || 'a job'}` });
     });
-  }
-
-  // Sort newest first
-  reports.sort((a, b) => b.savedAt - a.savedAt);
-
-  if (reports.length === 0) {
-    list.innerHTML = `<div class="saved-empty">No matches for "${escapeHtml(searchEl.value.trim())}"</div>`;
-    return;
-  }
-
-  list.innerHTML = reports.map(r => {
-    const date = new Date(r.savedAt);
-    const dateStr = date.toLocaleDateString('en-AU', { day:'numeric', month:'short' });
-    const risk = r.reportData.riskLevel || 'none';
-    const addr = (r.address || 'Untitled property') + (r.conflictCopy ? ' (copy from this phone)' : '') + (isSampleJob(r) ? ' (sample)' : '');
-    const pending = (r.reportData.pendingNotes || []).length;
-    const status = savedReportStatus(r);
-    const statusTag = `<span class="saved-item-status ${status.tone}">${status.label}</span>`;
-    const answer = quoteAnswerSummary(getSavedQuotes()[r.id] || r.quote);
-    const answerTag = answer ? `<span class="saved-item-quote ${answer.tone}">${answer.short}</span>` : '';
-    return `
-      <div class="saved-item" onclick="loadReport('${r.id}')">
-        <div class="saved-item-info">
-          <div class="saved-item-address">${escapeHtml(addr)}</div>
-          <div class="saved-item-meta">
-            <span>${dateStr}</span>
-            <span class="saved-item-risk ${risk}">${risk === 'none' ? 'N/A' : risk}</span>
-            ${statusTag}
-            ${answerTag}
-            ${pending ? `<span class="saved-item-pending">${pending} note${pending !== 1 ? 's' : ''} to fill in</span>` : ''}
-            ${notInAccount(r) ? '<span class="saved-item-unsynced">Not in your account yet</span>' : ''}
-          </div>
-        </div>
-        <button class="saved-item-delete" onclick="deleteReport('${r.id}', event)" title="Delete">✕</button>
-      </div>
-    `;
-  }).join('') + archivedNote;
+    if (!back.length) return;
+    refreshJobsList();
+    if (back.length === 1) showToast(back[0].said, 'success', { label: 'Open', run: () => openDashboardJob(back[0].id, 'job') });
+    else showToast(`${back.length} came back: ${back.map(b => b.said).join('. ')}`, 'success');
+  } catch (e) { /* no signal, or the account is down: the next open asks again */ }
 }
 
 // Safe inside text and inside quoted attributes (value="…", src="…").

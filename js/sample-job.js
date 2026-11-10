@@ -299,7 +299,7 @@ function removeSampleJob() {
     localStorage.setItem(quotesStorageKey(), JSON.stringify(all));
   } catch (e) {}
   if (wasOpen) startBlankReport();
-  renderSavedList();
+  refreshJobsList();
   closeJobPage();
   openDashboard();
   showToast('Sample job removed. Bring it back from the menu any time', 'info');

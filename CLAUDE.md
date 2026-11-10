@@ -54,7 +54,7 @@ They are plain scripts, not modules: every top-level name is shared across all o
 | `job.js` | DRAWER, MENU, BOTTOM DOCK, THIS JOB, LAST VISIT, ADDRESS SUGGESTIONS, WEATHER, APPLICABLE STANDARD, JOB INFO, DATE CHIPS, PERSISTENCE — SAVED REPORTS |
 | `account.js` | AUTH STATE, BILLING / STRIPE, SIGN UP / IN / OUT, PASSWORD RESET, DELETE MY ACCOUNT, YOUR TEAM, BUSINESS LOAD, ENTER APP, SESSION RESTORE |
 | `sync.js` | SUPABASE REPORT SYNC, SYNC BETWEEN DEVICES, SYNC / SAVE STATUS INDICATOR, OLDER JOBS, DATA EXPORT / IMPORT, ACCESSIBILITY SETTINGS |
-| `dashboard.js` | DASHBOARD, STATUS / TOAST, WHAT THE REPORT IS STILL MISSING (the one list Finish, the check sheet and the percentage read), COMPLETED JOBS, GAPS BEFORE YOU LEAVE |
+| `dashboard.js` | DASHBOARD (the Jobs list), LINKS OUT (every agreement and quote link a client hasn't answered, checked when Jobs opens), STATUS / TOAST, WHAT THE REPORT IS STILL MISSING (the one list Finish, the check sheet and the percentage read), COMPLETED JOBS, GAPS BEFORE YOU LEAVE |
 | `send.js` | SEND TO CLIENT, CHECK BEFORE SENDING (the report's, and the quote's own from `js/quote.js`) |
 | `pdf.js` | jsPDF loading (`ensureJsPDFLoaded`), SHARED PDF PIECES, the inspection report PDF (`buildReportPdf`) |
 

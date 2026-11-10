@@ -445,7 +445,7 @@ function saveBaitVisit() {
   storeQuoteOnReport(q, true);
   closeBaitVisit();
   renderQuoteAnswer();
-  if (typeof renderSavedList === 'function') renderSavedList();
+  refreshJobsList();
   showToast(visit.sentAt ? 'Visit saved' : 'Visit saved. Email the client their visit report', 'success');
   track('bait_visit_recorded', { stations: visit.stations.length, active: visit.stations.filter(s => BAIT_FEEDING.includes(s.status)).length, finished: visit.finished });
   // The report to email is the next tap.

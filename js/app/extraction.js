@@ -865,7 +865,7 @@ async function processPendingNotes(manual) {
     renderPendingNotes();
     setAI('ready', 'AI ready');
   }
-  // A report that's already in Saved Reports is re-saved, so its copy
+  // A report that's already on the Jobs list is re-saved, so its copy
   // there doesn't keep the notes and fill them in a second time.
   if (filled && reportData === target && currentReportId && getSavedReports().some(r => r.id === currentReportId)) {
     saveCurrentReport(true);

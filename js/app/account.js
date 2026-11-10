@@ -759,7 +759,7 @@ async function endSessionOnDevice() {
     resetReportState();
     ['jobAddress','jobSuburb','jobState','jobPostcode','jobClient','jobInspector'].forEach(id => { document.getElementById(id).value = ''; });
     updateJob();
-    renderSavedList();
+    refreshJobsList();
   }
   document.getElementById('mainMenu').style.display  = 'none';
   document.getElementById('app').style.display       = 'none';
@@ -1425,7 +1425,7 @@ function enterApp() {
     // hadn't landed yet. Per-account keys mean nothing ever gets deleted on
     // a switch - the previous account's reports stay exactly where they
     // were, under their own key, completely untouched.
-    renderSavedList();
+    refreshJobsList();
   }
   lastActiveAccountUserId = authUser ? authUser.id : lastActiveAccountUserId;
 

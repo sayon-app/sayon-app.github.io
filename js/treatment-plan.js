@@ -19,7 +19,7 @@
 //
 // Loaded after js/quote.js and uses its globals (quoteState, newQuoteItem,
 // QUOTE_CATALOGUE, QUOTE_SYSTEM_LABELS, QUOTE_PLAN_TIMES, QUOTE_PLAN_SERVICE,
-// renderQuotePlan, renderQuoteItems, scheduleQuoteSave, quotePlanReport,
+// renderQuotePlan, renderQuoteItems, scheduleQuoteSave, quoteReport,
 // currentQuoteSource, isQuoteLocked) and the js/app/ files' (workerFetch,
 // escapeHtml, showToast, sha256Hex, stableJson, track, authSession).
 // ══════════════════════════════════════════════════════════════════════════
@@ -412,7 +412,7 @@ function setTreatmentPlanState(reportKey, ai) {
 
 async function runTreatmentPlan(extra) {
   const q = quoteState;
-  const rd = quotePlanReport();
+  const rd = quoteReport();
   if (!q || !rd || treatmentPlanRuns[q.reportKey]) return;
   const key = q.reportKey;
   const prev = q.aiPlan || {};
@@ -467,6 +467,8 @@ function askTreatmentPlanAgain() {
 function openTreatmentPlanFromReport() {
   openQuoteFromReport();
   const q = quoteState;
+  // Asked for, so it shows even on a quote that has gone.
+  if (q) tpCardOpen.add(q.reportKey);
   if (q && !q.aiPlan && !treatmentPlanRuns[q.reportKey] && !isQuoteLocked()) {
     if (navigator.onLine) runTreatmentPlan(''); else { treatmentPlanWaiting[q.reportKey] = ''; renderTreatmentPlanCard(); }
   } else if (q && q.aiPlan) showTreatmentPlan();
@@ -710,13 +712,16 @@ function renderTreatmentPlanCard() {
   const el = document.getElementById('quoteAiPlan');
   if (!el) return;
   const q = quoteState;
-  const rd = quotePlanReport();
+  const rd = quoteReport();
   const ai = q && q.aiPlan;
   const locked = isQuoteLocked();
   const busy = !!(q && treatmentPlanRuns[q.reportKey]);
   const waiting = !!(q && q.reportKey in treatmentPlanWaiting);
-  // Nothing to plan for and nothing asked: no card.
-  if (!q || (!ai && !busy && !waiting && (!reportNeedsPlan(rd) || locked))) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  // Nothing to plan for and nothing asked: no card. It's offered once the
+  // quote has lines to compare against, and steps aside once the quote has
+  // gone to the client, unless it was opened to read (tpCardOpen).
+  const aside = q && quoteHasGone(q) && !tpCardOpen.has(q.reportKey) && !busy;
+  if (!q || aside || (!ai && !busy && !waiting && (!reportNeedsPlan(rd) || locked || !quoteHasItems(q)))) { el.style.display = 'none'; el.innerHTML = ''; return; }
   el.style.display = '';
   const head = (title, sub, tag) => `<div class="tp-head"><span class="tp-mark" aria-hidden="true">${TP_SPARK}</span>
     <span class="tp-head-text"><span class="tp-title-row"><span class="tp-title">${title}</span>${tag ? `<span class="tp-tag">${tag}</span>` : ''}</span>${sub ? `<span class="tp-head-sub">${sub}</span>` : ''}</span></div>`;

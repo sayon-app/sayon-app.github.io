@@ -148,7 +148,8 @@ let shotN = 0;
   console.log('after send: emails', emails.slice(em).map(e => e.subject + ' -> ' + e.to + ' [' + (e.attachments || []).map(a => a.filename) + ']'), 'downloads', downloads.slice(dl), 'toasts', await toasts());
 
   // 7. The quote.
-  await tap(p.locator('#mainPanel .doc-chip', { hasText: 'Quote' }), 'Quote in the document strip'); await p.waitForTimeout(1200); await shot('quote');
+  await tap(p.locator('#app > header .header-back'), 'Back to the job'); await p.waitForTimeout(800); await shot('job-after-report');
+  await tap(p.locator('#jobOverlay button.job-step[onclick*="quote"]'), 'Quote step on This job'); await p.waitForTimeout(1200); await shot('quote');
   const q = await p.evaluate(() => ({ items: (quoteState.items || []).map(i => i.desc || i.description || JSON.stringify(i)).slice(0, 6), total: document.getElementById('qTotal').textContent, client: document.getElementById('qClient').value, email: document.getElementById('qClientEmail').value, addr: document.getElementById('qAddress').value }));
   console.log('quote:', JSON.stringify(q));
   check(q.client === 'Sam Taylor' && q.email === 'sam@example.com' && /Banksia/.test(q.addr), 'quote carries the client and address');
@@ -159,10 +160,11 @@ let shotN = 0;
   console.log('after quote send tap:', qs, 'toasts', await toasts());
   if (await p.locator('#sendReviewOverlay.open').count()) { await tap(p.locator('#sendReviewBtn'), 'quote send confirm'); await p.waitForTimeout(6000); }
   await shot('quote-sent');
+  check(await p.evaluate(() => document.getElementById('jobOverlay').classList.contains('open') && !quoteScreenOpen()), 'once the quote has gone the app is back on This job');
   console.log('after quote send: emails', emails.slice(em).map(e => e.subject + ' -> ' + e.to + ' [' + (e.attachments || []).map(a => a.filename) + ']'), 'toasts', await toasts());
 
   // 8. The client's answer, signed on the phone.
-  await tap(p.locator('#quoteAnswer button', { hasText: /^Accepted$/i }).first(), 'Accepted'); await p.waitForTimeout(800); await shot('answer-open');
+  await tap(p.locator('#jobOverlay .job-next button', { hasText: /^Accepted$/i }), 'Accepted'); await p.waitForTimeout(800); await shot('answer-open');
   const qa = await p.evaluate(() => ({ by: document.getElementById('qaBy').value, method: document.getElementById('qaMethod').value, signShown: !document.getElementById('qaSignWrap').hidden && !!document.getElementById('qaSignWrap').offsetParent, btn: document.getElementById('qaSaveBtn').disabled }));
   console.log('answer sheet:', JSON.stringify(qa));
   if (!qa.by) await p.fill('#qaBy', 'Sam Taylor');
@@ -174,7 +176,7 @@ let shotN = 0;
   console.log('toasts', await toasts());
 
   // 9. Treatment record.
-  await tap(p.getByRole('button', { name: /^Record the treatment$/i }), 'Record treatment'); await p.waitForTimeout(1000); await shot('treatment-open');
+  await tap(p.locator('#jobOverlay .job-next button', { hasText: /^Record (the )?treatment$/i }), 'Record treatment'); await p.waitForTimeout(1000); await shot('treatment-open');
   const tr0 = await p.evaluate(() => [...document.querySelectorAll('#treatmentOverlay input, #treatmentOverlay textarea, #treatmentOverlay select')].filter(e => e.offsetParent && e.type !== 'radio' && e.type !== 'checkbox').map(e => `${e.id}=${e.value}`).join(' | '));
   console.log('treatment prefill:', tr0);
   const need = await p.evaluate(() => ({ btn: document.getElementById('trSaveBtn').disabled, need: (document.querySelector('#treatmentOverlay .sign-need, #trSaveNeed') || {}).textContent }));
@@ -191,16 +193,18 @@ let shotN = 0;
   check(!!tr, 'treatment record saved');
 
   // 10. Certificate.
-  await p.evaluate(() => window.scrollTo(0, 0)); await shot('quote-after-treatment');
+  await shot('job-after-treatment');
   em = emails.length;
-  await tap(p.locator('#quoteAnswer .qp-cert-email'), 'Email certificate'); await p.waitForTimeout(2000); await shot('cert-1');
+  await tap(p.locator('#jobOverlay .job-next .qp-cert-email'), 'Email certificate'); await p.waitForTimeout(2000); await shot('cert-1');
   if (await p.locator('#sendReviewOverlay.open').count()) { await tap(p.locator('#sendReviewBtn'), 'certificate send confirm'); }
   await p.waitForTimeout(5000); await shot('cert-sent');
   const certMail = emails.slice(em);
   console.log('certificate: emails', certMail.map(e => e.subject + ' -> ' + e.to + ' [' + (e.attachments || []).map(a => a.filename) + ']'), 'toasts', await toasts());
   check(certMail.length === 1 && (certMail[0].attachments || []).length === 1, 'certificate emailed with its PDF');
   dl = downloads.length;
-  await tap(p.locator('#quoteAnswer .qp-cert-actions button', { hasText: /^PDF$/ }), 'Certificate PDF'); await p.waitForTimeout(3000);
+  // Once it's emailed the certificate sits under the Treatment step.
+  await tap(p.locator('#jobOverlay .job-fold[data-step="treatment"] > summary'), 'Treatment step'); await p.waitForTimeout(400);
+  await tap(p.locator('#jobOverlay .job-fold[data-step="treatment"] .qp-cert-actions button', { hasText: /^PDF$/ }), 'Certificate PDF'); await p.waitForTimeout(3000);
   console.log('certificate pdf:', downloads.slice(dl));
   // Save every PDF that went out, to look at.
   for (const e of emails) for (const a of (e.attachments || [])) if (a.content) fs.writeFileSync(`${OUT}/${a.filename}`, Buffer.from(a.content, 'base64'));

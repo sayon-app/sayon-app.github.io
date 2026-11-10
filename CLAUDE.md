@@ -12,11 +12,11 @@ Read only the files your task needs. The app's own code is split into 18 files i
 |---|---|
 | `index.html` | Every screen and overlay: splash, sign-in, platform menu, report (sections 1–7 + sign-off), drawer menu pages, quote screen and sheets |
 | `js/app/*.js` | The report app and everything shared, in 18 files (see below) |
-| `js/quote.js` | Quote builder, the client's answer and the quote PDF |
+| `js/quote.js` | Quote builder and the quote PDF. The quote screen is only the quote; the client's answer (its sheet and `quoteAnswerPanel`) is recorded from This job. THE JOB'S QUOTE (`useJobQuote`): while This job is open, `quoteState` is the job's saved quote, so the answer, treatment and bait sheets work there |
 | `js/price-book.js` | Your prices: the business's own price for every quote line, set in onboarding and Menu › Your prices. Same store as the prices remembered from quotes (`quotePriceMemory`) |
 | `js/photo-markup.js` | Mark up a report photo (circle, arrow, draw, label) from the photo viewer |
-| `js/treatment.js` | Treatment record and the one-page certificate PDF |
-| `js/bait.js` | Bait station visits after a baiting system goes in: the visit sheet, the client's visit report PDF, the job's due date |
+| `js/treatment.js` | Treatment record and the one-page certificate PDF. Opened from This job, which shows the record line and the certificate card (`treatmentRecordLine`, `treatmentCertificateCard`) |
+| `js/bait.js` | Bait station visits after a baiting system goes in: the visit sheet, the client's visit report PDF, the job's due date. The visits card (`renderBaitBlock`) is This job's Bait station visits step |
 | `js/reinspection.js` | Re-inspections due: the Jobs screen's Due tab (each property whose next inspection is coming up or overdue, from the report date plus its interval, or the treatment record's date), the reminder email to the client, starting the new report |
 | `js/site-plan.js` | The drawn site plan on the treatment record: symbols, legend, the editor (drag corners and walls, turn to any angle, pinch to zoom), and the plan page on the certificates and bait visit reports |
 | `js/chemicals.js` | Chemical register (Menu › Chemical register): products, label and SDS links, each label use with its rate. The treatment record's product picker fills the active, rate and life from it. Once a week each APVMA No. is checked against the APVMA's list of registered products on data.gov.au, and a product that has dropped off is flagged |
@@ -51,7 +51,7 @@ They are plain scripts, not modules: every top-level name is shared across all o
 | `editing.js` | EDITING, REPORT STEPS, PROGRESS, REPORT DONE (the Done mark and the one next step), SHOW ME (walking what's still blank), SIGNATURE PADS, SAY IT INSTEAD |
 | `agreement.js` | PRE-INSPECTION AGREEMENT, REMOTE SIGNING |
 | `photos.js` | PHOTO ATTACHMENTS, photo store, PHOTO VIEWER, SECTION-AWARE PHOTO SYSTEM, READY-MADE RECOMMENDATIONS |
-| `job.js` | DRAWER, MENU, BOTTOM DOCK, THIS JOB, LAST VISIT, ADDRESS SUGGESTIONS, WEATHER, APPLICABLE STANDARD, JOB INFO, DATE CHIPS, PERSISTENCE — SAVED REPORTS |
+| `job.js` | DRAWER, MENU, BOTTOM DOCK, THIS JOB (the one list of a job's steps: the client's answer, treatment, certificate and bait visits are done on it, `jobStepPanel`, `jobNextAction`), LAST VISIT, ADDRESS SUGGESTIONS, WEATHER, APPLICABLE STANDARD, JOB INFO, DATE CHIPS, PERSISTENCE — SAVED REPORTS |
 | `account.js` | AUTH STATE, BILLING / STRIPE, SIGN UP / IN / OUT, PASSWORD RESET, DELETE MY ACCOUNT, YOUR TEAM, BUSINESS LOAD, ENTER APP, SESSION RESTORE |
 | `sync.js` | SUPABASE REPORT SYNC, SYNC BETWEEN DEVICES, SYNC / SAVE STATUS INDICATOR, OLDER JOBS, DATA EXPORT / IMPORT, ACCESSIBILITY SETTINGS |
 | `dashboard.js` | DASHBOARD (the Jobs list), LINKS OUT (every agreement and quote link a client hasn't answered, checked when Jobs opens), STATUS / TOAST, WHAT THE REPORT IS STILL MISSING (the one list Finish, the check sheet and the percentage read), FINALISED JOBS (the lock, versions and Amend), GAPS BEFORE YOU LEAVE |

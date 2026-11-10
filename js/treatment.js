@@ -109,9 +109,7 @@ function formatLongDate(iso) {
 
 // The quote's report, for pre-filling a first record.
 function treatmentSourceReport() {
-  const src = typeof currentQuoteSource === 'function' ? currentQuoteSource() : null;
-  if (!src) return {};
-  return (src.key === (currentReportId || 'draft') ? reportData : src.reportData) || {};
+  return quoteReport() || {};
 }
 
 // Months between inspections, from the report's recommendation
@@ -244,12 +242,22 @@ function treatmentPestFromReport(rd, methods) {
   return pests.join('; ');
 }
 
-// ── ON THE QUOTE ──
-function renderTreatmentBlock(q) {
+// ── ON THIS JOB ── The treatment is a step of the job (js/app/job.js): its
+// record sheet opens from there, and once it's recorded the step opens to
+// the record and its certificate. On a finalised job they're the record,
+// and changing them starts with Amend.
+function treatmentRecordLine(q) {
   const t = q.treatment;
-  if (!t) {
-    return `<button class="quote-btn primary quote-step-btn" onclick="openTreatmentRecord()">Record the treatment</button>`;
-  }
+  return `<p class="job-fold-text good"><strong>Treatment recorded</strong>: done on ${escapeHtml(formatAnswerDate(t.date))}${t.technician ? ` by ${escapeHtml(t.technician)}` : ''}</p>
+    ${t.nextInspection ? `<div class="quote-answer-note">Next inspection due ${escapeHtml(formatAnswerDate(t.nextInspection))}</div>` : ''}
+    ${isReportLocked() ? '' : '<div class="qp-links"><button type="button" class="quote-text-btn" onclick="openTreatmentRecord()">Edit the record</button></div>'}`;
+}
+
+// The certificate: where it goes or when it went, what it would go
+// without, and the ways to give it to the client.
+function treatmentCertificateCard(q) {
+  const t = q.treatment;
+  if (!t) return '';
   const many = installedSystems(t).length > 0;
   const who = (q.client || '').trim();
   const first = who.split(/\s+/)[0];
@@ -261,22 +269,17 @@ function renderTreatmentBlock(q) {
     : to ? `Goes to ${to}` : 'Not sent yet';
   // What the certificate would go without, said before it's emailed.
   const missing = treatmentRecordGaps(t).filter(Boolean).map(g => g.missing);
-  return `<div class="quote-step">
-      <div><strong>Treatment recorded</strong>: done on ${escapeHtml(formatAnswerDate(t.date))}${t.technician ? ` by ${escapeHtml(t.technician)}` : ''}</div>
-      ${t.nextInspection ? `<div class="quote-answer-note">Next inspection due ${escapeHtml(formatAnswerDate(t.nextInspection))}</div>` : ''}
-    </div>
-    <div class="qp-cert ${given ? 'sent' : ''}">
+  return `<div class="qp-cert ${given ? 'sent' : ''}">
       <div class="qp-cert-title">${many ? 'Treatment and installation certificates' : 'Treatment certificate'}</div>
       <p class="qp-cert-text">${escapeHtml(status)}</p>
-      ${missing.length ? `<div class="qp-cert-gaps"><span>The certificate${many ? 's don\'t' : ' doesn\'t'} say ${escapeHtml(joinWithAnd(missing))} yet.</span><button class="quote-link-btn" onclick="openTreatmentRecord()">Add ${missing.length === 1 ? 'it' : 'them'}</button></div>` : ''}
-      ${treatmentSourceReport().propertyState === 'QLD' ? '<div class="quote-answer-note">In Queensland, email alone isn\'t enough: also hand the client a printed copy, or leave one in their letterbox.</div>' : ''}
+      ${missing.length ? `<div class="qp-cert-gaps"><span>The certificate${many ? 's don\'t' : ' doesn\'t'} say ${escapeHtml(joinWithAnd(missing))} yet.</span>${isReportLocked() ? '' : `<button type="button" class="quote-link-btn" onclick="openTreatmentRecord()">Add ${missing.length === 1 ? 'it' : 'them'}</button>`}</div>` : ''}
+      ${treatmentReportFor(q).propertyState === 'QLD' ? '<div class="quote-answer-note">In Queensland, email alone isn\'t enough: also hand the client a printed copy, or leave one in their letterbox.</div>' : ''}
       <div class="qp-cert-actions">
-        <button class="${given ? 'quote-link-btn' : 'quote-btn primary'} qp-cert-email" onclick="emailTreatmentCertificate()">${q.certificateSentAt ? 'Email again' : q.certificateHandedAt ? 'Email a copy' : `Email${first ? ' to ' + escapeHtml(first) : ''}`}</button>
-        <button class="quote-link-btn" onclick="downloadTreatmentCertificate()">PDF</button>
-        <button class="quote-link-btn" onclick="openTreatmentRecord()">Edit</button>
+        <button type="button" class="${given ? 'quote-link-btn' : 'quote-btn primary'} qp-cert-email" onclick="emailTreatmentCertificate()">${q.certificateSentAt ? 'Email again' : q.certificateHandedAt ? 'Email a copy' : `Email${first ? ' to ' + escapeHtml(first) : ''}`}</button>
+        <button type="button" class="quote-link-btn" onclick="downloadTreatmentCertificate()">PDF</button>
       </div>
-      ${given ? '' : `<button class="qp-cert-handed" onclick="markCertificateHanded()">Handed ${many ? 'them' : 'it'} over in person? <span>Mark as given</span></button>`}
-    </div>${typeof renderBaitBlock === 'function' ? renderBaitBlock(q) : ''}`;
+      ${given ? '' : `<button type="button" class="qp-cert-handed" onclick="markCertificateHanded()">Handed ${many ? 'them' : 'it'} over in person? <span>Mark as given</span></button>`}
+    </div>`;
 }
 
 // ── THE RECORD SHEET ──
@@ -903,12 +906,12 @@ function saveTreatmentRecord() {
   persistQuote();
   storeQuoteOnReport(q, true);
   closeTreatmentRecord();
-  renderQuoteAnswer();
+  renderQuoteProgress();
   if (typeof renderIssueState === 'function') renderIssueState();
   refreshJobsList();
-  // On to the certificate, with the bait station visits under it.
-  setTimeout(() => { const st = document.getElementById('qgStep4'); if (st) st.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 60);
-  showToast(typeof baitInstalled === 'function' && baitInstalled(q) ? 'Treatment recorded. Send the certificate, and record bait visits just under it' : 'Treatment recorded. The certificate is ready to send', 'success');
+  // On to the certificate, which is This job's next step.
+  jobShowNext();
+  showToast('Treatment recorded. The certificate is ready to send', 'success');
   track('treatment_recorded', { methods: Object.keys(t.methods).length });
 }
 

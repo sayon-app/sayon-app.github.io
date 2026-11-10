@@ -155,18 +155,20 @@ const emails = [];
   const sentQ = await p.evaluate(() => ({ open: document.getElementById('sendReviewOverlay').classList.contains('open'), starting: quoteState.items.filter(isStartingPrice).length }));
   check(emails.length === 1 && emails[0].to === 'sam@example.com' && /sign\.html/.test(emails[0].text) && !sentQ.open, 'the button sends it, with the link, and the sheet closes');
   check(sentQ.starting === 0, 'prices that went to a client are the business\'s own from then on');
+  check(await p.evaluate(() => navPlace() === 'job' && !document.getElementById('quoteScreen').classList.contains('open')), 'once the quote has gone, the app is back on This job, where the next step is');
 
   // ── 6. The certificate card ──
   await p.evaluate(() => {
     quoteState.answer = { status: 'accepted', by: 'Sam Taylor', date: todayIsoDate(), method: 'verbal', note: '', at: Date.now(), hash: quoteContentHash(quoteState) };
     quoteState.treatment = { date: todayIsoDate(), technician: 'Alex Example', licence: 'NSW 000000', methods: { barrier: '' }, products: [], areas: 'Whole perimeter', notice: 'none', noticeWhere: '', nextInspection: '', signature: 'x', at: Date.now() };
-    persistQuote(); renderQuoteAnswer();
+    persistQuote(); renderQuoteProgress();
+    document.querySelector('#jobOverlay .job-fold[data-step="treatment"]').open = true;
   });
   await p.waitForTimeout(500);
-  const cert = await p.evaluate(() => { const el = document.querySelector('.qp-cert-gaps'); return el ? el.innerText.replace(/\s+/g, ' ') : ''; });
+  const cert = await p.evaluate(() => { const el = document.querySelector('#jobOverlay .job-fold[data-step="treatment"] .qp-cert-gaps'); return el ? el.innerText.replace(/\s+/g, ' ') : ''; });
   check(/The certificates? (doesn't|don't) say the product used and the next inspection date yet\. Add them/.test(cert), 'the certificate card says what the certificate would go without: ' + cert);
-  await p.evaluate(() => document.querySelector('.qp-cert').scrollIntoView({ block: 'center' })); await p.screenshot({ path: `${OUT}/5-certificate-gaps.png` });
-  await p.evaluate(() => { quoteState.treatment.products = [{ name: 'Termidor HE' }]; quoteState.treatment.nextInspection = '2027-11-10'; renderQuoteAnswer(); }); await p.waitForTimeout(300);
+  await p.evaluate(() => document.querySelector('#jobOverlay .job-fold[data-step="treatment"] .qp-cert').scrollIntoView({ block: 'center' })); await p.screenshot({ path: `${OUT}/5-certificate-gaps.png` });
+  await p.evaluate(() => { quoteState.treatment.products = [{ name: 'Termidor HE' }]; quoteState.treatment.nextInspection = '2027-11-10'; persistQuote(); renderQuoteProgress(); }); await p.waitForTimeout(300);
   check(await p.evaluate(() => !document.querySelector('.qp-cert-gaps')), 'and nothing once the record is whole');
 
   check(!errs.length, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));

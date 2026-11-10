@@ -72,9 +72,11 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
     quoteState.treatment = { date: installDate, technician: 'Alex Example', licence: 'NSW 000000', methods: { bait: '12' }, products: [{ name: 'Exterra', active: 'chlorfluazuron', batch: 'B-0003' }], areas: 'Perimeter of the building', notice: 'new', noticeWhere: 'Meter box', nextInspection: '', signature: '', at: Date.now() };
     quoteState.certificateSentAt = Date.now();
     persistQuote(); storeQuoteOnReport(quoteState, false);
-    renderQuoteAnswer(); renderDocStrips();
+    // The visits are a step of the job, so they're recorded on This job.
+    closeQuote(); tabGo('job');
   }, { sc, installDate });
   await p.waitForTimeout(800);
+  const openBaitFold = () => p.evaluate(() => { const f = document.querySelector('#jobOverlay .job-fold[data-step="bait"]'); f.open = true; f.scrollIntoView({ block: 'center' }); });
 
   // 1. The job knows about the stations: the first check is due 4 weeks
   // after the install, so this job is back in To do.
@@ -82,11 +84,12 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   console.log('job before any visit:', JSON.stringify(j0));
   check(j0.group === 'todo' && /First bait station check due/.test(j0.status) && j0.next === 'bait', 'a baiting job with no visit yet is in To do, first check due');
   check(j0.steps.length === 5 && /Bait station visits:now:First check due .*overdue/.test(j0.steps[4]) && j0.bars === 7, 'the job has a fifth stage, Bait station visits, and its Jobs card shows seven steps with Job details and the agreement');
-  const strip = await p.evaluate(() => [...document.querySelectorAll('#quoteScreen .doc-strip .doc-chip')].map(c => c.textContent.trim()));
-  check(strip.includes('Bait visits'), 'the document strip gains Bait visits: ' + strip.join(', '));
-  await p.evaluate(() => document.getElementById('qpBait').scrollIntoView({ block: 'center' })); await shot('bait-card');
+  const page0 = await p.evaluate(() => ({ next: document.querySelector('#jobOverlay .job-next').innerText.replace(/\s+/g, ' '), btn: (document.querySelector('#jobOverlay .job-next .dash-detail-primary') || {}).textContent,
+    step: !!document.querySelector('#jobOverlay .job-fold[data-step="bait"]'), quote: document.getElementById('quoteScreen').classList.contains('open') }));
+  check(page0.step && /First bait station check due/.test(page0.next) && page0.btn === 'Record the visit' && !page0.quote, 'This job lists Bait station visits as a step and its Next step is the first check: ' + page0.next.slice(0, 120));
+  await openBaitFold(); await p.waitForTimeout(200); await shot('bait-card');
   const card = await p.evaluate(() => document.getElementById('qpBait').innerText);
-  check(/First check of the stations due/.test(card) && /12 stations installed/.test(card), 'the quote shows the bait card with the first check due: ' + card.replace(/\n/g, ' | ').slice(0, 120));
+  check(/First check of the stations due/.test(card) && /12 stations installed/.test(card), 'the step opens to the bait card with the first check due: ' + card.replace(/\n/g, ' | ').slice(0, 120));
 
   // 2. Record a visit by tapping.
   await tap(p.locator('#qpBait button', { hasText: 'Record a visit' }), 'Record a visit'); await p.waitForTimeout(600); await shot('visit-open');
@@ -119,6 +122,8 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   // 3. The job now waits on the report going out, then on the next visit.
   const j1 = await p.evaluate(() => { const j = dashboardJob(getSavedReports()[0], getSavedQuotes()); return { group: j.group, status: j.status, step: j.steps[4] }; });
   check(j1.group === 'todo' && j1.status === 'Email the visit report' && j1.step.state === 'now', 'a visit not yet emailed keeps the job in To do: ' + JSON.stringify(j1));
+  const next1 = await p.evaluate(() => ({ title: document.querySelector('#jobOverlay .job-next .dash-next-title').textContent, btn: (document.querySelector('#jobOverlay .job-next .dash-detail-primary') || {}).textContent, open: document.querySelector('#jobOverlay .job-fold[data-step="bait"]').open }));
+  check(next1.title === 'Email the visit report' && next1.btn === 'Email the visit report to Sam' && next1.open, 'saving the visit leaves This job on its next step, emailing the report, with the visits still open: ' + JSON.stringify(next1));
   const card1 = await p.evaluate(() => document.getElementById('qpBait').innerText);
   check(/1 of 12 active, 1 damaged/.test(card1) && /Not sent yet/.test(card1) && /Next due/.test(card1), 'the card lists the visit, not sent, with the next due: ' + card1.replace(/\n/g, ' | ').slice(0, 160));
   await shot('card-one-visit');
@@ -126,7 +131,7 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   // 4. Email the visit report.
   await p.evaluate(() => ensureJsPDFLoaded()); await p.waitForTimeout(500);
   let em = emails.length;
-  await tap(p.locator('#qpBait button', { hasText: /^Email report/ }), 'Email report'); await p.waitForTimeout(4000);
+  await tap(p.locator('#jobOverlay .job-next .dash-detail-primary'), 'Email the visit report, from the Next step card'); await p.waitForTimeout(4000);
   const sentMail = emails.slice(em);
   console.log('emails:', sentMail.map(e => `${e.subject} -> ${e.to} [${(e.attachments || []).map(a => a.filename)}]`));
   check(sentMail.length === 1 && /Bait station visit report/.test(sentMail[0].subject) && sentMail[0].to === 'sam@example.com' && (sentMail[0].attachments || []).some(a => /Bait_Visit/.test(a.filename)), 'the visit report goes to the client by email');
@@ -177,7 +182,7 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   await tap(p.locator('#bvSaveBtn'), 'Save the change'); await p.waitForTimeout(500);
   check(await p.evaluate(() => !quoteState.baitVisits.find(v => v.stations[2].status === 'eaten').sentAt), 'a change the client would see clears the sent mark');
 
-  // 8. The job page shows the stage; the quote's bait card lists the visits.
+  // 8. The job page shows the stage, which opens to the visits.
   await p.evaluate(() => { jobGo('job'); });
   await p.waitForTimeout(600); await shot('job-page');
   const jp = await p.evaluate(() => [...document.querySelectorAll('#jobOverlay .job-steps li')].map(li => li.className + ':' + li.querySelector('.job-step-label').firstChild.textContent + ':' + li.querySelector('.job-step-text').textContent));
@@ -187,15 +192,19 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   await p.evaluate(() => { closeJobPage(); openDashboard(); openDashboardJob(getSavedReports()[0].id, 'job'); });
   await p.waitForTimeout(600);
   check(await p.evaluate(() => navPlace() === 'job' && currentReportId === getSavedReports()[0].id), 'the job\'s card on the Jobs list opens its page');
-  await p.evaluate(() => { jobGo('quote'); document.getElementById('qpBait').scrollIntoView({ block: 'center' }); });
-  await p.waitForTimeout(600); await shot('quote-bait-card');
+  await p.locator('#jobOverlay .job-fold[data-step="bait"] > summary').click(); await p.waitForTimeout(300); await shot('job-bait-card');
   const baitCard = await p.evaluate(() => document.getElementById('qpBait').innerText);
-  check(/1 of 12 active/.test(baitCard), 'the quote\'s bait card lists the visits: ' + baitCard.replace(/\n/g, ' | ').slice(0, 200));
+  check(/1 of 12 active/.test(baitCard), 'tapping the step opens the visits in place: ' + baitCard.replace(/\n/g, ' | ').slice(0, 200));
+  // The quote screen is only the quote: no visits, answer or treatment on it.
+  await p.evaluate(() => jobGo('quote')); await p.waitForTimeout(600);
+  check(await p.evaluate(() => !document.querySelector('#quoteScreen .bait-card, #quoteScreen .qp-cert, #quoteScreen [onclick*="openQuoteAnswer"], #quoteScreen [onclick*="openTreatmentRecord"]')), 'the quote screen carries no bait visits, certificate or answer buttons');
   await p.evaluate(() => tabGo('job'));
 
   // 9. Finished: the job is done.
   await p.evaluate(() => { jobGo('bait'); });
   await p.waitForTimeout(600);
+  check(await p.evaluate(() => navPlace() === 'job' && !document.getElementById('baitOverlay').classList.contains('open')), 'with a visit report still to email, the bait step lands on This job, not on a new visit');
+  await openBaitFold(); await p.waitForTimeout(200);
   await tap(p.locator('#qpBait button', { hasText: 'Record a visit' }), 'Record a visit (3)'); await p.waitForTimeout(500);
   await tap(p.locator('.bait-rest-btn'), 'Rest are clear (3)'); await p.waitForTimeout(200);
   const quiet = await p.evaluate(() => ({ next: document.getElementById('bvNext').value, date: document.getElementById('bvDate').value }));

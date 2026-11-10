@@ -50,9 +50,9 @@ function showMenuPage(panelId) {
 
 // ── BOTTOM DOCK ──────────────────────────────────────────────────────────
 // Jobs, the mic and This job. Jobs is every job (the account and settings
-// open from its top corner); This job is the open job's page, and each of
-// its documents (agreement, report, quote, treatment) opens a layer below
-// it. Each tab closes whatever is open, then opens its place. Which tab is
+// open from its top corner); This job is the open job's page. The report
+// and the quote each open a layer below it; the agreement, the client's
+// answer, the treatment record and bait visits open over it. Each tab closes whatever is open, then opens its place. Which tab is
 // lit is css, read off the screens that are open. 'report', 'quote' and
 // 'menu' still work as places for the code that sends people there.
 function tabGo(to) {
@@ -99,9 +99,11 @@ function drawerBackTap() {
 }
 
 // ── THIS JOB ─────────────────────────────────────────────────────────────
-// The open job's page: where it's up to and the next step, then every
-// stage in the order a job runs, each opening its document, then the job's
-// details. Built from the same reading of a job as the dashboard's list.
+// The open job's page, and the one list of its steps: where it's up to
+// and the next step, then every step in the order a job runs. Job details,
+// the client's answer, the treatment (with its certificate) and bait
+// visits open in place; the agreement, the report and the quote open their
+// own screen. Built from the same reading of a job as the dashboard's list.
 function currentJobSummary() {
   saveOpenReportNow();
   const quotes = getSavedQuotes();
@@ -115,7 +117,8 @@ function currentJobSummary() {
 function openJobPage() {
   const overlay = document.getElementById('jobOverlay');
   if (!overlay) return;
-  renderJobPage();
+  jobFoldsOpen.clear();
+  renderJobPage(true);
   renderDateChips();
   overlay.classList.add('open');
   document.getElementById('jobPageBody').scrollTop = 0;
@@ -134,6 +137,7 @@ function closeJobPage() {
   if (!overlay || !overlay.classList.contains('open')) return;
   overlay.classList.remove('open');
   parkJobPanel();
+  releaseJobQuote();
 }
 
 function jobAgreementStep(d = reportData) {
@@ -203,15 +207,35 @@ function jobStepLine(j, st) {
   if (st.to === 'quote' && j.total && st.state !== 'skip') return `${formatAUD(j.total).replace(/\.00$/, '')}${j.q && j.q.sentAt ? ', sent ' + dashDate(j.q.sentAt) : ', not sent yet'}`;
   if (st.to === 'quote' && open) return 'Not written yet';
   if (st.to === 'answer' && open) return j.q && j.q.sentAt ? `Waiting on ${who} since ${dashDate(j.q.sentAt)}` : 'Once the quote is sent';
-  if (st.to === 'treatment' && open) return quoteHasItems(j.q) && (quoteAnswerState(j.q) || {}).status === 'accepted' ? 'Accepted, not recorded yet' : `Once ${who} accepts`;
+  if (st.to === 'treatment' && open && !(j.q && j.q.treatment)) return quoteHasItems(j.q) && (quoteAnswerState(j.q) || {}).status === 'accepted' ? 'Accepted, not recorded yet' : `Once ${who} accepts`;
   if (st.state === 'now' || st.state === 'bad' || st.state === 'skip' || !st.full) return st.text;
   return st.full.replace(/ · /g, ', ');
 }
 
+// The steps kept on this page open in place. Which are open, so a redraw
+// (an answer saved, a certificate sent) leaves them as they were.
+const jobFoldsOpen = new Set();
+function jobFoldToggled(el) {
+  if (el.open) jobFoldsOpen.add(el.dataset.step); else jobFoldsOpen.delete(el.dataset.step);
+}
+
+// What a step opens to on this page: the client's answer, the treatment's
+// record and certificate, the bait visits. They're stored on the quote (q,
+// THE JOB'S QUOTE in js/quote.js). '' for a step that opens its own screen
+// or sheet, or one with nothing to open yet.
+function jobStepPanel(st, q) {
+  if (st.to === 'answer') return quoteHasItems(q) ? quoteAnswerPanel(q) : '';
+  if (st.to === 'treatment') return q && q.treatment ? treatmentRecordLine(q) + treatmentCertificateCard(q) : '';
+  if (st.to === 'bait') return q ? renderBaitBlock(q) : '';
+  return '';
+}
+
 // The steps as cards, each with its document's icon in the colour of where
 // it's up to. tap(st) is the step's onclick. details: the Job details
-// step's card, which opens in place instead of going anywhere.
-function jobStepsHTML(j, steps, tap, details) {
+// step's card, which opens in place instead of going anywhere. A step that
+// can't be started yet (an answer or a treatment before there's a quote)
+// is a line, not a button.
+function jobStepsHTML(j, steps, tap, details, q) {
   const tick = '<svg class="icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
   const stateWord = { done: 'done', now: 'next', todo: 'to come', skip: 'not needed', bad: 'declined' };
   const chev = '<svg class="icon job-step-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
@@ -220,19 +244,50 @@ function jobStepsHTML(j, steps, tap, details) {
       ${jobStepsCounted(steps).map((st, i) => {
         const line = jobStepLine(j, st);
         if (st.to === 'details') return `<li class="${st.state}">${details}</li>`;
-        return `
-        <li class="${st.state}">
-          <button type="button" class="job-step" onclick="${tap(st)}" aria-label="${i + 1}. ${escapeHtml(st.label)}, ${stateWord[st.state] || ''}: ${escapeHtml(line)}">
-            <span class="job-tile ${st.state}" aria-hidden="true">${jobIcon(st.to, 20)}${st.state === 'done' ? `<span class="job-tile-tick">${tick}</span>` : ''}</span>
+        const label = `aria-label="${i + 1}. ${escapeHtml(st.label)}, ${stateWord[st.state] || ''}: ${escapeHtml(line)}"`;
+        const inner = `<span class="job-tile ${st.state}" aria-hidden="true">${jobIcon(st.to, 20)}${st.state === 'done' ? `<span class="job-tile-tick">${tick}</span>` : ''}</span>
             <span class="job-step-main">
               <span class="job-step-label">${st.label}${st.state === 'now' ? '<span class="job-step-flag">Next</span>' : ''}</span>
               <span class="job-step-text">${escapeHtml(line)}</span>
               ${st.to === 'report' && st.state === 'now' && !st.ready ? `<span class="job-step-bar"><i style="width:${Math.max(4, Math.min(100, pct))}%"></i></span>` : ''}
-            </span>
-            ${chev}
-          </button>
+            </span>`;
+        const panel = jobStepPanel(st, q);
+        if (panel) return `
+        <li class="${st.state}">
+          <details class="job-details job-fold" data-step="${st.to}"${jobFoldsOpen.has(st.to) ? ' open' : ''} ontoggle="jobFoldToggled(this)">
+            <summary class="job-details-head" ${label}>${inner}${chev}</summary>
+            <div class="job-fold-body">${panel}</div>
+          </details>
+        </li>`;
+        if ((st.to === 'answer' || st.to === 'treatment') && !quoteHasItems(q)) return `
+        <li class="${st.state}"><div class="job-step job-step-still" ${label.replace('aria-label', 'role="group" aria-label')}>${inner}</div></li>`;
+        return `
+        <li class="${st.state}">
+          <button type="button" class="job-step" onclick="${tap(st)}" ${label}>${inner}${chev}</button>
         </li>`; }).join('')}
     </ol>`;
+}
+
+// The Next step card's way to do the step. One that's done on this page
+// (the client's answer, the certificate, a bait visit's report) is done
+// from the card itself; the rest open their screen or sheet.
+function jobNextAction(next, q) {
+  const to = next.next.to;
+  if (to === 'answer' && quoteHasItems(q)) return quoteAnswerButtons(q, true);
+  if (to === 'certificate' && q && q.treatment) return treatmentCertificateCard(q);
+  const b = to === 'bait' && q && typeof baitProgram === 'function' ? baitProgram(q) : null;
+  if (b && b.last && !b.last.sentAt) {
+    const first = (q.client || '').trim().split(/\s+/)[0];
+    return `<button type="button" class="dash-detail-primary" onclick="emailBaitVisit('${escapeHtml(b.last.id)}')">Email the visit report${first ? ' to ' + escapeHtml(first) : ''}</button>`;
+  }
+  return `<button type="button" class="dash-detail-primary" onclick="jobGo('${to}')">${next.next.label}</button>`;
+}
+
+// After a step is saved on this page: back up to the Next step card, which
+// now holds what follows it.
+function jobShowNext() {
+  const card = document.querySelector('#jobOverlay.open .job-next');
+  if (card) setTimeout(() => card.scrollIntoView({ block: 'center', behavior: 'smooth' }), 60);
 }
 
 // The job page's icons: one per document, plus the hero's actions.
@@ -256,11 +311,15 @@ function jobIcon(name, size) {
   return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${JOB_ICONS[name] || JOB_ICONS.clock}</svg>`;
 }
 
-function renderJobPage() {
+function renderJobPage(opening) {
   const body = document.getElementById('jobPageBody');
   if (!body) return;
   parkJobPanel();
   const j = currentJobSummary();
+  // The job's quote, for the steps done on this page.
+  const showing = (opening || document.getElementById('jobOverlay').classList.contains('open')) && !quoteScreenOpen();
+  if (showing) useJobQuote(j.q);
+  const q = showing ? quoteState : j.q;
   const addr = (j.r.address || '').trim();
   // No street address yet: a new job, still being filled in.
   const isNew = !(document.getElementById('jobAddress').value || '').trim();
@@ -321,7 +380,7 @@ function renderJobPage() {
     </details>`;
   const stepsHTML = `
     <div class="job-section-head">Job steps</div>
-    ${jobStepsHTML(j, isNew ? steps.slice(1) : steps, st => `jobGo('${st.to}')`, detailsHTML)}
+    ${jobStepsHTML(j, isNew ? steps.slice(1) : steps, st => `jobGo('${st.to}')`, detailsHTML, q)}
     ${isNew ? '' : jobSkippedHTML(j, steps)}`;
   // A new job: what to fill in, the form, then the agreement as the next step.
   if (isNew) {
@@ -369,7 +428,7 @@ function renderJobPage() {
       </div>
       ${next.hint ? `<p class="dash-next-hint">${escapeHtml(next.hint)}</p>` : ''}
       ${finalise ? finalise.html : ''}
-      ${next.next ? `<button type="button" class="dash-detail-primary" onclick="jobGo('${next.next.to}')">${next.next.label}</button>` : ''}
+      ${next.next ? jobNextAction(next, q) : ''}
       ${waitLinks || skipLink ? `<div class="dash-detail-links">${waitLinks || skipLink}</div>` : ''}
     </section>
     ${stepsHTML}
@@ -379,42 +438,45 @@ function renderJobPage() {
     </div>` : ''}`;
   const panel = document.getElementById('jobPanel');
   if (panel) document.getElementById('jobPageSlot').appendChild(panel);
+  // A quote out on a link is checked for the client's answer as the page is read.
+  if (showing && q && !q.answer && quoteLinkCurrent(q)) checkQuoteLink(q, false);
+  // The certificate's Email button builds its PDF inside the tap, so the PDF tools are fetched ahead.
+  if (showing && q && q.treatment && !certificateGiven(q)) ensureJsPDFLoaded().catch(() => {});
 }
 
-// Opens one of the open job's documents from its page (or from the strip
-// at the top of a document).
-// from: where it was opened from ('jobs', 'job', 'report', 'quote'), read
+// Goes to one of the open job's steps, from its page or the Jobs list.
+// The report and the quote open their screen and the agreement its sheet;
+// the client's answer, the treatment, the certificate and bait visits are
+// on This job, so it opens (with the sheet over it for one that has one).
+// from: where it was asked for ('jobs', 'job', 'report', 'quote'), read
 // off the screen when not given. A sheet closed unfinished goes back there
 // (SHEETS OPENED FROM A PAGE in js/app/shell.js).
 function jobGo(to, from) {
   from = from || navPlace();
-  closeJobPage();
-  if (document.getElementById('quoteScreen').classList.contains('open') && to !== 'quote' && to !== 'answer' && to !== 'treatment' && to !== 'certificate' && to !== 'bait') {
+  const onJob = to === 'job' || to === 'details' || to === 'answer' || to === 'treatment' || to === 'certificate' || to === 'bait';
+  if (!onJob) closeJobPage();
+  if (document.getElementById('quoteScreen').classList.contains('open') && to !== 'quote') {
     closeQuote();
     if (document.getElementById('app').style.display !== 'flex') openApp('inspect');
   }
-  if (to === 'job') { openJobPage(); return; }
-  if (to === 'details') { openJobPage(); const f = document.getElementById('jobDetailsFold'); if (f) f.open = true; document.getElementById('jobDetailsHead')?.scrollIntoView({ block: 'start' }); return; }
   if (to === 'agreement') { openAgreementSheet(); rememberSheetFrom('agreementOverlay', from); return; }
   if (to === 'report') return;
-  if (!document.getElementById('quoteScreen').classList.contains('open')) openQuoteFromReport();
-  if (to === 'treatment') { openTreatmentRecord(); rememberSheetFrom('treatmentOverlay', from); }
-  if (to === 'bait') {
-    const card = document.getElementById('qpBait');
-    if (card) card.scrollIntoView({ block: 'center' });
-    // Nothing recorded yet, or a check due: straight onto the sheet.
-    const b = typeof baitProgram === 'function' ? baitProgram(quoteState) : null;
-    if (b && !b.finished && !(b.last && !b.last.sentAt) && (b.dueNow || !b.visits.length || !card)) { openBaitVisit(); rememberSheetFrom('baitOverlay', from); }
-  }
-  if (to === 'answer' || to === 'certificate') {
-    const step = document.getElementById('qgStep3');
-    if (step) step.scrollIntoView({ block: 'center' });
+  if (to === 'quote') { if (!document.getElementById('quoteScreen').classList.contains('open')) openQuoteFromReport(); return; }
+  if (to === 'job') { closeJobPage(); openJobPage(); return; }
+  if (!document.getElementById('jobOverlay').classList.contains('open')) openJobPage();
+  if (to === 'details') { const f = document.getElementById('jobDetailsFold'); if (f) f.open = true; document.getElementById('jobDetailsHead')?.scrollIntoView({ block: 'start' }); return; }
+  const q = quoteState;
+  if (to === 'treatment' && q) { openTreatmentRecord(); rememberSheetFrom('treatmentOverlay', from); }
+  if (to === 'bait' && q && typeof baitProgram === 'function') {
+    // A visit's report still to email is on the Next step card. Otherwise
+    // it's a visit to record: straight onto the sheet.
+    const b = baitProgram(q);
+    if (b && !b.finished && !(b.last && !b.last.sentAt)) { openBaitVisit(); rememberSheetFrom('baitOverlay', from); }
   }
   // The certificate's Email button, lit so it's the obvious next tap.
   if (to === 'certificate') {
-    ensureJsPDFLoaded().catch(() => {});
-    const btn = document.querySelector('#quoteAnswer .qp-cert-email');
-    if (btn) { btn.scrollIntoView({ block: 'center' }); btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 2400); }
+    const btn = document.querySelector('#jobOverlay .job-next .qp-cert-email');
+    if (btn) { btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 2400); }
   }
 }
 
@@ -438,35 +500,6 @@ function saveJobNow(later) {
   if (!saveCurrentReport(true)) return;
   showToast(later ? 'Saved to your jobs' : 'Job saved', 'success');
   if (later) tabGo('dashboard'); else refreshDashboardIfOpen();
-}
-
-// The strip at the top of the report and the quote: back to the job's page,
-// then its documents, the one on show lit. Treatment joins once the client
-// has accepted (or once it's recorded), Bait visits once stations are in.
-function renderDocStrips() {
-  if (typeof quoteHasItems !== 'function') return; // js/quote.js not loaded yet
-  const q = currentJobQuote();
-  const accepted = quoteHasItems(q) && (quoteAnswerState(q) || {}).status === 'accepted';
-  const docs = [['agreement', 'Agreement', !!reportData.agreement], ['report', 'Report'], ['quote', 'Quote', quoteHasItems(q)]];
-  if (accepted || q && q.treatment) docs.push(['treatment', 'Treatment', !!q.treatment]);
-  if (typeof baitInstalled === 'function' && baitInstalled(q)) docs.push(['bait', 'Bait visits', !!(baitProgram(q) || {}).finished]);
-  document.querySelectorAll('.doc-strip').forEach(strip => {
-    const here = strip.dataset.doc;
-    strip.innerHTML = `<button type="button" class="doc-chip doc-chip-job" onclick="jobGo('job')"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Job</button>`
-      + docs.map(([to, label, done]) => `<button type="button" class="doc-chip${to === here ? ' here' : ''}${done ? ' done' : ''}" ${to === here ? 'aria-current="page"' : `onclick="jobGo('${to}')"`}>${label}</button>`).join('');
-    if (!strip.dataset.fades) { strip.dataset.fades = '1'; strip.addEventListener('scroll', () => syncDocStripFade(strip), { passive: true }); }
-  });
-  requestAnimationFrame(() => document.querySelectorAll('.doc-strip').forEach(strip => syncDocStripFade(strip, true)));
-}
-
-// A strip too wide for the screen fades at the side with more to see. On a
-// redraw, the document on show is scrolled into view.
-function syncDocStripFade(strip, redraw) {
-  if (!strip.clientWidth) return;
-  const here = strip.querySelector('.doc-chip.here');
-  if (redraw && here && here.offsetLeft + here.offsetWidth > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = here.offsetLeft + here.offsetWidth - strip.clientWidth + 24;
-  strip.classList.toggle('more-right', strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 2);
-  strip.classList.toggle('more-left', strip.scrollLeft > 2);
 }
 
 // What the dock's tabs show about the job. This job: how far the job is
@@ -619,9 +652,6 @@ function updateJob() {
   const street = document.getElementById('tabJobStreet');
   if (street) street.textContent = document.getElementById('jobAddress').value.trim();
   if (typeof renderReportJobCard === 'function') renderReportJobCard();
-  document.getElementById('reportSubtitle').textContent = addr
-    ? `${addr} · Speak to populate fields`
-    : 'Enter job details and speak to populate fields';
 
   const summary = document.getElementById('jobPanelSummary');
   if (summary) {

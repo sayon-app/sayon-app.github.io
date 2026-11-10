@@ -889,7 +889,6 @@ function updateProgress() {
   renderReportJobCard();
   syncDockReport();
   syncDockJobs();
-  renderDocStrips();
   syncNothingFoundButtons();
   syncFindingsGroups();
   syncAccessGroups();

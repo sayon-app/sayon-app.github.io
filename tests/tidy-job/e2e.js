@@ -1,5 +1,5 @@
-// The tidied job screens: the certificates card (one line, Email / PDF /
-// Edit, "Mark as given" as a quiet link, both certificates in one PDF),
+// The tidied job screens: the certificates card on This job (one line,
+// Email / PDF, "Mark as given" as a quiet link, both certificates in one PDF),
 // Finalise as a finished job's next step, then the "Job finalised" card
 // (with what went in folded away), the voice panel docked on the dock and short
 // enough to read the report above it, and the quiet Say the quote row.
@@ -70,22 +70,27 @@ const emails = [];
   check(c && c.buttons.join('|') === 'Email it to me|Save PDF|Amend' && !c.primary && c.fold && !c.open && c.items === 5 && c.h < 240, `the PDF again and Amend, none of them shouting (${c && Math.round(c.h)}px)`);
   await p.locator('#jobOverlay .job-pdf').scrollIntoViewIfNeeded(); await shot('2-jobpdf-made');
 
-  // 2. The certificates card on the quote.
-  await p.evaluate(() => { closeJobPage(); jobGo('quote'); }); await p.waitForTimeout(1200);
-  await p.evaluate(() => { delete quoteState.certificateSentAt; delete quoteState.certificateHandedAt; renderQuoteAnswer(); }); await p.waitForTimeout(400);
+  // 2. The certificates card, on This job: its Next step card while the
+  // certificate is still to give, then under the Treatment step.
+  await p.evaluate(() => { delete quoteState.certificateSentAt; delete quoteState.certificateHandedAt; persistQuote(); storeQuoteOnReport(quoteState, false); renderQuoteProgress(); document.getElementById('jobPageBody').scrollTop = 0; }); await p.waitForTimeout(400);
   const cert = () => p.evaluate(() => {
-    const el = document.querySelector('#quoteAnswer .qp-cert:not(.bait-card)');
-    return { title: el.querySelector('.qp-cert-title').textContent, text: el.querySelector('.qp-cert-text').textContent,
+    const next = document.querySelector('#jobOverlay .job-next .qp-cert');
+    const fold = document.querySelector('#jobOverlay .job-fold[data-step="treatment"]');
+    if (!next && fold) fold.open = true;
+    const el = next || fold.querySelector('.qp-cert');
+    return { where: next ? 'next' : 'step', title: el.querySelector('.qp-cert-title').textContent, text: el.querySelector('.qp-cert-text').textContent,
       buttons: [...el.querySelectorAll('.qp-cert-actions button')].map(x => x.textContent.trim()), handed: (el.querySelector('.qp-cert-handed') || {}).textContent || '',
-      rows: new Set([...el.querySelectorAll('.qp-cert-actions button')].map(x => Math.round(x.getBoundingClientRect().top))).size, h: el.getBoundingClientRect().height };
+      rows: new Set([...el.querySelectorAll('.qp-cert-actions button')].map(x => Math.round(x.getBoundingClientRect().top))).size, h: el.getBoundingClientRect().height,
+      nextTitle: document.querySelector('#jobOverlay .job-next .dash-next-title').textContent, quote: document.getElementById('quoteScreen').classList.contains('open') };
   });
   let k = await cert();
   console.log('certificate card:', JSON.stringify(k));
+  check(k.where === 'next' && k.nextTitle === 'Email the certificate' && !k.quote, 'a certificate still to give is This job\'s Next step, done from its card (not inside the quote)');
   check(k.title === 'Treatment and installation certificates' && k.text === 'Goes to jordan@example.com', 'one line under the title: where they go');
-  check(k.buttons.join('|') === 'Email to Jordan|PDF|Edit' && k.rows === 1, 'three buttons on one row: Email to Jordan, PDF, Edit');
+  check(k.buttons.join('|') === 'Email to Jordan|PDF' && k.rows === 1, 'two buttons on one row: Email to Jordan, PDF');
   check(/^Handed them over in person\? Mark as given$/.test(k.handed), '"Mark as given" is a quiet link under them');
   check(k.h < 190, `the card is short (${Math.round(k.h)}px)`);
-  await p.locator('#quoteAnswer .qp-cert').first().scrollIntoViewIfNeeded(); await shot('3-cert');
+  await p.locator('#jobOverlay .job-next .qp-cert').scrollIntoViewIfNeeded(); await shot('3-cert');
   // PDF: both certificates in one file.
   const pdf = await p.evaluate(async () => {
     let got = null; const real = window.deliverPdfBlob;
@@ -101,15 +106,33 @@ const emails = [];
   });
   console.log('certificate pdf:', JSON.stringify(pdf));
   check(pdf && pdf.pages === pdf.treat + pdf.install && /^SAYON_Certificates_/.test(pdf.fname), 'PDF gives both certificates as one file: ' + JSON.stringify(pdf));
-  await tap(p.locator('#quoteAnswer .qp-cert-handed'), 'Mark as given'); await p.waitForTimeout(600);
+  await tap(p.locator('#jobOverlay .job-next .qp-cert-handed'), 'Mark as given'); await p.waitForTimeout(600);
   k = await cert();
-  check(/^Given to Jordan Sample in person \d/.test(k.text) && k.buttons.join('|') === 'Email a copy|PDF|Edit' && !k.handed, 'marked as given: the line says so and the link goes: ' + k.text);
+  check(k.where === 'step' && /^Given to Jordan Sample in person \d/.test(k.text) && k.buttons.join('|') === 'Email a copy|PDF' && !k.handed, 'marked as given: the card moves under the Treatment step, its line says so and the link goes: ' + k.text);
+  const rec = await p.evaluate(() => document.querySelector('#jobOverlay .job-fold[data-step="treatment"] .job-fold-body').innerText.replace(/\s+/g, ' '));
+  check(/Treatment recorded: done on/.test(rec) && !/Edit the record/.test(rec), 'the step opens to the record; on a finalised job there is no Edit (that starts with Amend): ' + rec.slice(0, 90));
 
-  // 3. The Say the quote row.
-  const say = await p.evaluate(() => { const v = document.getElementById('quoteVoice'); const r = v.getBoundingClientRect(); return { h: r.height, label: v.querySelector('.sheet-voice-label').textContent, hint: v.querySelector('.sheet-voice-hint').textContent }; });
-  console.log('say box:', JSON.stringify(say));
-  check(say.label === 'Say the quote' && say.h < 100, `Say the quote is one quiet row (${Math.round(say.h)}px)`);
-  await p.locator('#quoteVoice').scrollIntoViewIfNeeded(); await shot('4-say-quote');
+  // 3. The quote of a job that's finished: only the quote. Say the quote and
+  // the second opinion have stepped aside, the work is folded to its total
+  // and Send again is a quiet button.
+  await p.evaluate(() => jobGo('quote')); await p.waitForTimeout(1200);
+  const gone = await p.evaluate(() => { const vis = id => { const el = document.getElementById(id); return !!el && el.getBoundingClientRect().height > 0; };
+    return { say: vis('quoteVoice'), opinion: vis('quoteAiPlan'), workOpen: document.getElementById('quoteWorkFold').open, total: document.getElementById('quoteWorkTotal').textContent,
+      send: document.getElementById('quoteSendLabel').textContent, filled: document.getElementById('quoteEmailBtn').classList.contains('primary'),
+      steps: document.querySelectorAll('#quoteScreen .qp-step, #quoteScreen .qp-cert, #quoteScreen .bait-card').length, parts: [...document.querySelectorAll('#quoteParts .quote-fold .quote-card-title')].map(x => x.textContent).join('|') }; });
+  console.log('finished quote:', JSON.stringify(gone));
+  check(!gone.say && !gone.opinion, 'on a quote that has gone, Say the quote and the second opinion step aside');
+  check(!gone.workOpen && /^\$/.test(gone.total) && gone.parts === 'Scope of works|Treatment plan|Terms|Client details', 'its parts are folded, the work first with its total and the client last: ' + gone.parts);
+  check(gone.send === 'Send again' && !gone.filled, 'Send again is the quiet button beside PDF');
+  check(!gone.steps, 'the quote screen has no steps of its own: the answer, the treatment and bait visits are on This job');
+  await shot('4-quote-gone');
+  // The job is finalised: the quote's parts open to read, but nothing in
+  // them takes an edit.
+  await p.evaluate(() => { const f = document.getElementById('quoteTermsFold'); f.open = true; f.scrollIntoView({ block: 'start' }); }); await p.waitForTimeout(300);
+  const termsBefore = await p.inputValue('#qPaymentTerms');
+  await p.locator('#qPaymentTerms').click({ force: true }).catch(() => {}); await p.waitForTimeout(300);
+  const lockedQuote = await p.evaluate(() => ({ locked: isQuoteLocked(), note: document.getElementById('quoteLockNote').getBoundingClientRect().height > 0, focus: document.activeElement && document.activeElement.id, toast: (document.getElementById('toast') || {}).innerText || '' }));
+  check(lockedQuote.locked && lockedQuote.note && lockedQuote.focus !== 'qPaymentTerms' && /finalised and locked/.test(lockedQuote.toast) && await p.inputValue('#qPaymentTerms') === termsBefore, 'a finalised job\'s quote opens to read but its fields don\'t take an edit: ' + lockedQuote.toast.replace(/\s+/g, ' ').slice(0, 70));
 
   // 4. The voice panel, on a new job's report.
   await p.evaluate(() => { closeQuote(); startNewJob(); closeJobPage(); }); await p.waitForTimeout(1200);

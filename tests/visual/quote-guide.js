@@ -1,5 +1,5 @@
-// The quote guide's Write the quote step, for before and after shots: its
-// four folds closed, then the client and the work open, in light and dark.
+// The quote's parts, for before and after shots: its four folds closed,
+// then the client and the work open, in light and dark.
 // node quote-guide.js <outDir> [w]  (serve the repo on :8765; see README.md)
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2] || '/tmp/quote-guide'; fs.mkdirSync(OUT, { recursive: true });
@@ -22,11 +22,11 @@ const sc = require('./scenarios.js').find(s => s.name === 'standard');
     document.getElementById('jobClientEmail').value = 'sam@example.com'; updateJob();
     await populateFields(sc.fields); saveCurrentReport(true); openQuoteFromReport();
     quoteState.clientEmail = 'sam@example.com';
-    persistQuote(); renderQuoteAnswer();
+    persistQuote(); renderQuoteProgress();
   }, { sc });
   await p.waitForTimeout(500);
   for (const mode of ['light', 'dark']) {
-    await p.evaluate(m => { document.body.classList.toggle('dark-screen', m === 'dark'); document.querySelectorAll('#quoteAnswer .quote-fold').forEach(f => f.open = false); document.getElementById('quoteAnswer').scrollIntoView({ block: 'start' }); }, mode);
+    await p.evaluate(m => { document.body.classList.toggle('dark-screen', m === 'dark'); document.querySelectorAll('#quoteParts .quote-fold').forEach(f => f.open = false); document.getElementById('quoteParts').scrollIntoView({ block: 'start' }); }, mode);
     await p.waitForTimeout(400); await p.screenshot({ path: `${OUT}/${mode}-1-folds.png` });
     await p.evaluate(() => { document.getElementById('quoteDetailsFold').open = true; document.getElementById('quoteDetailsFold').scrollIntoView({ block: 'start' }); });
     await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/${mode}-2-client.png` });

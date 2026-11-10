@@ -91,8 +91,12 @@ let shotN = 0;
   check(!/Check \d+ prices?|Set the service period/.test(guide), 'the sent quote asks for nothing more: no prices to check, a service period set');
   await tap(p.locator('#quotePdfBtn'), 'quote PDF'); await p.waitForTimeout(2500);
   check(await priceList() === pricesBefore, 'saving the sample\'s quote PDF leaves the price list alone');
-  await tap(p.locator('#quoteScreen .doc-chip', { hasText: 'Treatment' }), 'Treatment chip'); await p.waitForTimeout(1200); await shot('treatment');
-  await p.evaluate(() => { if (document.getElementById('treatmentOverlay')?.classList.contains('open')) closeTreatmentRecord(); jobGo('job'); }); await p.waitForTimeout(800);
+  // Back to This job, where the treatment and its certificate are.
+  await tap(p.locator('#quoteScreen .quote-topbar-back'), 'Back to the job'); await p.waitForTimeout(800);
+  await tap(p.locator('#jobOverlay .job-fold[data-step="treatment"] > summary'), 'Treatment step'); await p.waitForTimeout(500); await shot('treatment');
+  const treat = await p.evaluate(() => document.querySelector('#jobOverlay .job-fold[data-step="treatment"] .job-fold-body').innerText.replace(/\s+/g, ' '));
+  check(/Treatment recorded/.test(treat) && /certificate/i.test(treat) && /Email again|Email a copy/.test(treat), 'the Treatment step opens in place to the record and its certificate: ' + treat.slice(0, 140));
+  await p.evaluate(() => jobGo('job')); await p.waitForTimeout(800);
 
   // 3. Finalise: one PDF, and emailing it goes to the business.
   await tap(p.getByRole('button', { name: 'Finalise and email it to me' }), 'Finalise and email it to me'); await p.waitForTimeout(6000); await shot('after-email');

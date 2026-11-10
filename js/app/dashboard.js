@@ -137,7 +137,7 @@ function dashboardJob(r, quotes) {
   } else if (!a) {
     group = q.sentAt ? 'waiting' : 'todo';
     status = q.sentAt ? `Quote sent ${dashDate(q.sentAt)}` : 'Send the quote';
-    hint = q.sentAt ? 'Waiting on ' + who + '. When they answer, record it on the quote.' : 'The quote is priced. Send it to ' + who + '.';
+    hint = q.sentAt ? 'Waiting on ' + who + '. Record their answer when it comes.' : 'The quote is priced. Send it to ' + who + '.';
     next = { label: q.sentAt ? 'Record their answer' : 'Send the quote', to: q.sentAt ? 'answer' : 'quote' };
   } else if (a.stale) {
     group = 'todo'; status = 'Quote changed, get a new answer';

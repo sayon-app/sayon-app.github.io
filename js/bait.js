@@ -103,7 +103,7 @@ function baitVisitNumber(q, v) {
   return `${treatmentCertNumber(q, 'BV')}-${n || 1}`;
 }
 
-// ── ON THE QUOTE ── Under the treatment certificate.
+// ── ON THIS JOB ── What the Bait station visits step opens to (js/app/job.js).
 function renderBaitBlock(q) {
   const b = baitProgram(q);
   if (!b) return '';
@@ -444,12 +444,12 @@ function saveBaitVisit() {
   persistQuote();
   storeQuoteOnReport(q, true);
   closeBaitVisit();
-  renderQuoteAnswer();
+  renderQuoteProgress();
   refreshJobsList();
   showToast(visit.sentAt ? 'Visit saved' : 'Visit saved. Email the client their visit report', 'success');
   track('bait_visit_recorded', { stations: visit.stations.length, active: visit.stations.filter(s => BAIT_FEEDING.includes(s.status)).length, finished: visit.finished });
-  // The report to email is the next tap.
-  setTimeout(() => { const card = document.getElementById('qpBait'); if (card) card.scrollIntoView({ block: 'center' }); }, 60);
+  // The report to email is This job's next step.
+  jobShowNext();
 }
 
 // ── SAID INSTEAD OF TYPED ──
@@ -556,7 +556,9 @@ function emailBaitVisit(id) {
     body: clientMessage({ client: q.client, address: q.address, docs: 'bait station visit report', signOff: v.technician }),
   }).then(sent => {
     if (!sent) return;
-    v.sentAt = Date.now();
+    // Found again, in case the quote was read afresh while it sent.
+    const visit = (q.baitVisits || []).find(x => x.id === id) || v;
+    visit.sentAt = Date.now();
     storeSentQuote(q);
     track('bait_visit_sent');
   });

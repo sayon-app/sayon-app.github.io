@@ -24,7 +24,7 @@ let aiAnswer = {}; let lastSystem = '';
     return r.fulfill({ json: { plan: 'starter', status: 'active', ai_calls_used_this_period: 1, limit: 150 } });
   });
   await ctx.route(/supabase\.co/, r => r.fulfill({ json: r.request().url().includes('businesses?owner_id') ? [{ id: 'b1', name: sc.company.name, owner_id: uid, settings: {} }] : [] }));
-  await ctx.addInitScript((s) => { localStorage.setItem('korva_session', JSON.stringify(s)); localStorage.setItem('korva_onboarded_v1', '1'); }, sess);
+  await ctx.addInitScript((s) => { localStorage.setItem('korva_session', JSON.stringify(s)); localStorage.setItem('korva_onboarded_v1', '1'); localStorage.setItem('korva_onboarded_v1:u-owner', '1'); }, sess);
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(3000);
   await p.evaluate(async ({ sc }) => {
@@ -39,6 +39,20 @@ let aiAnswer = {}; let lastSystem = '';
   const start = await p.evaluate(() => ({ items: quoteState.items.map(i => ({ desc: i.desc, qty: i.qty, unit: i.unit, price: i.price, key: i.key })), box: !!document.getElementById('quoteVoice'), label: document.querySelector('#quoteVoice .sheet-voice-label').textContent }));
   console.log('lines from the report:', start.items.map(i => `${i.desc} ${i.qty} ${i.unit} $${i.price}`).join(' | '));
   check(start.box && start.label === 'Say the quote', 'the quote screen has a Say the quote button');
+  // A draft opens on its work: Say the quote, then the lines (open), with
+  // the second opinion under them and the client's details last.
+  const draft = await p.evaluate(() => {
+    const shown = [...document.querySelector('#quoteParts .qp-folds').children].filter(e => e.offsetParent).map(e => e.id);
+    const work = document.getElementById('quoteWorkFold'), hero = document.querySelector('.quote-hero-problem-text');
+    return { shown, workOpen: work.open, workTop: Math.round(work.getBoundingClientRect().top), vh: innerHeight,
+      purposeLines: hero ? Math.round(hero.getBoundingClientRect().height / parseFloat(getComputedStyle(hero).lineHeight)) : 0,
+      send: document.getElementById('quoteSendLabel').textContent, filled: document.getElementById('quoteEmailBtn').classList.contains('primary') };
+  });
+  console.log('draft quote:', JSON.stringify(draft));
+  check(draft.shown[0] === 'quoteVoice' && draft.shown[1] === 'quoteWorkFold' && draft.shown.indexOf('quoteAiPlan') === 2 && draft.shown[draft.shown.length - 1] === 'quoteDetailsFold', 'a draft lists Say the quote, the work, the second opinion, then the plan, terms and client: ' + draft.shown.join(', '));
+  check(draft.workOpen && draft.workTop < draft.vh * 0.6, `the work is open and starts on the first screen (${draft.workTop}px of ${draft.vh})`);
+  check(draft.purposeLines > 0 && draft.purposeLines <= 2, `the purpose of treatment is two lines at most (${draft.purposeLines})`);
+  check(draft.send === 'Send to client' && draft.filled, 'Send to client is the filled button on a draft');
 
   // Change the first line's quantity and price, take off the last line, add
   // monitoring at a price and a follow-up with no price, and set the terms.

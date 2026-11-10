@@ -63,9 +63,11 @@ let shotN = 0;
     quoteState.clientEmail = 'sam@example.com';
     quoteState.answer = { status: 'accepted', by: 'Sam Taylor', date: todayIsoDate(), method: 'signed', note: '', at: Date.now(), hash: quoteContentHash(quoteState) };
     persistQuote(); storeQuoteOnReport(quoteState, false);
-    renderQuoteAnswer();
+    // The treatment and the bait visits are done on This job.
+    closeQuote(); tabGo('job');
   }, { sc });
   await p.waitForTimeout(500);
+  const openBaitFold = () => p.evaluate(() => { const f = document.querySelector('#jobOverlay .job-fold[data-step="bait"]'); f.open = true; f.scrollIntoView({ block: 'center' }); });
 
   // 1. The record: the site is filled from the report, and the plan is one tap.
   await p.evaluate(() => openTreatmentRecord()); await p.waitForTimeout(500);
@@ -211,9 +213,9 @@ let shotN = 0;
   }
 
   // 5. The first visit takes its stations from the plan.
-  await p.evaluate(() => { quoteState.certificateSentAt = Date.now(); persistQuote(); renderQuoteAnswer(); });
+  await p.evaluate(() => { quoteState.certificateSentAt = Date.now(); persistQuote(); renderQuoteProgress(); });
   await p.waitForTimeout(300);
-  await p.evaluate(() => document.getElementById('qpBait').scrollIntoView({ block: 'center' })); await shot('bait-card-installed');
+  await openBaitFold(); await p.waitForTimeout(200); await shot('bait-card-installed');
   check(await p.evaluate(() => /Stations as installed/.test(document.getElementById('qpBait').innerText)), 'the bait card shows the stations as installed');
   await tap(p.locator('#qpBait button', { hasText: 'Record a visit' }), 'Record a visit'); await p.waitForTimeout(500);
   const v0 = await p.evaluate(() => baitDraft.stations.map(s => s.n + ':' + s.where));
@@ -224,6 +226,7 @@ let shotN = 0;
   await tap(p.locator('#bvStations .bait-station[data-i="2"] .bait-chip.damaged'), 'station 3 damaged');
   await tap(p.locator('.bait-rest-btn'), 'Rest are clear');
   await sign('#bvSigCanvas'); await tap(p.locator('#bvSaveBtn'), 'Save visit'); await p.waitForTimeout(800);
+  await openBaitFold(); await p.waitForTimeout(200);
   await p.evaluate(() => document.querySelector('#qpBait .bait-plan').scrollIntoView({ block: 'start' })); await shot('bait-card-visit');
   const card = await p.evaluate(() => ({ cap: document.querySelector('#qpBait .bait-plan-caption').textContent, legend: [...document.querySelectorAll('#qpBait .site-plan-legend li')].map(li => li.textContent) }));
   check(/Stations as found on/.test(card.cap) && card.legend.includes('Termites active') && card.legend.includes('Clear, no activity') && card.legend.includes('Damaged, missing or not checked'), 'the card colours each station by what the visit found');

@@ -104,9 +104,9 @@ async function setup(b, opts) {
   // The sample: treatment record from This job, ✕ back to This job; typed, Esc keeps it.
   await openCard('Example Street');
   await p.evaluate(() => jobGo('treatment')); await p.waitForTimeout(900);
-  check(await where() === 'quote+treatmentOverlay', 'the treatment record opens over the quote');
+  check(await where() === 'job+treatmentOverlay', 'the treatment record opens over This job, not inside the quote');
   await p.click('#treatmentOverlay .voice-popover-close'); await p.waitForTimeout(700);
-  check(await where() === 'job', 'its ✕ goes back to This job (not left on the quote)');
+  check(await where() === 'job', 'its ✕ leaves This job as it was');
   await p.evaluate(() => jobGo('treatment')); await p.waitForTimeout(900);
   await p.evaluate(() => { const el = document.getElementById('trWeather'); el.value = 'Overcast, 18°C'; el.dispatchEvent(new Event('input', { bubbles: true })); }); await p.waitForTimeout(800);
   await p.keyboard.press('Escape'); await p.waitForTimeout(700);
@@ -115,17 +115,21 @@ async function setup(b, opts) {
   check(await p.inputValue('#trWeather') === 'Overcast, 18°C', 'what was typed before Esc is still there when it opens again');
   await p.click('#treatmentOverlay .voice-popover-close'); await p.waitForTimeout(500);
 
-  // 4. The quote: folded, it has its own back button.
+  // 4. The quote and the report: one top row each, with a back button to This job.
   await p.evaluate(() => jobGo('quote')); await p.waitForTimeout(900);
-  await p.evaluate(() => { if (!document.getElementById('quoteScreen').classList.contains('top-folded')) toggleQuoteBar('top'); }); await p.waitForTimeout(300);
-  check(await p.locator('.quote-topbar-back').isVisible(), 'the folded quote bar shows a back button');
-  await shot('03-quote-folded');
+  const qtop = await p.evaluate(() => { const bar = document.querySelector('#quoteScreen .quote-topbar').getBoundingClientRect(); const first = document.getElementById('quoteHead').getBoundingClientRect();
+    return { chips: document.querySelectorAll('.doc-chip, .doc-strip').length, folds: document.querySelectorAll('#quoteTopFold, #quoteBottomFold').length, gap: Math.round(first.top - bar.bottom) }; });
+  check(await p.locator('.quote-topbar-back').isVisible() && !qtop.chips && !qtop.folds && qtop.gap < 40, 'the quote has one top row with a back button: no document chips, nothing to fold, the quote straight under it: ' + JSON.stringify(qtop));
+  await shot('03-quote-top');
   await p.click('.quote-topbar-back'); await p.waitForTimeout(600);
   check(await where() === 'job', 'it goes back to This job');
-  await p.evaluate(() => { jobGo('quote'); toggleQuoteBar('top'); }); await p.waitForTimeout(700);
-  const fade = await p.evaluate(() => { const s = document.querySelector('#quoteScreen .doc-strip'); return { cls: s.className, over: s.scrollWidth > s.clientWidth }; });
-  check(!fade.over || /more-right/.test(fade.cls), 'the documents strip fades at the side when it runs off the screen: ' + JSON.stringify(fade));
-  await shot('04-quote-strip');
+  await p.evaluate(() => jobGo('report')); await p.waitForTimeout(600);
+  const rtop = await p.evaluate(() => { const head = document.querySelector('#app > header').getBoundingClientRect(); const tabs = document.querySelector('.section-tabs').getBoundingClientRect();
+    return { logo: !!document.querySelector('#app > header .app-logo'), addr: document.getElementById('headerJob').textContent, ring: !!document.querySelector('#app > header .progress-ring-wrap'), gap: Math.round(tabs.top - head.bottom) }; });
+  check(await p.locator('#app > header .header-back').isVisible() && !rtop.logo && /Example Street/.test(rtop.addr) && rtop.ring && rtop.gap < 12, 'the report has one top row (back, the address, the ring) with the step tabs straight under it: ' + JSON.stringify(rtop));
+  await shot('04-report-top');
+  await p.click('#app > header .header-back'); await p.waitForTimeout(600);
+  check(await where() === 'job', 'its back button goes to This job too');
 
   // 5. Esc closes the top layer only: the photo viewer, then the menu page, then the menu.
   await p.evaluate(() => tabGo('menu')); await p.waitForTimeout(500);

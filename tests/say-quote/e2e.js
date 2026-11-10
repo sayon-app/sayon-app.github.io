@@ -86,7 +86,7 @@ let aiAnswer = {}; let lastSystem = '';
   // Locked: the button refuses.
   await p.evaluate(() => { reportData.issue = { version: 1, at: Date.now() }; sayQuote(); });
   await p.waitForTimeout(300);
-  check(/quote is locked/.test(await p.evaluate(() => document.getElementById('toast').innerText)) && await p.evaluate(() => !sheetVoice), 'a locked quote can\'t be changed by voice');
+  check(/finalised and locked/.test(await p.evaluate(() => document.getElementById('toast').innerText)) && await p.evaluate(() => !sheetVoice), 'a locked quote can\'t be changed by voice');
   await p.evaluate(() => { delete reportData.issue; });
 
   check(errs.length === 0, `no page errors ${errs.join(' | ')}`);

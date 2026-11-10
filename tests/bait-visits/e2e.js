@@ -60,6 +60,8 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
     document.getElementById('jobClientEmail').value = 'sam@example.com'; updateJob();
     await populateFields(sc.fields);
     reportData.sent = { at: Date.now() - 31 * 86400000, to: 'sam@example.com' };
+    const v = agreementFormValues();
+    reportData.agreement = { method: 'paper', signerName: 'Sam Taylor', signedAt: Date.now() - 32 * 86400000, inspectionDate: v.inspectionDate, fee: '350', notes: '', standard: v.standard, text: v.text };
     saveCurrentReport(true);
     directEmail = true;
     openQuoteFromReport();

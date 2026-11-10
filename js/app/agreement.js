@@ -383,7 +383,7 @@ function agreementLinkUrl(id) {
 }
 
 async function sendAgreementLink() {
-  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  if (isReportLocked()) { sayLocked(); return; }
   if (isSampleJob(currentReportId)) { showToast('The sample job doesn\'t make signing links. Try it on a real job', 'info'); return; }
   const signerName = document.getElementById('agreementSignerName').value.trim();
   if (!agreementTypeChosen()) { showToast('Choose the inspection type first: it sets the standard the agreement names', 'error'); return; }
@@ -570,7 +570,7 @@ function renderAgreementRemote() {
 }
 
 function removeAgreement() {
-  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  if (isReportLocked()) { sayLocked(); return; }
   if (!confirm('Remove the signed agreement from this report? The client will need to sign again.')) return;
   delete reportData.agreement;
   saveDraft();

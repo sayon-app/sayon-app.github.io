@@ -186,8 +186,9 @@ const ai = (obj) => ({ json: { content: [{ type: 'text', text: JSON.stringify(ob
   await p.evaluate(() => { reportData.issue = { version: 1 }; reportData.amending = false; });
   const lockedBefore = calls.length;
   await p.evaluate(id => describePhoto(id), ids.conducive); await p.waitForTimeout(200);
-  check(calls.length === lockedBefore && /locked/.test(await p.locator('#toast').textContent()), 'a complete, locked job can\'t be described');
-  await p.evaluate(() => { delete reportData.issue; });
+  check(calls.length === lockedBefore && /locked/.test(await p.locator('#toast').textContent()), 'a finalised, locked job can\'t be described');
+  await p.evaluate(() => { delete reportData.issue; dismissToast(); });
+  check(await p.evaluate(() => getComputedStyle(document.getElementById('toast')).pointerEvents) === 'none', 'a note with a button stops catching taps once it has gone');
 
   // ── Larger text ──
   await p.evaluate(() => { document.documentElement.style.setProperty('--ts', '1.3'); showSection('findings'); });

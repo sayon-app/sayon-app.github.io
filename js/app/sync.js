@@ -704,6 +704,10 @@ function saveCurrentReport(quiet) {
   // This phone's side of a sync clash keeps its tag, so the two jobs for
   // one address can be told apart until one is deleted.
   if (prev && prev.conflictCopy) entry.conflictCopy = true;
+  // The report changed after it went to the client: the Jobs list and the
+  // job's page say to send it again (dashboardJob in js/app/dashboard.js).
+  const went = reportData.sent || reportData.issue;
+  if (went && !isReportLocked() && !reportMatches(went.fingerprint)) entry.reportStale = true;
 
   const existingIndex = reports.findIndex(r => r.id === id);
   if (existingIndex >= 0) {

@@ -1576,7 +1576,7 @@ function compassPointFor(h) {
 }
 
 async function openCompass() {
-  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  if (isReportLocked()) { sayLocked(); return; }
   commitActive();
   compassTarget = null;
   compassHeading = null;

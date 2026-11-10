@@ -1,7 +1,7 @@
 // The tidied job screens: the certificates card (one line, Email / PDF /
 // Edit, "Mark as given" as a quiet link, both certificates in one PDF),
-// the job PDF card ("Ready to finalise", then "Job finalised", with what
-// went in folded away), the voice panel docked on the dock and short
+// Finalise as a finished job's next step, then the "Job finalised" card
+// (with what went in folded away), the voice panel docked on the dock and short
 // enough to read the report above it, and the quiet Say the quote row.
 // node e2e.js <outDir>   (serve the repo on :8765; see tests/visual/README.md)
 const { chromium } = require('playwright'); const fs = require('fs');
@@ -42,27 +42,32 @@ const emails = [];
   await tap(p.getByRole('button', { name: /See a finished sample job first/i }), 'See a finished sample job first');
   await p.waitForTimeout(1800);
 
-  // 1. The job PDF card, before it's made.
+  // 1. Finalise is the finished job's next step; the card is its record after.
+  const next = () => p.evaluate(() => {
+    const s = document.querySelector('#jobOverlay .job-next');
+    return { title: s.querySelector('.dash-next-title').textContent, main: (s.querySelector('.dash-detail-primary') || {}).textContent, buttons: [...s.querySelectorAll('button')].map(x => x.textContent.trim()),
+      fold: !!s.querySelector('details.job-pdf-more'), open: !!s.querySelector('details.job-pdf-more[open]'), items: s.querySelectorAll('.job-pdf-list li').length, h: s.getBoundingClientRect().height };
+  });
   const card = () => p.evaluate(() => {
     const s = document.querySelector('#jobOverlay .job-pdf');
     return s && { label: s.querySelector('.job-step-label').textContent, line: s.querySelector('.job-step-text').textContent, made: s.classList.contains('made'),
       buttons: [...s.querySelectorAll('.dash-detail-links button')].map(x => x.textContent.trim()), primary: !!s.querySelector('.job-pdf-btn.primary'),
       fold: !!s.querySelector('details.job-pdf-more'), open: !!s.querySelector('details.job-pdf-more[open]'), items: s.querySelectorAll('.job-pdf-list li').length, h: s.getBoundingClientRect().height };
   });
+  const n = await next();
   let c = await card();
-  console.log('job pdf card:', JSON.stringify(c));
-  check(c && c.label === 'Ready to finalise' && !c.made, 'a finished job\'s card reads "Ready to finalise"');
-  check(c && c.line === 'Agreement, report, quote and 2 certificates, in one PDF.', 'one line says what goes in: ' + (c && c.line));
-  check(c && c.buttons.join('|') === 'Email it to me|Save PDF' && c.primary, 'Email comes first and is the main button, then Save PDF');
-  check(c && c.fold && !c.open && c.items === 5, 'the five parts are listed, folded away');
-  check(c && c.h < 220, `the card is short (${c && Math.round(c.h)}px)`);
-  await p.locator('#jobOverlay .job-pdf').scrollIntoViewIfNeeded(); await shot('1-jobpdf-ready');
-  await tap(p.getByRole('button', { name: 'Email it to me' }), 'Email it to me'); await p.waitForTimeout(6000);
+  console.log('finalise, the next step:', JSON.stringify(n));
+  check(n.title === 'Finalise the job' && !c, 'a finished job\'s next step is "Finalise the job", and it\'s on the page once');
+  check(n.buttons.join('|') === 'Finalise and email it to me|Finalise and save the PDF' && n.main === 'Finalise and email it to me', 'Email comes first and is the main button, then Save: ' + n.buttons.join(' | '));
+  check(n.fold && !n.open && n.items === 5, 'the five parts are listed, folded away');
+  check(n.h < 340, `the card is short (${Math.round(n.h)}px)`);
+  await p.locator('#jobOverlay .job-next').scrollIntoViewIfNeeded(); await shot('1-finalise-next');
+  await tap(p.getByRole('button', { name: 'Finalise and email it to me' }), 'Finalise and email it to me'); await p.waitForTimeout(6000);
   c = await card();
   console.log('after email:', JSON.stringify(c));
   check(emails.length === 1, 'the job PDF was emailed');
-  check(c && c.label === 'Job finalised' && c.made && /^Emailed to Jordan Sample \d/.test(c.line) && /Agreement, report, quote and 2 certificates\.$/.test(c.line), 'once emailed it reads "Job finalised", who it went to and when: ' + (c && c.line));
-  check(c && !c.primary, 'once it\'s done, neither button shouts');
+  check(c && c.label === 'Job finalised' && c.made && /^Version 1, \d+ \w+ \d{4}\. Job PDF emailed to you \d+ \w+ \d{4}\.$/.test(c.line), 'once emailed the card reads "Job finalised", the version and where the PDF went: ' + (c && c.line));
+  check(c && c.buttons.join('|') === 'Email it to me|Save PDF|Amend' && !c.primary && c.fold && !c.open && c.items === 5 && c.h < 240, `the PDF again and Amend, none of them shouting (${c && Math.round(c.h)}px)`);
   await p.locator('#jobOverlay .job-pdf').scrollIntoViewIfNeeded(); await shot('2-jobpdf-made');
 
   // 2. The certificates card on the quote.

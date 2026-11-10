@@ -95,7 +95,7 @@ let shotN = 0;
   await p.evaluate(() => { if (document.getElementById('treatmentOverlay')?.classList.contains('open')) closeTreatmentRecord(); jobGo('job'); }); await p.waitForTimeout(800);
 
   // 3. Finalise: one PDF, and emailing it goes to the business.
-  await tap(p.getByRole('button', { name: 'Email it to me' }), 'Email it to me'); await p.waitForTimeout(6000); await shot('after-email');
+  await tap(p.getByRole('button', { name: 'Finalise and email it to me' }), 'Finalise and email it to me'); await p.waitForTimeout(6000); await shot('after-email');
   console.log('emails:', emails.map(e => `${e.subject} -> ${e.to} [${(e.attachments || []).map(a => a.filename)}]`));
   check(emails.length === 1 && emails[0].to === 'owner@example.com' && /^Sample: /.test(emails[0].subject), 'the sample\'s email goes to the business, marked Sample');
   if (emails[0]) { const s = Buffer.from(emails[0].attachments[0].content, 'base64'); fs.writeFileSync(`${OUT}/job-file.pdf`, s); check((s.toString('latin1').match(/\(SAMPLE\) Tj/g) || []).length >= 1, 'the job file carries SAMPLE'); }

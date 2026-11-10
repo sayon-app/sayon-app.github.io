@@ -125,23 +125,6 @@ function answerDidItSend(yes) {
   if (!yes) showToast('Not marked as sent', 'info');
 }
 
-// One "Sent" line per document the job has (report, quote, certificate),
-// for the report banner and the quote screen. Each: { label, at, stale, verb }.
-function sentDocs(rd, q) {
-  const sent = rd && rd.sent;
-  const docs = [{ label: 'Report', at: sent ? sent.at : null }];
-  if (quoteHasItems(q)) {
-    docs.push({ label: 'Quote', at: q.sentAt || null, stale: !!q.sentAt && q.sentHash !== quoteContentHash(q) });
-    if (q.treatment) docs.push({ label: 'Certificate', at: q.certificateSentAt || q.certificateHandedAt || null, verb: !q.certificateSentAt && q.certificateHandedAt ? 'Given' : '' });
-  }
-  return docs;
-}
-function renderSentLines(rd, q) {
-  return `<div class="doc-sent-lines">${sentDocs(rd, q).map(d =>
-    `<div class="doc-sent ${d.at ? (d.stale ? 'stale' : 'sent') : 'unsent'}"><span>${d.label}</span>` +
-    `<strong>${d.at ? `${d.verb || 'Sent'} ${formatIssueDate(d.at)}${d.stale ? ' · changed since' : ''}` : 'Not sent yet'}</strong></div>`).join('')}</div>`;
-}
-
 async function sendPdfsDirect({ files, to, subject, body }) {
   if (directEmailSending) return false;
   directEmailSending = true;

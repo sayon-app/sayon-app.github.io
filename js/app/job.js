@@ -138,6 +138,9 @@ function closeJobPage() {
 
 function jobAgreementStep(d = reportData) {
   const a = d.agreement;
+  // The inspection is over and the report has gone: an agreement that was
+  // never put on file isn't a step any more, just something to add.
+  if (!a && (d.sent || d.issue)) return { label: 'Agreement', to: 'agreement', state: 'skip', text: 'No agreement on file' };
   const sent = !a && d.agreementRequest;
   if (sent) return { label: 'Agreement', to: 'agreement', state: 'now', text: `Link sent${sent.signerName ? ' to ' + sent.signerName : ''}, waiting for them to sign` };
   if (!a) return { label: 'Agreement', to: 'agreement', state: 'now', text: 'Not signed yet. Get it signed before you start' };
@@ -152,8 +155,30 @@ function jobAgreementStep(d = reportData) {
 function jobPageSteps(j) {
   const d = j.r.reportData || {};
   const steps = [jobDetailsStep(j), jobAgreementStep(d), ...j.steps.map(st => ({ ...st }))];
-  if (!d.agreement) steps.slice(2).forEach(st => { if (st.state === 'now') st.state = 'todo'; });
+  if (!d.agreement && steps[1].state !== 'skip') steps.slice(2).forEach(st => { if (st.state === 'now') st.state = 'todo'; });
   return steps;
+}
+
+// The steps this job has. One it doesn't call for (no quote needed, no
+// treatment after a declined quote) isn't a step: it isn't listed, drawn
+// in a progress bar or counted, so a declined job reads "5 of 5".
+const jobStepsCounted = steps => steps.filter(st => st.state !== 'skip');
+const jobStepsDone = steps => steps.filter(st => st.state === 'done' || st.state === 'bad').length;
+
+// What the job skipped, as quiet lines under its steps, each with the one
+// thing that can still be done about it.
+function jobSkippedHTML(j, steps) {
+  const skipped = to => steps.some(st => st.to === to && st.state === 'skip');
+  const who = (j.r.client || '').trim().split(/\s+/)[0] || 'The client';
+  // On a finalised job these are the record; changing one starts with Amend.
+  const can = (onclick, label) => isReportLocked() ? '' : ` <button type="button" onclick="${onclick}">${label}</button>`;
+  const lines = [];
+  if (skipped('agreement')) lines.push(`No agreement on file.${can('jobGo(\'agreement\')', 'Add one signed on paper')}`);
+  if (skipped('quote')) lines.push(j.clientNotGoingAhead
+    ? `No quote: the client isn't going ahead.${can('setClientNotGoingAhead(false)', 'Write a quote after all')}`
+    : `No quote needed: the report didn't recommend treatment.${can('jobGo(\'quote\')', 'Write one anyway')}`);
+  else if (skipped('treatment')) lines.push(`No treatment: ${escapeHtml(who)} declined the quote.`);
+  return lines.length ? `<div class="job-skipped">${lines.map(l => `<p>${l}</p>`).join('')}</div>` : '';
 }
 
 // Job details: the job's first step, before the agreement and the report.
@@ -169,15 +194,17 @@ function jobDetailsStep(j) {
   return { label: 'Job details', to: 'details', state: named ? 'done' : 'todo', text: named ? reach : 'Still to add: the client\'s name' };
 }
 
-// A step's line: the fuller wording for one that's done or still to come
-// (when, who, how much), and what a later step is waiting on.
+// A step's line: when, who and how much for one that's done, and what one
+// still to come is waiting on. A step that's next says what's to do.
 function jobStepLine(j, st) {
-  const who = (j.r.client || '').trim().split(/\s+/)[0];
-  if (st.to === 'report' && st.state !== 'done' && st.state !== 'skip' && !st.ready) return `${Math.round(j.r.completion || 0)}% filled in`;
+  const who = (j.r.client || '').trim().split(/\s+/)[0] || 'the client';
+  const open = st.state === 'now' || st.state === 'todo';
+  if (st.to === 'report' && open && !st.ready) return `${Math.round(j.r.completion || 0)}% filled in`;
   if (st.to === 'quote' && j.total && st.state !== 'skip') return `${formatAUD(j.total).replace(/\.00$/, '')}${j.q && j.q.sentAt ? ', sent ' + dashDate(j.q.sentAt) : ', not sent yet'}`;
+  if (st.to === 'quote' && open) return 'Not written yet';
+  if (st.to === 'answer' && open) return j.q && j.q.sentAt ? `Waiting on ${who} since ${dashDate(j.q.sentAt)}` : 'Once the quote is sent';
+  if (st.to === 'treatment' && open) return quoteHasItems(j.q) && (quoteAnswerState(j.q) || {}).status === 'accepted' ? 'Accepted, not recorded yet' : `Once ${who} accepts`;
   if (st.state === 'now' || st.state === 'bad' || st.state === 'skip' || !st.full) return st.text;
-  if (st.state === 'todo' && st.to === 'answer') return j.q && j.q.sentAt ? `Waiting on ${who || 'the client'}` : 'Once the quote is sent';
-  if (st.state === 'todo' && st.to === 'treatment') return quoteHasItems(j.q) && (quoteAnswerState(j.q) || {}).status === 'accepted' ? 'Accepted, not recorded yet' : 'Once the client accepts';
   return st.full.replace(/ · /g, ', ');
 }
 
@@ -190,7 +217,7 @@ function jobStepsHTML(j, steps, tap, details) {
   const chev = '<svg class="icon job-step-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
   const pct = Math.round(j.r.completion || 0);
   return `<ol class="job-steps">
-      ${steps.map((st, i) => {
+      ${jobStepsCounted(steps).map((st, i) => {
         const line = jobStepLine(j, st);
         if (st.to === 'details') return `<li class="${st.state}">${details}</li>`;
         return `
@@ -238,24 +265,20 @@ function renderJobPage() {
   // No street address yet: a new job, still being filled in.
   const isNew = !(document.getElementById('jobAddress').value || '').trim();
   const steps = jobPageSteps(j);
-  // Before the agreement is signed, that is the next step. Once its link
-  // has gone, the job is waiting on the client and the card says so.
-  const next = !reportData.agreement && addr ? agreementNext(reportData, j.r.client)
-    : j.finished && !reportData.jobPdfAt && typeof jobPdfSectionHTML === 'function' ? {
-        status: 'Finalise the job',
-        hint: j.onlyReportUnsent
-          ? 'Everything\'s done except sending the report. Email the job PDF and the report goes with it, or send the report on its own.'
-          : 'Everything\'s done' + (j.group === 'waiting' ? ' apart from the bait station checks' : '') + '. Put it all into one PDF for the client or your records.',
-        next: j.onlyReportUnsent && jobClientEmailOf() ? { label: `Finalise and email to ${(j.r.client || '').trim().split(/\s+/)[0] || 'the client'}`, to: 'jobpdf-email' } : { label: 'Finalise job', to: 'jobpdf' } }
-    : { status: j.status, hint: j.hint, next: j.next };
+  // Before the agreement is signed, that is the next step (once its link
+  // has gone, the job is waiting on the client and the card says so). After
+  // the last step, Finalise is: it locks the job and makes its PDF.
+  const reportGone = !!(reportData.sent || reportData.issue);
+  const finalise = jobCanFinalise(j) && (!isReportLocked() || !reportData.jobPdfAt) ? jobFinaliseNext(j) : null;
+  const next = !reportData.agreement && addr && !reportGone ? agreementNext(reportData, j.r.client)
+    : finalise || { status: j.status, hint: j.hint, next: j.next };
   // Treatment recommended but the client isn't having a quote: skip it, and
   // the treatment and bait steps with it.
-  const skipLink = j.status === 'Write the quote' ? '<button type="button" onclick="setClientNotGoingAhead(true)">Client isn\'t going ahead</button>'
-    : j.clientNotGoingAhead && !quoteHasItems(j.q) ? '<button type="button" onclick="setClientNotGoingAhead(false)">Write a quote after all</button>' : '';
+  const skipLink = j.status === 'Write the quote' ? '<button type="button" onclick="setClientNotGoingAhead(true)">Client isn\'t going ahead</button>' : '';
   // Waiting on the client to sign: ask now instead of opening the agreement to find out.
   const waitLinks = next.sent ? '<button type="button" onclick="checkAgreementLink(true)">Check now</button><button type="button" onclick="sendAgreementLinkOn()">Send again</button>' : '';
 
-  const done = steps.filter(st => st.state === 'done' || st.state === 'skip').length;
+  const counted = jobStepsCounted(steps), done = jobStepsDone(steps);
   // What the job is and when, over the address.
   const type = (reportData.jobInspectionType || '').split(' — ')[0];
   const when = reportData.jobInspectionDate ? new Date(reportData.jobInspectionDate + 'T00:00:00') : null;
@@ -271,7 +294,7 @@ function renderJobPage() {
     email && `<a class="job-act" href="mailto:${escapeHtml(email)}">${jobIcon('mail', 18)}Email</a>`,
     addr && `<a class="job-act" href="https://maps.apple.com/?q=${encodeURIComponent(addr)}" target="_blank" rel="noopener">${jobIcon('directions', 18)}Directions</a>`,
   ].filter(Boolean).join('');
-  const nextIcon = next.next ? (next.next.to.startsWith('jobpdf') ? 'jobpdf' : next.next.to) : j.group === 'done' && addr ? 'tick' : !addr ? 'details' : 'clock';
+  const nextIcon = finalise ? 'jobpdf' : next.next ? next.next.to : j.group === 'done' && addr ? 'tick' : !addr ? 'details' : 'clock';
   const chev = '<svg class="icon job-step-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
   const group = (DASHBOARD_TABS.find(([k]) => k === j.group) || [, ''])[1];
   // Job details come first, as they do on the job: before the agreement and
@@ -298,7 +321,8 @@ function renderJobPage() {
     </details>`;
   const stepsHTML = `
     <div class="job-section-head">Job steps</div>
-    ${jobStepsHTML(j, isNew ? steps.slice(1) : steps, st => `jobGo('${st.to}')`, detailsHTML)}`;
+    ${jobStepsHTML(j, isNew ? steps.slice(1) : steps, st => `jobGo('${st.to}')`, detailsHTML)}
+    ${isNew ? '' : jobSkippedHTML(j, steps)}`;
   // A new job: what to fill in, the form, then the agreement as the next step.
   if (isNew) {
     body.innerHTML = `
@@ -328,27 +352,28 @@ function renderJobPage() {
   body.innerHTML = `
     ${isSampleJob(currentReportId) && typeof sampleJobNoteHTML === 'function' ? sampleJobNoteHTML() : ''}
     <div class="job-hero ${j.group}">
-      ${addr ? `<div class="job-hero-top"><span class="dash-detail-chip ${j.group}">${group}</span><span class="job-hero-count">${done} of ${steps.length} done</span></div>` : ''}
+      ${addr ? `<div class="job-hero-top"><span class="dash-detail-chip ${j.group}">${group}</span><span class="job-hero-count">${done} of ${counted.length} done</span></div>` : ''}
       ${eyebrow ? `<div class="job-hero-eyebrow">${escapeHtml(eyebrow)}</div>` : ''}
       <h3 class="job-hero-addr">${escapeHtml(addr || 'New job')}</h3>
       ${j.r.client ? `<p class="job-hero-sub">${escapeHtml(j.r.client)}</p>` : ''}
-      ${addr ? `<div class="job-progress" aria-hidden="true">${steps.map(st => `<i class="${st.state}"></i>`).join('')}</div>` : ''}
+      ${addr ? `<div class="job-progress" aria-hidden="true">${counted.map(st => `<i class="${st.state}"></i>`).join('')}</div>` : ''}
       ${actions ? `<div class="job-acts">${actions}</div>` : ''}
     </div>
     <section class="dash-next job-next ${next.sent ? 'waiting' : j.group}">
       <div class="job-next-head">
-        <span class="job-tile ${j.group === 'done' && addr && !next.next ? 'done' : 'now'}" aria-hidden="true">${jobIcon(nextIcon, 22)}</span>
+        <span class="job-tile ${j.group === 'done' && addr && !next.next && !finalise ? 'done' : 'now'}" aria-hidden="true">${jobIcon(nextIcon, 22)}</span>
         <div>
-          <div class="dash-next-label">${next.next && !next.sent ? 'Next step' : addr ? 'Where it\'s at' : 'Next step'}</div>
+          <div class="dash-next-label">${finalise || next.next && !next.sent ? 'Next step' : addr ? 'Where it\'s at' : 'Next step'}</div>
           <div class="dash-next-title">${escapeHtml(next.status)}</div>
         </div>
       </div>
       ${next.hint ? `<p class="dash-next-hint">${escapeHtml(next.hint)}</p>` : ''}
+      ${finalise ? finalise.html : ''}
       ${next.next ? `<button type="button" class="dash-detail-primary" onclick="jobGo('${next.next.to}')">${next.next.label}</button>` : ''}
       ${waitLinks || skipLink ? `<div class="dash-detail-links">${waitLinks || skipLink}</div>` : ''}
     </section>
     ${stepsHTML}
-    ${typeof jobPdfSectionHTML === 'function' ? jobPdfSectionHTML(j) : ''}
+    ${jobFinalisedHTML(j)}
     ${currentReportId && !isSampleJob(currentReportId) && getSavedReports().some(r => r.id === currentReportId) ? `<div class="dash-detail-foot job-delete">
       <button type="button" class="dash-detail-delete" onclick="deleteThisJob()"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete this job</button>
     </div>` : ''}`;
@@ -362,7 +387,6 @@ function renderJobPage() {
 // off the screen when not given. A sheet closed unfinished goes back there
 // (SHEETS OPENED FROM A PAGE in js/app/shell.js).
 function jobGo(to, from) {
-  if (to === 'jobpdf' || to === 'jobpdf-email') { makeJobPdf(to === 'jobpdf' ? 'save' : 'email'); return; }
   from = from || navPlace();
   closeJobPage();
   if (document.getElementById('quoteScreen').classList.contains('open') && to !== 'quote' && to !== 'answer' && to !== 'treatment' && to !== 'certificate' && to !== 'bait') {
@@ -445,17 +469,23 @@ function syncDocStripFade(strip, redraw) {
   strip.classList.toggle('more-left', strip.scrollLeft > 2);
 }
 
-// What the dock's tabs show about the job. This job: how much of the
-// report's required answers are in, as a number, a tick once it's done.
-function syncDockReport(pct, locked) {
+// What the dock's tabs show about the job. This job: how far the job is
+// along its steps ("2/6", a tick once they're all done), the same count as
+// its page. The report's own percentage stays in the report's corner.
+function syncDockReport() { syncDockJobs(); }
+function renderDockJobSteps(quotes) {
   const badge = document.getElementById('tabReportRing');
   if (!badge) return;
-  const done = locked || pct >= 100;
-  const n = Math.max(0, Math.min(99, Math.round(pct || 0)));
-  badge.querySelector('.tab-progress-pct').textContent = n + '%';
-  badge.classList.toggle('done', done);
-  badge.classList.toggle('empty', !done && !n);
-  badge.closest('.tab').setAttribute('aria-label', done ? 'This job, report done' : `This job, report ${n}% filled in`);
+  const address = getFullAddress();
+  const saved = currentReportId && getSavedReports().find(r => r.id === currentReportId);
+  const j = dashboardJob({ id: currentReportId || 'draft', address, client: (document.getElementById('jobClient') || {}).value || '',
+    completion: calculateCompletion(), reportData, quote: currentJobQuote(), reportStale: !!(saved && saved.reportStale), savedAt: Date.now() }, quotes);
+  const steps = jobStepsCounted(jobPageSteps(j)), n = jobStepsDone(steps);
+  const all = !!address && n === steps.length;
+  badge.querySelector('.tab-progress-pct').textContent = `${n}/${steps.length}`;
+  badge.classList.toggle('done', all);
+  badge.classList.toggle('empty', !address);
+  badge.closest('.tab').setAttribute('aria-label', !address ? 'This job' : all ? 'This job, every step done' : `This job, ${n} of ${steps.length} steps done`);
 }
 
 // Jobs: how many need the inspector today. Quote: a dot in the colour of
@@ -467,6 +497,7 @@ function syncDockJobs() {
   dockJobsTimer = setTimeout(() => {
     try {
       const quotes = getSavedQuotes();
+      renderDockJobSteps(quotes);
       // The number in the Jobs headline: today's, not what's booked for later.
       const need = jobsNeedingYou(getSavedReports().map(r => dashboardJob(r, quotes))).today;
       const count = document.getElementById('tabJobsCount');
@@ -690,7 +721,8 @@ function renderLastVisitBanner() {
   const btn = document.getElementById('lastVisitBtn');
   const skip = document.getElementById('lastVisitSkip');
   const started = reportData.lastVisit;
-  const prev = started ? null : previousVisitFor();
+  // Starting from the last visit is for a report still being written.
+  const prev = started || isReportDone() ? null : previousVisitFor();
   if (started) {
     banner.hidden = false;
     text.textContent = `Started from the ${formatIssueDate(started.date)} inspection here.`;
@@ -719,7 +751,7 @@ function dismissLastVisit() {
 // Copies what doesn't change about the property, and only into blank
 // fields, so nothing the inspector has already said is overwritten.
 function startFromLastVisit() {
-  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  if (isReportLocked()) { sayLocked(); return; }
   const prev = previousVisitFor();
   if (!prev) { renderLastVisitBanner(); return; }
   const pr = prev.reportData || {};

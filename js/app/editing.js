@@ -877,7 +877,7 @@ function updateProgress() {
     const label = document.getElementById('progressRingLabel');
     if (label) { label.style.display = locked || done ? '' : 'none'; label.textContent = locked ? 'Complete' : 'Done'; }
   }
-  renderFinishNext();
+  renderFinishNext(total - filled);
   renderReportJobCard();
   syncDockReport(pct, locked || done);
   syncDockJobs();
@@ -890,10 +890,10 @@ function updateProgress() {
 
 // ── REPORT DONE ───────────────────────────────────────────────────────────
 // The inspector says the report is finished: reportData.doneAt. Every step
-// then reads done, the header and the dock show a tick, and the job moves
-// on to the quote or sending. It's a mark, not a lock: the report can still
-// be changed, and "Keep working on it" takes the mark off. Sending or
-// completing the job counts as done too.
+// then reads done, the header and the dock show a tick, a line at the top of
+// the report says so with the next step, and the job moves on to the quote
+// or sending. It's a mark, not a lock: the report can still be changed, and
+// "Keep working on it" takes the mark off. Sent or completed counts as done.
 function isReportDone() {
   return !!(reportData.doneAt || reportData.sent || reportData.issue);
 }
@@ -911,20 +911,38 @@ function setReportDone(on) {
   }
 }
 
-// The Finish step's end: Report done until it's ticked, then one big
-// button for the next step (the quote while the report recommends a
-// treatment and there's none yet, else sending) and the rest quiet.
-function renderFinishNext() {
+// What comes after the report: the quote while the report recommends a
+// treatment and there's none yet, else sending. 'sent' once it has gone
+// (and hasn't changed for an amendment since).
+function reportNextStep() {
+  const q = currentJobQuote(), hasQuote = quoteHasItems(q);
+  const wantsQuote = reportData.treatmentRecommended === 'YES' && !reportData.noQuoteNeeded;
+  const sent = reportData.sent, amending = reportData.amending;
+  const gone = !!sent && !(amending && sent.at < amending.startedAt);
+  return { q, hasQuote, wantsQuote, sent, gone, next: wantsQuote && !hasQuote ? 'quote' : gone ? 'sent' : 'send' };
+}
+
+// When it was ticked off or sent: "today", "yesterday", else the date.
+function doneWhen(ts) {
+  const w = dashWhen(ts);
+  return w === 'Today' || w === 'Yesterday' ? w.toLowerCase() : formatIssueDate(ts);
+}
+
+// The Finish step's end: Report done until it's ticked (with how many
+// required answers are still blank), then one big button for the next step
+// and the rest quiet. blank: required answers not filled in.
+function renderFinishNext(blank) {
   const doneBtn = document.getElementById('reportDoneBtn');
   if (!doneBtn || typeof quoteHasItems !== 'function') return;
   const done = isReportDone(), locked = isReportLocked();
-  const q = currentJobQuote(), hasQuote = quoteHasItems(q);
-  const wantsQuote = reportData.treatmentRecommended === 'YES' && !reportData.noQuoteNeeded;
-  const sent = reportData.sent;
+  const { q, hasQuote, wantsQuote, sent, next } = reportNextStep();
   doneBtn.hidden = done;
+  document.getElementById('reportDoneSub').textContent = blank > 0
+    ? `${blank} required answer${blank === 1 ? ' is' : 's are'} still blank. You can tick it off anyway.`
+    : 'Ticks it off on the job. You can still change it.';
   document.getElementById('finishDone').hidden = !done;
-  const at = reportData.doneAt || (reportData.issue && reportData.issue.completedAt) || (sent && sent.at);
-  document.getElementById('finishDoneWhen').textContent = locked ? 'Job complete and locked' : sent ? `Sent ${formatIssueDate(sent.at)}` : at ? `Ticked off ${formatIssueDate(at)}` : '';
+  document.getElementById('finishDoneWhen').textContent = locked ? 'Job complete and locked'
+    : sent ? `Sent ${doneWhen(sent.at)}` : reportData.doneAt ? `Ticked off ${doneWhen(reportData.doneAt)}` : '';
   // Only a plain mark comes off; a sent or completed report stays done.
   document.getElementById('finishDoneUndo').hidden = !reportData.doneAt || !!sent || !!reportData.issue;
   document.getElementById('finishNextLabel').hidden = !done;
@@ -934,14 +952,25 @@ function renderFinishNext() {
   shareBtn.hidden = !done;
   document.getElementById('finishQuoteTitle').textContent = hasQuote ? 'Open the quote' : 'Write the quote';
   document.getElementById('finishQuoteSub').textContent = hasQuote ? (q.sentAt ? 'Sent ' + formatIssueDate(q.sentAt) : 'Check it before it goes') : 'Starts from what the report found';
-  document.getElementById('shareTitle').textContent = sent ? 'Send it again' : 'Send to client';
-  document.getElementById('shareSub').textContent = sent ? 'Only if something changed since it went' : hasQuote ? 'Check the report, then email it with the quote' : 'Check the report, then email it';
-  // One big button: the quote first when it's still to write, else Send.
-  // Once it has gone, nothing shouts.
-  const quoteFirst = wantsQuote && !hasQuote;
-  quoteBtn.classList.toggle('primary', done && quoteFirst);
-  shareBtn.classList.toggle('primary', done && !quoteFirst && !sent);
-  if (quoteFirst) quoteBtn.after(shareBtn); else shareBtn.after(quoteBtn);
+  document.getElementById('shareTitle').textContent = next === 'sent' ? 'Send it again' : 'Send to client';
+  document.getElementById('shareSub').textContent = next === 'sent' ? 'Only if something changed since it went'
+    : hasQuote ? 'Check the report, then email it with the quote' : 'Check the report, then email it';
+  // One big button. Once everything has gone, nothing shouts.
+  quoteBtn.classList.toggle('primary', done && next === 'quote');
+  shareBtn.classList.toggle('primary', done && next === 'send');
+  if (next === 'quote') quoteBtn.after(shareBtn); else shareBtn.after(quoteBtn);
+
+  // The line at the top of every step, for a report done but not sent yet.
+  const banner = document.getElementById('reportDoneBanner');
+  if (banner) {
+    banner.hidden = !reportData.doneAt || !!sent || locked;
+    if (!banner.hidden) {
+      document.getElementById('reportDoneBannerText').textContent = `Report done ${doneWhen(reportData.doneAt)}. Next, ${next === 'quote' ? 'the quote' : 'send it to the client'}.`;
+      const btn = document.getElementById('reportDoneBannerBtn');
+      btn.textContent = next === 'quote' ? 'Write the quote' : 'Send to client';
+      btn.onclick = next === 'quote' ? () => tabGo('quote') : () => openSendReview();
+    }
+  }
 }
 
 // The Property step's Job details card: the address and client, then the

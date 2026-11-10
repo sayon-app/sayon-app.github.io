@@ -365,6 +365,10 @@ body:not(.dark-screen) .quote-bar-label, body:not(.dark-screen) .quote-bar-chev 
 .quote-fold-btn .icon { transition: transform 0.2s; }
 body:not(.dark-screen) .quote-fold-btn { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
 #quoteScreen.top-folded .doc-strip-bar { display: none; }
+/* With the strip folded away, its Job chip goes too: a back button stands in. */
+.quote-topbar-back { display: none; }
+#quoteScreen.top-folded .quote-topbar-back { display: flex; width: 32px; height: 32px; margin-left: -4px; }
+body:not(.dark-screen) .quote-topbar .drawer-back { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
 #quoteScreen.top-folded .quote-topbar { min-height: calc(42px + env(safe-area-inset-top, 0px)); padding-top: calc(4px + env(safe-area-inset-top, 0px)); padding-bottom: 4px; }
 #quoteScreen.top-folded .quote-topbar-title { font-size: calc(15px * var(--ts)); }
 #quoteScreen.top-folded .quote-fold-btn { width: 32px; height: 32px; }

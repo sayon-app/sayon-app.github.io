@@ -493,6 +493,7 @@ function treatmentSketchImage() {
 }
 
 function closeTreatmentRecord() {
+  forgetSheetFrom('treatmentOverlay');
   dropUnsavedSheet();
   cancelSheetVoice('treatment');
   document.getElementById('treatmentOverlay').classList.remove('open');

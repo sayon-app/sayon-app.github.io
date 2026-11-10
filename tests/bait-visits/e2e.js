@@ -175,17 +175,21 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   await tap(p.locator('#bvSaveBtn'), 'Save the change'); await p.waitForTimeout(500);
   check(await p.evaluate(() => !quoteState.baitVisits.find(v => v.stations[2].status === 'eaten').sentAt), 'a change the client would see clears the sent mark');
 
-  // 8. The job page shows the stage; the dashboard peek lists the visits.
+  // 8. The job page shows the stage; the quote's bait card lists the visits.
   await p.evaluate(() => { jobGo('job'); });
   await p.waitForTimeout(600); await shot('job-page');
   const jp = await p.evaluate(() => [...document.querySelectorAll('#jobOverlay .job-steps li')].map(li => li.className + ':' + li.querySelector('.job-step-label').firstChild.textContent + ':' + li.querySelector('.job-step-text').textContent));
   console.log('job page steps:', JSON.stringify(jp));
   check(jp.length === 6 && /Bait station visits:Visit report not emailed yet/.test(jp[5]), 'the job page lists Bait station visits after Treatment');
-  await p.evaluate(() => { closeJobPage(); openDashboard(); openDashboardDetail(getSavedReports()[0].id); openDashboardPeek(getSavedReports()[0].id, 'bait'); });
-  await p.waitForTimeout(600); await shot('dashboard-peek');
-  const peek = await p.evaluate(() => document.getElementById('dashboardDetailSheet').innerText);
-  check(/Bait station visits/.test(peek) && /Stations\s*12/.test(peek) && /1 of 12 active/.test(peek), 'the dashboard peek shows the stations and visits: ' + peek.replace(/\n/g, ' | ').slice(0, 200));
-  await p.evaluate(() => closeDashboard());
+  // A job on the Jobs list opens its page, whose Bait station visits step opens the visits.
+  await p.evaluate(() => { closeJobPage(); openDashboard(); openDashboardJob(getSavedReports()[0].id, 'job'); });
+  await p.waitForTimeout(600);
+  check(await p.evaluate(() => navPlace() === 'job' && currentReportId === getSavedReports()[0].id), 'the job\'s card on the Jobs list opens its page');
+  await p.evaluate(() => { jobGo('quote'); document.getElementById('qpBait').scrollIntoView({ block: 'center' }); });
+  await p.waitForTimeout(600); await shot('quote-bait-card');
+  const baitCard = await p.evaluate(() => document.getElementById('qpBait').innerText);
+  check(/1 of 12 active/.test(baitCard), 'the quote\'s bait card lists the visits: ' + baitCard.replace(/\n/g, ' | ').slice(0, 200));
+  await p.evaluate(() => tabGo('job'));
 
   // 9. Finished: the job is done.
   await p.evaluate(() => { jobGo('bait'); });

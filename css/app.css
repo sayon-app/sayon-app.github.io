@@ -3752,11 +3752,6 @@ body.dark-screen .dash-card-act { border-top-color: var(--border2); background: 
 .dash-next-hint { margin: 6px 0 0; font-size: calc(14px * var(--ts)); line-height: 1.55; color: var(--text2); text-wrap: pretty; }
 .dash-next .dash-detail-primary { margin-top: 14px; }
 
-.dash-detail-section {
-  display: flex; justify-content: space-between; align-items: baseline; margin: 22px 0 10px;
-  font-size: calc(10.5px * var(--ts)); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3);
-}
-.dash-detail-section span + span { letter-spacing: 0; text-transform: none; font-size: calc(12.5px * var(--ts)); font-weight: 600; color: var(--text2); }
 
 /* The side line: numbered dots, ticked when done, joined by a line that fills in blue. */
 
@@ -3791,35 +3786,15 @@ body.dark-screen .dash-card-act { border-top-color: var(--border2); background: 
 .reinspect-body { min-height: 240px; font: inherit; font-size: calc(14.5px * var(--ts)); line-height: 1.5; resize: vertical; }
 .reinspect-form + .reinspect-note + .dash-detail-actions { margin-top: 16px; }
 
-/* A step's preview inside the sheet. */
+/* A page inside the sheet (the Due tab's reminder email), with a back link. */
 .dash-peek-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -4px 0 12px; }
-.dash-peek-back, .dash-peek-full {
-  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px;
-  border-radius: 99px; font: inherit; font-size: calc(13.5px * var(--ts)); font-weight: 600; cursor: pointer;
+.dash-peek-back {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; margin-left: -8px;
+  border: none; border-radius: 99px; background: none; color: var(--accent2);
+  font: inherit; font-size: calc(13.5px * var(--ts)); font-weight: 600; cursor: pointer;
 }
-.dash-peek-back { margin-left: -8px; border: none; background: none; color: var(--accent2); }
-.dash-peek-full { border: 1px solid var(--border); background: var(--surface2); color: var(--text); }
 .dash-peek-kicker { font-size: calc(12.5px * var(--ts)); color: var(--text3); }
 .dash-peek-title { margin: 2px 0 0; font-family: 'Space Grotesk', sans-serif; font-size: calc(22px * var(--ts)); font-weight: 800; letter-spacing: -0.3px; color: var(--text); }
-.dash-peek-status { margin-top: 4px; font-size: calc(13.5px * var(--ts)); font-weight: 600; color: var(--text2); }
-.dash-peek-status.done { color: var(--accent2); }
-.dash-peek-status.now { color: var(--accent2); }
-.dash-peek-status.bad { color: var(--risk); }
-.dash-peek-body { margin: 16px 0 20px; padding: 14px; border-radius: 14px; background: var(--surface2); border: 1px solid var(--border); }
-.dash-peek-rows { display: grid; grid-template-columns: minmax(92px, auto) 1fr; gap: 8px 14px; margin: 0; font-size: calc(13.5px * var(--ts)); }
-.dash-peek-rows dt { color: var(--text3); }
-.dash-peek-rows dd { margin: 0; color: var(--text); font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
-.dash-peek-sub { margin: 14px 0 8px; padding-top: 12px; border-top: 1px solid var(--border); font-size: calc(11px * var(--ts)); font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text3); }
-.dash-peek-none { margin: 0; font-size: calc(13.5px * var(--ts)); color: var(--text3); }
-.dash-peek-warn { margin: 10px 0 0; font-size: calc(13px * var(--ts)); font-weight: 600; color: var(--yellow-text); }
-.dash-peek-num { margin-bottom: 8px; font-size: calc(12.5px * var(--ts)); color: var(--text3); }
-.dash-peek-lines { list-style: none; margin: 0 0 12px; padding: 0 0 10px; border-bottom: 1px solid var(--border); }
-.dash-peek-lines li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: calc(13.5px * var(--ts)); color: var(--text); }
-.dash-peek-lines strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.dash-peek-totals { margin: 0; padding: 0; border: none; }
-.dash-peek-totals li { color: var(--text2); }
-.dash-peek-totals li.grand { color: var(--text); font-size: calc(15px * var(--ts)); font-weight: 700; }
-.dash-peek-sig { display: block; margin-top: 12px; max-width: 200px; max-height: 70px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
 
 /* Wide screens: the sheet sits at the side, so the job list stays in view. */
 @media (min-width: 900px) {
@@ -4797,7 +4772,7 @@ body:not(.dark-screen) #jobPanel:not(.menu-page-active) { border-color: transpar
 /* Unsigned agreement: light red, as no job should start without it. */
 body:not(.dark-screen) .agreement-banner { background: linear-gradient(135deg, #FFE4E4 0%, #FFF1F1 60%, #FFF7F7 100%); border-color: #F2A3A3; color: #9B1C1C; box-shadow: 0 0 0 1px rgba(215,38,30,0.08), 0 6px 22px -6px rgba(215,38,30,0.45); }
 body:not(.dark-screen) .agreement-banner:not(.signed) .agreement-banner-btn { background: #D7261E; border-color: #D7261E; color: #FFFFFF; box-shadow: 0 3px 10px rgba(215,38,30,0.35); }
-body:not(.dark-screen) .agreement-banner.signed { background: var(--green-wash); border-color: var(--green-edge); color: var(--green); }
+body:not(.dark-screen) .agreement-banner.signed { background: var(--green-wash); border-color: var(--green-edge); color: var(--green); box-shadow: none; }
 /* Link sent: it's on the client now, so amber rather than the red "get it signed". */
 body:not(.dark-screen) .agreement-banner.waiting { background: rgba(212,146,10,0.1); border-color: var(--yellow); color: var(--yellow-text); box-shadow: none; }
 body:not(.dark-screen) .agreement-banner.waiting .agreement-banner-btn { background: transparent; border-color: currentColor; color: inherit; box-shadow: none; }
@@ -5742,6 +5717,31 @@ button.header-job.has-job { text-decoration: underline; text-decoration-color: r
 }
 .date-chip.on { border-color: transparent; background: var(--accent-grad); color: #FFFFFF; }
 body.dark-screen .date-chip.on { background: var(--accent-glow); color: #000000; }
+#jobDateChips { margin-bottom: 6px; }
+
+/* Report done, not sent yet: the line at the top of every step. */
+.report-done-banner .agreement-banner-btn,
+body:not(.dark-screen) .report-done-banner .agreement-banner-btn { background: var(--accent2); border-color: var(--accent2); color: #FFFFFF; box-shadow: none; }
+body.dark-screen .report-done-banner .agreement-banner-btn { background: var(--accent-glow); border-color: var(--accent-glow); color: #000000; }
+
+/* The job page's Delete, at the very bottom. */
+.job-delete { margin: 18px 4px 0; }
+
+/* BACK: the arrow that follows a swipe in from the left edge (home-screen app). */
+.edge-back {
+  position: fixed; left: 0; z-index: 1000; width: 40px; height: 40px; margin-top: -20px; border-radius: 50%;
+  display: grid; place-items: center; pointer-events: none;
+  background: var(--surface); color: var(--text2); border: 1px solid var(--border2); box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+  transform: translateX(calc(-44px + var(--pull, 0) * 60px)); opacity: calc(0.3 + var(--pull, 0) * 0.7);
+}
+.edge-back[hidden] { display: none; }
+.edge-back.ready { background: var(--accent2); border-color: var(--accent2); color: #FFFFFF; }
+
+/* The job's documents strip: when it runs off the side, its edge fades so
+   it reads as more to scroll to (renderDocStrips). */
+.doc-strip.more-right { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent); }
+.doc-strip.more-left { -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px); mask-image: linear-gradient(90deg, transparent, #000 32px); }
+.doc-strip.more-left.more-right { -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 40px), transparent); }
 
 
 /* Next: always there, so the steps can be walked in order; quieter until

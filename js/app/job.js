@@ -17,7 +17,13 @@ function toggleDrawer() {
 // tapping an item opens it as its own page, with Back to return to the list.
 // Each item is a drawer panel: its header is the list row, its body the page.
 function openMenuPage(panelId) {
-  if (!document.getElementById('sidebarPanel').classList.contains('open')) toggleDrawer();
+  if (!document.getElementById('sidebarPanel').classList.contains('open')) {
+    // The Jobs list and This job sit above the menu, so they close first
+    // (SAYON often opens on the Jobs list now: WHERE YOU WERE).
+    if (document.getElementById('dashboardOverlay').classList.contains('open')) closeDashboard();
+    closeJobPage();
+    toggleDrawer();
+  }
   showMenuPage(panelId);
 }
 
@@ -114,6 +120,13 @@ function openJobPage() {
   overlay.classList.add('open');
   document.getElementById('jobPageBody').scrollTop = 0;
   track('screen_viewed', { screen: 'job' });
+}
+
+// Delete from the job's page (it asks first, with Undo after), then the Jobs list.
+function deleteThisJob() {
+  const id = currentReportId;
+  deleteReport(id);
+  if (!getSavedReports().some(r => r.id === id)) tabGo('dashboard');
 }
 
 function closeJobPage() {
@@ -320,15 +333,22 @@ function renderJobPage() {
     </section>
     ${stepsHTML}
     ${typeof jobPdfSectionHTML === 'function' ? jobPdfSectionHTML(j) : ''}
-    ${detailsHTML}`;
+    ${detailsHTML}
+    ${currentReportId && !isSampleJob(currentReportId) && getSavedReports().some(r => r.id === currentReportId) ? `<div class="dash-detail-foot job-delete">
+      <button type="button" class="dash-detail-delete" onclick="deleteThisJob()"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete this job</button>
+    </div>` : ''}`;
   const panel = document.getElementById('jobPanel');
   if (panel) document.getElementById('jobPageSlot').appendChild(panel);
 }
 
 // Opens one of the open job's documents from its page (or from the strip
 // at the top of a document).
-function jobGo(to) {
+// from: where it was opened from ('jobs', 'job', 'report', 'quote'), read
+// off the screen when not given. A sheet closed unfinished goes back there
+// (SHEETS OPENED FROM A PAGE in js/app/shell.js).
+function jobGo(to, from) {
   if (to === 'jobpdf' || to === 'jobpdf-email') { makeJobPdf(to === 'jobpdf' ? 'save' : 'email'); return; }
+  from = from || navPlace();
   closeJobPage();
   if (document.getElementById('quoteScreen').classList.contains('open') && to !== 'quote' && to !== 'answer' && to !== 'treatment' && to !== 'certificate' && to !== 'bait') {
     closeQuote();
@@ -336,16 +356,16 @@ function jobGo(to) {
   }
   if (to === 'job') { openJobPage(); return; }
   if (to === 'details') { openJobPage(); const f = document.getElementById('jobDetailsFold'); if (f) f.open = true; document.getElementById('jobDetailsHead')?.scrollIntoView({ block: 'start' }); return; }
-  if (to === 'agreement') { openAgreementSheet(); return; }
+  if (to === 'agreement') { openAgreementSheet(); rememberSheetFrom('agreementOverlay', from); return; }
   if (to === 'report') return;
   if (!document.getElementById('quoteScreen').classList.contains('open')) openQuoteFromReport();
-  if (to === 'treatment') openTreatmentRecord();
+  if (to === 'treatment') { openTreatmentRecord(); rememberSheetFrom('treatmentOverlay', from); }
   if (to === 'bait') {
     const card = document.getElementById('qpBait');
     if (card) card.scrollIntoView({ block: 'center' });
     // Nothing recorded yet, or a check due: straight onto the sheet.
     const b = typeof baitProgram === 'function' ? baitProgram(quoteState) : null;
-    if (b && !b.finished && !(b.last && !b.last.sentAt) && (b.dueNow || !b.visits.length || !card)) openBaitVisit();
+    if (b && !b.finished && !(b.last && !b.last.sentAt) && (b.dueNow || !b.visits.length || !card)) { openBaitVisit(); rememberSheetFrom('baitOverlay', from); }
   }
   if (to === 'answer' || to === 'certificate') {
     const step = document.getElementById('qgStep3');
@@ -395,7 +415,19 @@ function renderDocStrips() {
     const here = strip.dataset.doc;
     strip.innerHTML = `<button type="button" class="doc-chip doc-chip-job" onclick="jobGo('job')"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Job</button>`
       + docs.map(([to, label, done]) => `<button type="button" class="doc-chip${to === here ? ' here' : ''}${done ? ' done' : ''}" ${to === here ? 'aria-current="page"' : `onclick="jobGo('${to}')"`}>${label}</button>`).join('');
+    if (!strip.dataset.fades) { strip.dataset.fades = '1'; strip.addEventListener('scroll', () => syncDocStripFade(strip), { passive: true }); }
   });
+  requestAnimationFrame(() => document.querySelectorAll('.doc-strip').forEach(strip => syncDocStripFade(strip, true)));
+}
+
+// A strip too wide for the screen fades at the side with more to see. On a
+// redraw, the document on show is scrolled into view.
+function syncDocStripFade(strip, redraw) {
+  if (!strip.clientWidth) return;
+  const here = strip.querySelector('.doc-chip.here');
+  if (redraw && here && here.offsetLeft + here.offsetWidth > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = here.offsetLeft + here.offsetWidth - strip.clientWidth + 24;
+  strip.classList.toggle('more-right', strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 2);
+  strip.classList.toggle('more-left', strip.scrollLeft > 2);
 }
 
 // What the dock's tabs show about the job. This job: how much of the
@@ -1030,26 +1062,43 @@ function saveJobInfo() {
 }
 
 // ── DATE CHIPS ───────────────────────────────────────────────────────────
-// Today, tomorrow and the next few days as one-tap chips under the date,
-// the chosen one lit. The date field stays for anything further out.
+// The booking's day and time in one tap each: Today, Tomorrow and the next
+// five days, then the usual start times. The chosen ones are lit (a day
+// further out shows as its own chip), and the date and time fields stay for
+// anything else, so nobody pages through a calendar month by month.
+const JOB_TIME_CHIPS = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
 function renderDateChips() {
-  const wrap = document.getElementById('jobDateChips');
-  const input = document.getElementById('jobInspectionDate');
-  if (!wrap || !input) return;
-  const iso = isoDate;
+  const dateWrap = document.getElementById('jobDateChips');
+  const timeWrap = document.getElementById('jobTimeChips');
+  const date = document.getElementById('jobInspectionDate');
+  const time = document.getElementById('jobInspectionTime');
+  if (!dateWrap || !date) return;
   const now = new Date();
   const days = Array.from({ length: 7 }, (_, i) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + i));
-  wrap.innerHTML = days.map((d, i) => {
-    const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric' });
-    const on = input.value === iso(d);
-    return `<button type="button" class="date-chip${on ? ' on' : ''}" aria-pressed="${on}" onclick="pickJobDate('${iso(d)}')">${label}</button>`;
-  }).join('');
+  const chip = (on, label, call) => `<button type="button" class="date-chip${on ? ' on' : ''}" aria-pressed="${on}" onclick="${call}">${label}</button>`;
+  const dayLabel = (d, i) => i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric' });
+  const picked = date.value;
+  const inRange = days.some(d => isoDate(d) === picked);
+  const other = picked && !inRange ? new Date(picked + 'T00:00:00') : null;
+  dateWrap.innerHTML = (other && !isNaN(other) ? chip(true, other.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }), `pickJobDate('${picked}')`) : '')
+    + days.map((d, i) => chip(isoDate(d) === picked, dayLabel(d, i), `pickJobDate('${isoDate(d)}')`)).join('');
+  if (timeWrap && time) {
+    const t = (time.value || '').slice(0, 5);
+    timeWrap.innerHTML = JOB_TIME_CHIPS.map(v => chip(v === t, formatClockTime(v).replace(':00 ', ''), `pickJobTime('${v}')`)).join('');
+  }
+  // The lit chip in view, without moving the page.
+  [dateWrap, timeWrap].forEach(w => {
+    const on = w && w.querySelector('.date-chip.on');
+    if (on && w.clientWidth && (on.offsetLeft + on.offsetWidth > w.scrollLeft + w.clientWidth || on.offsetLeft < w.scrollLeft)) w.scrollLeft = on.offsetLeft - 8;
+  });
 }
 
-function pickJobDate(iso) {
-  const input = document.getElementById('jobInspectionDate');
+function pickJobDate(iso) { setJobBookingField('jobInspectionDate', iso); }
+function pickJobTime(hhmm) { setJobBookingField('jobInspectionTime', hhmm); }
+function setJobBookingField(id, value) {
+  const input = document.getElementById(id);
   if (!input || isReportLocked()) return;
-  input.value = iso;
+  input.value = value;
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 

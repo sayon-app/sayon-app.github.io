@@ -354,7 +354,7 @@ function initPhotoViewer() {
     e.preventDefault();
     zoomPhotoAt(photoView.scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX, e.clientY);
   }, { passive: false });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closePhotoViewer(); });
+  // Esc closes it through BACK (js/app/shell.js), like every other layer.
   // Any photo in the app opens here.
   document.addEventListener('click', e => {
     const img = e.target.closest && e.target.closest('img[data-photo-id]');

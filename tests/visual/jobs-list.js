@@ -64,8 +64,9 @@ const JOBS = [
   }, { sc, JOBS });
   await shoot('1-todo');
   for (const [tab, n] of [['waiting', '2-waiting'], ['done', '3-done']]) { await p.evaluate(t => setDashboardTab(t), tab); await shoot(n); }
-  await p.evaluate(() => { setDashboardTab('todo'); openDashboardDetail(dashboardJobs.find(j => j.group === 'todo').r.id); });
-  await shoot('4-sheet');
+  // A card opens the job's own page.
+  await p.evaluate(() => { setDashboardTab('todo'); openDashboardJob(dashboardJobs.find(j => j.group === 'todo').r.id, 'job'); });
+  await shoot('4-job-page');
   console.log(errs.length ? 'errors: ' + errs.join(' | ') : 'no page errors');
   await b.close();
 })();

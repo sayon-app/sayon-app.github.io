@@ -345,7 +345,7 @@ const SPECIES_DB = {
       { product: 'Heat Treatment', type: 'Physical', notes: 'Heating structure or items to specific temperature to kill termites. Energy-intensive, requires specialised equipment.', toxicity: 'None' }
     ],
     specialFlags: [
-      { type: 'danger', icon: '🚨', text: 'NOTIFIABLE PEST — Cryptotermes brevis is a regulated pest under the Australian Biosecurity Act 2015 and is a National Priority Plant Pest (NPPP). This finding must be reported to the relevant state biosecurity authority. Do not remove any infested timber or furniture from the property until directed by the authority.' },
+      { type: 'danger', icon: '🚨', text: 'NOTIFIABLE PEST — In Queensland, West Indian drywood termite is restricted matter under the Biosecurity Act 2014 (Qld): report it to Biosecurity Queensland within 24 hours on 13 25 23. In NSW, owners have a duty under the Biosecurity Act 2015 (NSW) to prevent its spread: report it to NSW DPI. In other states, report it to the state biosecurity authority. Do not remove any infested timber or furniture from the property until directed by the authority.' },
       { type: 'warning', icon: '⚠', text: 'BIOSECURITY RISK — Infested furniture, timber or materials must not be moved from the property. Transportation of infested goods is how this species spreads. Advise client immediately.' }
     ],
     fieldNotePrompts: [

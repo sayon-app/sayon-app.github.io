@@ -413,6 +413,14 @@ function fixReportGap(kind, from = 'send') {
   if (kind === 'agreement') { leave(); openAgreementSheet(); return; }
   if (kind === 'photos') { backUpPhotosFromGap(from); return; }
   if (kind.startsWith('finding:')) { leave(); showAreaFindingPrompt(kind.slice(8)); return; }
+  if (kind === 'interval12') {
+    reportData.inspectionFrequency = '12 months';
+    const el = document.getElementById('f-inspectionFrequency');
+    if (el) renderField(el, 'inspectionFrequency', reportData.inspectionFrequency);
+    saveDraft();
+    reopen();
+    return;
+  }
   if (/^(inspected|na):/.test(kind)) {
     const [k, z] = kind.split(':');
     if (!reportData.areaStatus) reportData.areaStatus = {};

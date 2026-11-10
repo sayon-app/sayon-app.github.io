@@ -661,7 +661,8 @@ function changedSections(before, after) {
   const names = new Set();
   keys.forEach(k => {
     if (ISSUE_META_KEYS.includes(k) || (before || {})[k] === (after || {})[k]) return;
-    let sec = (k === 'job' || k === 'quote') ? k : Object.keys(SECTIONS).find(s => SECTIONS[s].fields.includes(k));
+    // The site plan is drawn under the areas, and prints there.
+    let sec = (k === 'job' || k === 'quote') ? k : k === 'sitePlan' ? 'obstructions' : Object.keys(SECTIONS).find(s => SECTIONS[s].fields.includes(k));
     if (!sec) {
       const el = document.getElementById('f-' + k);
       const section = el && el.closest('.report-section');

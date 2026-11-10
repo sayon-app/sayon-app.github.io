@@ -408,6 +408,8 @@ function renderAreaChecklist() {
       <div class="area-body"><div class="area-status">${statusBtns}</div>${result}${reasons}</div></details></div>`;
   }).join('');
   hydrateSpotPhotos(wrap);
+  // The site plan sits under the areas (js/site-plan.js).
+  if (typeof renderReportPlan === 'function') renderReportPlan();
 }
 const AREA_DOT_TICK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
 const AREA_DOT_DASH = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"><path d="M5 12h14"/></svg>';

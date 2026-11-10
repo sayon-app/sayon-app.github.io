@@ -19,6 +19,7 @@ One name for each thing, everywhere: on the screens, in the emails and PDFs, on 
 | **Download a copy** | The backup file of everything, to load back into SAYON. Not the PDFs. | `Export your data` |
 | **Menu, Billing** | Where the plan is changed or cancelled. | `tap your initials` |
 | **Email to Sam** | A button that sends says how and to whom. Once sent: Email again, Send it again. | `Send anyway` |
+| **site plan** | The drawing of the property: started on the report if the inspector wants one, and the treatment record adds the treatment and stations to it. | |
 | **client** | The person the job is for. | |
 
 The agreement's own wording (its numbered clauses) and the Terms and Privacy Policy are legal text: change them only with their version number, and they may say "voice notes" where they mean the recordings.

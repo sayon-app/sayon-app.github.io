@@ -814,6 +814,7 @@ function syncInvasiveDetails() {
 
 function updateProgress() {
   syncInvasiveDetails();
+  renderConditionPhotos();
   // FIX: this duplicated calculateCompletion()'s old plain-presence check
   // independently, so the same bug (a routine render lazily creating a
   // placeholder finding via getFindings(), silently marking the Findings
@@ -823,10 +824,16 @@ function updateProgress() {
   let filled = 0, total = 0;
   const secState = {};
   Object.entries(SECTIONS).forEach(([sec, cfg]) => {
-    const req = REQUIRED_FIELDS[sec] || [];
+    const all = REQUIRED_FIELDS[sec] || [];
+    filled += all.filter(k => isFieldFilled(k)).length; total += all.length;
+    // A section's badge counts what the section itself asks. The agreement
+    // is a step of the job, signed before the report is touched: it is on
+    // the percentage and the list of what's missing, not on Sign-off's badge.
+    const own = k => k !== 'agreement';
+    const req = all.filter(own);
     const reqFilled = req.filter(k => isFieldFilled(k)).length;
-    const any = cfg.fields.some(k => isFieldFilled(k));
-    filled += reqFilled; total += req.length;
+    // Areas is under way from the first area marked, not only once all are.
+    const any = cfg.fields.some(k => own(k) && isFieldFilled(k)) || (sec === 'obstructions' && Object.keys(OBS_ZONES).some(z => areaStatusOf(z)));
 
     const sts = document.getElementById('sts-' + sec);
     const nextBtn = document.getElementById('next-btn-' + sec);
@@ -1159,20 +1166,45 @@ function initSignaturePads() {
   }
 }
 
+// "Sign again": the pad empties to be signed afresh.
 function clearInspectorSignature() {
   if (inspectorSignaturePad) inspectorSignaturePad.clear();
   delete reportData.inspectorSignature;
+  keepInspectorSignature(false);
   setInspectorSignatureStatus(false);
   updateProgress();
   saveDraft();
 }
 
+// A signature already on the report (saved with it, or carried over from
+// the inspector's last report) can't be drawn on: a thumb scrolling past
+// would mark it. Sign again empties the pad to draw a new one.
+function keepInspectorSignature(kept) {
+  const wrap = document.getElementById('sigCanvasInspector');
+  if (wrap) wrap.parentElement.classList.toggle('kept', kept);
+}
+
 function setInspectorSignatureStatus(signed) {
   const status = document.getElementById('sigStatusInspector');
   if (status) {
-    status.textContent = signed ? 'Signed' : 'Not signed';
+    const name = (document.getElementById('jobInspector').value || '').trim();
+    status.textContent = signed ? (name ? `Signed as ${name}` : 'Signed') : 'Not signed';
     status.classList.toggle('signed', signed);
   }
+  const again = document.getElementById('sigAgainInspector');
+  if (again) again.hidden = !signed;
+}
+
+// The inspector's name changed. A signature carried over from the last
+// report was signed as the name it came with, so it doesn't stay under
+// another one; a signature drawn on this report does.
+function onInspectorName() {
+  const last = lastInspectorDetails(currentReportId);
+  const name = document.getElementById('jobInspector').value.trim();
+  if (reportData.inspectorSignature && reportData.inspectorSignature === last.signature && name !== last.name) clearInspectorSignature();
+  else setInspectorSignatureStatus(!!reportData.inspectorSignature);
+  saveDraft();
+  updateProgress();
 }
 
 function restoreLicenceField() {
@@ -1184,6 +1216,7 @@ function restoreLicenceField() {
 // loaded, and brings the agreement banner up to date.
 function restoreSignaturePads() {
   if (inspectorSignaturePad) inspectorSignaturePad.show(reportData.inspectorSignature);
+  keepInspectorSignature(!!reportData.inspectorSignature);
   setInspectorSignatureStatus(!!reportData.inspectorSignature);
   renderAgreementBanner();
 }

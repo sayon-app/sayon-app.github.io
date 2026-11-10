@@ -89,12 +89,12 @@ const emails = [];
   // ── 2. Show me, and the walk ──
   await p.locator('#finishGaps .link-btn', { hasText: 'Show me' }).first().click(); await p.waitForTimeout(900);
   const shown = await p.evaluate(() => ({ step: currentStep, focus: document.activeElement && (document.activeElement.id || document.activeElement.className), bar: !document.getElementById('blankWalk').hidden, text: document.getElementById('blankWalkText').textContent, next: document.getElementById('blankWalkNext').textContent }));
-  check(shown.step === 'property' && /structureType/.test(shown.focus) && shown.bar, 'Show me goes to the first blank answer on its step: ' + shown.focus);
+  check(shown.step === 'property' && /occupancyStatus/.test(shown.focus) && shown.bar, 'Show me goes to the first blank answer on its step, the Visit\'s: ' + shown.focus);
   check(shown.text === '17 still blank' && shown.next === 'Next', 'a bar under the report says how many are left, with Next: ' + shown.text);
   await p.screenshot({ path: `${OUT}/3-show-me.png` });
   await p.click('#blankWalkNext'); await p.waitForTimeout(700);
   const second = await p.evaluate(() => document.activeElement && document.activeElement.id);
-  check(/constructionEra/.test(second), 'Next goes on to the next blank answer: ' + second);
+  check(/weatherConditions/.test(second), 'Next goes on to the next blank answer: ' + second);
   // Answer one: the count drops everywhere.
   await p.evaluate(() => { reportData.structureType = 'Single dwelling'; renderField(document.getElementById('f-structureType'), 'structureType', reportData.structureType); updateProgress(); }); await p.waitForTimeout(300);
   check(await p.evaluate(() => document.getElementById('blankWalkText').textContent) === '16 still blank', 'answering one drops the count on the bar');

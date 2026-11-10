@@ -1194,13 +1194,12 @@ function renderIssueState() {
 
 // While locked, taps and typing in the report, the job details and the mic
 // are stopped with a note pointing at Amend. Scrolling and the section tabs
-// still work, and a signed agreement can still be viewed.
+// still work.
 let lockToastAt = 0;
 function installReportLockGuard() {
   const stop = e => {
     if (!isReportLocked()) return;
     if (e.target.closest('.issue-banner')) return;
-    if (reportData.agreement && e.target.closest('.agreement-banner-btn')) return;
     // Touches only matter on the signature pad; elsewhere they're scrolling.
     if (e.type === 'touchstart' && e.target.tagName !== 'CANVAS') return;
     e.preventDefault();

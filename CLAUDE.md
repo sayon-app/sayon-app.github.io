@@ -40,7 +40,7 @@ They are plain scripts, not modules: every top-level name is shared across all o
 | File | What's in it |
 |---|---|
 | `state.js` | STATE (shared `let`s such as `reportData`), onboarding, YOUR BUSINESS |
-| `areas.js` | Areas inspected, OBSTRUCTION ZONE SELECTOR, hindered and restricted access, ACCESS SPOTS and their photos |
+| `areas.js` | Areas inspected, OBSTRUCTION ZONE SELECTOR, hindered and restricted access, ACCESS SPOTS and their photos (entered on the area's own card; Areas unable to be inspected reads them back) |
 | `talk-photos.js` | PHOTOS WHILE TALKING |
 | `species.js` | SPECIES INTELLIGENCE DATABASE (`SPECIES_DB`, `lookupSpecies`) |
 | `prompts.js` | `SECTIONS`, `REQUIRED_FIELDS`, `SYSTEM_PROMPT`, the plate scan and insect ID prompts |
@@ -50,8 +50,8 @@ They are plain scripts, not modules: every top-level name is shared across all o
 | `fields.js` | FIELD RENDERING, MULTI-FINDING ENGINE, CHOICE CARDS, SELECT CARDS, BORER FINDINGS, COMPASS, MOISTURE METER READINGS |
 | `editing.js` | EDITING, REPORT STEPS, PROGRESS, REPORT DONE (the Done mark and the one next step), SHOW ME (walking what's still blank), SIGNATURE PADS, SAY IT INSTEAD |
 | `agreement.js` | PRE-INSPECTION AGREEMENT, REMOTE SIGNING |
-| `photos.js` | PHOTO ATTACHMENTS, photo store, PHOTO VIEWER, SECTION-AWARE PHOTO SYSTEM, READY-MADE RECOMMENDATIONS |
-| `job.js` | DRAWER, MENU, BOTTOM DOCK, THIS JOB (the one list of a job's steps: the client's answer, treatment, certificate and bait visits are done on it, `jobStepPanel`, `jobNextAction`), LAST VISIT, ADDRESS SUGGESTIONS, WEATHER, APPLICABLE STANDARD, JOB INFO, DATE CHIPS, PERSISTENCE — SAVED REPORTS |
+| `photos.js` | PHOTO ATTACHMENTS, photo store, PHOTO VIEWER, SECTION-AWARE PHOTO SYSTEM (Add photo is the camera, `takePhoto`; "Choose one instead" is the sheet, `choosePhotoSource`), CONDITION PHOTOS (a conducive condition's own photos, `photosBySection['cond-<field>']`), READY-MADE RECOMMENDATIONS |
+| `job.js` | DRAWER, MENU, BOTTOM DOCK, THIS JOB (the one list of a job's steps: the client's answer, treatment, certificate and bait visits are done on it, `jobStepPanel`, `jobNextAction`), LAST VISIT, ADDRESS SUGGESTIONS, WEATHER (fills itself on the inspection day, `fillWeatherOnTheDay`), APPLICABLE STANDARD, JOB INFO, DATE CHIPS, PERSISTENCE — SAVED REPORTS |
 | `account.js` | AUTH STATE, BILLING / STRIPE, SIGN UP / IN / OUT, PASSWORD RESET, DELETE MY ACCOUNT, YOUR TEAM, BUSINESS LOAD, ENTER APP, SESSION RESTORE |
 | `sync.js` | SUPABASE REPORT SYNC, SYNC BETWEEN DEVICES, SYNC / SAVE STATUS INDICATOR, OLDER JOBS, DATA EXPORT / IMPORT, ACCESSIBILITY SETTINGS |
 | `dashboard.js` | DASHBOARD (the Jobs list), LINKS OUT (every agreement and quote link a client hasn't answered, checked when Jobs opens), STATUS / TOAST, WHAT THE REPORT IS STILL MISSING (the one list Finish, the check sheet and the percentage read), FINALISED JOBS (the lock, versions and Amend), GAPS BEFORE YOU LEAVE |

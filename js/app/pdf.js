@@ -1509,7 +1509,8 @@ async function buildReportPdf() {
 
     notesBlock('conducive');
     gap(4);
-    renderSectionPhotosInPDF('conducive', 'Conducive Conditions');
+    // Each condition's own photos, then any from the old section box.
+    renderSectionPhotosInPDF(null, 'Conducive Conditions', [...conditionPhotos(), ...((reportData.photosBySection || {}).conducive || [])]);
   });
 
   // ─────────────────────────────────────────────────────────────────────

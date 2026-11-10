@@ -537,7 +537,7 @@ function noteForEarlierJob(target, note) {
   const id = savedIdFor.get(target);
   const reports = getSavedReports();
   const entry = id && reports.find(r => r.id === id);
-  setAI('ready', 'AI ready');
+  setAI('ready', 'Ready');
   if (!isRecording) document.getElementById('extractBtn').disabled = false;
   if (!entry) {
     showToast('You changed job while that note was filling in, so it is still in the box', 'info');
@@ -614,7 +614,7 @@ async function runFill({ whileRecording = false } = {}) {
     // can never land on top of a newer one and overwrite it.
     if (getPendingNotes().length && navigator.onLine) {
       if (!queuePendingNote(note)) {
-        setAI('ready', 'AI ready');
+        setAI('ready', 'Ready');
         if (!isRecording) document.getElementById('extractBtn').disabled = false;
         return false;
       }
@@ -627,14 +627,14 @@ async function runFill({ whileRecording = false } = {}) {
       await populateFields(data, note);
       extracted = true;
       pendingNotesProblem = null;
-      setAI('ready', 'Data extracted');
+      setAI('ready', 'Report filled in');
       // The after-Extract sheet says what was filled, so no toast here.
     }
   } catch (err) {
     // A note too long to answer in one go would fail the same way every
     // time, so it stays in the box to be split up.
     if (err.tooLong || err.status === 413) {
-      setAI('ready', 'AI ready');
+      setAI('ready', 'Ready');
       if (!isRecording) document.getElementById('extractBtn').disabled = false;
       showToast('That note is too long for the AI in one go. Split it into shorter notes and fill each one in', 'error');
       return false;
@@ -645,7 +645,7 @@ async function runFill({ whileRecording = false } = {}) {
     pendingNotesProblem = (err.noSignal || isNoteSpecificProblem(err)) ? null : extractionProblem(err);
     if (reportData !== fillTarget) { noteForEarlierJob(fillTarget, note); return false; }
     if (!queuePendingNote(note)) {
-      setAI('ready', 'AI ready');
+      setAI('ready', 'Ready');
       if (!isRecording) document.getElementById('extractBtn').disabled = false;
       return false;
     }
@@ -863,7 +863,7 @@ async function processPendingNotes(manual) {
     pendingNotesRunning = false;
     if (reportData === target && !getPendingNotes().length) delete reportData.pendingNotes;
     renderPendingNotes();
-    setAI('ready', 'AI ready');
+    setAI('ready', 'Ready');
   }
   // A report that's already on the Jobs list is re-saved, so its copy
   // there doesn't keep the notes and fill them in a second time.
@@ -1344,6 +1344,8 @@ function photoPlaceLabel(section) {
     const where = String((termite ? termite.activityLocation : borer ? borer.location : '') || '').trim();
     return (borer ? 'Borer finding' : 'Termite finding') + (where ? `, at ${where.slice(0, 120)}` : '');
   }
+  const cond = /^cond-(.+)$/.exec(section);
+  if (cond && CONDITION_PHOTO_LABELS[cond[1]]) return 'Conducive conditions: ' + CONDITION_PHOTO_LABELS[cond[1]];
   return PHOTO_PLACE_NAMES[section] || 'Inspection photos';
 }
 

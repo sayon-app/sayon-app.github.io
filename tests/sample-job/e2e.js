@@ -69,10 +69,10 @@ let shotN = 0;
   check(q.barrier && q.barrier.price === 32 && q.barrier.qty === 57, 'the quote uses the business\'s own prices');
   check(q.plan && q.inspector === 'NSW 123456' && q.tech === 'Alex Example', 'the treatment has a site plan, and the inspector is the account\'s own name and licence');
   // Opened for the first time, every banner already reads the finished job.
-  const looks = await p.evaluate(() => ({ banner: document.getElementById('agreementBannerText').textContent, sync: document.getElementById('syncStatusText').textContent,
+  const looks = await p.evaluate(() => ({ banner: document.getElementById('agreementBanner').getBoundingClientRect().height, signed: !!reportData.agreement, sync: document.getElementById('syncStatusText').textContent,
     number: reportData.reportNumber, inspected: reportData.jobInspectionDate, phone: reportData.jobClientPhone }));
   console.log('looks:', JSON.stringify(looks));
-  check(/^Agreement signed by Jordan Sample/.test(looks.banner), 'the report screen shows the agreement signed, first time open');
+  check(looks.signed && looks.banner === 0, 'the agreement is signed, first time open, so the report has no banner asking for it');
   check(/Sample job: kept on this phone only/.test(looks.sync), 'the save line says the sample stays on this phone, not that it syncs');
   check(looks.number.startsWith('SY-' + looks.inspected.replace(/-/g, '')), 'the report number carries the inspection date');
   check(looks.phone === '0491 570 156', 'the client\'s phone number is one kept for made-up use');

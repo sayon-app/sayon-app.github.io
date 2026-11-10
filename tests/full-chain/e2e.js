@@ -94,10 +94,15 @@ let shotN = 0;
   const ag = await p.evaluate(() => reportData.agreement ? { method: reportData.agreement.method, name: reportData.agreement.signerName } : null);
   check(ag && ag.method === 'onsite' && ag.name === 'Sam Taylor', 'agreement signed on site: ' + JSON.stringify(ag));
   const dlBefore = downloads.length;
-  await tap(p.locator('#agreementBannerBtn'), 'View agreement'); await p.waitForTimeout(600);
+  // Once it's signed the report has no banner for it: the agreement is on This job.
+  check(await p.evaluate(() => document.getElementById('agreementBanner').getBoundingClientRect().height === 0), 'a signed agreement has no banner on the report');
+  await tap(p.locator('#app > header .header-back'), 'Back to the job'); await p.waitForTimeout(600);
+  await tap(p.locator('#jobOverlay button.job-step[onclick*="agreement"]'), 'Agreement step on This job'); await p.waitForTimeout(600);
   await tap(p.getByRole('button', { name: /Send the client a copy/i }), 'agreement copy'); await p.waitForTimeout(2500); await shot('agreement-copy');
   console.log('after agreement copy: downloads', downloads.slice(dlBefore), 'emails', emails.length, 'toasts', await toasts());
   if (await p.evaluate(() => document.getElementById('agreementOverlay').classList.contains('open'))) await tap(p.locator('#agreementOverlay .voice-popover-close'), 'close agreement');
+  await p.waitForTimeout(500);
+  await tap(p.locator('#jobOverlay .job-step', { hasText: 'Report' }), 'Report step on the job page (2)'); await p.waitForTimeout(600);
 
   // 4. A typed note, filled by the canned AI.
   // One tap opens the panel listening; a tap on the record button stops it, to type instead.

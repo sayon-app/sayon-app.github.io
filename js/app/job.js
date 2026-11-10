@@ -272,6 +272,7 @@ function jobStepsHTML(j, steps, tap, details, q) {
 // (the client's answer, the certificate, a bait visit's report) is done
 // from the card itself; the rest open their screen or sheet.
 function jobNextAction(next, q) {
+  if (next.ways) return agreementWaysHTML(next);
   const to = next.next.to;
   if (to === 'answer' && quoteHasItems(q)) return quoteAnswerButtons(q, true);
   if (to === 'certificate' && q && q.treatment) return treatmentCertificateCard(q);
@@ -281,6 +282,50 @@ function jobNextAction(next, q) {
     return `<button type="button" class="dash-detail-primary" onclick="emailBaitVisit('${escapeHtml(b.last.id)}')">Email the visit report${first ? ' to ' + escapeHtml(first) : ''}</button>`;
   }
   return `<button type="button" class="dash-detail-primary" onclick="jobGo('${to}')">${next.next.label}</button>`;
+}
+
+// The agreement's two ways to get signed (agreementNext in
+// js/app/dashboard.js), on the Next step card: the one that leads as the
+// filled button, the other under it. isNew: a job with no address yet,
+// which is asked for first, and can be saved to come back to.
+function agreementWaysHTML(next, isNew) {
+  const call = w => w.way === 'link' ? 'jobAgreementLink()' : isNew ? 'jobNewAgreement()' : "jobGo('agreement')";
+  const [lead, other] = next.ways;
+  return `<button type="button" class="dash-detail-primary job-way-${lead.way}" onclick="${call(lead)}">${escapeHtml(lead.label)}</button>
+      <div class="dash-detail-links"><button type="button" class="job-way-${other.way}" onclick="${call(other)}">${escapeHtml(other.label)}</button></div>
+      ${isNew ? '<div class="dash-detail-links job-next-later"><button type="button" onclick="saveJobNow(true)">Save it for later</button></div>' : ''}`;
+}
+
+// A new job's Next step card: the agreement, either way. Which way leads
+// follows the booking's day and the client's email, so the card is redrawn
+// as Job details are typed (refreshJobNewNext).
+function jobNewNextHTML() {
+  const next = agreementNext(Object.assign({}, reportData, { agreement: null, agreementRequest: null }), document.getElementById('jobClient').value);
+  return `
+      <div class="job-next-head">
+        <span class="job-tile now" aria-hidden="true">${jobIcon('agreement', 22)}</span>
+        <div>
+          <div class="dash-next-label">Next step</div>
+          <div class="dash-next-title">Get the agreement signed</div>
+        </div>
+      </div>
+      <p class="dash-next-hint">${escapeHtml(next.ways[0].way === 'link' ? next.hint : 'The client signs it before you start. Then tap the mic and talk through the inspection.')}</p>
+      ${agreementWaysHTML(next, true)}`;
+}
+function refreshJobNewNext() {
+  const card = document.querySelector('#jobOverlay.open.new-job .job-next-new');
+  if (!card) return;
+  const html = jobNewNextHTML();
+  // Only when it reads differently, so a button isn't swapped mid-tap.
+  if (card.drawn !== html) { card.innerHTML = html; card.drawn = html; }
+}
+
+// The link way, from the Next step card: the agreement as Job details have
+// it goes to the client to sign on their own phone. Anything it still
+// needs (the inspection type, a name) is asked for on the agreement sheet.
+function jobAgreementLink() {
+  if (!document.getElementById('jobAddress').value.trim()) { askForJobAddress(); return; }
+  sendAgreementLink();
 }
 
 // After a step is saved on this page: back up to the Next step card, which
@@ -392,17 +437,7 @@ function renderJobPage(opening) {
       <p class="job-hero-tip"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v4"/></svg><span>Or tap the mic and say the address and the client's name.</span></p>
     </div>
     ${detailsHTML}
-    <section class="dash-next job-next job-next-new">
-      <div class="job-next-head">
-        <span class="job-tile now" aria-hidden="true">${jobIcon('agreement', 22)}</span>
-        <div>
-          <div class="dash-next-label">Next step</div>
-          <div class="dash-next-title">Get the agreement signed</div>
-        </div>
-      </div>
-      <p class="dash-next-hint">The client signs it before you start. Then tap the mic and talk through the inspection.</p>
-      <button type="button" class="dash-detail-primary" onclick="jobNewAgreement()">Open the agreement</button>
-      <div class="dash-detail-links"><button type="button" onclick="saveJobNow(true)">Save it for later</button></div>
+    <section class="dash-next job-next job-next-new">${jobNewNextHTML()}
     </section>
     ${stepsHTML}`;
     document.getElementById('jobPageSlot').appendChild(document.getElementById('jobPanel'));
@@ -453,7 +488,7 @@ function renderJobPage(opening) {
 // (SHEETS OPENED FROM A PAGE in js/app/shell.js).
 function jobGo(to, from) {
   from = from || navPlace();
-  const onJob = to === 'job' || to === 'details' || to === 'answer' || to === 'treatment' || to === 'certificate' || to === 'bait';
+  const onJob = to === 'job' || to === 'details' || to === 'agreementLink' || to === 'answer' || to === 'treatment' || to === 'certificate' || to === 'bait';
   if (!onJob) closeJobPage();
   if (document.getElementById('quoteScreen').classList.contains('open') && to !== 'quote') {
     closeQuote();
@@ -473,9 +508,10 @@ function jobGo(to, from) {
     const b = baitProgram(q);
     if (b && !b.finished && !(b.last && !b.last.sentAt)) { openBaitVisit(); rememberSheetFrom('baitOverlay', from); }
   }
-  // The certificate's Email button, lit so it's the obvious next tap.
-  if (to === 'certificate') {
-    const btn = document.querySelector('#jobOverlay .job-next .qp-cert-email');
+  // The certificate's Email button, or the agreement's link button, lit so
+  // it's the obvious next tap.
+  if (to === 'certificate' || to === 'agreementLink') {
+    const btn = document.querySelector(`#jobOverlay .job-next ${to === 'certificate' ? '.qp-cert-email' : '.job-way-link'}`);
     if (btn) { btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 2400); }
   }
 }
@@ -666,6 +702,7 @@ function updateJob() {
 
   syncAllSelectCards();
   renderLastVisitBanner();
+  refreshJobNewNext();
   saveDraft();
 }
 
@@ -1148,6 +1185,7 @@ function saveJobInfo() {
   syncAllSelectCards();
   renderDateChips();
   if (typeof renderReportJobCard === 'function') renderReportJobCard();
+  refreshJobNewNext();
   saveDraft();
 }
 

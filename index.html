@@ -2524,10 +2524,17 @@
             <span class="agr-step-dot" aria-hidden="true"><b>1</b></span>
             <div><div class="agr-step-of">Step 1 of 3</div><h3 class="agr-step-title">The job</h3></div>
           </div>
-          <!-- The type decides the standard and the wording of clause 1, so it
-               is chosen before the client signs (see onAgreementTypeChange). -->
-          <div class="job-field">
-            <div class="job-field-label">Inspection type</div>
+          <!-- What Job details already say, on one line. Only what's missing
+               is asked here, and Change shows all three; each writes back to
+               Job details, so the job has one type, one date and one fee
+               (see renderAgreementJob). The type decides the standard and
+               the wording of clause 1, so it is chosen before the client signs. -->
+          <div class="agr-job-line" id="agreementJobLine">
+            <span class="agr-job-text" id="agreementJobText"></span>
+            <button type="button" class="link-btn" id="agreementJobChange" onclick="changeAgreementJob()">Change</button>
+          </div>
+          <div class="job-field" id="agreementTypeField">
+            <label class="job-field-label" for="agreementInspectionType">Inspection type</label>
             <select class="job-input job-select" id="agreementInspectionType" onchange="onAgreementTypeChange()">
               <option value="">Select…</option>
               <option>Annual — Existing Building</option>
@@ -2540,13 +2547,13 @@
               <option>Other</option>
             </select>
           </div>
-          <div class="job-row">
-            <div class="job-field">
-              <div class="job-field-label">Inspection date</div>
-              <input class="job-input" id="agreementDate" type="date" onchange="refreshAgreementPreview()">
+          <div class="job-row" id="agreementDateFeeRow">
+            <div class="job-field" id="agreementDateField">
+              <label class="job-field-label" for="agreementDate">Inspection date</label>
+              <input class="job-input" id="agreementDate" type="date" onchange="onAgreementDateChange()">
             </div>
-            <div class="job-field">
-              <div class="job-field-label">Inspection fee</div>
+            <div class="job-field" id="agreementFeeField">
+              <label class="job-field-label" for="agreementFee">Inspection fee</label>
               <input class="job-input" id="agreementFee" inputmode="decimal" placeholder="e.g. $330" oninput="addDollarSign(this);onAgreementFeeInput()">
             </div>
           </div>
@@ -2607,10 +2614,14 @@
         <div class="agr-signed-meta" id="agreementViewSummary"></div>
         <img class="agreement-view-signature" id="agreementViewSignature" alt="Client signature">
       </section>
+      <!-- What can be done with a signed agreement, straight under the
+           signature: the wording below it is ten clauses long. -->
+      <div class="agr-signed-acts">
+        <button class="extract-btn" onclick="shareAgreementPdf()">Send the client a copy (PDF)</button>
+        <button class="link-btn agreement-other-toggle" id="agreementRemoveBtn" onclick="removeAgreement()">Remove and sign again</button>
+      </div>
       <div class="agr-section-label">What was agreed</div>
       <article class="agr-doc" id="agreementViewText"></article>
-      <button class="extract-btn" onclick="shareAgreementPdf()">Send the client a copy (PDF)</button>
-      <button class="link-btn agreement-other-toggle" onclick="removeAgreement()">Remove and sign again</button>
     </div>
   </div>
 </div>

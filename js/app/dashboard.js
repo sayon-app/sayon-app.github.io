@@ -258,16 +258,30 @@ function dashWhen(ts) {
   return dashDate(ts);
 }
 
-// Before the report's under way, the agreement comes first. Once its link
+// Before the report's under way, the agreement comes first. There are two
+// ways to get it signed, and the card offers both (ways): a link the client
+// signs from, which leads on a job booked for a later day with an email to
+// send it to (the client isn't there, so it goes out when the job is
+// booked), and signing on this phone, which leads on the day. Once a link
 // has gone, the job is waiting on the client and says so, with the day it
 // went (sent: true).
 function agreementNext(d, client) {
   const sent = !d.agreement && d.agreementRequest;
-  if (!sent) return { status: 'Get the agreement signed', hint: 'The client signs it before the inspection starts.', next: { label: 'Open the agreement', to: 'agreement' } };
-  const who = String(sent.signerName || client || '').trim().split(/\s+/)[0] || 'the client';
-  return { status: `Agreement sent ${dashDate(sent.emailedAt || sent.sentAt)}, waiting on ${who}`, sent: true,
+  const who = String((sent && sent.signerName) || client || '').trim().split(/\s+/)[0] || 'the client';
+  if (sent) return { status: `Agreement sent ${dashDate(sent.emailedAt || sent.sentAt)}, waiting on ${who}`, sent: true,
     hint: 'It shows as signed here once they sign. They can still sign on this phone instead.',
     next: { label: 'Open the agreement', to: 'agreement' } };
+  const email = String(d.jobClientEmail || '').trim();
+  const day = d.jobInspectionDate && d.jobInspectionDate > todayIsoDate() ? new Date(d.jobInspectionDate + 'T00:00:00') : null;
+  const later = day && !isNaN(day);
+  const link = { way: 'link', label: directEmail && email ? `Email it to ${who} to sign` : `Send ${who} a link to sign` };
+  const phone = { way: 'phone', label: 'Sign on this phone' };
+  const ways = later && email ? [link, phone] : [phone, link];
+  return { status: 'Get the agreement signed', ways,
+    hint: ways[0] === link
+      ? `The inspection is on ${day.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}, so ${who} can sign from ${directEmail ? `an email before then. It goes to ${email}.` : 'a link before then.'}`
+      : 'The client signs it before the inspection starts.',
+    next: { label: ways[0].label, to: 'agreement', way: ways[0].way } };
 }
 
 // A job's next step on the Jobs list, as on the job page: the agreement
@@ -329,7 +343,7 @@ function dashCardHTML(j) {
         </span>
         <span class="dash-card-progress" aria-hidden="true">${jobStepsCounted(steps).map(st => `<i class="${st.state}"></i>`).join('')}</span>
       </button>
-      ${act ? `<button type="button" class="dash-card-act${next.sent ? ' wait' : ''}" onclick="openDashboardJob('${id}', '${next.next.to}')"><span>${escapeHtml(act)}</span>${arrow}</button>` : ''}
+      ${act ? `<button type="button" class="dash-card-act${next.sent ? ' wait' : ''}" onclick="openDashboardJob('${id}', '${next.next.way === 'link' ? 'agreementLink' : next.next.to}')"><span>${escapeHtml(act)}</span>${arrow}</button>` : ''}
     </div>`;
 }
 

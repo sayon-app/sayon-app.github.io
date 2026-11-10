@@ -63,7 +63,7 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 
 ## New job
 
-`tests/visual/new-job.js <outDir> [width]` taps New job on the Jobs list and types a job in by hand, checking on the way: the job page opens empty with the address ready to type and today's date, the page shows the address as it's typed, a postcode fills in the state (but not over one picked by hand), Open the agreement with no address asks for one, Save it for later puts the job on the Jobs list, and once saved the job page leads with the agreement. It shoots the empty page, the filled-in page, the Jobs list and the saved job's page. `MODES=light,dark` adds dark shots of the empty page. Before and after shots are in `docs/screenshots/new-job/`.
+`tests/visual/new-job.js <outDir> [width]` taps New job on the Jobs list and types a job in by hand, checking on the way: the job page opens empty with the address ready to type and today's date, the page shows the address as it's typed, a postcode fills in the state (but not over one picked by hand), Sign on this phone with no address asks for one, Save it for later puts the job on the Jobs list, and once saved the job page leads with the agreement. It shoots the empty page, the filled-in page, the Jobs list and the saved job's page. `MODES=light,dark` adds dark shots of the empty page. Before and after shots are in `docs/screenshots/new-job/`.
 
 ## Areas inspected
 
@@ -86,6 +86,8 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 `node tests/run-all.js` runs every `tests/*/e2e.js`, three at a time, and ends with a count (`node tests/run-all.js navigation send-gaps` runs just those). It starts the server on :8765 if nothing is there. Each test's output is kept in `/tmp/sayon-tests/<name>.log`.
 
 ## Before it goes
+
+`tests/agreement-ways/e2e.js <outDir>` checks the agreement, either way: the Next step card leads with Sign on this phone on the day and with "Email it to Sam to sign" on a job booked for a later day with an email, the link goes from the card filled from Job details (and the sheet opens to ask for the inspection type when that's missing), the sheet's first step is one line read from Job details with a box only for what's missing, a date changed on the sheet changes the job's date, the client's sign page says a copy comes with the report, a signed agreement's two buttons sit under the signature, the PDF cover names the job's client when someone else signs, and the Jobs card of a job booked ahead opens This job with the link button lit.
 
 `tests/before-it-goes/e2e.js <outDir>` checks that nothing leaves with a hole in it: Finish and the check before sending show one list of what the report is still missing, and the percentage reads off it; Show me goes to a blank answer and Next walks the rest; the Send button stays at the foot of the sheet and names who it goes to; a business with no email is told replies won't reach it; the quote's Send to client opens the same check and nothing goes until its button is tapped; the certificate card says what the certificate would go without.
 

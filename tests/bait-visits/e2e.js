@@ -79,7 +79,7 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   const j0 = await p.evaluate(() => { const j = dashboardJob(getSavedReports()[0], getSavedQuotes()); return { group: j.group, status: j.status, next: j.next && j.next.to, steps: j.steps.map(s => `${s.label}:${s.state}:${s.text}`), bars: (dashCardHTML(j).match(/<i class=/g) || []).length }; });
   console.log('job before any visit:', JSON.stringify(j0));
   check(j0.group === 'todo' && /First bait station check due/.test(j0.status) && j0.next === 'bait', 'a baiting job with no visit yet is in To do, first check due');
-  check(j0.steps.length === 5 && /Bait station visits:now:First check due .*overdue/.test(j0.steps[4]) && j0.bars === 6, 'the job has a fifth stage, Bait station visits, and its Jobs card shows six steps with the agreement');
+  check(j0.steps.length === 5 && /Bait station visits:now:First check due .*overdue/.test(j0.steps[4]) && j0.bars === 7, 'the job has a fifth stage, Bait station visits, and its Jobs card shows seven steps with Job details and the agreement');
   const strip = await p.evaluate(() => [...document.querySelectorAll('#quoteScreen .doc-strip .doc-chip')].map(c => c.textContent.trim()));
   check(strip.includes('Bait visits'), 'the document strip gains Bait visits: ' + strip.join(', '));
   await p.evaluate(() => document.getElementById('qpBait').scrollIntoView({ block: 'center' })); await shot('bait-card');
@@ -180,7 +180,7 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   await p.waitForTimeout(600); await shot('job-page');
   const jp = await p.evaluate(() => [...document.querySelectorAll('#jobOverlay .job-steps li')].map(li => li.className + ':' + li.querySelector('.job-step-label').firstChild.textContent + ':' + li.querySelector('.job-step-text').textContent));
   console.log('job page steps:', JSON.stringify(jp));
-  check(jp.length === 6 && /Bait station visits:Visit report not emailed yet/.test(jp[5]), 'the job page lists Bait station visits after Treatment');
+  check(jp.length === 7 && /Job details/.test(jp[0]) && /Agreement/.test(jp[1]) && /Bait station visits:Visit report not emailed yet/.test(jp[6]), 'the job page starts with Job details, then the agreement, and lists Bait station visits after Treatment');
   // A job on the Jobs list opens its page, whose Bait station visits step opens the visits.
   await p.evaluate(() => { closeJobPage(); openDashboard(); openDashboardJob(getSavedReports()[0].id, 'job'); });
   await p.waitForTimeout(600);

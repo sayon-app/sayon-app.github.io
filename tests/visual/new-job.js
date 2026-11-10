@@ -75,7 +75,7 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   const saved = await p.evaluate(() => ({ isNew: document.getElementById('jobOverlay').classList.contains('new-job'), next: (document.querySelector('#jobPageBody .job-next .dash-next-title') || {}).textContent }));
   check(!saved.isNew && saved.next === 'Get the agreement signed', 'once saved, the job page leads with the agreement: ' + JSON.stringify(saved));
   await shoot('4-saved');
-  // Its details, folded at the foot of the page.
+  // Its details: the first of the job's steps, opening in place.
   await p.locator('#jobDetailsHead').click(); await p.waitForTimeout(400);
   await p.evaluate(() => document.getElementById('jobDetailsHead').scrollIntoView({ block: 'start' }));
   await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/5-details-light.png` });

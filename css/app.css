@@ -5964,8 +5964,8 @@ body:not(.dark-screen) .job-page #jobPanel { border-color: transparent; box-shad
    and one-tap Call, Email and Directions; the next step with its
    document's icon; each step as a card with an icon tile in the colour of
    where it's up to (green done, blue next, grey to come), joined by a
-   short line; then Job PDF and Job details, which folds shut once the
-   address is in. */
+   short line, Job details first (they come before the agreement and the
+   report), opening in place; then the job PDF. */
 .job-hero { padding: 18px 0 6px; }
 .job-hero-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .job-hero-top .dash-detail-chip { margin: 0; }
@@ -6055,6 +6055,7 @@ body:not(.dark-screen) .job-page #jobPanel { border-color: transparent; box-shad
 .job-details-head::-webkit-details-marker { display: none; }
 .job-details[open] .job-details-head .job-step-chev { transform: rotate(90deg); }
 body .job-page .job-details #jobPanel:not(.menu-page-active) { margin: 0; border: none; border-top: 1px solid var(--border); border-radius: 0; box-shadow: none; }
+.job-steps .job-details { margin-top: 0; }
 
 /* On the ink backdrop (the light screen): white cards with a shadow, the
    hero's text and buttons light. */
@@ -6080,7 +6081,7 @@ body:not(.dark-screen) .job-page .job-step:active { background: var(--surface2);
 /* Job details in three parts: Property, Client and Booking, each under its
    own head. On a new job they're the page itself, a card each, with the
    agreement after them as the next step; once the address is in they fold
-   into Job details at the foot of the page. */
+   into Job details, the first of the job's steps. */
 .job-group-head {
   display: flex; align-items: center; gap: 10px; margin: 0 0 12px;
   font: 700 calc(16px * var(--ts))/1.2 'Space Grotesk', sans-serif; letter-spacing: -0.01em; color: var(--text);

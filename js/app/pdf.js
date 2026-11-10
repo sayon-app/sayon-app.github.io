@@ -1230,6 +1230,28 @@ async function buildReportPdf() {
     });
     if (!anyStatus) noneRow(false);
     notesBlock('obstructions');
+    // The site plan, when the inspector drew one: under the areas, each
+    // view kept on one page with its legend (js/site-plan.js draws it).
+    const plan = reportData.sitePlan;
+    if (typeof sitePlanHasContent === 'function' && sitePlanHasContent(plan)) {
+      ['site', 'sub'].filter(layer => layer === 'site' || sitePlanHasSubfloor(plan)).forEach(layer => keepGroup(() => {
+        const sum = layer === 'sub' ? sitePlanSubSummary(plan) : sitePlanSummary(plan, { report: true });
+        const words = layer === 'sub' ? `The area under the suspended floor, with the building's walls above it in grey.${sum ? ` It shows ${sum}.` : ''}`
+          : sum ? `The plan shows ${sum}.` : '';
+        // The drawing can't run over a page, so the room it takes (heading,
+        // words, plan and legend) is found first.
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+        const legendRows = sitePlanLegendKeys(plan, layer).length + (layer === 'sub' ? 1 : 0);
+        const need = 13 + (words ? doc.splitTextToSize(words, CW).length * 4.3 + 3 : 0) + CW * PLAN_H / PLAN_W + 4 + 6 + Math.ceil(legendRows / 3) * 6.6;
+        if (y + (atPageTop() ? 0 : 4) + need > 280) newPage();
+        if (!atPageTop()) gap(4);
+        subhead(layer === 'sub' ? 'SUBFLOOR PLAN' : 'SITE PLAN');
+        gap(3);
+        if (words) para(words);
+        y += drawSitePlanPdf(doc, plan, { x: M, y, w: CW, layer }) + 4;
+        y += drawSitePlanLegendPdf(doc, plan, { x: M, y, w: CW, layer }) + 2;
+      }));
+    }
     renderSectionPhotosInPDF('obstructions', 'Areas Inspected');
   });
 
@@ -1876,7 +1898,7 @@ async function buildReportPdf() {
       [REPORT_PARTS.client, 'Client & Inspection Details', 'Who the report is for, the property, and who inspected it.'],
       [REPORT_PARTS.summary, 'Summary', 'The main results under access, activity and safety & risk, with where to read more.'],
       [REPORT_PARTS.property, 'About the Property', 'How the building is built and used, and its termite management system.'],
-      [REPORT_PARTS.areas, 'Areas Inspected', 'Each area, how much of it was inspected, and what was found there.'],
+      [REPORT_PARTS.areas, 'Areas Inspected', `Each area, how much of it was inspected, and what was found there${typeof sitePlanHasContent === 'function' && sitePlanHasContent(reportData.sitePlan) ? ', with the site plan' : ''}.`],
       [REPORT_PARTS.access, 'Areas Unable to Be Inspected, and Why', 'Obstructions, restricted access, high risk areas and invasive inspection.'],
       [REPORT_PARTS.findings, 'Findings', 'Termites, borers, wood decay, chemical delignification and previous treatment.'],
       [REPORT_PARTS.conducive, 'Conducive Conditions', 'Conditions that make timber pest attack more likely, and why each matters.'],

@@ -4592,6 +4592,9 @@ body:not(.dark-screen) .choice-card { transition: background-color 0.3s, border-
 .areas-mark-all:focus-visible { outline: 3px solid rgba(var(--accent-rgb), 0.45); outline-offset: 2px; }
 
 #areaChecklist { gap: 10px; padding: 10px 14px 14px; }
+/* The site plan under the areas (THE SITE PLAN IN THE REPORT, js/site-plan.js). */
+.report-plan { padding: 2px 14px 16px; }
+.report-plan-head { margin: 0 0 8px; font-size: calc(13px * var(--ts)); font-weight: 800; color: var(--text); }
 .area-node { position: relative; }
 .area-node:not(:last-child)::after { content: ''; position: absolute; left: 34px; top: 100%; width: 2px; height: 10px; background: var(--border2); }
 .area-node[class*="area-node-"]:not(:last-child)::after { background: var(--green-fill); }

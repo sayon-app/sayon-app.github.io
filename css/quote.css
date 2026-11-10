@@ -561,6 +561,8 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-system-choice { background:
 .sp-selrow .job-input { flex: 1; min-width: 0; min-height: 42px; }
 .sp-delete { color: var(--risk); }
 .sp-groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 3px; border-radius: 12px; background: var(--surface3); }
+/* The report's plan has four tabs (no Treatment or Stations): one row. */
+.sp-groups[data-n="4"] { grid-template-columns: repeat(4, 1fr); }
 .sp-group { min-height: 38px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: calc(12.5px * var(--ts)); font-weight: 700; color: var(--text2); cursor: pointer; }
 .sp-group.on { background: var(--surface); color: var(--accent2); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
 .sp-tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }

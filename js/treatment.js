@@ -325,7 +325,12 @@ function openTreatmentRecord() {
   document.getElementById('trSiteExisting').value = site.existing || '';
   renderTreatmentSiteSummary();
   ['trSiteBuilding', 'trSiteFloor', 'trSiteSurrounds', 'trSiteExisting'].forEach(id => { document.getElementById(id).oninput = renderTreatmentSiteSummary; });
-  treatmentPlanDraft = sitePlanHasContent(t.plan) ? JSON.parse(JSON.stringify(t.plan)) : null;
+  // A new record starts from the report's plan, when the inspector drew
+  // one: the house and what was found are there, to add the treatment to.
+  const reportPlan = !q.treatment && treatmentSourceReport().sitePlan;
+  treatmentPlanFromReport = !sitePlanHasContent(t.plan) && sitePlanHasContent(reportPlan);
+  treatmentPlanDraft = sitePlanHasContent(t.plan) ? JSON.parse(JSON.stringify(t.plan))
+    : treatmentPlanFromReport ? JSON.parse(JSON.stringify(reportPlan)) : null;
   renderTreatmentPlan();
   document.getElementById('trAreas').value = t.areas || '';
   document.getElementById('trNotTreated').value = t.notTreated || '';
@@ -406,37 +411,19 @@ function renderTreatmentSiteSummary() {
 }
 
 // ── THE SITE PLAN ON THE RECORD ── The drawn plan (js/site-plan.js) is kept
-// here until the record is saved.
-let treatmentPlanDraft = null;
+// here until the record is saved. treatmentPlanFromReport: it's still the
+// report's plan as it came, nothing added yet.
+let treatmentPlanDraft = null, treatmentPlanFromReport = false;
 
 function renderTreatmentPlan() {
   drawTreatmentPlan();
   renderTreatmentFolds();
 }
 function drawTreatmentPlan() {
-  const el = document.getElementById('trPlan');
-  const plan = treatmentPlanDraft;
-  if (!sitePlanHasContent(plan)) {
-    el.innerHTML = `<button type="button" class="treat-plan-empty" onclick="openTreatmentSitePlan()">
-        <span class="treat-plan-empty-title">Draw the site plan</span>
-        <span class="treat-plan-empty-text">The building, what you treated, any stations and the notice. It prints on the certificate.</span>
-      </button>`;
-    return;
-  }
-  const sum = sitePlanSummary(plan);
-  const sub = sitePlanHasSubfloor(plan);
-  const subSum = sub ? sitePlanSubSummary(plan) : '';
-  el.innerHTML = `<button type="button" class="treat-plan-view" onclick="openTreatmentSitePlan()" aria-label="Edit the site plan">${sitePlanSVG(plan)}</button>
-    ${sitePlanLegendHTML(plan)}
-    ${sum ? `<p class="quote-hint">The plan shows ${escapeHtml(sum)}.</p>` : ''}
-    ${sub ? `<div class="treat-plan-sub">
-      <p class="treat-plan-caption">Subfloor</p>
-      <button type="button" class="treat-plan-view" onclick="openTreatmentSitePlan('sub')" aria-label="Edit the subfloor plan">${sitePlanSVG(plan, { layer: 'sub' })}</button>
-      ${sitePlanLegendHTML(plan, { layer: 'sub' })}
-      ${subSum ? `<p class="quote-hint">The subfloor plan shows ${escapeHtml(subSum)}.</p>` : ''}
-    </div>` : ''}
-    <button type="button" class="quote-link-btn" onclick="openTreatmentSitePlan()">Edit the site plan</button>
-    ${sub ? '' : '<button type="button" class="quote-link-btn" onclick="openTreatmentSitePlan(\'sub\')">Add the subfloor</button>'}`;
+  document.getElementById('trPlan').innerHTML = sitePlanCardHTML(treatmentPlanDraft, 'openTreatmentSitePlan', {
+    empty: ['Draw the site plan', 'The building, what you treated, any stations and the notice. It prints on the certificate.'],
+    note: treatmentPlanFromReport ? 'Started from the report\'s plan. Add what you treated and any stations.' : '',
+  });
 }
 
 function openTreatmentSitePlan(layer) {
@@ -446,6 +433,7 @@ function openTreatmentSitePlan(layer) {
   const methods = [...document.querySelectorAll('#trMethods input[type=checkbox]:checked')].map(box => box.dataset.key);
   openSitePlan(treatmentPlanDraft, plan => {
     treatmentPlanDraft = sitePlanHasContent(plan) ? plan : null;
+    treatmentPlanFromReport = false;
     renderTreatmentPlan();
     unsavedSheetChanged();
     // The stations drawn fill an empty station count, and tick baiting.

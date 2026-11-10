@@ -447,12 +447,15 @@ function loadDraft() {
     document.getElementById('jobPostcode').value = draft.jobPostcode || '';
     document.getElementById('jobClient').value = draft.jobClient || '';
     document.getElementById('jobInspector').value = draft.jobInspector || '';
-    updateJob();
 
     reportData = { ...draft.reportData };
     upgradeRenamedChoices(reportData);
     fieldNotes = { ...(draft.fieldNotes || {}) };
     currentReportId = draft.currentReportId || null;
+    // After the job's own data is back: the Last visit check skips the open
+    // job, so done before, it offered the job's own saved copy as an earlier
+    // inspection ("Inspected here before" on today's job).
+    updateJob();
     externalizePhotos(reportData).then(changed => { if (changed) saveDraft(); });
 
     Object.keys(reportData).forEach(key => {
@@ -749,7 +752,6 @@ function loadReport(id, quiet) {
   document.getElementById('jobPostcode').value = entry.jobPostcode || '';
   document.getElementById('jobClient').value = entry.client || '';
   document.getElementById('jobInspector').value = entry.inspector || '';
-  updateJob();
 
   // Restore report data
   reportData = { ...entry.reportData };
@@ -757,6 +759,7 @@ function loadReport(id, quiet) {
   fieldNotes = { ...(entry.fieldNotes || {}) };
   currentReportId = entry.id;
   savedIdFor.set(reportData, entry.id);
+  updateJob(); // once it's this job (see loadDraft)
   externalizePhotos(reportData).then(changed => { if (changed) saveDraft(); });
 
   // Re-render all fields

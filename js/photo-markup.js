@@ -250,9 +250,7 @@ function initPhotoMarkup() {
     if (e.key === 'Enter') { e.preventDefault(); addMarkupLabel(); }
     if (e.key === 'Escape') { e.preventDefault(); closeMarkupLabel(); }
   });
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && !document.getElementById('photoMarkup').hidden && !markupState.pendingLabel) closePhotoMarkup();
-  });
+  // Esc, back and swipe back close it through BACK (js/app/shell.js).
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initPhotoMarkup); else initPhotoMarkup();
 

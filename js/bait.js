@@ -251,6 +251,7 @@ function renderBaitFolds(reset) {
 }
 
 function closeBaitVisit() {
+  forgetSheetFrom('baitOverlay');
   dropUnsavedSheet();
   cancelSheetVoice('bait');
   document.getElementById('baitOverlay').classList.remove('open');

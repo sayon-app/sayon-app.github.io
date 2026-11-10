@@ -279,6 +279,7 @@
   <!-- The top bar and the job's documents fold to one slim row, and the
        total bar to a slim total, to clear space (toggleQuoteBar). -->
   <div class="quote-topbar page-topbar">
+    <button type="button" class="drawer-back quote-topbar-back" onclick="tabGo('job')" aria-label="Back to the job"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
     <div class="quote-topbar-title page-topbar-title">Quote</div>
     <div class="quote-save-state" id="quoteSaveState"></div>
     <button type="button" class="quote-fold-btn" id="quoteTopFold" onclick="toggleQuoteBar('top')" aria-expanded="true" aria-label="Fold the top bar"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg></button>
@@ -573,7 +574,7 @@
   <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="treatmentTitle">
     <div class="page-sheet-header">
       <span class="page-sheet-title" id="treatmentTitle">Record the treatment</span>
-      <button class="voice-popover-close" onclick="closeTreatmentRecord()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+      <button class="voice-popover-close" onclick="cancelSheet('treatmentOverlay')" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
     </div>
     <div class="page-sheet-body sheet-secs">
       <div class="sheet-voice" id="trVoice" data-state="idle">
@@ -771,7 +772,7 @@
         </div>
       </div>
       <button class="extract-btn" id="trSaveBtn" onclick="saveTreatmentRecord()">Save treatment record</button>
-      <button class="link-btn send-review-cancel" onclick="closeTreatmentRecord()">Cancel</button>
+      <button class="link-btn send-review-cancel" onclick="cancelSheet('treatmentOverlay')">Cancel</button>
       </section>
     </div>
   </div>
@@ -859,7 +860,7 @@
   <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="baitTitle">
     <div class="page-sheet-header">
       <span class="page-sheet-title" id="baitTitle">Bait station visit</span>
-      <button class="voice-popover-close" onclick="closeBaitVisit()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+      <button class="voice-popover-close" onclick="cancelSheet('baitOverlay')" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
     </div>
     <div class="page-sheet-body sheet-secs">
       <div class="sheet-voice" id="bvVoice" data-state="idle">
@@ -974,7 +975,7 @@
       </div>
       <p class="bait-need" id="bvNeed" hidden></p>
       <button class="extract-btn" id="bvSaveBtn" onclick="saveBaitVisit()">Save visit</button>
-      <button class="link-btn send-review-cancel" onclick="closeBaitVisit()">Cancel</button>
+      <button class="link-btn send-review-cancel" onclick="cancelSheet('baitOverlay')">Cancel</button>
       </section>
     </div>
   </div>
@@ -990,7 +991,7 @@
         <div class="app-logo-name">SAYON</div>
       </div>
       <div class="header-divider"></div>
-      <div class="header-job" id="headerJob">No job loaded</div>
+      <button type="button" class="header-job" id="headerJob" onclick="jobGo('details')" title="Job details: address, client, date">No job loaded</button>
     </div>
     <div class="header-right">
       <div class="progress-ring-wrap" title="Report completion">
@@ -1018,6 +1019,7 @@
   <div class="job-overlay" id="jobOverlay">
     <div class="job-page" role="dialog" aria-modal="true" aria-labelledby="jobPageTitle">
       <div class="page-topbar">
+        <button type="button" class="drawer-back" onclick="tabGo('dashboard')" aria-label="Back to Jobs"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
         <h2 class="page-topbar-title" id="jobPageTitle">This job</h2>
         <button type="button" class="topbar-new" onclick="startNewJob()"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>New job</button>
       </div>
@@ -1129,6 +1131,10 @@
                   <input class="job-input" id="jobInspectionTime" type="time" oninput="saveJobInfo()">
                 </div>
               </div>
+              <!-- One tap for the usual days, so nobody pages through the
+                   calendar (DATE CHIPS in js/app/job.js). -->
+              <div class="date-chips" id="jobDateChips" role="group" aria-label="Pick the inspection day"></div>
+              <div class="date-chips" id="jobTimeChips" role="group" aria-label="Pick the start time"></div>
               <div class="job-row">
                 <div class="job-field">
                   <label class="job-field-label" for="jobFee">Fee (inc GST)</label>
@@ -1567,6 +1573,15 @@
              JOBS in js/app/) -->
         <div class="issue-banner" id="issueBanner" style="display:none"></div>
 
+        <!-- Report done, not sent yet: says so on every step, with the next
+             step (REPORT DONE in js/app/editing.js). Once it's sent, the
+             banner above takes over. -->
+        <div class="agreement-banner signed report-done-banner" id="reportDoneBanner" hidden>
+          <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          <span class="agreement-banner-text" id="reportDoneBannerText">Report done</span>
+          <button class="agreement-banner-btn issue-primary" id="reportDoneBannerBtn">Send to client</button>
+        </div>
+
         <!-- Pre-inspection agreement: signed before the job (see the
              PRE-INSPECTION AGREEMENT block in js/app/) -->
         <div class="agreement-banner" id="agreementBanner">
@@ -1582,6 +1597,14 @@
           <button class="link-btn last-visit-skip" id="lastVisitSkip" onclick="dismissLastVisit()">Not now</button>
           <button class="agreement-banner-btn" id="lastVisitBtn" onclick="lastVisitAction()">Start from it</button>
         </div>
+
+        <!-- The job's details (address, client, booking), one tap back to
+             edit them on the job's page. Property step only. -->
+        <button type="button" class="report-job-card" id="reportJobCard" onclick="jobGo('details')">
+          <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span>
+          <span class="report-job-text"><span class="report-job-title">Job details</span><span class="report-job-sub" id="reportJobSub">Address, client and booking</span></span>
+          <span class="report-job-edit">Edit</span>
+        </button>
 
         <!-- PROPERTY -->
         <div class="report-section grouped" id="section-property">
@@ -2268,18 +2291,28 @@
             </div>
           </div>
           <div class="warn-note note-good"><svg class="icon " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> Signatures are saved with this report, synced to your account when you're signed in, and printed in the PDF.</div>
-          <!-- What happens once the report is done: the quote, then both go
-               to the client. The PDF on its own is the quiet last option. -->
-          <div class="finish-next">
-            <div class="finish-next-label">Next</div>
-            <button class="finish-next-btn" onclick="tabGo('quote')">
+          <!-- The end of the report: Report done ticks it off, then the one
+               next step (the quote, or sending) is the big button and the
+               rest are quiet. See REPORT DONE in js/app/editing.js. -->
+          <div class="finish-next" id="finishNext">
+            <div class="finish-done" id="finishDone" hidden>
+              <span class="finish-done-tick" aria-hidden="true"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+              <span class="finish-done-text"><b>Report done</b><small id="finishDoneWhen"></small></span>
+              <button type="button" class="link-btn" id="finishDoneUndo" onclick="setReportDone(false)">Keep working on it</button>
+            </div>
+            <button class="finish-next-btn primary" id="reportDoneBtn" onclick="setReportDone(true)">
+              <span class="finish-next-icon"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+              <span class="finish-next-text"><b>Report done</b><small id="reportDoneSub">Ticks it off on the job. You can still change it.</small></span>
+            </button>
+            <div class="finish-next-label" id="finishNextLabel" hidden>Next</div>
+            <button class="finish-next-btn" id="finishQuoteBtn" onclick="tabGo('quote')" hidden>
               <span class="finish-next-icon"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/></svg></span>
-              <span class="finish-next-text"><b>Write the quote</b><small>Starts from what the report found</small></span>
+              <span class="finish-next-text"><b id="finishQuoteTitle">Write the quote</b><small id="finishQuoteSub">Starts from what the report found</small></span>
               <svg class="icon finish-next-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
             </button>
-            <button class="finish-next-btn primary" id="shareBtn" onclick="openSendReview()" disabled>
+            <button class="finish-next-btn" id="shareBtn" onclick="openSendReview()" hidden disabled>
               <span class="finish-next-icon"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg></span>
-              <span class="finish-next-text"><b>Send to client</b><small>Check the report, then email it with the quote</small></span>
+              <span class="finish-next-text"><b id="shareTitle">Send to client</b><small id="shareSub">Check the report, then email it</small></span>
               <svg class="icon finish-next-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
             </button>
             <button class="finish-next-pdf" id="generateBtn" onclick="generateReport()" disabled>
@@ -2477,7 +2510,7 @@
   <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="agreementTitle">
     <div class="page-sheet-header">
       <span class="page-sheet-title" id="agreementTitle">Pre-inspection agreement</span>
-      <button class="voice-popover-close" onclick="closeAgreementSheet()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+      <button class="voice-popover-close" onclick="cancelSheet('agreementOverlay')" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
       <!-- How far through: the job, read it, signed. See updateAgreementSignButton. -->
       <div class="agr-progress" id="agreementProgress" aria-hidden="true"><i></i><i></i><i></i></div>
     </div>

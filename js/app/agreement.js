@@ -267,6 +267,7 @@ function restoreAgreementForm(d) {
 }
 
 function closeAgreementSheet() {
+  forgetSheetFrom('agreementOverlay');
   if (typeof dropUnsavedSheet === 'function') dropUnsavedSheet();
   cancelSheetVoice('agreement');
   document.getElementById('agreementOverlay').classList.remove('open');

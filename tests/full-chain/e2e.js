@@ -139,6 +139,8 @@ let shotN = 0;
   let dl = downloads.length;
   await tap(p.locator('#generateBtn'), 'Generate report'); await p.waitForTimeout(5000); await shot('generated');
   console.log('after generate: downloads', downloads.slice(dl), 'toasts', await toasts());
+  await tap(p.locator('#reportDoneBtn'), 'Report done'); await p.waitForTimeout(600);
+  check(await p.evaluate(() => !!reportData.doneAt && !document.getElementById('shareBtn').hidden), 'Report done ticks the report off and shows Send');
   await tap(p.locator('#shareBtn'), 'Send to client (Finish step)'); await p.waitForTimeout(1500); await shot('send-review');
   console.log('send review:', (await p.evaluate(() => document.querySelector('#sendReviewOverlay .page-sheet').innerText)).slice(0, 600));
   let em = emails.length;

@@ -318,7 +318,7 @@ function renderJobPage() {
       ${skipLink ? `<div class="dash-detail-links">${skipLink}</div>` : ''}
     </section>
     ${stepsHTML}
-    ${typeof jobPdfSectionHTML === 'function' ? jobPdfSectionHTML() : ''}
+    ${typeof jobPdfSectionHTML === 'function' ? jobPdfSectionHTML(j) : ''}
     ${detailsHTML}`;
   const panel = document.getElementById('jobPanel');
   if (panel) document.getElementById('jobPageSlot').appendChild(panel);
@@ -438,19 +438,21 @@ function syncDockJobs() {
   }, 400);
 }
 
-// The mic is for the report: from anywhere else it goes to the report and
-// opens the voice panel there.
+// The mic is for the report: from anywhere else it goes to the report.
+// One tap opens the voice panel already listening, so a tech about to
+// drive off has one thing to press. With the panel open and quiet, the
+// same button closes it.
 function tabMic() {
   // While it listens, Talk reads Stop: a tap stops the recording.
   if (isRecording) { toggleRecording(); return; }
+  const popover = document.getElementById('voicePopover');
   const onReport = document.getElementById('app').style.display === 'flex'
     && !['quoteScreen', 'sidebarPanel', 'dashboardOverlay', 'jobOverlay'].some(id => document.getElementById(id).classList.contains('open'));
-  if (!onReport) {
-    tabGo('report');
-    if (!document.getElementById('voicePopover').classList.contains('open')) toggleVoicePopover();
-    return;
-  }
-  toggleVoicePopover();
+  if (!onReport) tabGo('report');
+  else if (popover.classList.contains('open')) { toggleVoicePopover(); return; }
+  if (!popover.classList.contains('open')) toggleVoicePopover();
+  // A finished report keeps the panel shut, and so nothing listens.
+  if (popover.classList.contains('open')) startRecording();
 }
 
 function toggleVoicePopover() {

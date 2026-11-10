@@ -74,6 +74,7 @@ let shotN = 0;
   const site = await p.evaluate(() => ['trSiteBuilding', 'trSiteFloor', 'trSiteSurrounds', 'trSiteExisting'].map(id => document.getElementById(id).value));
   console.log('site:', JSON.stringify(site));
   check(/Single storey house/.test(site[0]) && /Brick veneer/.test(site[0]) && site[1] === 'Concrete slab' && /Garden beds/.test(site[2]) && /None found/.test(site[3]), 'the site fields come from the report');
+  check(await p.evaluate(() => document.querySelector('#trFold1 .quote-card-title').textContent) === 'The visit', 'the record\'s first part is The visit, as on the bait sheet (Job details is the job\'s own step)');
   // Areas treated may open folded once the record is pre-filled.
   await p.evaluate(() => { document.getElementById('trFold3').open = true; });
   await p.locator('#trPlan').scrollIntoViewIfNeeded(); await p.evaluate(() => document.getElementById('trSiteBuilding').scrollIntoView({ block: 'start' }));
@@ -82,6 +83,7 @@ let shotN = 0;
   // 2. Draw the plan.
   await tap(p.locator('#trPlan .treat-plan-empty'), 'Draw the site plan'); await p.waitForTimeout(400);
   check(await p.evaluate(() => document.getElementById('sitePlanOverlay').classList.contains('open') && sitePlanEditor.plan.items.length === 1 && sitePlanEditor.plan.items[0].k === 'house'), 'the editor opens with a house to start from');
+  check(await p.evaluate(() => sitePlanEditor.group === 'build' && document.querySelector('#spGroups .sp-group.on').textContent === 'Buildings'), 'a new plan opens on Buildings, to fit the house first');
   await shot('editor-start');
   // A garage dragged out to the right.
   await tool('Buildings', 'Garage or shed'); await dragPlan(850, 275, 975, 425);
@@ -217,15 +219,21 @@ let shotN = 0;
   await p.waitForTimeout(300);
   await openBaitFold(); await p.waitForTimeout(200); await shot('bait-card-installed');
   check(await p.evaluate(() => /Stations as installed/.test(document.getElementById('qpBait').innerText)), 'the bait card shows the stations as installed');
+  check(await p.evaluate(() => [...document.querySelectorAll('#qpBait button')].find(b => /Record a visit/.test(b.textContent)).className === 'quote-link-btn'), 'Record a visit is a quiet button while the first check is weeks away');
   await tap(p.locator('#qpBait button', { hasText: 'Record a visit' }), 'Record a visit'); await p.waitForTimeout(500);
+  const carried = await p.evaluate(() => ({ kept: document.getElementById('bvSigCanvas').parentElement.classList.contains('kept'), same: padSignature(baitPad) === quoteState.treatment.signature, again: !document.querySelector('#baitOverlay .agr-sig-clear').hidden }));
+  check(carried.kept && carried.same && carried.again, 'the technician who signed the treatment record doesn\'t sign the visit again: ' + JSON.stringify(carried));
   const v0 = await p.evaluate(() => baitDraft.stations.map(s => s.n + ':' + s.where));
   console.log('visit stations:', JSON.stringify(v0));
   check(v0.length === 11 && v0[0] === '1:Front left corner' && v0[4] === '5:Rear, by the laundry' && v0[10].startsWith('11:'), 'the visit lists the 11 stations from the plan, with where they are');
+  await tap(p.locator('#bvStations .bait-station[data-i="4"] .bait-row'), 'station 5');
   await tap(p.locator('#bvStations .bait-station[data-i="4"] .bait-chip.active'), 'station 5 active');
+  await tap(p.locator('#bvStations .bait-station[data-i="9"] .bait-row'), 'station 10');
   await tap(p.locator('#bvStations .bait-station[data-i="9"] .bait-chip.eaten'), 'station 10 bait eaten');
+  await tap(p.locator('#bvStations .bait-station[data-i="2"] .bait-row'), 'station 3');
   await tap(p.locator('#bvStations .bait-station[data-i="2"] .bait-chip.damaged'), 'station 3 damaged');
   await tap(p.locator('.bait-rest-btn'), 'Rest are clear');
-  await sign('#bvSigCanvas'); await tap(p.locator('#bvSaveBtn'), 'Save visit'); await p.waitForTimeout(800);
+  await tap(p.locator('#bvSaveBtn'), 'Save visit'); await p.waitForTimeout(800);
   await openBaitFold(); await p.waitForTimeout(200);
   await p.evaluate(() => document.querySelector('#qpBait .bait-plan').scrollIntoView({ block: 'start' })); await shot('bait-card-visit');
   const card = await p.evaluate(() => ({ cap: document.querySelector('#qpBait .bait-plan-caption').textContent, legend: [...document.querySelectorAll('#qpBait .site-plan-legend li')].map(li => li.textContent) }));
@@ -244,6 +252,14 @@ let shotN = 0;
   await p.evaluate(() => { document.body.classList.add('dark-screen'); openTreatmentRecord(); document.getElementById('trPlan').scrollIntoView({ block: 'start' }); });
   await shot('record-plan-dark');
   await p.evaluate(() => openTreatmentSitePlan()); await p.waitForTimeout(300); await shot('editor-dark');
+  // A plan already drawn opens where the ticked treatment goes.
+  const tab = await p.evaluate(() => { const house = { items: [{ k: 'house' }] }, lined = { items: [{ k: 'house' }, { k: 'barrier' }] };
+    return { now: sitePlanEditor.group, on: document.querySelector('#spGroups .sp-group.on').textContent, none: sitePlanStartGroup(null, ['bait']), barrier: sitePlanStartGroup(house, ['barrier', 'bait']),
+      then: sitePlanStartGroup(lined, ['barrier', 'bait']), other: sitePlanStartGroup(house, ['borer']), sub: sitePlanStartGroup({ items: [{ k: 'house' }, { k: 'inground', layer: 'sub' }] }, ['bait']) }; });
+  check(tab.now === 'stations' && tab.on === 'Stations', 'on a baiting job the drawn plan opens on Stations: ' + tab.on);
+  check(tab.none === 'build' && tab.barrier === 'treat' && tab.then === 'stations' && tab.other === 'build' && tab.sub === 'stations', 'a barrier job opens on Treatment, then on Stations once the barrier is drawn; nothing ticked for the plan opens on Buildings: ' + JSON.stringify(tab));
+  const recSig = await p.evaluate(() => ({ kept: document.getElementById('trSigCanvas').parentElement.classList.contains('kept'), again: !document.querySelector('#treatmentOverlay .agr-sig-clear').hidden, by: document.getElementById('trSigBy').textContent }));
+  check(recSig.kept && recSig.again && recSig.by === 'Alex Example', 'the saved record\'s signature is kept, with Sign again: ' + JSON.stringify(recSig));
   const wanted = await p.evaluate(() => ({ n: sitePlanEditor.stationsWanted, qty: document.querySelector('#trMethods [data-qty="bait"]').value }));
   check(wanted.n > 0 && String(wanted.n) === wanted.qty, `the record's station count goes to Stations all round (${wanted.n})`);
   await p.evaluate(() => { closeSitePlan(); closeTreatmentRecord(); document.body.classList.remove('dark-screen'); });

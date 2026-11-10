@@ -128,13 +128,16 @@ function renderBaitBlock(q) {
         </div>
       </div>`;
   }).join('');
+  // Record a visit is the filled button only once a check is due, and the
+  // last visit's report has gone: until then it's a quiet way in.
+  const recordLeads = !b.finished && b.dueNow && !(newest[0] && !newest[0].sentAt);
   return `<div class="qp-cert bait-card${b.finished ? ' sent' : ''}" id="qpBait">
       <div class="qp-cert-title">Bait station visits</div>
       <p class="qp-cert-text">${status}</p>
       ${baitPlanHTML(q, b.last)}
       ${rows ? `<div class="bait-visits">${rows}</div>` : ''}
       <div class="quote-step-actions">
-        <button class="${b.finished || (newest[0] && !newest[0].sentAt) ? 'quote-link-btn' : 'quote-btn primary'}" onclick="openBaitVisit()">${b.finished ? 'Record another visit' : 'Record a visit'}</button>
+        <button class="${recordLeads ? 'quote-btn primary' : 'quote-link-btn'}" onclick="openBaitVisit()">${b.finished ? 'Record another visit' : 'Record a visit'}</button>
       </div>
     </div>`;
 }
@@ -160,7 +163,8 @@ function baitPlanHTML(q, v) {
 
 // ── THE VISIT SHEET ──
 let baitPad = null;
-// The visit on the sheet: { id (null for a new one), stations, nextTouched }.
+// The visit on the sheet: { id (null for a new one), stations, nextTouched,
+// open (the index of the station whose row is open, or null) }.
 let baitDraft = null;
 
 function draftBaitVisit(q, prev) {
@@ -194,7 +198,7 @@ function openBaitVisit(id) {
   const copy = unsavedSheetCopy(sheetKey);
   const restored = !!copy && copy.at > ((existing && existing.at) || 0);
   const v = restored ? copy.data : existing ? JSON.parse(JSON.stringify(existing)) : draftBaitVisit(q, visits[visits.length - 1]);
-  baitDraft = { id: existing ? existing.id : null, stations: v.stations || [], nextTouched: restored ? !!v.nextTouched : !!existing };
+  baitDraft = { id: existing ? existing.id : null, stations: v.stations || [], nextTouched: restored ? !!v.nextTouched : !!existing, open: null };
   track('screen_viewed', { screen: 'bait_visit' });
   document.getElementById('baitTitle').textContent = existing ? 'Edit the bait station visit' : 'Bait station visit';
   document.getElementById('bvDate').value = v.date || todayIsoDate();
@@ -211,8 +215,8 @@ function openBaitVisit(id) {
   cancelSheetVoice('bait');
   document.getElementById('baitOverlay').classList.add('open');
   document.querySelector('#baitOverlay .page-sheet-body').scrollTop = 0;
-  if (!baitPad) baitPad = createSignaturePad(document.getElementById('bvSigCanvas'), document.getElementById('bvSigPlaceholder'), () => { updateBaitSaveBtn(); unsavedSheetChanged(); });
-  baitPad.show(v.signature || '');
+  if (!baitPad) baitPad = createSignaturePad(document.getElementById('bvSigCanvas'), document.getElementById('bvSigPlaceholder'), () => { keepSheetSignature(baitPad, false); updateBaitSaveBtn(); unsavedSheetChanged(); });
+  openSheetSignature(baitPad, v.signature || '', v.technician);
   updateBaitSaveBtn();
   renderBaitFolds(true);
   const sheet = document.getElementById('baitOverlay');
@@ -257,20 +261,34 @@ function closeBaitVisit() {
   document.getElementById('baitOverlay').classList.remove('open');
 }
 
+// One row per station: its number, where it is and what was found. A tap
+// opens it to the six answers, where it is (set at the install, changed
+// here if it moves) and, when the answer calls for it, the bait added or
+// the action taken. One row is open at a time (baitDraft.open).
+const BAIT_ROW_CHEV = '<svg class="icon bait-row-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
 function baitStationHTML(s, i) {
   const esc = escapeHtml;
+  const open = baitDraft.open === i;
   const feeding = BAIT_FEEDING.includes(s.status);
   const problem = BAIT_PROBLEMS.includes(s.status);
-  return `<div class="bait-station${s.status ? ' set ' + s.status : ''}" data-i="${i}">
-      <div class="bait-station-head">
+  const where = (s.where || '').trim();
+  const found = s.status ? BAIT_STATUSES[s.status].label : 'Not marked';
+  // What was added or done there, under where it is, while the row is shut.
+  const more = [(s.bait || '').trim() ? `Bait added: ${s.bait.trim()}` : '', (s.note || '').trim()].filter(Boolean).join(' · ');
+  return `<div class="bait-station${s.status ? ' set ' + s.status : ''}${open ? ' open' : ''}" data-i="${i}">
+      <button type="button" class="bait-row" aria-expanded="${open}" onclick="toggleBaitStation(${i})" aria-label="Station ${s.n}${where ? ', ' + esc(where) : ''}: ${esc(found)}">
         <span class="bait-station-no" aria-hidden="true">${s.n}</span>
-        <input class="job-input bait-station-where" value="${esc(s.where || '')}" placeholder="Where, e.g. rear left corner" aria-label="Where station ${s.n} is" oninput="baitDraft.stations[${i}].where = this.value">
-      </div>
-      <div class="qp-chips bait-chips" role="radiogroup" aria-label="What you found at station ${s.n}">
-        ${Object.entries(BAIT_STATUSES).map(([k, st]) => `<button type="button" role="radio" aria-checked="${s.status === k}" class="qp-chip bait-chip ${k}${s.status === k ? ' on' : ''}" onclick="setBaitStation(${i}, '${k}')">${st.label}</button>`).join('')}
-      </div>
-      ${feeding || (s.bait || '').trim() ? `<label class="bait-station-extra"><span>Bait added</span><input class="job-input" value="${esc(s.bait || '')}" placeholder="e.g. 2 cartridges, blank if none" oninput="baitDraft.stations[${i}].bait = this.value"></label>` : ''}
-      ${problem || (s.note || '').trim() ? `<label class="bait-station-extra"><span>Action taken</span><input class="job-input" value="${esc(s.note || '')}" placeholder="e.g. Lid replaced" oninput="baitDraft.stations[${i}].note = this.value"></label>` : ''}
+        <span class="bait-row-main"><span class="bait-row-where${where ? '' : ' empty'}">${where ? esc(where) : 'Where not set'}</span>${more && !open ? `<span class="bait-row-more">${esc(more)}</span>` : ''}</span>
+        <span class="bait-row-found">${esc(found)}</span>${BAIT_ROW_CHEV}
+      </button>
+      ${open ? `<div class="bait-row-body">
+        <div class="qp-chips bait-chips" role="radiogroup" aria-label="What you found at station ${s.n}">
+          ${Object.entries(BAIT_STATUSES).map(([k, st]) => `<button type="button" role="radio" aria-checked="${s.status === k}" class="qp-chip bait-chip ${k}${s.status === k ? ' on' : ''}" onclick="setBaitStation(${i}, '${k}')">${st.label}</button>`).join('')}
+        </div>
+        <label class="bait-station-extra"><span>Where</span><input class="job-input bait-station-where" value="${esc(s.where || '')}" placeholder="e.g. rear left corner" oninput="setBaitStationWhere(${i}, this.value)"></label>
+        ${feeding || (s.bait || '').trim() ? `<label class="bait-station-extra"><span>Bait added</span><input class="job-input bait-station-bait" value="${esc(s.bait || '')}" placeholder="e.g. 2 cartridges, blank if none" oninput="baitDraft.stations[${i}].bait = this.value"></label>` : ''}
+        ${problem || (s.note || '').trim() ? `<label class="bait-station-extra"><span>Action taken</span><input class="job-input bait-station-note" value="${esc(s.note || '')}" placeholder="e.g. Lid replaced" oninput="baitDraft.stations[${i}].note = this.value"></label>` : ''}
+      </div>` : ''}
     </div>`;
 }
 
@@ -289,18 +307,43 @@ function redrawBaitStation(i) {
   if (el) el.outerHTML = baitStationHTML(baitDraft.stations[i], i);
 }
 
+// Opens a station's row, or shuts the one that's open.
+function toggleBaitStation(i) {
+  const was = baitDraft.open;
+  baitDraft.open = was === i ? null : i;
+  if (was != null && was !== i) redrawBaitStation(was);
+  redrawBaitStation(i);
+}
+
+// Where a station is, as it's typed: the row's own line follows it.
+function setBaitStationWhere(i, value) {
+  baitDraft.stations[i].where = value;
+  const line = document.querySelector(`#bvStations .bait-station[data-i="${i}"] .bait-row-where`);
+  if (!line) return;
+  line.textContent = value.trim() || 'Where not set';
+  line.classList.toggle('empty', !value.trim());
+}
+
+// Clear needs nothing more, so its row shuts once it says where it is. Any
+// other answer keeps it open for the bait added or the action taken.
+const baitRowDone = s => s.status === 'clear' && !!(s.where || '').trim();
+
 function setBaitStation(i, status) {
   const s = baitDraft.stations[i];
   if (!s) return;
   s.status = s.status === status ? '' : status;
+  if (baitDraft.open === i && baitRowDone(s)) baitDraft.open = null;
   redrawBaitStation(i);
   baitStatusChanged();
 }
 
 function markRestBaitClear() {
   let n = 0;
-  baitDraft.stations.forEach((s, i) => { if (!s.status) { s.status = 'clear'; redrawBaitStation(i); n++; } });
+  baitDraft.stations.forEach(s => { if (!s.status) { s.status = 'clear'; n++; } });
   if (!n) { showToast('Every station is already marked', 'info'); return; }
+  const open = baitDraft.stations[baitDraft.open];
+  if (open && baitRowDone(open)) baitDraft.open = null;
+  renderBaitStations();
   baitStatusChanged();
 }
 
@@ -308,12 +351,15 @@ function setBaitStationCount() {
   const n = Math.min(parseInt(document.getElementById('bvCount').value, 10) || 0, 99);
   if (n < 1) { showToast('Type how many stations are in the ground', 'error'); return; }
   baitDraft.stations = Array.from({ length: n }, (_, i) => ({ n: i + 1, where: '', status: '', bait: '', note: '' }));
+  baitDraft.open = null;
   renderBaitStations();
 }
 
+// A new station opens, asking where it is.
 function addBaitStation() {
   const n = baitDraft.stations.reduce((m, s) => Math.max(m, s.n), 0) + 1;
   baitDraft.stations.push({ n, where: '', status: '', bait: '', note: '' });
+  baitDraft.open = baitDraft.stations.length - 1;
   renderBaitStations();
   const last = document.querySelector('#bvStations .bait-station:last-child .bait-station-where');
   if (last) last.focus();
@@ -324,6 +370,7 @@ function removeLastBaitStation() {
   if (!s) return;
   if (s.status && !confirmRemoveBait(s)) return;
   baitDraft.stations.pop();
+  if (baitDraft.open >= baitDraft.stations.length) baitDraft.open = null;
   renderBaitStations();
   baitStatusChanged();
 }
@@ -424,7 +471,7 @@ function readBaitForm() {
     nextVisit: finished ? '' : v('bvNext'),
     finished,
     notes: v('bvNotes'),
-    signature: baitPad && !baitPad.empty ? baitPad.canvas.toDataURL('image/png') : '',
+    signature: padSignature(baitPad),
     at: Date.now(),
   };
 }

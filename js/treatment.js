@@ -344,9 +344,9 @@ function openTreatmentRecord() {
   cancelSheetVoice('treatment');
   document.getElementById('treatmentOverlay').classList.add('open');
   if (!treatmentPad) {
-    treatmentPad = createSignaturePad(document.getElementById('trSigCanvas'), document.getElementById('trSigPlaceholder'), () => { updateTreatmentSaveBtn(); unsavedSheetChanged(); });
+    treatmentPad = createSignaturePad(document.getElementById('trSigCanvas'), document.getElementById('trSigPlaceholder'), () => { keepSheetSignature(treatmentPad, false); updateTreatmentSaveBtn(); unsavedSheetChanged(); });
   }
-  treatmentPad.show(t.signature || '');
+  openSheetSignature(treatmentPad, t.signature || '', t.technician);
   if (!treatmentSketch) {
     treatmentSketch = createSignaturePad(document.getElementById('trSketchCanvas'), document.getElementById('trSketchPlaceholder'), unsavedSheetChanged);
   }
@@ -449,6 +449,7 @@ function openTreatmentSitePlan(layer) {
   // The stations counted on the record are how many Stations all round places.
   const baitQty = document.querySelector('#trMethods [data-qty="bait"]');
   const stations = baitQty && !baitQty.hidden ? parseInt(baitQty.value, 10) || 0 : 0;
+  const methods = [...document.querySelectorAll('#trMethods input[type=checkbox]:checked')].map(box => box.dataset.key);
   openSitePlan(treatmentPlanDraft, plan => {
     treatmentPlanDraft = sitePlanHasContent(plan) ? plan : null;
     renderTreatmentPlan();
@@ -467,7 +468,7 @@ function openTreatmentSitePlan(layer) {
       const lQty = document.querySelector(`#trMethods [data-qty="${k}"]`);
       if (lm && lBox && lBox.checked && lQty && !lQty.value.trim()) lQty.value = String(lm);
     });
-  }, { stations });
+  }, { stations, methods });
   if (layer === 'sub') setSitePlanLayer('sub');
 }
 
@@ -890,7 +891,7 @@ function readTreatmentForm() {
     nextInspection: v('trNext'),
     warranty: v('trWarranty'),
     notes: v('trNotes'),
-    signature: treatmentPad && !treatmentPad.empty ? treatmentPad.canvas.toDataURL('image/png') : '',
+    signature: padSignature(treatmentPad),
     at: Date.now(),
   };
 }

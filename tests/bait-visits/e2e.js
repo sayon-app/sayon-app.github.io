@@ -90,6 +90,8 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   await openBaitFold(); await p.waitForTimeout(200); await shot('bait-card');
   const card = await p.evaluate(() => document.getElementById('qpBait').innerText);
   check(/First check of the stations due/.test(card) && /12 stations installed/.test(card), 'the step opens to the bait card with the first check due: ' + card.replace(/\n/g, ' | ').slice(0, 120));
+  const recordBtn = () => p.evaluate(() => [...document.querySelectorAll('#qpBait button')].find(b => /Record a(nother)? visit/.test(b.textContent)).className);
+  check(/primary/.test(await recordBtn()), 'with the check due, Record a visit is the filled button');
 
   // 2. Record a visit by tapping.
   await tap(p.locator('#qpBait button', { hasText: 'Record a visit' }), 'Record a visit'); await p.waitForTimeout(600); await shot('visit-open');
@@ -97,18 +99,40 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   console.log('sheet opened:', JSON.stringify(open));
   check(open.stations === 12 && open.product === 'Exterra' && open.batch === 'B-0003' && open.tech === 'Alex Example', '12 stations listed, bait and technician from the treatment record');
   check(open.save && /Mark each station/.test(open.need), 'save waits until every station is marked: ' + open.need);
-  await p.fill('#bvStations .bait-station[data-i="5"] .bait-station-where', 'Rear left corner');
-  await tap(p.locator('#bvStations .bait-station[data-i="5"] .bait-chip.active'), 'station 6 active'); await p.waitForTimeout(200);
-  const after6 = await p.evaluate(() => ({ extra: !!document.querySelector('#bvStations .bait-station[data-i="5"] .bait-station-extra input'), next: document.getElementById('bvNext').value, date: document.getElementById('bvDate').value }));
-  check(after6.extra, 'an active station opens a Bait added box');
+  // One row per station, all shut: its number, where it is and what was found.
+  const rows = await p.evaluate(() => { const r = [...document.querySelectorAll('#bvStations .bait-station')]; const a = r[0].getBoundingClientRect(), z = r[r.length - 1].getBoundingClientRect();
+    return { open: r.filter(x => x.classList.contains('open')).length, chips: document.querySelectorAll('#bvStations .bait-chip').length, tall: Math.round(z.bottom - a.top), first: r[0].querySelector('.bait-row').innerText.replace(/\s+/g, ' ').trim() }; });
+  console.log('rows:', JSON.stringify(rows));
+  check(rows.open === 0 && rows.chips === 0 && rows.tall < 700 && /^1 Where not set Not marked$/.test(rows.first), 'the 12 stations are one row each, shut, and fit on a screen: ' + JSON.stringify(rows));
+  const row = i => p.locator(`#bvStations .bait-station[data-i="${i}"]`);
+  await tap(row(5).locator('.bait-row'), 'station 6'); await p.waitForTimeout(200);
+  check(await row(5).locator('.bait-chip').count() === 6 && await p.locator('#bvStations .bait-station.open').count() === 1, 'a tap on a row opens it to the six answers');
+  await shot('station-open');
+  await row(5).locator('.bait-station-where').fill('Rear left corner');
+  await tap(row(5).locator('.bait-chip.active'), 'station 6 active'); await p.waitForTimeout(200);
+  const after6 = await p.evaluate(() => ({ extra: !!document.querySelector('#bvStations .bait-station[data-i="5"] .bait-station-bait'), open: document.querySelector('#bvStations .bait-station[data-i="5"]').classList.contains('open'), next: document.getElementById('bvNext').value, date: document.getElementById('bvDate').value }));
+  check(after6.extra && after6.open, 'an active station stays open, with a Bait added box');
   check(after6.next === daysFrom(after6.date, 28), 'termites feeding: the next visit starts at 4 weeks (' + after6.next + ')');
-  await p.fill('#bvStations .bait-station[data-i="5"] .bait-station-extra input', '2 cartridges');
-  await tap(p.locator('#bvStations .bait-station[data-i="6"] .bait-chip.damaged'), 'station 7 damaged'); await p.waitForTimeout(200);
-  await p.fill('#bvStations .bait-station[data-i="6"] .bait-station-extra input', 'Lid replaced');
+  await row(5).locator('.bait-station-bait').fill('2 cartridges');
+  // The next row opened shuts this one, which then reads back what was said.
+  await tap(row(6).locator('.bait-row'), 'station 7'); await p.waitForTimeout(200);
+  const shut6 = await row(5).locator('.bait-row').innerText();
+  check(await p.locator('#bvStations .bait-station.open').count() === 1 && /Rear left corner/.test(shut6) && /Bait added: 2 cartridges/.test(shut6) && /Active/.test(shut6), 'opening the next row shuts the last, which reads back where, what was found and the bait: ' + shut6.replace(/\s+/g, ' '));
+  await tap(row(6).locator('.bait-chip.damaged'), 'station 7 damaged'); await p.waitForTimeout(200);
+  await row(6).locator('.bait-station-note').fill('Lid replaced');
+  // Clear needs nothing more: its row shuts once it says where it is.
+  await tap(row(0).locator('.bait-row'), 'station 1'); await p.waitForTimeout(200);
+  await tap(row(0).locator('.bait-chip.clear'), 'station 1 clear'); await p.waitForTimeout(200);
+  check(await row(0).evaluate(e => e.classList.contains('open')), 'a clear station with no "where" yet stays open for it');
+  await row(0).locator('.bait-station-where').fill('Front tap');
+  await tap(row(1).locator('.bait-row'), 'station 2'); await p.waitForTimeout(200);
+  await row(1).locator('.bait-station-where').fill('Driveway side');
+  await tap(row(1).locator('.bait-chip.clear'), 'station 2 clear'); await p.waitForTimeout(200);
+  check(await p.locator('#bvStations .bait-station.open').count() === 0 && /Driveway side/.test(await row(1).locator('.bait-row').innerText()), 'one that says where it is shuts on Clear');
   await tap(p.locator('.bait-rest-btn'), 'Rest are clear'); await p.waitForTimeout(200);
   const marked = await p.evaluate(() => ({ summary: document.getElementById('bvSummary').textContent, need: document.getElementById('bvNeed').textContent, clear: document.querySelectorAll('#bvStations .bait-station.clear').length }));
   console.log('marked:', JSON.stringify(marked));
-  check(marked.clear === 10 && /10 clear, 1 active, 1 damaged/.test(marked.summary), 'Rest are clear marks the other 10, and the summary says so');
+  check(marked.clear === 10 && /10 clear, 1 active, 1 damaged/.test(marked.summary), 'Rest are clear marks the others, and the summary says so');
   check(/Sign the visit/.test(marked.need), 'then only the signature is missing: ' + marked.need);
   await shot('visit-marked');
   await sign('#bvSigCanvas'); await p.waitForTimeout(200);
@@ -139,6 +163,7 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   const j2 = await p.evaluate(() => { const j = dashboardJob(getSavedReports()[0], getSavedQuotes()); return { group: j.group, status: j.status, sent: !!quoteState.baitVisits[0].sentAt, step: j.steps[4] }; });
   console.log('after email:', JSON.stringify(j2));
   check(j2.sent && j2.group === 'waiting' && /Bait check due/.test(j2.status), 'once emailed, the job waits for the next visit: ' + j2.status);
+  check(await recordBtn() === 'quote-link-btn', 'and Record a visit goes quiet until that check is due');
 
   // 5. The PDF: a summary, the station table and what happens next.
   const pdf = await p.evaluate(async () => { const { blob, fname } = buildBaitVisitPDF(quoteState, quoteState.baitVisits[0]); const buf = new Uint8Array(await blob.arrayBuffer()); let s = ''; for (let i = 0; i < buf.length; i += 32768) s += String.fromCharCode.apply(null, buf.subarray(i, i + 32768)); return { b64: btoa(s), fname, pages: (s.match(/\/Type\s*\/Page[^s]/g) || []).length }; });
@@ -156,8 +181,12 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   // 6. A second visit, said instead of typed: the spots carry over, and the
   // spoken note fills the stations.
   await tap(p.locator('#qpBait button', { hasText: 'Record a visit' }), 'Record a visit (2)'); await p.waitForTimeout(500);
-  const open2 = await p.evaluate(() => ({ where6: document.querySelector('#bvStations .bait-station[data-i="5"] .bait-station-where').value, status: document.querySelectorAll('#bvStations .bait-station.set').length, product: document.getElementById('bvProduct').value }));
+  const open2 = await p.evaluate(() => ({ where6: document.querySelector('#bvStations .bait-station[data-i="5"] .bait-row-where').textContent, status: document.querySelectorAll('#bvStations .bait-station.set').length, product: document.getElementById('bvProduct').value }));
   check(open2.where6 === 'Rear left corner' && open2.status === 0 && open2.product === 'Exterra', 'the next visit keeps where each station is and the bait, not what was found');
+  // The technician signed the last visit, so this one opens signed the same.
+  const sig2 = await p.evaluate(() => ({ kept: document.getElementById('bvSigCanvas').parentElement.classList.contains('kept'), same: padSignature(baitPad) === quoteState.baitVisits[0].signature, by: document.getElementById('bvSigBy').textContent,
+    again: !document.querySelector('#baitOverlay .agr-sig-clear').hidden, taps: getComputedStyle(document.getElementById('bvSigCanvas')).pointerEvents }));
+  check(sig2.kept && sig2.same && sig2.by === 'Alex Example' && sig2.again && sig2.taps === 'none', 'the technician\'s signature from the last visit is already on this one, with Sign again: ' + JSON.stringify(sig2));
   await p.evaluate(() => sheetVoiceFill('bait', 'one to five clear, six active added two cartridges, seven lid was off replaced it, rest are clear, Exterra batch 4471, back in four weeks'));
   await p.waitForTimeout(1500);
   const voiced = await p.evaluate(() => ({ summary: document.getElementById('bvSummary').textContent, s6: baitDraft.stations[5], s7: baitDraft.stations[6], batch: document.getElementById('bvBatch').value, next: document.getElementById('bvNext').value, date: document.getElementById('bvDate').value, notes: document.getElementById('bvNotes').value, said: document.querySelector('#bvVoice .sheet-voice-text').textContent }));
@@ -165,7 +194,14 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   check(voiced.s6.status === 'active' && voiced.s6.bait === '2 cartridges' && voiced.s7.status === 'damaged' && voiced.s7.note === 'Lid replaced' && /10 clear/.test(voiced.summary), 'the spoken note marks the stations, bait and note');
   check(voiced.batch === '4471' && voiced.next === daysFrom(voiced.date, 28) && /mulch/.test(voiced.notes), 'and the batch, next visit and client note');
   await shot('visit-voiced');
-  await sign('#bvSigCanvas'); await tap(p.locator('#bvSaveBtn'), 'Save visit (2)'); await p.waitForTimeout(800);
+  // Another name typed over a carried signature: it doesn't stay.
+  await p.evaluate(() => { document.getElementById('bvFold1').open = true; });
+  await p.fill('#bvTech', 'Chris Other'); await p.waitForTimeout(200);
+  check(await p.evaluate(() => baitPad.empty && document.getElementById('bvSaveBtn').disabled && /Sign the visit/.test(document.getElementById('bvNeed').textContent)), 'a carried signature doesn\'t stay under another technician\'s name');
+  await p.fill('#bvTech', 'Alex Example');
+  await sign('#bvSigCanvas'); await p.waitForTimeout(200);
+  check(await p.evaluate(() => !baitPad.empty && !document.querySelector('#baitOverlay .agr-sig-clear').hidden), 'signing afresh shows Sign again beside it');
+  await tap(p.locator('#bvSaveBtn'), 'Save visit (2)'); await p.waitForTimeout(800);
   check(await p.evaluate(() => quoteState.baitVisits.length === 2), 'the second visit is kept too');
 
   // 7. Editing a sent visit: a change the client would see needs sending again.
@@ -178,6 +214,7 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   await tap(p.locator('#qpBait .bait-visit-row').first().locator('button', { hasText: 'Edit' }), 'Edit again'); await p.waitForTimeout(500);
   // A finished visit opens with every part folded: open The stations first.
   await p.locator('#bvFold2 > summary').click(); await p.waitForTimeout(200);
+  await tap(p.locator('#bvStations .bait-station[data-i="2"] .bait-row'), 'station 3'); await p.waitForTimeout(200);
   await tap(p.locator('#bvStations .bait-station[data-i="2"] .bait-chip.eaten'), 'station 3 bait eaten'); await p.waitForTimeout(200);
   await tap(p.locator('#bvSaveBtn'), 'Save the change'); await p.waitForTimeout(500);
   check(await p.evaluate(() => !quoteState.baitVisits.find(v => v.stations[2].status === 'eaten').sentAt), 'a change the client would see clears the sent mark');

@@ -1109,11 +1109,30 @@ function restoreA11ySettings() {
   } catch (e) {}
 }
 
+// The last signature drawn under a name, wherever it was signed: a report's
+// Sign-off, a treatment record or a bait station visit. It stays with the
+// person, never with a name it wasn't signed as. '' when that name hasn't
+// signed yet. exceptId: a report to leave out (the one that's open).
+function lastSignatureOf(name, exceptId) {
+  name = (name || '').trim();
+  if (!name) return '';
+  let best = { at: -1, signature: '' };
+  const take = (who, signature, at) => { if (signature && (who || '').trim() === name && (at || 0) > best.at) best = { at: at || 0, signature }; };
+  getSavedReports().forEach(r => {
+    if (isSampleJob(r)) return;
+    if (r.id !== exceptId) take(r.inspector, r.reportData && r.reportData.inspectorSignature, r.savedAt);
+    const q = r.quote;
+    if (!q) return;
+    if (q.treatment) take(q.treatment.technician, q.treatment.signature, q.treatment.at);
+    (q.baitVisits || []).forEach(v => take(v.technician, v.signature, v.at));
+  });
+  return best.signature;
+}
+
 // A new job starts with the inspector's name, licence and signature from
 // the most recent saved report on this account, so the sign-off isn't
-// retyped and signed again on every job. The signature is the last one
-// drawn under that name: it stays with the inspector, never with a name it
-// wasn't signed as. exceptId: a report to leave out (the one that's open).
+// retyped and signed again on every job. exceptId: a report to leave out
+// (the one that's open).
 function lastInspectorDetails(exceptId) {
   const reports = getSavedReports()
     .filter(r => !isSampleJob(r) && r.id !== exceptId)
@@ -1122,11 +1141,10 @@ function lastInspectorDetails(exceptId) {
   // No report yet: the signed-in person's own name is the best guess.
   const meta = (typeof authUser !== 'undefined' && authUser && authUser.user_metadata) || {};
   const name = (latest ? latest.inspector || '' : '') || (meta.name || '').trim();
-  const signed = name && reports.find(r => r.reportData && r.reportData.inspectorSignature && (r.inspector || '').trim() === name);
   return {
     name,
     licence: latest && latest.reportData ? latest.reportData.inspectorLicence || '' : '',
-    signature: signed ? signed.reportData.inspectorSignature : '',
+    signature: lastSignatureOf(name, exceptId),
   };
 }
 

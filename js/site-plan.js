@@ -729,15 +729,34 @@ function newSitePlan() {
 
 function planId() { return 'p' + Math.random().toString(36).slice(2, 9); }
 
+// The tab the editor opens on. A new plan starts with the building, which
+// is fitted to the house first. One already drawn opens where the treatment
+// ticked on the record goes next: Stations for a baiting system, Treatment
+// for a barrier, reticulation or a direct treatment. The first of those not
+// on the plan yet, else the first one ticked. methods: the record's ticked
+// treatments, in the record's order.
+const SITE_PLAN_METHOD_MARKS = {
+  barrier: ['treat', ['barrier']], retic: ['treat', ['retic']], physical: ['treat', ['physical']],
+  direct: ['treat', ['treated']], nest: ['treat', ['treated']], bait: ['stations', ['inground', 'above']],
+};
+function sitePlanStartGroup(plan, methods) {
+  if (!sitePlanHasContent(plan)) return 'build';
+  const marks = (methods || []).map(m => SITE_PLAN_METHOD_MARKS[m]).filter(Boolean);
+  const drawn = planLayerItems(plan).map(it => it.k);
+  const next = marks.find(([, keys]) => !keys.some(k => drawn.includes(k))) || marks[0];
+  return next ? next[0] : 'build';
+}
+
 // opts.stations: how many bait stations the treatment record has, which
-// Stations all round places.
+// Stations all round places. opts.methods: the treatments ticked on the
+// record, which decide the tab it opens on.
 function openSitePlan(plan, onSave, opts = {}) {
   const E = sitePlanEditor;
   E.stationsWanted = opts.stations > 0 ? Math.round(opts.stations) : 0;
   E.plan = sitePlanHasContent(plan) ? JSON.parse(JSON.stringify(plan)) : newSitePlan();
   if (E.plan.north == null) E.plan.north = 0;
   E.tool = null; E.sel = null; E.part = null; E.drawing = null; E.drag = null; E.undo = []; E.onSave = onSave; E.note = '';
-  E.layer = 'site'; E.group = 'build'; E.zoom = 1; E.cx = PLAN_W / 2; E.cy = PLAN_H / 2;
+  E.layer = 'site'; E.group = sitePlanStartGroup(plan, opts.methods); E.zoom = 1; E.cx = PLAN_W / 2; E.cy = PLAN_H / 2;
   E.ptrs.clear(); E.pinch = null; E.down = null; E.grab = false; E.space = false;
   track('screen_viewed', { screen: 'site_plan' });
   document.getElementById('sitePlanOverlay').classList.add('open');

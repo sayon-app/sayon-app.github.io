@@ -1810,7 +1810,10 @@ body.pocket-lock .voice-btn { user-select: none; -webkit-user-select: none; -web
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 16px 16px;
+  /* On a computer the report takes the same column as Jobs and This job
+     (680 wide), instead of stretching a label to one edge and its answer
+     to the other. */
+  padding: 16px max(16px, calc(50% - 340px));
   padding-bottom: calc(var(--mic-clearance) + 16px);
   display: block;
   background: var(--bg);
@@ -2742,6 +2745,12 @@ body.dark-screen .signature-clear-btn { background: var(--surface2); border-colo
 }
 .add-photo-btn:hover { opacity: 0.88; }
 .add-photo-btn:disabled { background: var(--surface2); color: var(--text3); cursor: not-allowed; }
+/* On Finish, Report done or Send is the step's one filled button. */
+.add-photo-btn.quiet:not(:disabled) { background: var(--surface); color: var(--accent2); border: 1px solid var(--border2); }
+/* A done report's banner offers the next step, so Next steps aside. */
+#mainPanel.done-waiting .next-section-btn, body:not(.dark-screen) #mainPanel.done-waiting .next-section-btn {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border2); box-shadow: none;
+}
 
 .photo-grid {
   display: grid;
@@ -4320,6 +4329,12 @@ body[data-voice="thinking"] .voice-hud { animation: hudPulse 0.6s ease-in-out in
 #askOverlay .did-it-send-btns { margin-top: 14px; }
 #askOverlay .link-btn { align-self: center; min-height: 44px; }
 #askOverlay .extract-btn.danger { background: var(--risk); }
+#askOverlay .ask-input {
+  width: 100%; box-sizing: border-box; margin-top: 12px; padding: 12px 14px; min-height: 48px;
+  background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px;
+  color: var(--text); font-family: inherit; font-size: calc(16px * var(--ts)); outline: none;
+}
+#askOverlay .ask-input:focus { border-color: var(--accent2); }
 .ask-facts { margin: 10px 0 0; border-top: 1px solid var(--border); }
 .ask-facts > div { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: calc(13px * var(--ts)); line-height: 1.4; }
 .ask-facts dt { flex: 0 0 76px; color: var(--text3); }
@@ -5335,7 +5350,8 @@ body.dark-screen .qp-cert-gaps { background: rgba(255,176,0,0.10); }
 /* ── REPORT STEPS ──
    Six steps that fit across a phone without sliding: the dot sits over the
    label. The strip still scrolls if larger text makes it wider. */
-.section-tabs { gap: 2px; padding: 6px 8px; }
+/* On a computer the strip sits over the report's column. */
+.section-tabs { gap: 2px; padding: 6px max(8px, calc(50% - 344px)); }
 .section-tab {
   flex: 1 1 auto; min-width: 0;
   flex-direction: column; justify-content: center; gap: 4px;
@@ -5351,6 +5367,14 @@ body.large-touch .section-tab { flex: 0 0 auto; }
 /* The agreement banner shows where it's acted on, before the inspection.
    Finish lists an unsigned agreement with what else is missing. */
 #reportBody:not([data-step="property"]) > #agreementBanner { display: none !important; }
+/* One filled button. On Finish the done banner would only repeat Finish's
+   own next step. On Property, an agreement still to sign comes first: its
+   button is the filled one, and the done banner's goes quiet. */
+#reportBody[data-step="finish"] > #reportDoneBanner { display: none !important; }
+#reportBody[data-step="property"]:has(> #agreementBanner:not([hidden]):not(.waiting)) #reportDoneBannerBtn,
+body:not(.dark-screen) #reportBody[data-step="property"]:has(> #agreementBanner:not([hidden]):not(.waiting)) #reportDoneBannerBtn {
+  background: transparent; border-color: currentColor; color: inherit; box-shadow: none;
+}
 /* The Property step's Job details card: back to the address and booking. */
 .report-job-card {
   display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 12px; padding: 12px 14px; text-align: left;

@@ -1,0 +1,58 @@
+# Runs every test on each pull request into main, and on main: the syntax check of
+# every script, then node tests/run-all.js (every tests/*/e2e.js, three at
+# a time). A failing test fails the check, and its screenshots and PDFs
+# are kept with the run (Summary, Artifacts) for a week.
+# Nothing here deploys: GitHub Pages publishes the live branch only. Go-live
+# pull requests into live don't run it (live carries no tests/).
+name: Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      NODE_PATH: /tmp/node-tools/node_modules
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Syntax check
+        run: for f in js/app/*.js js/*.js tests/*/e2e.js; do node --check "$f"; done
+
+      - name: Playwright, Chromium and pdftotext
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q poppler-utils
+          mkdir -p /tmp/node-tools && cd /tmp/node-tools
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund playwright@1.63.0
+          npx playwright install --with-deps chromium
+
+      - name: jsPDF and the app's fonts
+        run: sh tests/visual/setup.sh
+
+      - name: Every test
+        run: node tests/run-all.js
+
+      - name: Keep what the tests made
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: /tmp/sayon-tests
+          retention-days: 7

@@ -135,9 +135,9 @@ function openJobPage() {
 }
 
 // Delete from the job's page (it asks first, with Undo after), then the Jobs list.
-function deleteThisJob() {
+async function deleteThisJob() {
   const id = currentReportId;
-  deleteReport(id);
+  await deleteReport(id);
   if (!getSavedReports().some(r => r.id === id)) tabGo('dashboard');
 }
 
@@ -693,11 +693,6 @@ function pdfFileName(what, address, { ref = '', date = '' } = {}) {
   return [fileNamePart(what), String(ref).replace(/[^\w-]+/g, ''), fileNamePart(address) || 'Property', fileNamePart(date)].filter(Boolean).join('_') + '.pdf';
 }
 
-function formatAddress(street, suburb, state, postcode) {
-  const line2 = [suburb, [state, postcode].filter(Boolean).join(' ')].filter(Boolean).join(' ');
-  return [street, line2].filter(Boolean).join(', ');
-}
-
 let jobHadAddress = false;   // whether the job had an address when updateJob last ran
 function updateJob() {
   const addr = getFullAddress();
@@ -1171,42 +1166,19 @@ async function fillWeather({ quiet = false } = {}) {
 }
 
 // ── APPLICABLE STANDARD ──────────────────────────────────────────────────
-// (updateStandard() removed — dead code, no #standardSelect element exists
-// and nothing called it; setStandard() below is the real active path)
-
-function setStandard(val, fromHeader = false) {
+function setStandard(val) {
   reportData.standard = val;
-
   const el = document.getElementById('f-standard');
   if (el) renderField(el, 'standard', val);
-
-  if (!fromHeader) {
-    const sel = document.getElementById('standardSelect');
-    if (sel) sel.value = val;
-  }
-
   updateProgress();
 }
 
 // ══════════════════════════════════════════════════════════════════════════
 // PERSISTENCE — SAVED REPORTS (localStorage)
 // ══════════════════════════════════════════════════════════════════════════
-// FIX: this used to be a single flat key shared by every signed-in account on
-// a device, the same bug class as the old COMPANY_KEY. The original design
-// dealt with that by WIPING this key on every sign-in/sign-out of a
-// different user and relying on supabaseSyncOnOpen() to pull that account's
-// reports back down from the cloud. That works eventually, but
-// saveCurrentReport() pushes to the cloud in the background (non-blocking) -
-// so switching accounts again within a few seconds of saving, before that
-// background push has actually landed in Supabase, meant switching BACK
-// showed the just-saved report as gone (confirmed live: saved "12 New
-// street" on one account, switched away and back, and the dashboard dropped
-// back from 5 jobs to 4 - the report never left the cloud, the LOCAL cache
-// had just been wiped and the resync raced the still-in-flight save).
-// Scoping this per-account like COMPANY_KEY removes the race entirely: each
-// account reads its own key, which is never touched by another account
-// switching in, so a just-saved report is there instantly with no network
-// round trip needed to reappear.
+// Each account keeps its reports under its own key, so switching accounts
+// on one phone never wipes or shows another account's jobs, and a report
+// saved a moment ago is there at once without waiting for the cloud.
 const STORAGE_KEY = 'korva_saved_reports'; // legacy flat key, pre-multi-tenant - kept only for one-time migration below
 const DRAFT_KEY = 'korva_draft';
 let currentReportId = null;
@@ -1363,30 +1335,10 @@ function clearJobInfo() {
   syncAllSelectCards();
   renderDateChips();
 }
-// Stored separately from report data, per-business, used on every report.
-//
-// FIX: this used to be a single flat key shared by every signed-in business on
-// a device ('korva_company' with no business id in it at all). On a shared
-// device - or simply the same browser the developer used while building the
-// app - whichever business saved its letterhead details first (here, the
-// original "Baz Pest Co" account) kept showing for every OTHER business that
-// signed in afterwards on that same browser, including inside their generated
-// PDF reports (getCompanyDetails() feeds the report cover/letterhead directly).
-// Scoping the key by authBusiness.id gives each signed-in business its own
-// independent record, so switching accounts can never leak one business's
-// name/licence/phone/ABN/logo into another business's reports.
-const COMPANY_KEY = 'korva_company'; // legacy flat key, pre-multi-tenant - kept only for one-time migration below
 
-function companyStorageKey(business = authBusiness) {
-  return (business && business.id) ? `korva_company_${business.id}` : COMPANY_KEY;
-}
-
-// One-time migration for accounts that already had data under the old flat
-// key before this fix shipped. We only claim it for the business whose name
-// matches what was actually stored there - otherwise we'd be guessing which
-// business the legacy blob belongs to, and a wrong guess would just recreate
-// the same cross-account leak this fix is meant to close. If nothing matches,
-// the legacy blob is simply left in place, unused, which is harmless.
+// Details saved under the old shared key (COMPANY_KEY, in common.js) move to the business whose name
+// matches them; if none matches they're left where they are, unused, rather
+// than guessed onto the wrong business.
 function migrateLegacyCompanyDetails() {
   if (!authBusiness || !authBusiness.id) return;
   const perBizKey = companyStorageKey();
@@ -1421,71 +1373,6 @@ function companyDetailGaps() {
 }
 function joinWithAnd(list) {
   return list.length < 2 ? (list[0] || '') : list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
-}
-
-// The name an email or text greets the client by: the first name ("Hi
-// Jo,"), "Mr Smith" for "Mr John Smith", "Jo and Sam" for "Jo & Sam Lee",
-// and nothing for a business or a bare initial, so the message opens "Hi,"
-// instead of "Hi Mr," or "Hi Harbour,". A name typed all in lower or
-// upper case gets its capitals.
-const GREETING_TITLE = /^(mr|mrs|ms|miss|mx|dr|prof|sir|dame|rev)\.?$/i;
-const GREETING_BUSINESS = /\b(pty|ltd|limited|inc|corp|co|company|strata|owners|corporation|council|trust|trustees?|estate|realty|property|properties|management|managers|agency|agents|partners|group|holdings|services|church|school|club|association|the)\b/i;
-function greetingName(name) {
-  const fix = w => w === w.toLowerCase() || w === w.toUpperCase()
-    ? w.toLowerCase().replace(/(^|[-'’])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()) : w;
-  const words = String(name || '').replace(/[.,]+$/, '').trim().split(/\s+/).filter(Boolean);
-  if (!words.length || GREETING_BUSINESS.test(words.join(' '))) return '';
-  const and = i => words[i] === '&' || /^and$/i.test(words[i]);
-  if (GREETING_TITLE.test(words[0])) {
-    const title = w => fix(w.replace(/\.$/, ''));
-    // "Mr & Mrs Smith": both titles and the surname.
-    if (words.length > 3 && and(1) && GREETING_TITLE.test(words[2])) return `${title(words[0])} and ${title(words[2])} ${fix(words[words.length - 1])}`;
-    const last = words[words.length - 1];
-    return words.length > 1 && !and(words.length - 1) && !GREETING_TITLE.test(last) ? `${title(words[0])} ${fix(last)}` : '';
-  }
-  const first = words[0];
-  if (/^\p{L}\.?$/u.test(first)) return '';
-  // "Jo & Sam Lee", "Jo Lee and Sam Ng": both first names.
-  const join = words.findIndex((w, i) => i > 0 && and(i));
-  if (join > 0 && words[join + 1] && !GREETING_TITLE.test(words[join + 1])) return `${fix(first)} and ${fix(words[join + 1])}`;
-  return fix(first);
-}
-
-// The inspector's words placed inside a sentence, used by the report, the
-// quote and the certificate.
-// lowerFirst: the first letter lower-cased ("Garage door" reads "garage
-// door"), unless the first word looks like a name or an abbreviation
-// ("NSW", "Smith St", "John's shed").
-function lowerFirst(text) {
-  const t = String(text || '').trim();
-  const [first = '', second = ''] = t.split(/\s+/);
-  if (!/^[A-Z][a-z]/.test(first) || /'s\b/.test(first) || /^[A-Z]/.test(second)) return t;
-  return t.charAt(0).toLowerCase() + t.slice(1);
-}
-// bracketText: words to set inside brackets, with no brackets of their own
-// ("Fungal decay (wet rot)" becomes "Fungal decay, wet rot") and no full
-// stop or comma at the end.
-function bracketText(text) {
-  return String(text || '').trim().replace(/\s*\(([^()]*)\)/g, ', $1').replace(/[()]/g, '').replace(/[.;,\s]+$/, '').replace(/^[,\s]+/, '');
-}
-// inBrackets: " (words)" ready to follow a phrase, or '' when there are none.
-function inBrackets(text) {
-  const t = lowerFirst(bracketText(text));
-  return t ? ` (${t})` : '';
-}
-// joinPlaces: places one after another with semicolons. The first keeps its
-// capital unless lowerAll; the rest are lower-cased, so the list reads as one
-// sentence: "Rear deck; garage door; front stump".
-function joinPlaces(list, lowerAll) {
-  return list.map(t => String(t || '').trim().replace(/[.;,]+$/, '')).filter(Boolean)
-    .map((t, i) => i || lowerAll ? lowerFirst(t) : t).join('; ');
-}
-
-function getCompanyDetails() {
-  try {
-    const stored = localStorage.getItem(companyStorageKey());
-    return stored ? JSON.parse(stored) : {};
-  } catch(e) { return {}; }
 }
 
 const LOGO_MAX_DIMENSION = 240;

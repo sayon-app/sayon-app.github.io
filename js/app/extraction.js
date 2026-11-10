@@ -57,7 +57,7 @@ async function callExtraction(text) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-5',
+        model: AI_MODEL,
         // The model thinks before it answers, and that thinking counts
         // toward max_tokens. At 4096 and its default (high) effort, a
         // whole-house note thought for so long the JSON was cut off.
@@ -392,8 +392,8 @@ function forgetLearned(id) {
   storeLearned(l);
 }
 
-function forgetAllLearned() {
-  if (!confirm('Forget everything SAYON has learned from your corrections?')) return;
+async function forgetAllLearned() {
+  if (!(await askFirst({ title: 'Forget what SAYON has learned?', text: 'The words and answers it learned from your corrections are cleared. It starts learning again from your next correction.', yes: 'Forget them', danger: true }))) return;
   const l = getLearned();
   l.removed.push(...l.fields.map(f => f.id), ...l.words.map(w => w.id));
   l.fields = []; l.words = [];
@@ -775,8 +775,8 @@ function queuePendingNote(text) {
   return true;
 }
 
-function removePendingNote(id) {
-  if (!confirm('Delete this saved note? It hasn\'t been added to the report yet.')) return;
+async function removePendingNote(id) {
+  if (!(await askFirst({ title: 'Delete this saved note?', text: 'It hasn\'t been added to the report yet.', yes: 'Delete note', danger: true }))) return;
   reportData.pendingNotes = getPendingNotes().filter(n => n.id !== id);
   if (!reportData.pendingNotes.length) delete reportData.pendingNotes;
   saveDraft();
@@ -1196,7 +1196,7 @@ async function askAiAboutPhoto({ system, base64, mediaType, text, maxTokens, eff
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-5',
+        model: AI_MODEL,
         // Room for the model's thinking as well as the small JSON answer
         // (see callExtraction()).
         max_tokens: maxTokens,

@@ -52,7 +52,7 @@ let aiAnswer = {}; let lastSystem = '';
   check(draft.shown[0] === 'quoteVoice' && draft.shown[1] === 'quoteWorkFold' && draft.shown.indexOf('quoteAiPlan') === 2 && draft.shown[draft.shown.length - 1] === 'quoteDetailsFold', 'a draft lists Say the quote, the work, the second opinion, then the plan, terms and client: ' + draft.shown.join(', '));
   check(draft.workOpen && draft.workTop < draft.vh * 0.6, `the work is open and starts on the first screen (${draft.workTop}px of ${draft.vh})`);
   check(draft.purposeLines > 0 && draft.purposeLines <= 2, `the purpose of treatment is two lines at most (${draft.purposeLines})`);
-  check(draft.send === 'Send to client' && draft.filled, 'Send to client is the filled button on a draft');
+  check(/^Email to \S/.test(draft.send) && draft.filled, 'the filled button on a draft says how and to whom: ' + draft.send);
 
   // Change the first line's quantity and price, take off the last line, add
   // monitoring at a price and a follow-up with no price, and set the terms.

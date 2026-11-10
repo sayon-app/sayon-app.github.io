@@ -4,14 +4,14 @@ A voice-to-report PWA for Australian timber pest inspectors. The chain is: pre-i
 
 **New to this repo, or starting a larger task? Read `docs/handover/README.md` first.** It covers the owner, what's live, the go-live recipe and the traps, and points to the rest.
 
-Read only the files your task needs. The app's own code is split into 18 files in `js/app/` (150 to 1,900 lines each), so find the file and the section with `grep -rn "SECTION NAME" js/app/` and read that range instead of whole files.
+Read only the files your task needs. The app's own code is split into 19 files in `js/app/` (140 to 1,900 lines each), so find the file and the section with `grep -rn "SECTION NAME" js/app/` and read that range instead of whole files.
 
 ## File map
 
 | File | What's in it |
 |---|---|
 | `index.html` | Every screen and overlay: splash, sign-in, platform menu, report (sections 1–7 + sign-off), drawer menu pages, quote screen and sheets |
-| `js/app/*.js` | The report app and everything shared, in 18 files (see below) |
+| `js/app/*.js` | The report app and everything shared, in 19 files (see below) |
 | `js/quote.js` | Quote builder and the quote PDF. The quote screen is only the quote; the client's answer (its sheet and `quoteAnswerPanel`) is recorded from This job. THE JOB'S QUOTE (`useJobQuote`): while This job is open, `quoteState` is the job's saved quote, so the answer, treatment and bait sheets work there. THE CLIENT'S SIGNED COPY: a client who signed to accept is owed the signed quote by email (`signedQuoteOwed`), the job's next step until it's sent or the treatment is recorded |
 | `js/price-book.js` | Your prices: the business's own price for every quote line, set in set-up and Menu › Your prices. Same store as the prices remembered from quotes (`quotePriceMemory`) |
 | `js/photo-markup.js` | Mark up a report photo (circle, arrow, draw, label) from the photo viewer |
@@ -36,16 +36,17 @@ Read only the files your task needs. The app's own code is split into 18 files i
 
 ## `js/app/` files (grep the banner text)
 
-They are plain scripts, not modules: every top-level name is shared across all of them and the later files (`js/quote.js` and the rest). They load in the order `index.html` lists them, which is the order below and the order of the old single `js/app.js`. A top-level statement that runs while the page loads (not inside a function or an event handler) can only use names from its own file or an earlier one; a function called later can use anything. A new file goes in `index.html` and `service-worker.js`'s `APP_SHELL`.
+They are plain scripts, not modules: every top-level name is shared across all of them and the later files (`js/quote.js` and the rest). They load in the order `index.html` lists them, which is the order below: `common.js` first, then the order of the old single `js/app.js`. A top-level statement that runs while the page loads (not inside a function or an event handler) can only use names from its own file or an earlier one; a function called later can use anything. A new file goes in `index.html` and `service-worker.js`'s `APP_SHELL`.
 
 | File | What's in it |
 |---|---|
+| `common.js` | SHARED HELPERS, loaded first: `AI_MODEL` (the one place the app names the model; the Worker's `ALLOWED_MODEL` must match), text (`escapeHtml`, `greetingName`, `lowerFirst`, `joinPlaces`), dates (`isoDate`, `todayIsoDate`, `formatLongDate`), money (`formatAUD`), `formatAddress`, the business's details (`getCompanyDetails`) and the pop-up message (`showToast`). A helper only one stage uses stays in that stage's file |
 | `state.js` | STATE (shared `let`s such as `reportData`), set-up (three cards: the business's details, Your prices, You're ready), YOUR BUSINESS (the Business details menu page, `openBusinessForm`; opened from a check, it goes back to that check) |
 | `areas.js` | Areas inspected, OBSTRUCTION ZONE SELECTOR, hindered and restricted access, ACCESS SPOTS and their photos (entered on the area's own card; Areas unable to be inspected reads them back) |
 | `talk-photos.js` | PHOTOS WHILE TALKING |
 | `species.js` | SPECIES INTELLIGENCE DATABASE (`SPECIES_DB`, `lookupSpecies`) |
 | `prompts.js` | `SECTIONS`, `REQUIRED_FIELDS`, `SYSTEM_PROMPT`, the plate scan and insect ID prompts |
-| `shell.js` | APP UPDATES, ADDRESS MOVE, SPLASH, PLATFORM NAVIGATION, keyboard access, BACK (phone back, Esc and the iPhone edge swipe go up one level), WHERE YOU WERE, ASK FIRST (`askFirst`: SAYON's own sheet for a question, in place of the browser's `confirm()`), SHEETS OPENED FROM A PAGE |
+| `shell.js` | APP UPDATES, ADDRESS MOVE, SPLASH, PLATFORM NAVIGATION, keyboard access, BACK (phone back, Esc and the iPhone edge swipe go up one level), WHERE YOU WERE, ASK FIRST (`askFirst`: SAYON's own sheet for a question, in place of the browser's `confirm()` and `prompt()`; `input` puts a box on it, `no: null` leaves one button; `showLinkToCopy` shows a link to press and hold), SHEETS OPENED FROM A PAGE |
 | `voice.js` | FIELD NOTES, NATIVE SPEECH RECOGNITION ADAPTER, VOICE, AI TRANSCRIPT CLEANUP, EXPERIMENTAL AUDIO CAPTURE, WHISPER LISTENING, QUICK PHRASES, VOICE HUD |
 | `extraction.js` | AI EXTRACTION, LEARNED CORRECTIONS, TEST MODE, WAITING NOTES, EXTRACT SUMMARY, SPOKEN READ-BACK, COMPLIANCE PLATE SCAN, INSECT / SPECIES PHOTO ID, ASK THE AI ABOUT A PHOTO (`askAiAboutPhoto`, shared by the photo calls), PHOTO DESCRIPTION (Describe: the AI's suggested photo caption) |
 | `fields.js` | FIELD RENDERING, MULTI-FINDING ENGINE, CHOICE CARDS, SELECT CARDS, BORER FINDINGS, COMPASS, MOISTURE METER READINGS |
@@ -55,8 +56,8 @@ They are plain scripts, not modules: every top-level name is shared across all o
 | `job.js` | DRAWER, MENU (who's signed in, then two lists, Your business and App; each row opens as a page, `openMenuPage`), BOTTOM DOCK, THIS JOB (the one list of a job's steps: the client's answer, treatment, certificate and bait visits are done on it, `jobStepPanel`, `jobNextAction`), LAST VISIT, ADDRESS SUGGESTIONS, WEATHER (fills itself on the inspection day, `fillWeatherOnTheDay`), APPLICABLE STANDARD, JOB INFO, DATE CHIPS, PERSISTENCE — SAVED REPORTS. `pdfFileName` names every PDF (what it is, its number, the address) |
 | `account.js` | AUTH STATE, BILLING / STRIPE, SIGN UP / IN / OUT, YOUR SIGN-IN (the name and a change of password, from the card on top of the menu), PASSWORD RESET, DELETE MY ACCOUNT, YOUR TEAM, BUSINESS LOAD, ENTER APP, SESSION RESTORE |
 | `sync.js` | SUPABASE REPORT SYNC, SYNC BETWEEN DEVICES, SYNC / SAVE STATUS INDICATOR, OLDER JOBS, DATA EXPORT / IMPORT, ACCESSIBILITY SETTINGS |
-| `dashboard.js` | DASHBOARD (the Jobs list), LINKS OUT (every agreement and quote link a client hasn't answered, checked when Jobs opens), STATUS / TOAST, WHAT THE REPORT IS STILL MISSING (the one list Finish, the check sheet and the percentage read), FINALISED JOBS (the lock, versions and Amend), GAPS BEFORE YOU LEAVE |
-| `send.js` | SEND TO CLIENT, CHECK BEFORE SENDING (the report's, and the quote's own from `js/quote.js`) |
+| `dashboard.js` | DASHBOARD (the Jobs list), LINKS OUT (every agreement and quote link a client hasn't answered, checked when Jobs opens), AI STATUS, WHAT THE REPORT IS STILL MISSING (the one list Finish, the check sheet and the percentage read), FINALISED JOBS (the lock, versions and Amend), GAPS BEFORE YOU LEAVE |
+| `send.js` | SEND TO CLIENT, CHECK BEFORE SENDING (the report's, and the quote's own from `js/quote.js`). `emailToLabel` names a send button ("Email to Sam") |
 | `pdf.js` | jsPDF loading (`ensureJsPDFLoaded`), SHARED PDF PIECES, the inspection report PDF (`buildReportPdf`): a blank prints "Not recorded", a section with nothing in it stays out and the ones after it move up a number (`partNo`) |
 
 ## Rules that aren't obvious from the code
@@ -66,11 +67,12 @@ They are plain scripts, not modules: every top-level name is shared across all o
 - **Don't rename stored keys.** That covers `korva_*` localStorage keys, the `korvus-photos` IndexedDB and the Worker URL; renaming them loses users' data. The brand was renamed KORVUS → SAYON in display text only.
 - **Font sizes grow with Settings › Text size.** Write one as `calc(13px * var(--ts))`, not `13px`, which stays the same at Large and Extra large (`tests/text-size/e2e.js` checks).
 - **Hide with the `hidden` mark.** One rule at the top of `css/app.css` makes it stick for every part, so none needs a rule of its own. Don't show a part that carries the mark with an inline `display`.
-- **Ask on SAYON's sheet.** A question goes through `askFirst` (`js/app/shell.js`): what will happen, a button that names it, "Not now". No new `confirm()` or `prompt()`.
+- **Ask on SAYON's sheet.** A question goes through `askFirst` (`js/app/shell.js`): what will happen, a button that names it, "Not now". No new `confirm()` or `prompt()`; Delete all jobs is the one left, on purpose (`tests/asks/e2e.js` checks).
+- **One name for each thing, one filled button.** `docs/words.md` is the word list: check new wording against it and add a line when a name is settled (`tests/words/e2e.js` fails on a word from its Not column). A screen or sheet has one filled button, the next thing to do (`tests/one-button/e2e.js` counts).
 - **Replace, don't duplicate.** Reuse the shared helpers (`PDF_COLORS`, `drawPdfCompanyMark`, `deliverPdfBlob`, `formatAddress`, `pdfFileName`) instead of adding copies.
 - **Trade wording:** never give a structural verdict (refer to a builder or engineer), and never rate risk by termite species.
 - **No App Store yet.**
 
 ## Testing
 
-Serve the repo with `python3 -m http.server 8765` and drive it with Playwright (Chromium is at `/opt/pw-browsers`). Block the service worker in tests. Run `node --check` on every changed JS file. `node tests/run-all.js` runs every `tests/*/e2e.js` (after `sh tests/visual/setup.sh`, with `NODE_PATH` pointing at Playwright).
+Serve the repo with `python3 -m http.server 8765` and drive it with Playwright (Chromium is at `/opt/pw-browsers`). Block the service worker in tests. Run `node --check` on every changed JS file. `node tests/run-all.js` runs every `tests/*/e2e.js` (after `sh tests/visual/setup.sh`, with `NODE_PATH` pointing at Playwright). The GitHub check (`.github/workflows/tests.yml`) runs the same on every pull request into `main`.

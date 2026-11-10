@@ -73,7 +73,7 @@ const emails = [];
   // ── 3. The Send button ──
   const foot = await p.evaluate(() => { const btn = document.getElementById('sendReviewBtn'); const body = document.querySelector('#sendReviewOverlay .page-sheet-body'); const r = btn.getBoundingClientRect();
     return { label: btn.textContent, inBody: body.contains(btn), onScreen: r.top > 0 && r.bottom <= innerHeight, scrolls: body.scrollHeight > body.clientHeight + 50, open: document.getElementById('sendReviewOpen').textContent, hidden: document.getElementById('sendReviewOpen').hidden }; });
-  check(foot.label === 'Send to jo@example.com' && !foot.inBody && foot.onScreen && foot.scrolls, 'Send sits at the foot of the sheet, on screen without scrolling, and says who it goes to: ' + foot.label);
+  check(foot.label === 'Email to jo@example.com' && !foot.inBody && foot.onScreen && foot.scrolls, 'Send sits at the foot of the sheet, on screen without scrolling, and says who it goes to: ' + foot.label);
   check(!foot.hidden && /things at the top are still open/.test(foot.open), 'with gaps it says how many are still open, not "Send anyway": ' + foot.open);
   await p.screenshot({ path: `${OUT}/2-check-sheet.png` });
 
@@ -141,7 +141,7 @@ const emails = [];
     to: document.getElementById('sendReviewTo').innerText, files: document.getElementById('sendReviewFiles').innerText, summaryHidden: document.getElementById('sendReviewSummary').hidden, sentAt: quoteState.sentAt || null, starting: quoteState.items.filter(isStartingPrice).length }));
   const qgaps = await lines('#sendReviewGaps');
   check(qsheet.open && qsheet.visible && !qsheet.sentAt && emails.length === 0, 'Send to client on the quote opens the check, and nothing has gone yet');
-  check(qsheet.label === 'Send to sam@example.com' && /sam@example\.com/.test(qsheet.to) && /Treatment quote/.test(qsheet.files) && qsheet.summaryHidden, 'it says who it goes to and what is attached: ' + qsheet.label);
+  check(qsheet.label === 'Email to sam@example.com' && /sam@example\.com/.test(qsheet.to) && /Treatment quote/.test(qsheet.files) && qsheet.summaryHidden, 'it says who it goes to and what is attached: ' + qsheet.label);
   check(startingBefore > 0 && qsheet.starting === startingBefore && qgaps.some(l => /still SAYON's starting price/.test(l)), 'starting prices are called out before it goes: ' + JSON.stringify(qgaps));
   await p.screenshot({ path: `${OUT}/4-quote-check.png` });
   await p.locator('#sendReviewGaps .link-btn', { hasText: /Check (it|them)/ }).click(); await p.waitForTimeout(700);

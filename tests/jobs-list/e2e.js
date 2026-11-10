@@ -169,8 +169,10 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
 
   // ── 7. Deleting says job, both times ──
   await p.evaluate(() => tabGo('dashboard')); await p.waitForTimeout(300);
-  p.once('dialog', d => { check(/^Delete the job at 40 Later Lane/.test(d.message()), 'the question names the job: ' + d.message().slice(0, 50)); d.accept(); });
-  await p.evaluate(() => deleteReport('report_kim')); await p.waitForTimeout(400);
+  await p.evaluate(() => { deleteReport('report_kim'); }); await p.waitForTimeout(300);
+  const delAsk = await p.evaluate(() => document.getElementById('askTitle').textContent);
+  check(/^Delete the job at 40 Later Lane/.test(delAsk), 'the question names the job: ' + delAsk.slice(0, 50));
+  await p.click('#askYes'); await p.waitForTimeout(400);
   check(/^Job deleted/.test(await toast()), 'then "Job deleted": ' + await toast());
   check(!(await cards()).some(c => c.street === '40 Later Lane'), 'and the card goes from the list at once');
   await p.locator('#toast .toast-action').click(); await p.waitForTimeout(400);

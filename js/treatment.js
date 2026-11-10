@@ -101,12 +101,6 @@ function installedSystemAreas(t, rd) {
   return left.charAt(0).toUpperCase() + left.slice(1);
 }
 
-function formatLongDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso + 'T00:00:00');
-  return isNaN(d) ? iso : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
-}
-
 // The quote's report, for pre-filling a first record.
 function treatmentSourceReport() {
   return quoteReport() || {};

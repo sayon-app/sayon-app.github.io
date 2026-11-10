@@ -166,10 +166,10 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   });
   check(!second.plain && second.allowed && second.alreadyOn && !second.offAgain, 'Second transcription is hidden like Test mode, and stays for a phone that has it on: ' + JSON.stringify(second));
   // The delete-account box names the button it means.
-  let asked = '';
-  p.once('dialog', d => { asked = d.message(); d.dismiss(); });
-  await p.evaluate(() => deleteMyAccount()); await p.waitForTimeout(300);
+  await p.evaluate(() => { deleteMyAccount(); }); await p.waitForTimeout(300);
+  const asked = await p.evaluate(() => document.getElementById('askText').textContent);
   check(/use Download a copy first/.test(asked) && !/Export your data/.test(asked), 'the delete-account box says "Download a copy", the button\'s own name');
+  await p.click('#askNo'); await p.waitForTimeout(200);
   check(misc.help, 'Help and support is in the drawer');
 
   // 8. The client's page shows who sent it and how to reach them.

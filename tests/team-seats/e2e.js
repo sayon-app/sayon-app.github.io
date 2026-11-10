@@ -71,7 +71,7 @@ async function setup(b, { user, sub, members, invites }) {
     localStorage.setItem('korva_session', JSON.stringify({ access_token: 'a.b.c', refresh_token: 'r', expires_at: Math.floor(Date.now() / 1000) + 3600, user: u }));
     localStorage.setItem('korva_onboarded_v1:' + u.id, '1');
   }, [user]);
-  await ctx.addInitScript(() => { window.__toasts = []; window.confirm = () => true; });
+  await ctx.addInitScript(() => { window.__toasts = []; });
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   p.hookToasts = () => p.evaluate(() => { const o = window.showToast; window.showToast = (m, k) => { window.__toasts.push(k + ': ' + m); return o && o(m, k); }; });
   p.toasts = () => p.evaluate(() => window.__toasts.splice(0));
@@ -141,7 +141,10 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     await p.evaluate(() => navigator.clipboard.writeText(''));
     await p.evaluate(() => shareTeamInvite('i-0')); await p.waitForTimeout(600);
     check(st.calls.some(c => c.path.includes('/rpc/invite_link') && c.body.p_invite_id === 'i-0') && (await p.evaluate(() => navigator.clipboard.readText())).includes('invite=' + 'b'.repeat(64)), 'Send link makes a fresh link');
-    await p.evaluate(() => cancelTeamInvite('i-1')); await p.waitForTimeout(800);
+    await p.evaluate(() => { cancelTeamInvite('i-1'); }); await p.waitForTimeout(300);
+    const cancelAsk = await p.evaluate(() => ({ title: document.getElementById('askTitle').textContent, yes: document.getElementById('askYes').textContent }));
+    check(cancelAsk.title === 'Cancel the invite for two@acme.test?' && cancelAsk.yes === 'Cancel the invite', 'cancelling an invite asks on SAYON\'s sheet: ' + JSON.stringify(cancelAsk));
+    await p.click('#askYes'); await p.waitForTimeout(800);
     check(st.calls.some(c => c.method === 'DELETE' && c.path.includes('/rest/v1/invites?id=eq.i-1')) && /2 of 3/.test(await p.textContent('#teamPlacesText')), 'cancelling an invite frees its place');
     check(!errs.length, 'no page errors ' + errs.join('; '));
     await ctx.close();
@@ -181,7 +184,10 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     await p.evaluate(() => openMenuPage('teamPanel')); await p.waitForTimeout(600);
     check(/2 of 6 inspector places used on your Team plan/.test(await p.textContent('#teamPlacesText')), 'Your team counts against the paid places');
     check(await p.evaluate(() => getComputedStyle(document.getElementById('teamMorePlaces')).display === 'none' && !document.getElementById('teamInviteBtn').disabled), 'with places free, Invite works and More places stays out of sight');
-    await p.evaluate(() => removeTeamMember('u-tech')); await p.waitForTimeout(800);
+    await p.evaluate(() => { removeTeamMember('u-tech'); }); await p.waitForTimeout(300);
+    const offAsk = await p.evaluate(() => ({ title: document.getElementById('askTitle').textContent, yes: document.getElementById('askYes').textContent, red: document.getElementById('askYes').classList.contains('danger') }));
+    check(offAsk.title === 'Take Tia Tech off your team?' && offAsk.yes === 'Take them off' && offAsk.red, 'taking someone off the team asks on SAYON\'s sheet, with a red button: ' + JSON.stringify(offAsk));
+    await p.click('#askYes'); await p.waitForTimeout(800);
     check(st.calls.some(c => c.method === 'DELETE' && c.path.includes(`team_members?business_id=eq.${BIZ_ID}&user_id=eq.u-tech`)) && /1 of 6/.test(await p.textContent('#teamPlacesText')), 'removing a technician frees a place');
     await p.screenshot({ path: `${OUT}/3b-team-page.png` });
     check(!errs.length, 'no page errors ' + errs.join('; '));

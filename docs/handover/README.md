@@ -47,7 +47,7 @@ For an AI model taking over this repo with no context. Last checked 2026-10-05: 
 
 ### Merging is not deploying (the most important rule)
 - Work goes into `main` by PR, which changes nothing live. GitHub Pages publishes the `live` branch.
-- Rulesets: `live` requires a PR and blocks force pushes and deletion; `main` blocks force pushes and deletion. There is no CI (no `.github/workflows`): the checks are your Playwright run and `node --check`.
+- Rulesets: `live` requires a PR and blocks force pushes and deletion; `main` blocks force pushes and deletion. One check runs on each PR into `main` (`.github/workflows/tests.yml`): `node --check` on every script, then `node tests/run-all.js`. A red check is a failing test; the run's Artifacts hold its screenshots and PDFs. Go-live PRs into `live` don't run it. Still run the tests yourself before pushing.
 - `gh pr …` uses GraphQL, which Claude Code sessions block. Use `gh api repos/{owner}/{repo}/pulls…` from the clone, or `list_project_prs`.
 - Go-live, only after baz says "deploy <thing>":
   1. In your thread, post a deploy request: what changes in plain English, plus the merged main PR's "Files changed" link. Wait for "deploy X".

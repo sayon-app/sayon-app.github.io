@@ -122,7 +122,7 @@ const emails = [];
   console.log('finished quote:', JSON.stringify(gone));
   check(!gone.say && !gone.opinion, 'on a quote that has gone, Say the quote and the second opinion step aside');
   check(!gone.workOpen && /^\$/.test(gone.total) && gone.parts === 'Scope of works|Treatment plan|Terms|Client details', 'its parts are folded, the work first with its total and the client last: ' + gone.parts);
-  check(gone.send === 'Send again' && !gone.filled, 'Send again is the quiet button beside PDF');
+  check(gone.send === 'Email again' && !gone.filled, 'Email again is the quiet button beside PDF');
   check(!gone.steps, 'the quote screen has no steps of its own: the answer, the treatment and bait visits are on This job');
   await shot('4-quote-gone');
   // The job is finalised: the quote's parts open to read, but nothing in

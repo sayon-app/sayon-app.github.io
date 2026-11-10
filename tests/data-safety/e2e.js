@@ -75,12 +75,14 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   check(after > before && state.saves > savesBeforeQuote, 'storing the quote bumps savedAt and saves to the account');
 
   // 4. Every delete asks first; No keeps the job.
-  p.once('dialog', d => d.dismiss());
   const idToDelete = await p.evaluate(() => getSavedReports()[0].id);
-  await p.evaluate(id => deleteReport(id), idToDelete); await p.waitForTimeout(200);
+  await p.evaluate(id => { deleteReport(id); }, idToDelete); await p.waitForTimeout(200);
+  await p.click('#askNo'); await p.waitForTimeout(200);
   check(await p.evaluate(id => getSavedReports().some(r => r.id === id), idToDelete), 'deleting a draft job asks first, and No keeps it');
-  p.once('dialog', d => { check(/Delete the job at/.test(d.message()), 'the question names the job: ' + d.message().slice(0, 60)); d.accept(); });
-  await p.evaluate(id => deleteReport(id), idToDelete); await p.waitForTimeout(200);
+  await p.evaluate(id => { deleteReport(id); }, idToDelete); await p.waitForTimeout(200);
+  const delAsk = await p.evaluate(() => document.getElementById('askTitle').textContent);
+  check(/Delete the job at/.test(delAsk), 'the question names the job: ' + delAsk.slice(0, 60));
+  await p.click('#askYes'); await p.waitForTimeout(200);
   check(await p.evaluate(id => !getSavedReports().some(r => r.id === id), idToDelete), 'Yes deletes it');
 
   // 5. A full phone: old finished jobs already in the account are parked there.
@@ -92,8 +94,12 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
     const orig = Storage.prototype.setItem; let thrown = false;
     Storage.prototype.setItem = function (k, v) { if (!thrown && k.startsWith('korva_saved_reports')) { thrown = true; const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; } return orig.call(this, k, v); };
   });
-  p.once('dialog', d => { check(/storage is full/.test(d.message()) && /2 oldest finished jobs/.test(d.message()) && /brought back from Jobs, under Done/.test(d.message()), 'asks to park the 2 oldest finished jobs, and says where they come back from: ' + d.message().slice(0, 80)); d.accept(); });
-  const saved = await p.evaluate(() => { const reports = getSavedReports(); reports.unshift({ id: 'report_new', address: 'New', jobAddress: 'New', reportData: {}, fieldNotes: {}, savedAt: Date.now(), cloudSavedAt: 0 }); return setSavedReports(reports); });
+  // Not asked: parking is what lets the save go through, and Bring them
+  // back undoes it. The note says what happened and where they come back from.
+  let parkAsked = false; p.once('dialog', d => { parkAsked = true; d.dismiss(); });
+  const saved = await p.evaluate(() => { window.__parkToasts = []; const o = window.showToast; window.showToast = (m, k, a) => { window.__parkToasts.push(m); return o(m, k, a); }; const reports = getSavedReports(); reports.unshift({ id: 'report_new', address: 'New', jobAddress: 'New', reportData: {}, fieldNotes: {}, savedAt: Date.now(), cloudSavedAt: 0 }); const ok = setSavedReports(reports); window.showToast = o; return ok; });
+  const parkSaid = await p.evaluate(() => window.__parkToasts.join(' | '));
+  check(!parkAsked && !(await p.evaluate(() => document.getElementById('askOverlay').classList.contains('open'))) && /This phone was full, so the 2 oldest finished jobs are now kept in your account only/.test(parkSaid) && /Bring them back from Jobs, under Done/.test(parkSaid), 'a full phone parks the 2 oldest finished jobs without asking, and says where they come back from: ' + parkSaid);
   const parked = await p.evaluate(() => ({ ids: getSavedReports().map(r => r.id), archived: getArchivedReportIds() }));
   check(saved && parked.ids.join() === 'report_new,report_old1,report_old2' && parked.archived.sort().join() === 'report_old3,report_old4', 'the save goes through with the two oldest finished jobs parked: ' + parked.ids.join());
   // Jobs says where they went, where they'd be looked for: under Done and under a search.

@@ -543,10 +543,6 @@ function commitEdit(el, key, value) {
   checkSystemVerify();
   checkSecondaryColonyFlag();
   ensureTreatmentForLiveTermites();
-  if (key === 'standard') {
-    const sel = document.getElementById('standardSelect');
-    if (sel) sel.value = value.trim();
-  }
   saveDraft();
 }
 
@@ -981,7 +977,8 @@ function renderFinishNext(progress) {
   document.getElementById('finishResend').hidden = !away;
   document.getElementById('finishQuoteTitle').textContent = hasQuote ? 'Open the quote' : 'Write the quote';
   document.getElementById('finishQuoteSub').textContent = hasQuote ? (q.sentAt ? 'Sent ' + formatIssueDate(q.sentAt) : 'Check it before it goes') : 'Starts from what the report found';
-  document.getElementById('shareTitle').textContent = sent && !gone ? 'Send it again' : 'Send to client';
+  const client = document.getElementById('jobClient').value;
+  document.getElementById('shareTitle').textContent = sent && !gone ? 'Send it again' : emailToLabel(client);
   document.getElementById('shareSub').textContent = sent && !gone ? 'So the client has it as it is now'
     : hasQuote ? 'Check the report, then email it with the quote' : 'Check the report, then email it';
   // One big button.
@@ -993,10 +990,13 @@ function renderFinishNext(progress) {
   const banner = document.getElementById('reportDoneBanner');
   if (banner) {
     banner.hidden = !reportData.doneAt || !!sent || locked;
+    // One filled button: while the banner offers the next step, the steps'
+    // Next buttons go quiet.
+    document.getElementById('mainPanel').classList.toggle('done-waiting', !banner.hidden);
     if (!banner.hidden) {
       document.getElementById('reportDoneBannerText').textContent = `Report done ${doneWhen(reportData.doneAt)}. Next, ${next === 'quote' ? 'the quote' : 'send it to the client'}.`;
       const btn = document.getElementById('reportDoneBannerBtn');
-      btn.textContent = next === 'quote' ? 'Write the quote' : 'Send to client';
+      btn.textContent = next === 'quote' ? 'Write the quote' : emailToLabel(client);
       btn.onclick = next === 'quote' ? () => tabGo('quote') : () => openSendReview();
     }
   }
@@ -1419,7 +1419,7 @@ async function sheetVoiceFill(kind, text) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-5',
+        model: AI_MODEL,
         max_tokens: 4000,
         output_config: { effort: 'low' },
         system: k.prompt(),

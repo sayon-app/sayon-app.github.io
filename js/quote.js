@@ -930,10 +930,10 @@ function addQuotePlan() {
   scheduleQuoteSave();
 }
 
-function rebuildQuotePlan() {
+async function rebuildQuotePlan() {
   const q = quoteState;
   if (!q || !q.plan) return;
-  if (!confirm('Replace the plan\'s steps with fresh ones from the report? Your edits to them will be lost.')) return;
+  if (!(await askFirst({ title: 'Replace the plan\'s steps?', text: 'Fresh ones are written from the report. Your edits to them are lost.', yes: 'Replace the steps' })) || quoteState !== q || !q.plan) return;
   const c = q.systemChoice;
   const fresh = buildQuotePlan(quoteReport(), c && c.picked);
   q.plan.we = fresh.we;
@@ -963,12 +963,13 @@ function setQuotePlanChoice(field, value) {
   scheduleQuoteSave();
 }
 
-function typeQuotePlanChoice(field) {
+async function typeQuotePlanChoice(field) {
   const p = quoteState && quoteState.plan;
   if (!p) return;
-  const typed = prompt(field === 'time' ? 'How long will the job take on site?' : 'How long is the service period?', p[field] || '');
-  if (typed === null) return;
-  p[field] = typed.trim();
+  const typed = await askFirst({ title: field === 'time' ? 'How long will the job take on site?' : 'How long is the service period?',
+    input: { value: p[field] || '', placeholder: field === 'time' ? 'e.g. 3 hours' : 'e.g. 12 months' }, yes: 'Save' });
+  if (typeof typed !== 'string' || !quoteState || quoteState.plan !== p) return;
+  p[field] = typed;
   renderQuotePlan();
   scheduleQuoteSave();
 }
@@ -1099,11 +1100,6 @@ function closeQuote() {
 }
 
 // ── RENDERING ───────────────────────────────────────────────────────────────
-function formatAUD(n) {
-  const v = isFinite(n) ? n : 0;
-  return v.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' });
-}
-
 function renderQuoteSourceOptions(preferKey) {
   const sel = document.getElementById('quoteSource');
   const hasSources = quoteSources.length > 0;
@@ -1137,7 +1133,7 @@ function onQuoteSourceChange() {
   const filled = saved && fillQuoteClientFromJob(quoteState, src);
   if (!saved || heard || filled) persistQuote();
   else setQuoteSaveState('Saved');
-  if (heard) showToast('Quote updated from your voice notes', 'success');
+  if (heard) showToast('Quote updated from your notes', 'success');
   renderQuoteEditor();
   renderQuoteLock();
   editor.style.display = 'flex';
@@ -1413,7 +1409,7 @@ function renderQuoteStartHint() {
   const any = quoteState.items.some(isStartingPrice);
   el.style.display = '';
   el.innerHTML = (any ? '<b>Starting price</b> is SAYON\'s suggested rate. Tap a line to set your own, or <button type="button" class="quote-hint-link" onclick="openPriceBook()">set all your prices</button>, and new quotes start at your price. ' : '') +
-    'You can also say the quote in your report voice notes: the work, prices, what isn\'t included and how they pay.';
+    'You can also say the quote in your notes on the report: the work, prices, what isn\'t included and how they pay.';
 }
 
 // Grows a line's description box to fit its text, so long names wrap
@@ -1517,10 +1513,11 @@ function removeQuoteItem(id) {
   scheduleQuoteSave();
 }
 
-function rebuildQuoteFromReport() {
+async function rebuildQuoteFromReport() {
   const src = currentQuoteSource();
   if (!src || !quoteState) return;
-  if (quoteState.items.length && !confirm('Replace the line items, exclusions and the problem with fresh ones from the report? Your edits to them will be lost.')) return;
+  const q = quoteState;
+  if (q.items.length && (!(await askFirst({ title: 'Replace the quote\'s lines?', text: 'The line items, exclusions and the problem are written fresh from the report. Your edits to them are lost.', yes: 'Replace them' })) || quoteState !== q)) return;
   const spoken = spokenQuoteItems(src.reportData);
   quoteState.items = spoken.length ? spoken : buildQuoteItemsFromReport(src.reportData);
   quoteState.systemChoice = spoken.length ? null : newSystemChoice(src.reportData);
@@ -1695,7 +1692,7 @@ function renderQuoteStage() {
   const stage = [q.reportKey, gone, isQuoteLocked(), quoteHasItems(q)].join('|');
   if (stage !== quoteStageDrawn) { quoteStageDrawn = stage; renderTreatmentPlanCard(); }
   document.getElementById('quoteEmailBtn').classList.toggle('primary', !gone);
-  document.getElementById('quoteSendLabel').textContent = !q.sentAt ? 'Send to client' : q.sentHash === quoteContentHash(q) ? 'Send again' : 'Send new version';
+  document.getElementById('quoteSendLabel').textContent = !q.sentAt ? emailToLabel(q.client) : q.sentHash === quoteContentHash(q) ? 'Email again' : 'Email new version';
 }
 
 // ── THE JOB'S QUOTE, ON THIS JOB ────────────────────────────────────────────
@@ -1797,12 +1794,10 @@ function saveQuoteAnswer() {
   track('quote_answered', { answer: quoteAnswerMode, method: method || 'none' });
 }
 
-function clearQuoteAnswer() {
+async function clearQuoteAnswer() {
   const q = quoteState;
   if (!q || !q.answer) return;
-  if (!confirm(q.treatment
-    ? 'Clear the client\'s answer to this quote? The treatment record and certificate stay.'
-    : 'Clear the client\'s recorded answer to this quote?')) return;
+  if (!(await askFirst({ title: 'Clear the client\'s answer?', text: q.treatment ? 'The treatment record and certificate stay.' : 'The quote goes back to waiting on an answer.', yes: 'Clear the answer', danger: true })) || quoteState !== q) return;
   delete q.answer;
   clearTimeout(quoteSaveTimer);
   persistQuote();
@@ -2020,7 +2015,7 @@ function openQuoteSendReview() {
   if (current) showSendReviewLink(r, quoteLinkUrl(current.id));
   else if (authSession && navigator.onLine && !isSampleJob(q.reportKey)) r.linkPending = prepareQuoteSendLink(r);
 
-  r.label = directEmail && email ? `Send to ${email}` : 'Open email to send';
+  r.label = directEmail && email ? `Email to ${email}` : 'Open email to send';
   const btn = document.getElementById('sendReviewBtn');
   btn.textContent = r.label;
   btn.disabled = false;
@@ -2198,7 +2193,7 @@ async function shareQuoteLink(q) {
     await navigator.clipboard.writeText(`${text} ${url}`);
     showToast('Link copied. Paste it into a text or email to the client', 'success');
   } catch (e) {
-    prompt('Copy this link and send it to the client:', url);
+    showLinkToCopy(url);
   }
 }
 

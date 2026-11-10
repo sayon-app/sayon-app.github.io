@@ -16,7 +16,7 @@ const sc = require('./scenarios.js').find(s => s.name === 'standard');
     await ctx.route(/workers\.dev/, r => r.fulfill({ json:{ plan:'starter', status:'active', ai_calls_used_this_period:1, limit:150 } }));
     await ctx.route(/supabase\.co/, r => { const u = r.request().url(); if (u.includes('businesses?owner_id')) return r.fulfill({ json:[{ id:'b1', name: sc.company.name, owner_id: uid, settings:{} }] }); return r.fulfill({ json:[] }); });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(`${W}-${scheme}: ${e.message}`));
-    await p.addInitScript((s) => { localStorage.setItem('korva_session', JSON.stringify(s)); localStorage.setItem('korva_onboarded_v1','1'); }, sess);
+    await p.addInitScript((s) => { localStorage.setItem('korva_session', JSON.stringify(s)); localStorage.setItem('korva_onboarded_v1:' + s.user.id, '1'); }, sess);
     await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(2500);
     await p.evaluate(async (sc) => { storeCompanyDetails(sc.company); openApp('inspect'); resetReportState();
       const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };

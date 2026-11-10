@@ -39,7 +39,7 @@ const probe = () => {
     await p.goto(`http://localhost:${PORT}/sign.html`); await p.waitForTimeout(1500); await snap('91-sign-page');
     await p.goto(`http://localhost:${PORT}/terms.html`); await p.waitForTimeout(800); await snap('92-terms', false);
     // Signed in
-    await p.addInitScript((s) => { localStorage.setItem('korva_session', JSON.stringify(s)); localStorage.setItem('korva_onboarded_v1','1'); }, sess);
+    await p.addInitScript((s) => { localStorage.setItem('korva_session', JSON.stringify(s)); localStorage.setItem('korva_onboarded_v1:' + s.user.id, '1'); }, sess);
     await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(3000);
     await snap('01-home', false);
     await p.evaluate(async (sc) => { storeCompanyDetails(sc.company); openApp('inspect'); resetReportState(); }, sc);

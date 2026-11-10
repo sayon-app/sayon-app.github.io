@@ -230,7 +230,7 @@ function dashNext(j) {
 // One job on the Jobs list: the street big and the suburb under it, the
 // client, how far along it is, and the next step as its own button, so a
 // job in To do is one tap from its next document. The card opens the
-// job's sheet.
+// job's page (This job).
 function dashCardHTML(j) {
   const id = j.r.id;
   const steps = jobPageSteps(j);
@@ -249,7 +249,7 @@ function dashCardHTML(j) {
   const arrow = '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
   return `
     <div class="dash-card ${j.group}${declined ? ' declined' : ''}">
-      <button type="button" class="dash-card-main" onclick="openDashboardDetail('${id}')">
+      <button type="button" class="dash-card-main" onclick="openDashboardJob('${id}', 'job')">
         <span class="job-tile ${tile[0]}" aria-hidden="true">${jobIcon(tile[1], 20)}</span>
         <span class="dash-card-text">
           <span class="dash-card-street">${escapeHtml(street)}</span>
@@ -365,165 +365,20 @@ function renderDashboardJobs(fade) {
     </div>` : ''}` : `<p class="dash-none${fade ? ' fade-in' : ''}">${empty}</p>`;
 }
 
-// One job's timeline and its next step, in a sheet over the list.
-function openDashboardDetail(id) {
-  const j = dashboardJobs.find(x => x.r.id === id);
-  const sheet = document.getElementById('dashboardDetailSheet');
-  if (!j || !sheet) return;
-  const group = (DASHBOARD_TABS.find(([k]) => k === j.group) || [, ''])[1];
-  const steps = jobPageSteps(j);
-  const next = dashNext(j);
-  const done = steps.filter(s => s.state === 'done' || s.state === 'skip').length;
-  const facts = [
-    ['Client', j.r.client || 'Not entered'],
-    ['Quote', j.total ? formatAUD(j.total).replace(/\.00$/, '') : 'None yet'],
-    ['Date', dashDate(j.time)],
-  ];
-  sheet.innerHTML = `
-    <div class="dash-detail-grab" aria-hidden="true"></div>
-    <div class="dash-detail-head">
-      <div class="dash-detail-head-text">
-        <span class="dash-detail-chip ${j.group}">${group}</span>
-        <h3 class="dash-detail-addr">${escapeHtml(j.r.address || 'No address')}</h3>
-      </div>
-      <button type="button" class="dash-detail-close" onclick="closeDashboardDetail()" aria-label="Close">
-        <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <dl class="dash-detail-facts">
-      ${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${escapeHtml(v)}</dd></div>`).join('')}
-    </dl>
-    <section class="dash-next ${j.group}">
-      <div class="dash-next-label">${next.next ? 'Next step' : 'Where it\'s at'}</div>
-      <div class="dash-next-title">${escapeHtml(next.status)}</div>
-      ${next.hint ? `<p class="dash-next-hint">${escapeHtml(next.hint)}</p>` : ''}
-      ${next.next ? `<button type="button" class="dash-detail-primary" onclick="openDashboardJob('${j.r.id}', '${next.next.to}')">${next.next.label}</button>` : ''}
-    </section>
-    <div class="dash-detail-section">
-      <span>Job steps</span><span>${done} of ${steps.length} done</span>
-    </div>
-    ${jobStepsHTML(j, steps, st => st.to === 'agreement' ? `openDashboardJob('${j.r.id}', 'agreement')` : `openDashboardPeek('${j.r.id}', '${st.to}')`)}
-    <div class="dash-detail-foot">
-      <button type="button" class="dash-detail-delete" onclick="closeDashboardDetail(); deleteReport('${j.r.id}')">
-        <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete this job
-      </button>
-    </div>
-  `;
-  sheet.scrollTop = 0;
-  document.getElementById('dashboardDetail').classList.add('open');
-}
-
-// A step opens as a small preview over the dashboard: what that section
-// holds, read-only, with a button to open it full screen. On a wide screen
-// the sheet sits at the side, so the job list stays in view.
-const DASH_PEEK_TITLES = { report: 'Report', quote: 'Quote', answer: 'Client\'s answer', treatment: 'Treatment', bait: 'Bait station visits' };
-const DASH_PEEK_OPEN = { report: 'Open the report', quote: 'Open the quote', answer: 'Open the quote', treatment: 'Open the treatment record', bait: 'Open the visits' };
-
-function openDashboardPeek(id, to) {
-  const j = dashboardJobs.find(x => x.r.id === id);
-  const sheet = document.getElementById('dashboardDetailSheet');
-  if (!j || !sheet) return;
-  const step = j.steps.find(s => s.to === to);
-  const expand = '<svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/></svg>';
-  sheet.innerHTML = `
-    <div class="dash-detail-grab" aria-hidden="true"></div>
-    <div class="dash-peek-bar">
-      <button type="button" class="dash-peek-back" onclick="openDashboardDetail('${id}')">
-        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Job
-      </button>
-      <button type="button" class="dash-peek-full" onclick="openDashboardJob('${id}', '${to}')" aria-label="Full screen">${expand}Full screen</button>
-    </div>
-    <div class="dash-peek-kicker">${escapeHtml(j.r.address || 'No address')}</div>
-    <h3 class="dash-peek-title">${DASH_PEEK_TITLES[to]}</h3>
-    ${step ? `<div class="dash-peek-status ${step.state}">${escapeHtml(step.text)}</div>` : ''}
-    <div class="dash-peek-body">${dashboardPeekBody(j, to)}</div>
-    <div class="dash-detail-actions">
-      <button type="button" class="dash-detail-primary" onclick="openDashboardJob('${id}', '${to}')">${DASH_PEEK_OPEN[to]}</button>
-    </div>`;
-  sheet.scrollTop = 0;
-  document.getElementById('dashboardDetail').classList.add('open');
-}
-
-function dashPeekRows(rows) {
-  const shown = rows.filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== '');
-  return shown.length ? `<dl class="dash-peek-rows">${shown.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}</dl>` : '';
-}
-
-function dashboardPeekBody(j, to) {
-  const d = j.r.reportData || {};
-  const q = j.q;
-  const none = (t) => `<p class="dash-peek-none">${escapeHtml(t)}</p>`;
-  if (to === 'report') {
-    const findings = (Array.isArray(d.findings) ? d.findings : []).filter(f => f && f.termiteActivity);
-    const borers = (Array.isArray(d.borerFindings) ? d.borerFindings : []).filter(f => f && f.borerActivity);
-    const ag = d.agreement;
-    const list = [
-      ...findings.map((f, i) => [`Termites ${i + 1}`, [f.termiteActivity, f.activityLocation].filter(Boolean).join(' · ')]),
-      ...borers.map((f, i) => [`Borers ${i + 1}`, [f.borerActivity, f.location].filter(Boolean).join(' · ')]),
-    ];
-    if (d.decayFound === 'YES') list.push(['Wood decay', d.decayWhere || 'Found']);
-    return dashPeekRows([
-      ['Inspection', d.inspectionType],
-      ['Filled in', `${j.r.completion || 0}%`],
-      ['Agreement', ag ? `Signed by ${ag.signerName || 'the client'}` : 'Not signed yet'],
-      ['Treatment', d.treatmentRecommended === 'YES' ? (d.treatmentType || 'Recommended') : d.treatmentRecommended === 'NO' ? 'Not recommended' : ''],
-    ]) + (list.length ? `<div class="dash-peek-sub">Findings</div>${dashPeekRows(list)}`
-      : `<div class="dash-peek-sub">Findings</div>${none('No termite or borer findings recorded.')}`);
-  }
-  if (!quoteHasItems(q)) return none(to === 'quote' ? 'No quote written yet.' : 'There\'s no quote for this job yet.');
-  if (to === 'quote') {
-    const t = quoteTotals(q);
-    return `${q.number ? `<div class="dash-peek-num">Quote ${escapeHtml(q.number)}</div>` : ''}
-      <ul class="dash-peek-lines">${q.items.map(it => `<li><span>${escapeHtml(it.desc || 'Line')}</span><strong>${formatAUD(lineTotal(it))}</strong></li>`).join('')}</ul>
-      <ul class="dash-peek-lines dash-peek-totals">${q.gst !== false ? `<li><span>GST</span><strong>${formatAUD(t.gst)}</strong></li>` : ''}<li class="grand"><span>Total</span><strong>${formatAUD(t.total)}</strong></li></ul>`;
-  }
-  if (to === 'answer') {
-    const a = quoteAnswerState(q);
-    if (!a) return none(q.sentAt ? 'Waiting on the client.' : 'The quote hasn\'t been sent yet.');
-    return dashPeekRows([
-      ['Answer', a.status === 'accepted' ? 'Accepted' : 'Declined'],
-      ['By', a.by], ['Date', formatAnswerDate(a.date)],
-      ['How', a.status === 'accepted' ? (QUOTE_ANSWER_METHODS[a.method] || '') : ''],
-      ['Note', a.note],
-    ]) + (isSignatureImage(a.signature) ? `<img class="dash-peek-sig" src="${a.signature}" alt="Client signature">` : '')
-      + (a.stale ? '<p class="dash-peek-warn">The quote changed after they answered.</p>' : '');
-  }
-  if (to === 'bait') {
-    const b = typeof baitProgram === 'function' ? baitProgram(q) : null;
-    if (!b) return none('No baiting system on this job.');
-    const rows = b.visits.slice().reverse().slice(0, 6).map((v, i) => [`${formatAnswerDate(v.date)}`, `${baitVisitShort(v)}${v.sentAt ? '' : ' · report not sent'}`]);
-    return dashPeekRows([
-      ['Stations', String(parseInt(q.treatment.methods.bait, 10) || (b.last ? (b.last.stations || []).length : '') || '')],
-      ['Next visit', b.finished ? 'None, baiting finished' : b.due ? `${formatAnswerDate(b.due)}${b.overdue ? ' (overdue)' : ''}` : ''],
-      ...rows,
-    ]) || none('No visits recorded yet.');
-  }
-  const t = q.treatment;
-  if (!t) return none('No treatment recorded yet.');
-  return dashPeekRows([
-    ['Date', formatAnswerDate(t.date)],
-    ['Technician', t.technician],
-    ['Pest', t.pest],
-    ['Work', Object.keys(t.methods || {}).map(k => (TREATMENT_METHODS[k] || {}).label || k).join(', ')],
-    ['Products', (t.products || []).map(p => p.name).filter(Boolean).join(', ')],
-    ['Areas', t.areas],
-    ['Certificate', q.certificateSentAt ? `Sent ${dashDate(q.certificateSentAt)}` : q.certificateHandedAt ? `Given in person ${dashDate(q.certificateHandedAt)}` : 'Not sent yet'],
-  ]);
-}
-
+// The sheet over the list: the Due tab's properties (js/reinspection.js).
+// A job's card opens the job's own page instead (openDashboardJob).
 function closeDashboardDetail() {
   const el = document.getElementById('dashboardDetail');
   if (el) el.classList.remove('open');
 }
 
-// Opens a job from the dashboard: its report, its quote, or straight into
-// recording the treatment.
-// Every step opens in any order: report, quote, the client's answer (the
-// quote, scrolled to it) or the treatment record.
+// Opens a job from the Jobs list: its page ('job'), or straight to one of
+// its documents (the card's next-step button). The job becomes This job. A
+// sheet opened this way and closed unfinished comes back to the list.
 function openDashboardJob(id, to) {
   closeDashboard();
-  loadReport(id);
-  jobGo(to);
+  loadReport(id, true);
+  jobGo(to, 'jobs');
 }
 
 const SAVED_EMPTY_HTML = `<div class="empty-state">

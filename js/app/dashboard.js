@@ -423,14 +423,14 @@ function renderDashboardJobs(fade) {
   const wrap = document.getElementById('dashboardJobs');
   if (!wrap) return;
   parkJobPanel();
-  const counts = { current: '', todo: 0, waiting: 0, done: 0, all: dashboardJobs.length };
+  const counts = { todo: 0, waiting: 0, done: 0 };
   dashboardJobs.forEach(j => counts[j.group]++);
   counts.due = typeof reinspectionsDue === 'function' ? reinspectionsDue().length : 0;
   const searchEl = document.getElementById('dashboardSearch');
   const query = searchEl ? searchEl.value.trim().toLowerCase() : '';
   const shown = dashboardJobs.filter(j => query
     ? [j.r.address, j.r.client, j.r.jobSuburb, j.r.jobPostcode].filter(Boolean).join(' ').toLowerCase().includes(query)
-    : dashboardTab === 'all' || j.group === dashboardTab);
+    : j.group === dashboardTab);
   // To do runs the way the week does: anything still open from an earlier
   // day, then today, then what's booked for later, each in the order it
   // comes. The other lists (and a search) are newest first.
@@ -543,14 +543,8 @@ async function checkLinksOut() {
   } catch (e) { /* no signal, or the account is down: the next open asks again */ }
 }
 
-// Safe inside text and inside quoted attributes (value="…", src="…").
-function escapeHtml(str) {
-  return String(str == null ? '' : str)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-// ── STATUS / TOAST ────────────────────────────────────────────────────────
+// ── AI STATUS ──────────────────────────────────────────────────────────────
+// (The pop-up message, showToast, is in common.js.)
 function setAI(state, text) {
   document.getElementById('aiStatus').textContent = text;
   document.getElementById('aiDot').className = 'ai-dot' + (state === 'thinking' ? ' thinking' : '');
@@ -566,68 +560,6 @@ function setAI(state, text) {
   const keep = document.getElementById('aiKeepBtn');
   if (keep) keep.hidden = !(busy && /Filling in/.test(text));
 }
-
-// action: optional { label, run } adds a button to the toast (e.g. Undo).
-function showToast(msg, type = 'default', action) {
-  const t = document.getElementById('toast');
-  clearTimeout(t._timeout);
-
-  const svgIcon = (path) => `<svg class="icon toast-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
-
-  const icons = {
-    success: svgIcon('<path d="M20 6 9 17l-5-5"/>'),
-    error: svgIcon('<path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'),
-    info: svgIcon('<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>'),
-    default: svgIcon('<circle cx="12" cy="12" r="9"/><circle class="logo-dot" cx="12" cy="4" r="2" fill="currentColor"/>'),
-  };
-
-  t.innerHTML = `${icons[type] || icons.default}<span>${escapeHtml(String(msg))}</span>`;
-  // Where inspectors get stuck. Toasts are the app's own wording; details
-  // in brackets (an error's own text) and any email or long number are
-  // blanked before it's sent.
-  if (type === 'error') track('error_shown', { message: scrubTelemetryText(String(msg).replace(/\([^)]*\)/g, '(…)')) });
-  t.className = 'toast show toast-' + type + (action ? ' toast-has-action' : '');
-  if (action) {
-    const btn = document.createElement('button');
-    btn.className = 'toast-action';
-    btn.textContent = action.label;
-    btn.onclick = () => { dismissToast(); action.run(); };
-    t.appendChild(btn);
-  }
-
-  t._shownAt = Date.now();
-  // Errors, and toasts with a button to press, stay up longer.
-  t._timeout = setTimeout(() => t.classList.remove('show'), (action && action.ms) || ((type === 'error' || action) ? 6000 : 2800));
-}
-
-function dismissToast() {
-  const t = document.getElementById('toast');
-  if (!t) return;
-  clearTimeout(t._timeout);
-  t.classList.remove('show');
-}
-
-// A toast belongs to the screen it was shown on: when the screen changes
-// (the menu, a menu page, the quote screen, the dashboard or a sheet opens
-// or closes), an older toast goes, so it never sits over the next screen's
-// buttons. A toast shown by the same tap that changed the screen stays.
-function installToastScreenWatch() {
-  // The toast sits inside the report app's markup, so it was hidden with
-  // the app (on the quote screen, for one). It belongs to the page.
-  const toast = document.getElementById('toast');
-  if (toast && toast.parentElement !== document.body) document.body.appendChild(toast);
-  const ids = ['app', 'quoteScreen', 'sidebarPanel', 'dashboardOverlay'];
-  const targets = ids.map(id => document.getElementById(id))
-    .concat([...document.querySelectorAll('.page-sheet-overlay, .menu-page, .saved-panel')])
-    .filter(Boolean);
-  const obs = new MutationObserver(() => {
-    const t = document.getElementById('toast');
-    if (t && t.classList.contains('show') && Date.now() - (t._shownAt || 0) > 400) dismissToast();
-  });
-  targets.forEach(el => obs.observe(el, { attributes: true, attributeFilter: ['class', 'style'] }));
-}
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installToastScreenWatch);
-else installToastScreenWatch();
 
 // ── FINALISED JOBS ────────────────────────────────────────────────────────
 // A job has one ending: Finalise, on This job, once its steps are done
@@ -988,7 +920,7 @@ function reportPrepGaps(from = 'send') {
   if (!reportData.inspectorSignature) push('signature', 'The inspector hasn\'t signed', show('sigCanvasInspector', 'Sign it'), { required: true, blank: true, targets: ['sigCanvasInspector'] });
 
   const pending = (reportData.pendingNotes || []).length;
-  if (pending) push('pending', `${pending} voice note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
+  if (pending) push('pending', `${pending} saved note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
   // Photos the account never received are only on this phone: the PDF
   // has them today, but a lost phone or another device's copy won't. They
   // go up on their own with signal, so they don't hold the percentage back.

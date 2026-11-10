@@ -30,6 +30,12 @@ function clientMessage({ client, address, docs, note, signOff, link }) {
   ].join('\n');
 }
 
+// A button that sends says how and to whom, as the certificate's does:
+// "Email to Sam", or "Email to the client" with no name to go by.
+function emailToLabel(client) {
+  return `Email to ${greetingName(client || '') || 'the client'}`;
+}
+
 // How the client gets back to the business, for the end of an email. An
 // email SAYON sends takes replies at the email in Business details; with
 // none there a reply would go to the address SAYON sends from, where nobody
@@ -255,7 +261,7 @@ function openSendReview() {
   if (withQuote && !(answer && !answer.stale)) prepareSendReviewLink(sendReview);
   // The button stays at the foot of the sheet and always says who it goes
   // to. With something still open above, a line over it says how many.
-  sendReview.label = directEmail && email ? `Send to ${email}` : 'Open email to send';
+  sendReview.label = directEmail && email ? `Email to ${email}` : 'Open email to send';
   const btn = document.getElementById('sendReviewBtn');
   btn.textContent = sendReview.label;
   btn.disabled = false;

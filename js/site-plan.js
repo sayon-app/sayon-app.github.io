@@ -799,6 +799,11 @@ function renderSitePlanGrab() {
 function closeSitePlan() {
   document.getElementById('sitePlanOverlay').classList.remove('open');
 }
+// The X, Cancel and back: a plan that was changed asks before it goes.
+async function leaveSitePlan() {
+  if (sitePlanEditor.undo.length && !(await askFirst({ title: 'Close the plan without saving?', text: 'What you drew since you opened it is lost. Save site plan keeps it.', yes: 'Close without saving', no: 'Keep drawing', danger: true }))) return;
+  closeSitePlan();
+}
 
 function saveSitePlan() {
   const E = sitePlanEditor;

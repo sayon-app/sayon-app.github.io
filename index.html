@@ -459,6 +459,7 @@
     <div class="did-it-send-title" id="askTitle"></div>
     <dl class="ask-facts" id="askFacts" hidden></dl>
     <p class="did-it-send-text" id="askText"></p>
+    <input class="ask-input" id="askInput" type="text" autocomplete="off" spellcheck="false" hidden oninput="syncAskYes()" onkeydown="if (event.key === 'Enter') { event.preventDefault(); answerAsk(true); }">
     <div class="did-it-send-btns">
       <button class="extract-btn" id="askYes" onclick="answerAsk(true)"></button>
       <button class="link-btn" id="askNo" onclick="answerAsk(false)"></button>
@@ -476,7 +477,7 @@
     <ol class="move-steps">
       <li>Tap <strong>Open the new address</strong>.</li>
       <li>Add it to your Home Screen. On an iPhone, tap Share, then Add to Home Screen.</li>
-      <li>Sign in there. Your reports, photos, quotes and company details come back.</li>
+      <li>Sign in there. Your reports, photos, quotes and business details come back.</li>
       <li>Delete this old SAYON icon.</li>
     </ol>
     <div class="did-it-send-btns">
@@ -716,7 +717,7 @@
   <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="spTitle">
     <div class="page-sheet-header">
       <span class="page-sheet-title" id="spTitle">Site plan</span>
-      <button class="voice-popover-close" onclick="closeSitePlan()" aria-label="Close without saving"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+      <button class="voice-popover-close" onclick="leaveSitePlan()" aria-label="Close without saving"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
     </div>
     <div class="page-sheet-body sp-body">
       <div class="sp-views" id="spViews" role="tablist" aria-label="Which plan">
@@ -781,7 +782,7 @@
       </div>
       <button class="extract-btn" onclick="saveSitePlan()">Save site plan</button>
       <div class="sp-foot">
-        <button class="link-btn" onclick="closeSitePlan()">Cancel</button>
+        <button class="link-btn" onclick="leaveSitePlan()">Cancel</button>
         <button class="link-btn" id="spClear" onclick="clearSitePlan()">Start again</button>
       </div>
     </div>
@@ -1255,7 +1256,7 @@
             <input class="job-input" id="teamInviteEmail" type="email" inputmode="email" autocomplete="off" placeholder="Their email address" aria-label="Their email address" onkeydown="if (event.key === 'Enter') inviteTeamMember()">
             <button class="job-action-btn settings-primary-btn" id="teamInviteBtn" onclick="inviteTeamMember()">Invite</button>
           </div>
-          <div class="settings-row-desc team-help">Send them the sign-up link SAYON gives you. When they sign up with that email, they join your business: your company details, logo and prices on every PDF, with their own reports and the AI fills shared.</div>
+          <div class="settings-row-desc team-help">Send them the sign-up link SAYON gives you. When they sign up with that email, they join your business: your business details, logo and prices on every PDF, with their own reports and the AI fills shared.</div>
           <button class="job-action-btn settings-primary-btn team-more" id="teamMorePlaces" onclick="openMenuPage('billingPanel')" hidden>More inspector places in Billing</button>
         </div>
       </div>
@@ -1428,7 +1429,7 @@
           <div class="settings-row" id="testModeRow" hidden>
             <div class="settings-row-text">
               <div class="settings-row-title">Test mode</div>
-              <div class="settings-row-desc">Saves every voice note and what SAYON pulled out of it to your account, so the AI can be checked and improved. Only you can see them.</div>
+              <div class="settings-row-desc">Saves every note and what SAYON filled from it to your account, so the AI can be checked and improved. Only you can see them.</div>
             </div>
             <button type="button" class="toggle-switch" id="toggleTestMode" onclick="toggleTestMode()" aria-label="Test mode"></button>
           </div>
@@ -1555,7 +1556,7 @@
         <div class="agreement-banner signed report-done-banner" id="reportDoneBanner" hidden>
           <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
           <span class="agreement-banner-text" id="reportDoneBannerText">Report done</span>
-          <button class="agreement-banner-btn issue-primary" id="reportDoneBannerBtn">Send to client</button>
+          <button class="agreement-banner-btn issue-primary" id="reportDoneBannerBtn">Email to the client</button>
         </div>
 
         <!-- The job's details (address, client, booking), one tap back to
@@ -2201,7 +2202,7 @@
           <div class="photo-toolbar">
             <span class="photo-count" id="photoCount"></span>
             <button type="button" class="link-btn photo-choose" id="choosePhotoBtn" onclick="choosePhotoSource('photoFileInput', true)">Choose one instead</button>
-            <button class="add-photo-btn" id="addPhotoBtn" onclick="takePhoto('photoFileInput')">
+            <button class="add-photo-btn quiet" id="addPhotoBtn" onclick="takePhoto('photoFileInput')">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>
               Add photo
             </button>
@@ -2261,7 +2262,7 @@
             </button>
             <button class="finish-next-btn" id="shareBtn" onclick="openSendReview()" hidden disabled>
               <span class="finish-next-icon"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg></span>
-              <span class="finish-next-text"><b id="shareTitle">Send to client</b><small id="shareSub">Check the report, then email it</small></span>
+              <span class="finish-next-text"><b id="shareTitle">Email to the client</b><small id="shareSub">Check the report, then email it</small></span>
               <svg class="icon finish-next-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
             </button>
             <!-- Once the report has gone, the next step is on the job's
@@ -2682,6 +2683,7 @@
 <script src="js/telemetry.js"></script>
 <script src="js/crash-guard.js"></script>
 <!-- The app: plain scripts that share one global scope, loaded in this order -->
+<script src="js/app/common.js"></script>
 <script src="js/app/state.js"></script>
 <script src="js/app/areas.js"></script>
 <script src="js/app/talk-photos.js"></script>

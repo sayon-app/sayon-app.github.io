@@ -77,13 +77,6 @@ function formatAgreementSignedAt(ms) {
   return new Date(ms).toLocaleString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-// A date as YYYY-MM-DD on the phone's own calendar. toISOString() gives the
-// UTC date, which in Australia is the day before until 10 or 11 in the morning.
-function isoDate(d) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-function todayIsoDate() { return isoDate(new Date()); }
-
 // The unsigned sheet is on screen, so its own boxes (who signs, special
 // requests) count.
 function agreementEditOpen() {
@@ -539,7 +532,7 @@ async function shareAgreementLink() {
     await navigator.clipboard.writeText(`${text} ${url}`);
     showToast('Link copied. Paste it into a text or email to the client', 'success');
   } catch (e) {
-    prompt('Copy this link and send it to the client:', url);
+    showLinkToCopy(url);
   }
 }
 
@@ -617,7 +610,7 @@ function takeSignedAgreement(reportId, row) {
 
 async function cancelAgreementLink() {
   const r = reportData.agreementRequest;
-  if (!r || !confirm('Cancel this link? The client won\'t be able to sign with it.')) return;
+  if (!r || !(await askFirst({ title: 'Cancel this link?', text: 'The client won\'t be able to sign with it. You can send a new one, or have them sign on this phone.', yes: 'Cancel the link', no: 'Keep it' }))) return;
   if (authSession) {
     fetch(`${SUPABASE_URL}/rest/v1/sign_requests?id=eq.${encodeURIComponent(r.id)}&status=eq.pending`, {
       method: 'PATCH', headers: getAuthHeaders(), body: JSON.stringify({ status: 'cancelled' }),
@@ -640,9 +633,9 @@ function renderAgreementRemote() {
   }
 }
 
-function removeAgreement() {
+async function removeAgreement() {
   if (isReportLocked()) { sayLocked(); return; }
-  if (!confirm('Remove the signed agreement from this report? The client will need to sign again.')) return;
+  if (!(await askFirst({ title: 'Remove the signed agreement?', text: 'The client will need to sign it again.', yes: 'Remove the agreement', danger: true }))) return;
   delete reportData.agreement;
   saveDraft();
   updateProgress();

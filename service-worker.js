@@ -21,6 +21,7 @@ const APP_SHELL = [
   './',
   './index.html',
   './css/app.css',
+  './js/app/common.js',
   './js/app/state.js',
   './js/app/areas.js',
   './js/app/talk-photos.js',

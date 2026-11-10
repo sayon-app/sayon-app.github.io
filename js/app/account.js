@@ -745,7 +745,7 @@ async function signOut() {
         failed ? `${failed} saved report${failed === 1 ? '' : 's'} couldn't be backed up (no signal?)` : '',
         unsaved ? 'The open report hasn\'t been saved' : '',
       ].filter(Boolean).join('. ');
-      if (!confirm(`${lost}.\n\nSigning out removes reports from this phone. Sign out anyway and lose them?`)) {
+      if (!(await askFirst({ title: 'Sign out and lose them?', text: `${lost}. Signing out removes reports from this phone.`, yes: 'Sign out and lose them', no: 'Stay signed in', danger: true }))) {
         showToast('Still signed in. Your reports are safe on this phone', 'info');
         return;
       }
@@ -869,12 +869,15 @@ async function deleteFolder(bucket, prefix, listFolder) {
 async function deleteMyAccount() {
   if (!authSession || !authUser) { showToast('Sign in to delete your account', 'error'); return; }
   if (!navigator.onLine) { showToast('You need signal to delete your account', 'error'); return; }
-  const typed = prompt(
-    'This permanently deletes your SAYON account, every saved report and photo, ' +
-    (authBusiness && authBusiness.owner_id === authUser.id ? 'your business details, ' : '') +
-    'and everything on this phone. It cannot be undone.\n\nTo keep a copy, tap Cancel and use Download a copy first.\n\nType DELETE to confirm.');
-  if (typed === null) return;
-  if (typed.trim().toUpperCase() !== 'DELETE') { showToast('Not deleted. Type DELETE to confirm', 'info'); return; }
+  const typed = await askFirst({
+    title: 'Delete your account?',
+    text: 'This permanently deletes your SAYON account, every saved report and photo, ' +
+      (authBusiness && authBusiness.owner_id === authUser.id ? 'your business details, ' : '') +
+      'and everything on this phone. It cannot be undone.\n\nTo keep a copy, tap Not now and use Download a copy first.\n\nType DELETE to confirm.',
+    input: { match: 'DELETE', placeholder: 'DELETE', label: 'Type DELETE to confirm' },
+    yes: 'Delete my account', danger: true });
+  if (typeof typed !== 'string') return;
+  if (typed.toUpperCase() !== 'DELETE') { showToast('Not deleted. Type DELETE to confirm', 'info'); return; }
   showToast('Deleting your account…', 'info');
   try {
     const blocked = await deleteAccountRpc(true);
@@ -1118,7 +1121,7 @@ async function sendInviteLink(email, token) {
 async function removeTeamMember(userId) {
   const m = teamCache.members.find(x => x.user_id === userId);
   if (!m || userId === authUser.id) return;
-  if (!confirm(`Take ${m.name || m.email} off your team? They can't use SAYON with your business after this. Their reports stay in their account.`)) return;
+  if (!(await askFirst({ title: `Take ${m.name || m.email} off your team?`, text: 'They can\'t use SAYON with your business after this. Their reports stay in their account.', yes: 'Take them off', danger: true }))) return;
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/team_members?business_id=eq.${authBusiness.id}&user_id=eq.${encodeURIComponent(userId)}`, { method: 'DELETE', headers: getAuthHeaders() });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -1131,7 +1134,7 @@ async function removeTeamMember(userId) {
 
 async function cancelTeamInvite(id) {
   const i = teamCache.invites.find(x => x.id === id);
-  if (!i || !confirm(`Cancel the invite for ${i.email}?`)) return;
+  if (!i || !(await askFirst({ title: `Cancel the invite for ${i.email}?`, text: 'Their sign-up link stops working. You can invite them again any time.', yes: 'Cancel the invite', no: 'Keep it' }))) return;
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/invites?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: getAuthHeaders() });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -1214,7 +1217,7 @@ function showInviteSignUp(joining) {
   if (joining) document.getElementById('suBusiness').value = '';
   document.getElementById('suTitle').textContent = joining ? `Join ${inviteSignUp.business} on SAYON` : 'Create your account';
   document.getElementById('suSubtitle').textContent = joining
-    ? `${inviteSignUp.business} has added you. Sign up with this email and you'll join their account, with their company details on your reports.`
+    ? `${inviteSignUp.business} has added you. Sign up with this email and you'll join their account, with their business details on your reports.`
     : `This email wasn't invited, so this sets up a business of your own. To join ${inviteSignUp.business}, use ${inviteSignUp.email}.`;
 }
 
@@ -1226,20 +1229,10 @@ function onSignUpEmailInput() {
 }
 
 // ── BUSINESS LOAD ────────────────────────────────────────────────────────
-// FIX: loadBusiness() used to be a plain check-then-create with no lock -
-// "is authBusiness already set? no -> look for an existing business row ->
-// none found -> create one." Two overlapping calls (confirmed live: sign-in
-// retried minutes apart after the team_members 500 below made it LOOK like
-// something had failed, each a fresh call since authBusiness resets on
-// reload) could both pass the "none found" check before either one's POST
-// landed, and both would create a business row for the same owner - exactly
-// what happened to two of the real test accounts (two "Korva Pest Control"
-// rows, two "JC Pest Control" rows, same owner_id each time, confirmed via
-// the businesses table and edge_logs). There's also no unique constraint on
-// businesses.owner_id at the database level, so nothing stopped it there
-// either. This in-flight lock makes every call for the same page session
-// share one real attempt instead of racing - a second caller just awaits
-// the first one's result instead of starting its own.
+// One attempt at a time: two calls that overlap (a sign-in retried) would
+// both find no business row and both create one, and nothing in the
+// database stops two rows for one owner. A second caller waits for the
+// first one's result.
 let _loadBusinessInFlight = null;
 async function loadBusiness() {
   if (!authUser) return;

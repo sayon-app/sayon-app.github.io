@@ -66,21 +66,8 @@ async function supabaseSaveNow(entry, quiet) {
       saved_at:    new Date(entry.savedAt).toISOString(),
       data:        entry,
     };
-    // FIX: this POST previously had no on_conflict target, so
-    // Prefer: resolution=merge-duplicates had nothing to tell it which
-    // unique constraint to upsert against (report_id is unique, but the
-    // request never said so, and id - the real primary key - isn't in the
-    // payload at all). The first save of a report (brand new report_id)
-    // always worked, a plain 201 insert. But re-saving the SAME report
-    // (e.g. "add more stuff" after already saving once) tried another
-    // plain insert, hit reports_report_id_key, and Postgres/PostgREST
-    // rejected it with 409 - confirmed live in production logs
-    // (POST | 409 | .../rest/v1/reports). That 409 does trigger the
-    // "could not sync to your account" toast below, but to the user it
-    // just looked like "reports aren't saving" since the whole point of
-    // re-saving is to update the existing one. on_conflict=report_id makes
-    // this a real upsert: same report_id updates the existing row instead
-    // of colliding with it.
+    // on_conflict=report_id makes this an upsert: saving the same report
+    // again updates its row instead of failing on the unique report_id.
     const res = await fetch(`${SUPABASE_URL}/rest/v1/reports?on_conflict=report_id`, {
       method: 'POST',
       headers: { ...getAuthHeaders(), 'Prefer': 'resolution=merge-duplicates' },
@@ -90,12 +77,8 @@ async function supabaseSaveNow(entry, quiet) {
       const detail = await res.text();
       console.warn('Supabase save failed:', detail);
       if (quiet) return false;
-      // FIX: this used to fail completely silently - "Report saved" already
-      // showed from the local save, so a rejected cloud sync (e.g. RLS
-      // blocking a write to a report row that doesn't belong to the current
-      // account/business) was invisible until someone noticed the report
-      // missing elsewhere. Surface it so "saved" never quietly means
-      // "saved on this device only, and the server said no."
+      // "Saved" must never quietly mean "on this phone only": a refused
+      // sync says so.
       showToast('Saved on this device, but could not sync to your account', 'error');
       updateSyncStatus('cloud_error');
       return false;
@@ -335,9 +318,8 @@ function flushDraftSave() {
     updateSyncStatus('saved');
     scheduleReportAutosave();
   } catch (e) {
-    // Previously a silent fail. Now surfaced once per failure episode so the
-    // technician knows in-progress work (including a just-captured signature)
-    // may not be persisting, without spamming a toast on every keystroke.
+    // Said once per run of failures, so the inspector knows work (a
+    // signature, say) may not be keeping, without a toast on every key.
     if (!saveDraftFailureNotified) {
       saveDraftFailureNotified = true;
       showToast('Could not save your progress. The phone\'s storage may be full', 'error');
@@ -474,9 +456,6 @@ function loadDraft() {
 
     restoreFieldNotes();
 
-    const sel = document.getElementById('standardSelect');
-    if (sel && reportData.standard) sel.value = reportData.standard;
-
     updateProgress();
     checkAsbestosFlag();
     checkFindingsGate();
@@ -560,8 +539,10 @@ function getArchivedReportIds() {
 function setArchivedReportIds(ids) {
   try { if (ids.length) localStorage.setItem(archivedReportsKey(), JSON.stringify(ids)); else localStorage.removeItem(archivedReportsKey()); } catch (e) {}
 }
-// Takes the oldest finished, backed-up jobs out of `reports` (in place)
-// after the inspector agrees. Returns true when something was removed.
+// Takes the oldest finished, backed-up jobs out of `reports` (in place).
+// Not asked: it's what lets the save go through, and it can be undone
+// (they're in the account, and Bring them back on Jobs, under Done, fetches
+// them). Returns true when something was removed.
 function freeStorageFor(reports) {
   if (!authSession) return false;
   const candidates = reports
@@ -570,12 +551,10 @@ function freeStorageFor(reports) {
   if (!candidates.length) return false;
   const n = Math.max(1, Math.ceil(candidates.length / 2));
   const going = candidates.slice(0, n);
-  const ok = confirm(`This phone's storage is full. Take the ${n === 1 ? 'oldest finished job' : `${n} oldest finished jobs`} off this phone? ${n === 1 ? 'It stays' : 'They stay'} in your account and can be brought back from Jobs, under Done.`);
-  if (!ok) return false;
   const ids = new Set(going.map(r => r.id));
   for (let i = reports.length - 1; i >= 0; i--) if (ids.has(reports[i].id)) reports.splice(i, 1);
   setArchivedReportIds([...new Set([...getArchivedReportIds(), ...ids])]);
-  showToast(`${n} older job${n === 1 ? '' : 's'} now kept in your account only`, 'info');
+  showToast(`This phone was full, so ${n === 1 ? 'the oldest finished job is' : `the ${n} oldest finished jobs are`} now kept in your account only. Bring ${n === 1 ? 'it' : 'them'} back from Jobs, under Done`, 'info');
   return true;
 }
 async function restoreArchivedReports() {
@@ -772,8 +751,6 @@ function loadReport(id, quiet) {
 
   restoreFieldNotes();
 
-  const sel = document.getElementById('standardSelect');
-  if (sel) sel.value = reportData.standard || 'AS 3660.2-2017';
   if (!reportData.standard) setStandard('AS 3660.2-2017');
 
   updateProgress();
@@ -833,7 +810,7 @@ async function flushPendingDeletes() {
   }
 }
 
-function deleteReport(id, event) {
+async function deleteReport(id, event) {
   if (event) event.stopPropagation();
   const all = getSavedReports();
   const index = all.findIndex(r => r.id === id);
@@ -844,8 +821,9 @@ function deleteReport(id, event) {
   const where = deleted.address || 'this property';
   const finished = deleted.reportData && deleted.reportData.issue;
   const extra = notInAccount(deleted) ? ' It isn\'t in your account yet, so it can\'t be brought back.' : '';
-  if (!confirm(`Delete the ${finished ? 'finished job' : 'job'} at ${where}? Its report, quote and photos go too.${extra}`)) return;
-  if (!setSavedReports(all.filter(r => r.id !== id))) return;
+  if (!(await askFirst({ title: `Delete the ${finished ? 'finished job' : 'job'} at ${where}?`, text: `Its report, quote and photos go too.${extra}`, yes: 'Delete job', danger: true }))) return;
+  // Read again: something may have saved while the question was up.
+  if (!setSavedReports(getSavedReports().filter(r => r.id !== id))) return;
   const wasOpen = currentReportId === id;
   if (wasOpen) startBlankReport();
   refreshJobsList();
@@ -970,7 +948,7 @@ function importAllData(file) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     let backup;
     try {
       backup = JSON.parse(e.target.result);
@@ -986,11 +964,10 @@ function importAllData(file) {
 
     const incoming = backupReports(backup);
     const existing = getSavedReports();
-    if (existing.length && !confirm(
-      `This copy has ${incoming.length} report${incoming.length === 1 ? '' : 's'}. ` +
-      `You have ${existing.length} on this phone.\n\n` +
-      `Add the copy's reports to yours? Nothing on this phone is removed, and where both have the same report the newer one is kept.`
-    )) return;
+    if (existing.length && !(await askFirst({
+      title: 'Add the copy\'s reports to yours?',
+      text: `This copy has ${incoming.length} report${incoming.length === 1 ? '' : 's'}. You have ${existing.length} on this phone.\n\nNothing on this phone is removed, and where both have the same report the newer one is kept.`,
+      yes: `Add ${incoming.length === 1 ? 'the report' : `the ${incoming.length} reports`}` }))) return;
 
     try {
       const { reports, added, updated } = mergeBackupReports(existing, incoming);

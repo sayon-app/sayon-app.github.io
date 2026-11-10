@@ -84,7 +84,7 @@ async function backUpForMove() {
   if (isBusinessOwner()) await pushBusinessSettings();
   const detailsLeft = isBusinessOwner() && localSettingsAhead(authBusiness.settings || {});
   if (missing || detailsLeft) {
-    const what = missing ? `${missing} report${missing === 1 ? '' : 's'}` : 'Your company details';
+    const what = missing ? `${missing} report${missing === 1 ? '' : 's'}` : 'Your business details';
     status.textContent = `${what} couldn't be backed up yet. Check you have internet, then try again.`;
     retryBtn.hidden = false;
     return;
@@ -278,7 +278,7 @@ const NAV_SHEET_BACK = {
   agreementOverlay: () => cancelSheet('agreementOverlay', true),
   treatmentOverlay: () => cancelSheet('treatmentOverlay', true),
   baitOverlay: () => cancelSheet('baitOverlay', true),
-  sitePlanOverlay: () => { if (!sitePlanEditor.undo.length || confirm('Close the plan without saving your changes?')) closeSitePlan(); },
+  sitePlanOverlay: () => leaveSitePlan(),
   sendReviewOverlay: () => { if (!(sendReview && sendReview.busy)) closeSendReview(); },
   didItSendOverlay: () => answerDidItSend(false),
   askOverlay: () => answerAsk(null),
@@ -419,14 +419,20 @@ function restoreNavPlace() {
 // ── ASK FIRST ────────────────────────────────────────────────────────────
 // SAYON's own sheet for a question, in place of the browser's grey box:
 // what will happen, a button that names it, and a quiet way out.
-//   askFirst({ title, text, facts, yes, no, danger })
+//   askFirst({ title, text, facts, yes, no, danger, input })
 // facts: [[label, value], …] set out above the text (a plan and its price).
 // yes: the button's words, which say what it does. no: the quiet one,
-// "Not now" unless given. danger: the button is red (it deletes something).
-// Resolves true for the named button, false for the quiet one, and null
-// when the sheet is closed by back, Esc or a tap outside it.
-let askResolve = null;
-function askFirst({ title, text = '', facts = null, yes, no = 'Not now', danger = false }) {
+// "Not now" unless given, or null for none (a sheet that only shows
+// something). danger: the button is red (it deletes something).
+// input: { value, placeholder, label, match, readonly } puts a box on the
+// sheet, in place of the browser's prompt(). The named button then gives
+// what's in the box (a string, trimmed); with match it stays off until
+// the box says that word (DELETE).
+// Resolves true for the named button (or the box's words), false for the
+// quiet one, and null when the sheet is closed by back, Esc or a tap
+// outside it.
+let askResolve = null, askInputMatch = '', askHasInput = false;
+function askFirst({ title, text = '', facts = null, yes, no = 'Not now', danger = false, input = null }) {
   if (askResolve) answerAsk(null);
   document.getElementById('askTitle').textContent = title;
   const textEl = document.getElementById('askText');
@@ -435,15 +441,43 @@ function askFirst({ title, text = '', facts = null, yes, no = 'Not now', danger 
   const factsEl = document.getElementById('askFacts');
   factsEl.hidden = !(facts && facts.length);
   factsEl.innerHTML = (facts || []).map(([k, v]) => `<div><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd></div>`).join('');
+  const box = document.getElementById('askInput');
+  box.hidden = !input;
+  askHasInput = !!input;
+  askInputMatch = (input && input.match) || '';
+  if (input) {
+    box.value = input.value || '';
+    box.placeholder = input.placeholder || '';
+    box.readOnly = !!input.readonly;
+    box.setAttribute('aria-label', input.label || title);
+    box.setAttribute('autocapitalize', askInputMatch ? 'characters' : 'sentences');
+  }
   const yesBtn = document.getElementById('askYes');
   yesBtn.textContent = yes;
   yesBtn.classList.toggle('danger', !!danger);
-  document.getElementById('askNo').textContent = no;
+  syncAskYes();
+  const noBtn = document.getElementById('askNo');
+  noBtn.hidden = no === null;
+  noBtn.textContent = no || '';
   document.getElementById('askOverlay').classList.add('open');
+  if (input) setTimeout(() => { box.focus(); if (input.readonly) box.select(); }, 60);
   return new Promise(resolve => { askResolve = resolve; });
 }
+// Where neither the share sheet nor the clipboard works: the link in a box
+// to press and hold, in place of the browser's prompt().
+function showLinkToCopy(url) {
+  return askFirst({ title: 'Copy the link', text: 'Press and hold the link to copy it, then send it to the client.', input: { value: url, readonly: true, label: 'The link' }, yes: 'Done', no: null });
+}
+// A box that wants a word keeps the button off until it has it.
+function syncAskYes() {
+  const typed = document.getElementById('askInput').value.trim().toUpperCase();
+  document.getElementById('askYes').disabled = !!askInputMatch && typed !== askInputMatch;
+}
 function answerAsk(answer) {
+  if (answer === true && document.getElementById('askYes').disabled) return;
+  if (answer === true && askHasInput) answer = document.getElementById('askInput').value.trim();
   document.getElementById('askOverlay').classList.remove('open');
+  document.getElementById('askInput').blur();
   const resolve = askResolve;
   askResolve = null;
   if (resolve) resolve(answer);

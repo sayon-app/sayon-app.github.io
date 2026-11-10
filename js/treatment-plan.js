@@ -247,7 +247,7 @@ async function requestTreatmentPlan(rd, address, extra, techQuote) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-5',
+        model: AI_MODEL,
         // The plan is reasoning, so it thinks before answering; thinking
         // counts toward max_tokens (see callExtraction).
         max_tokens: 16000,

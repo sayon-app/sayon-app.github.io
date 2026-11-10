@@ -114,8 +114,6 @@ body.dark-screen .risk-medium { background: rgba(255,176,0,0.14);  color: #FFC53
 body.dark-screen .risk-low    { background: rgba(var(--green-rgb),0.14); color: var(--green); border-color: rgba(var(--green-rgb),0.5); }
 body.dark-screen header { background: var(--surface); border-bottom-color: var(--border); box-shadow: none; }
 body.dark-screen .section-tabs { background: var(--surface2); border-bottom-color: var(--border); }
-body.dark-screen .report-header { border-bottom-color: var(--border); }
-body.dark-screen .report-title h2 { color: var(--text); }
 body.dark-screen .report-body { background: var(--bg); }
 body.dark-screen .report-section { border: 3px solid var(--frame); border-radius: 6px; box-shadow: none; }
 body.dark-screen .section-header { background: #000000; border-bottom: 2px solid var(--frame); }
@@ -745,38 +743,6 @@ header {
   gap: 10px;
   flex: 1;
   min-width: 0;
-}
-
-.app-logo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.app-logo-icon {
-  width: 26px;
-  height: 26px;
-  background: linear-gradient(145deg, var(--accent2), var(--accent));
-  border-radius: 7px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(13px * var(--ts));
-  box-shadow: 0 0 10px rgba(var(--accent-rgb),0.35);
-}
-
-.app-logo-name {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: calc(16px * var(--ts));
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  color: var(--text);
-}
-
-.header-divider {
-  width: 1px;
-  height: 16px;
-  background: rgba(255,255,255,0.08);
 }
 
 .header-job {
@@ -2031,21 +1997,6 @@ body.pocket-lock .voice-btn { user-select: none; -webkit-user-select: none; -web
   overflow: hidden;
   width: 100%;
 }
-
-.report-header {
-  padding: 12px 16px 10px;
-  border-bottom: 1px solid #D0DCE8;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-shrink: 0;
-  background: transparent;
-}
-.report-title { min-width: 0; }
-
-.report-title h2 { font-family: 'Space Grotesk', sans-serif; font-size: calc(18px * var(--ts)); font-weight: 700; letter-spacing: -0.4px; color: #0A1929; }
-.report-title p  { font-size: calc(12px * var(--ts)); color: var(--text2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Progress */
 .progress-wrap { height: 2px; background: rgba(255,255,255,0.04); flex-shrink: 0; }
@@ -4639,7 +4590,6 @@ body:not(.dark-screen) .menu-tile { border-color: transparent; box-shadow: 0 18p
 
 /* Top bar and section tabs: ink, light text, blue for the active tab. */
 body:not(.dark-screen) header { background: var(--ink); border-bottom: none; box-shadow: none; }
-body:not(.dark-screen) .app-logo-name { color: var(--on-ink); }
 body:not(.dark-screen) .header-job,
 body:not(.dark-screen) .header-job span,
 body:not(.dark-screen) .header-job.has-job { color: var(--on-ink2); }
@@ -4649,9 +4599,6 @@ body:not(.dark-screen) .hamburger-btn:hover { background: rgba(255,255,255,0.08)
 body:not(.dark-screen) .hamburger-btn span { background: var(--on-ink); }
 body:not(.dark-screen) header .progress-ring-bg { stroke: rgba(255,255,255,0.18); }
 body:not(.dark-screen) header .progress-ring-wrap { color: var(--on-ink2); }
-body:not(.dark-screen) .report-header { border-bottom: none; }
-body:not(.dark-screen) .report-title h2 { color: var(--on-ink); }
-body:not(.dark-screen) .report-title p { color: var(--on-ink2); }
 body:not(.dark-screen) .section-tabs { background: transparent; border-bottom: none; box-shadow: none; }
 body:not(.dark-screen) .section-tab { color: var(--on-ink2); }
 body:not(.dark-screen) .section-tab:hover { color: var(--on-ink); background: rgba(255,255,255,0.06); }
@@ -4732,7 +4679,6 @@ body:not(.dark-screen) .access-group-head {
 body:not(.dark-screen) .edit-mode .field-val:hover { box-shadow: 0 0 0 3px rgba(var(--glow),0.14), 0 0 16px rgba(var(--glow),0.18); }
 /* The same blue glow on the home screen, top bar, menu and dashboard. */
 /* Logo boxes fade like the intro's: near-white at the top into blue. */
-body:not(.dark-screen) .app-logo-icon,
 body:not(.dark-screen) .auth-logo-icon,
 body:not(.dark-screen) .menu-logo-icon {
   background: linear-gradient(180deg, #F4F7FA 0%, var(--accent-pale) 40%, var(--accent-hi) 78%, var(--accent) 100%);
@@ -4744,7 +4690,6 @@ body:not(.dark-screen) .menu-logo-icon {
   box-shadow: 0 0 34px rgba(var(--glow-hi),0.35), 0 8px 22px rgba(var(--glow),0.25), inset 0 1px 1px rgba(255,255,255,0.6), inset 0 -2px 4px rgba(var(--accent-deep-rgb),0.35);
 }
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  body:not(.dark-screen) .app-logo-name,
   body:not(.dark-screen) .auth-logo-name,
   body:not(.dark-screen) .menu-logo-text {
     background: linear-gradient(180deg, #F4F7FA 0%, var(--accent-pale) 45%, var(--accent-hi) 100%);
@@ -5532,7 +5477,7 @@ body.dark-screen .finish-next-btn.primary { background: var(--accent-glow); colo
 body.dark-screen .finish-next-btn.primary .finish-next-icon { background: rgba(0,0,0,0.12); color: #000000; }
 body.dark-screen .finish-next-btn.primary small, body.dark-screen .finish-next-btn.primary .finish-next-chev { color: rgba(0,0,0,0.75); }
 
-/* The certificate on the quote's Treatment step, and its Email button lit when arriving from the dashboard. */
+/* The treatment certificate on This job (its Next step card, then under Treatment), and its Email button lit when arriving from the Jobs list. */
 .qp-cert { margin-top: 8px; padding: 12px; border-radius: 12px; border: 1px solid rgba(var(--accent-rgb), 0.35); background: var(--surface); }
 .qp-cert.sent { border-color: var(--border); }
 .qp-cert-title { font-size: calc(13.5px * var(--ts)); font-weight: 700; color: var(--text); }
@@ -5546,6 +5491,8 @@ body.dark-screen .finish-next-btn.primary small, body.dark-screen .finish-next-b
 .qp-cert-gaps .quote-link-btn { flex: none; min-height: 36px; }
 body.dark-screen .qp-cert-gaps { background: rgba(255,176,0,0.10); }
 .qp-cert .quote-step-actions, .qp-cert .qp-cert-actions { margin-top: 10px; }
+/* Email and PDF are one row of buttons the same height. */
+.qp-cert .qp-cert-actions { align-items: stretch; }
 .qp-cert-actions .qp-cert-email { flex: 1 1 auto; }
 /* Given in person: a quiet line under the buttons, still a full-size tap. */
 .qp-cert-handed { display: block; min-height: 44px; margin: 2px 0 -8px; padding: 0; border: none; background: none; cursor: pointer;
@@ -5639,6 +5586,9 @@ body.large-touch .section-tab { flex: 0 0 auto; }
 .report-job-edit { flex: none; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border2); font-size: calc(13px * var(--ts)); font-weight: 700; color: var(--accent2); }
 body.dark-screen .report-job-card { border: 2px solid var(--border2); box-shadow: none; }
 
+/* The report's top row: back to This job, the address, the ring. */
+body:not(.dark-screen) header .header-back { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
+.header-job { font-size: calc(14px * var(--ts)); }
 /* The header's address opens the job's details. */
 button.header-job { border: none; background: none; padding: 0; text-align: left; font-family: inherit; cursor: pointer; }
 button.header-job.has-job { text-decoration: underline; text-decoration-color: rgba(255,255,255,0.25); text-underline-offset: 3px; }
@@ -5673,11 +5623,6 @@ body.dark-screen .report-done-banner .agreement-banner-btn { background: var(--a
 .edge-back[hidden] { display: none; }
 .edge-back.ready { background: var(--accent2); border-color: var(--accent2); color: #FFFFFF; }
 
-/* The job's documents strip: when it runs off the side, its edge fades so
-   it reads as more to scroll to (renderDocStrips). */
-.doc-strip.more-right { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent); }
-.doc-strip.more-left { -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px); mask-image: linear-gradient(90deg, transparent, #000 32px); }
-.doc-strip.more-left.more-right { -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 40px), transparent); }
 
 
 /* Next: always there, so the steps can be walked in order; quieter until
@@ -6006,6 +5951,27 @@ body:not(.dark-screen) .job-skipped button { color: var(--accent-glow); }
 .job-details[open] .job-details-head .job-step-chev { transform: rotate(90deg); }
 body .job-page .job-details #jobPanel:not(.menu-page-active) { margin: 0; border: none; border-top: 1px solid var(--border); border-radius: 0; box-shadow: none; }
 .job-steps .job-details { margin-top: 0; }
+/* Steps kept on the page (the client's answer, the treatment, bait visits)
+   open in place like Job details: what was recorded, and what can be done
+   about it. */
+.job-fold[open] .job-details-head .job-step-chev { transform: rotate(90deg); }
+.job-fold-body { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 14px; border-top: 1px solid var(--border); }
+.job-fold-text { margin: 0; font-size: calc(14px * var(--ts)); line-height: 1.5; color: var(--text2); }
+.job-fold-text.good strong { color: var(--green); }
+.job-fold-text.bad strong { color: var(--risk); }
+.job-fold-text.warn strong { color: var(--yellow-text); }
+.job-fold-body .qp-links { margin-top: 0; }
+.job-fold-body .qp-cert, .job-fold-body .bait-card { margin-top: 4px; }
+.job-steps li.now > .job-fold { border: 2px solid var(--accent); }
+body:not(.dark-screen) .job-page .job-steps li.now > .job-fold { border-color: var(--accent-hi); }
+/* A step that can't be started yet is a line, not a button. */
+.job-step-still { box-sizing: border-box; cursor: default; }
+/* The Next step card does a step that's done on this page: the client's
+   answer, the certificate. */
+.job-next .quote-answer-btns { margin-top: 14px; }
+.job-next .quote-answer-btns .quote-btn { height: 50px; border-radius: 14px; font-size: calc(15px * var(--ts)); }
+.job-next .qp-links { margin-top: 6px; }
+.job-next .qp-cert { margin-top: 14px; }
 
 /* On the ink backdrop (the light screen): white cards with a shadow, the
    hero's text and buttons light. */
@@ -6073,33 +6039,6 @@ body.dark-screen .job-tile-tick { color: #04210F; }
 body.dark-screen .job-act { background: var(--surface); border-color: var(--border2); }
 body.dark-screen .job-details { border: 3px solid var(--frame); border-radius: 6px; }
 
-/* ── DOCUMENT STRIP ──
-   At the top of the report and the quote: back to the job's page, then the
-   job's documents, the one on show lit. Scrolls sideways on a small phone. */
-.doc-strip { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 10px 16px 8px; }
-.doc-strip::-webkit-scrollbar { display: none; }
-.doc-strip:empty { display: none; }
-.doc-chip {
-  flex: none; display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 13px; border-radius: 17px;
-  border: 1px solid var(--border); background: var(--surface); color: var(--text2);
-  font: 600 calc(13px * var(--ts)) 'Inter', sans-serif; cursor: pointer; white-space: nowrap;
-}
-.doc-chip.done::after { content: ''; width: 6px; height: 6px; margin-left: 2px; border-radius: 50%; background: var(--accent); }
-.doc-chip.here { background: var(--accent); border-color: var(--accent); color: #fff; cursor: default; }
-.doc-chip.here.done::after { background: rgba(255,255,255,0.85); }
-.doc-chip-job { padding-left: 8px; color: var(--text); }
-body:not(.dark-screen) .doc-chip { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink2); }
-body:not(.dark-screen) .doc-chip-job { color: var(--on-ink); }
-body:not(.dark-screen) .doc-chip.done::after { background: var(--accent-glow); }
-body:not(.dark-screen) .doc-chip.here { background: linear-gradient(180deg, var(--accent-hi) 0%, var(--accent) 100%); border-color: transparent; color: var(--accent-ink); }
-body:not(.dark-screen) .doc-chip.here.done::after { background: var(--accent-ink); }
-.doc-strip-bar { flex-shrink: 0; }
-body:not(.dark-screen) .doc-strip-bar { background: var(--ink); }
-/* The strip names the document, so the report's own title line steps aside. */
-.report-header .report-title { display: none; }
-.report-header { padding: 0; }
-.report-header .doc-strip { flex: 1; min-width: 0; }
-
 /* The logo's dot is the brand's pink. */
 .logo-dot { fill: var(--pink); stroke: var(--pink); }
 /* Done, signed and clear are green, apart from the blue that marks
@@ -6111,7 +6050,6 @@ body:not(.dark-screen) .doc-strip-bar { background: var(--ink); }
   border-color: rgba(var(--green-rgb), 0.35);
 }
 .agr-signed-chip { background: rgba(var(--green-rgb), 0.16); color: var(--green); }
-body:not(.dark-screen) .doc-chip.done::after { background: var(--green-fill); }
 ::selection { background: rgba(var(--pink-rgb), 0.28); }
 
 /* Check before sending, refreshed: section heads in sentence case, roomier

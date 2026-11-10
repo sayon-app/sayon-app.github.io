@@ -543,6 +543,8 @@ async function confirmSendReview() {
       rememberQuotePrices(r.quote);
       markQuoteSent(r.quote);
       track('quote_sent', { with_link: !!r.link });
+      // It has gone, so what's next (the client's answer) is on This job.
+      if (quoteScreenOpen() && quoteReturnTo === 'app' && r.quote.reportKey === (currentReportId || 'draft')) tabGo('job');
       return;
     }
     const copy = sendCopyTo();

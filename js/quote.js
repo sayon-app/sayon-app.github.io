@@ -182,8 +182,8 @@ function persistQuote() {
     localStorage.setItem(quotesStorageKey(), JSON.stringify(all));
     storeQuoteOnReport(quoteState, false);
     setQuoteSaveState('Saved');
-    // A change after sending moves the steps and the Send button on.
-    renderQuoteAnswer();
+    // A change after sending moves the header's pill and the Send button on.
+    renderQuoteProgress();
   } catch (e) {
     setQuoteSaveState('Not saved');
     showToast('Could not save the quote. The phone\'s storage may be full', 'error');
@@ -638,8 +638,7 @@ function applyQuoteVoice(f) {
   q.exclusions = exclusions.join('\n');
   if (clean(f.paymentTerms)) { q.paymentTerms = clean(f.paymentTerms); n++; }
   if (clean(f.timeframe) || clean(f.servicePeriod)) {
-    const src = currentQuoteSource();
-    q.plan = q.plan || buildQuotePlan(src && (src.key === (currentReportId || 'draft') ? reportData : src.reportData));
+    q.plan = q.plan || buildQuotePlan(quoteReport(q));
     if (q.plan) {
       if (clean(f.timeframe)) { q.plan.time = spokenPlanChoice(f.timeframe, QUOTE_PLAN_TIMES); n++; }
       if (clean(f.servicePeriod)) { q.plan.service = spokenPlanChoice(f.servicePeriod, QUOTE_PLAN_SERVICE); n++; }
@@ -696,9 +695,7 @@ function buildQuoteProblem(rd) {
 // it's edited, so a quote already sent doesn't read as changed.
 function quoteProblem(q) {
   if (q && typeof q.problem === 'string') return q.problem;
-  const src = currentQuoteSource();
-  const rd = src && (src.key === (currentReportId || 'draft') ? reportData : src.reportData);
-  return buildQuoteProblem(rd);
+  return buildQuoteProblem(quoteReport(q));
 }
 
 // A report detail set in brackets mid-sentence: "Fungal decay (wet rot)."
@@ -817,9 +814,16 @@ function buildQuotePlan(rd, system) {
   return { we: buildPlanWe(rd, system), owner: buildPlanOwner(rd), time: '', service: '', inspections: buildPlanInspections(rd) };
 }
 
-function quotePlanReport() {
-  const src = currentQuoteSource();
-  return src ? (src.key === (currentReportId || 'draft') ? reportData : src.reportData) : null;
+function quoteScreenOpen() { return document.getElementById('quoteScreen').classList.contains('open'); }
+
+// The report a quote was made from, or null. For the quote open on the
+// quote screen it's the one picked there; otherwise (This job, or a stored
+// quote being sent) it's the report the quote is saved against.
+function quoteReport(q = quoteState) {
+  if (!q) return null;
+  const src = q === quoteState && quoteScreenOpen() ? currentQuoteSource() : null;
+  if (src && src.key === q.reportKey) return src.key === (currentReportId || 'draft') ? reportData : src.reportData;
+  return treatmentReportFor(q);
 }
 
 // One line for the folded row: what's set, and what's still to choose.
@@ -921,7 +925,7 @@ function editQuoteList(id) {
 function addQuotePlan() {
   if (!quoteState) return;
   const c = quoteState.systemChoice;
-  quoteState.plan = buildQuotePlan(quotePlanReport(), c && c.picked);
+  quoteState.plan = buildQuotePlan(quoteReport(), c && c.picked);
   renderQuotePlan();
   scheduleQuoteSave();
 }
@@ -931,7 +935,7 @@ function rebuildQuotePlan() {
   if (!q || !q.plan) return;
   if (!confirm('Replace the plan\'s steps with fresh ones from the report? Your edits to them will be lost.')) return;
   const c = q.systemChoice;
-  const fresh = buildQuotePlan(quotePlanReport(), c && c.picked);
+  const fresh = buildQuotePlan(quoteReport(), c && c.picked);
   q.plan.we = fresh.we;
   q.plan.owner = fresh.owner;
   q.plan.inspections = fresh.inspections;
@@ -1059,6 +1063,9 @@ function carryQuoteClientToJob(q, before) {
 
 // ── NAVIGATION ──────────────────────────────────────────────────────────────
 function openQuote(from, preferKey) {
+  // This job's copy of the quote (useJobQuote) is let go: the screen reads
+  // the stored one.
+  if (!quoteScreenOpen()) quoteState = null;
   quoteReturnTo = from || 'menu';
   document.getElementById('mainMenu').style.display = 'none';
   document.getElementById('app').style.display = 'none';
@@ -1067,41 +1074,8 @@ function openQuote(from, preferKey) {
   quoteSources = collectQuoteSources();
   renderQuoteSourceOptions(preferKey);
   onQuoteSourceChange();
-  renderDocStrips();
-  applyQuoteBarsFolded();
   document.querySelector('#quoteScreen .quote-scroll').scrollTop = 0;
   track('screen_viewed', { screen: 'quote' });
-}
-
-// The top bar (with the job's documents) and the total bar each fold to a
-// slim row to clear space. The choice is remembered on this device.
-const QUOTE_BARS_KEY = 'korva_quote_bars_folded';
-let quoteBarsState = null;
-function quoteBarsFolded() {
-  if (!quoteBarsState) {
-    try { quoteBarsState = JSON.parse(localStorage.getItem(QUOTE_BARS_KEY)) || {}; } catch (e) { quoteBarsState = {}; }
-  }
-  return quoteBarsState;
-}
-function applyQuoteBarsFolded() {
-  const f = quoteBarsFolded();
-  const screen = document.getElementById('quoteScreen');
-  screen.classList.toggle('top-folded', !!f.top);
-  screen.classList.toggle('bottom-folded', !!f.bottom);
-  // The total bar's button is the total itself, so it keeps its own words
-  // for a screen reader and says what a tap does in its title.
-  [['quoteTopFold', f.top, 'top bar', 'aria-label'], ['quoteBottomFold', f.bottom, 'total bar', 'title']].forEach(([id, folded, what, attr]) => {
-    const b = document.getElementById(id);
-    if (!b) return;
-    b.setAttribute('aria-expanded', folded ? 'false' : 'true');
-    b.setAttribute(attr, (folded ? 'Open the ' : 'Fold the ') + what);
-  });
-}
-function toggleQuoteBar(which) {
-  const f = quoteBarsFolded();
-  f[which] = !f[which];
-  try { localStorage.setItem(QUOTE_BARS_KEY, JSON.stringify(f)); } catch (e) { /* kept for this visit */ }
-  applyQuoteBarsFolded();
 }
 
 function openQuoteFromReport() {
@@ -1111,6 +1085,7 @@ function openQuoteFromReport() {
 }
 
 function closeQuote() {
+  if (!quoteScreenOpen()) return;
   cancelSheetVoice('quote');
   clearTimeout(quoteSaveTimer);
   if (quoteState) { persistQuote(); storeQuoteOnReport(quoteState, true); }
@@ -1169,9 +1144,9 @@ function onQuoteSourceChange() {
   editor.style.display = 'flex';
   bar.style.display = '';
   ['quoteDetailsFold', 'quoteTermsFold'].forEach(id => { document.getElementById(id).open = false; });
-  // The work stays folded unless there's a system to pick or no lines yet.
-  const c = quoteState.systemChoice;
-  document.getElementById('quoteWorkFold').open = !quoteState.items.length || !!(c && !c.picked && c.options && c.options.length);
+  // The quote opens on the work: the system to pick, the lines and their
+  // prices. Once it has gone to the client, the work folds to its total.
+  document.getElementById('quoteWorkFold').open = !quoteHasGone(quoteState);
   editor.querySelectorAll('.quote-item-desc, .quote-item-detail, .quote-textarea').forEach(fitQuoteText);
 }
 
@@ -1192,8 +1167,8 @@ function renderQuoteEditor() {
   renderQuoteCompanyGaps();
   renderQuoteFolds();
   renderQuotePlan();
-  renderTreatmentPlanCard();
-  renderQuoteAnswer();
+  quoteStageDrawn = '';
+  renderQuoteProgress();
   syncQuoteLists();
   ['qProblem', 'qPaymentTerms', 'qExclusions', 'qNotes'].forEach(id => fitQuoteText(document.getElementById(id)));
 }
@@ -1567,8 +1542,9 @@ function rebuildQuoteFromReport() {
 // how, and when. q.answer = { status: 'accepted'|'declined', by, date,
 // method, signature?, note, at, hash }. hash is the quote's content when the
 // client answered, so a later change to the quote shows the answer is for an
-// older version. Recording an answer doesn't change the quote itself, so it
-// works on a finalised (locked) job.
+// older version. The answer is a step of the job, so it's recorded on This
+// job (js/app/job.js): from its Next step card while the job is waiting on
+// it, and under its Client's answer step.
 const QUOTE_ANSWER_METHODS = {
   signed: 'signed on the phone',
   link: 'signed on their phone from the link',
@@ -1589,112 +1565,104 @@ function formatAnswerDate(iso) {
   return isNaN(d) ? iso : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-// The job's progress, at the foot of the quote: priced, sent, the client's
-// answer and the treatment, each with where it's up to and what to do next.
-function renderQuoteAnswer() {
-  const el = document.getElementById('quoteAnswer');
-  const q = quoteState;
-  renderQuoteHead();
-  renderQuoteSendLabel();
-  if (!q || !el) return;
-  const a = quoteHasItems(q) ? quoteAnswerState(q) : null;
-  const esc = escapeHtml;
-  const sentNow = !!q.sentAt && q.sentHash === quoteContentHash(q);
-  const answered = a && !a.stale;
-  const n = q.items.length;
-  // The parts below say what each needs, so this line only counts them.
-  const left = Object.values(quoteFoldNotes(q)).filter(Boolean).length;
-
-  const priced = {
-    title: 'Write the quote', state: sentNow || answered ? 'done' : 'now',
-    text: !n ? 'Add the work below.' : sentNow || answered ? '' : left ? `${left} part${left === 1 ? '' : 's'} below to finish.` : 'Ready to send.',
-  };
-  const sent = !q.sentAt
-    ? { title: 'Sent to the client', state: answered ? 'skip' : 'todo', text: answered ? 'Not needed. They answered before it was sent.' : 'Not sent yet. Send it from the bar below.' }
-    : sentNow || answered ? { title: 'Sent to the client', state: 'done', text: `Sent ${esc(formatIssueDate(q.sentAt))}.` }
-    : { title: 'Sent to the client', state: 'warn', text: `Sent ${esc(formatIssueDate(q.sentAt))}. You've changed the quote since, so send the new version.` };
-
-  let answer;
-  const link = quoteLinkCurrent(q);
-  if (!a && link && sentNow) {
-    checkQuoteLink(q, false);
-    answer = {
-      title: 'Client\'s answer', state: 'now',
-      text: `The quote went with a link. When ${esc((q.client || 'the client').split(/\s+/)[0])} taps Accept or Decline on their phone, it shows here. Heard back another way? Record it below.`,
-      extra: `<div class="qp-links">
-          <button class="quote-text-btn" onclick="checkQuoteLink(quoteState, true)">Check now</button>
-          <button class="quote-text-btn" onclick="shareQuoteLink(quoteState)">Share the link</button>
-        </div>
-        <div class="quote-answer-btns">
-          <button class="quote-btn" onclick="openQuoteAnswer('accepted')">Accepted</button>
-          <button class="quote-btn" onclick="openQuoteAnswer('declined')">Declined</button>
-        </div>`,
-    };
-  } else if (!a) {
-    answer = {
-      title: 'Client\'s answer', state: sentNow ? 'now' : 'todo',
-      text: q.sentAt ? 'Waiting on the client. Record their answer when it comes.' : 'Already answered on the spot or by phone? Record it here.',
-      extra: q.sentAt
-        ? `<div class="quote-answer-btns">
-            <button class="quote-btn primary" onclick="openQuoteAnswer('accepted')">Accepted</button>
-            <button class="quote-btn" onclick="openQuoteAnswer('declined')">Declined</button>
-          </div>`
-        : `<div class="qp-links">
-            <button class="quote-text-btn" onclick="openQuoteAnswer('accepted')">Accepted</button>
-            <button class="quote-text-btn" onclick="openQuoteAnswer('declined')">Declined</button>
-          </div>`,
-    };
-  } else {
-    const how = a.status === 'accepted' ? (QUOTE_ANSWER_METHODS[a.method] || '') : a.method === 'link' ? 'from the link on their phone' : '';
-    answer = {
-      title: 'Client\'s answer', state: a.stale ? 'warn' : a.status === 'accepted' ? 'done' : 'bad',
-      text: `<strong>${a.status === 'accepted' ? 'Accepted' : 'Declined'}</strong> by ${esc(a.by)} on ${esc(formatAnswerDate(a.date))}${how ? `, ${esc(how)}` : ''}`,
-      extra: `${a.note ? `<div class="quote-answer-note">${esc(a.note)}</div>` : ''}
-        ${isSignatureImage(a.signature) ? `<img class="quote-answer-sig" src="${a.signature}" alt="Client signature">` : ''}
-        ${a.stale ? '<div class="quote-answer-warn">The quote has changed since then. Send the new version and record the client\'s answer again.</div>' : ''}
-        <button class="quote-text-btn" onclick="clearQuoteAnswer()">${a.stale ? 'Record a new answer' : 'Change answer'}</button>`,
-    };
-  }
-
-  // A treatment recorded before the answer was (from the job's page, say)
-  // still shows here, with its certificate and bait visits.
-  const treatment = answered && a.status === 'accepted' || q.treatment
-    ? { title: 'Treatment', state: q.treatment && certificateGiven(q) ? 'done' : 'now',
-        text: !q.treatment ? 'Record it once the work is done.'
-          : q.certificateSentAt ? `Finished. Certificate emailed ${esc(formatIssueDate(q.certificateSentAt))}.`
-          : q.certificateHandedAt ? `Finished. Certificate given in person ${esc(formatIssueDate(q.certificateHandedAt))}.`
-          : 'Recorded. One thing left: email the client their certificate.',
-        extra: renderTreatmentBlock(q) }
-    : answered ? { title: 'Treatment', state: 'skip', text: 'Not needed. The quote was declined.' }
-    : { title: 'Treatment', state: 'todo', text: 'After the client accepts.' };
-
-  const steps = [priced, sent, answer, treatment];
-  // A step the job didn't need counts as done, so progress still reaches 4 of 4.
-  const done = steps.filter(st => st.state === 'done' || st.state === 'skip').length;
-  const tick = '<svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
-  // Each step is updated in place: step 1 holds the quote's folds, and
-  // rebuilding it would drop whatever is being typed there.
-  document.getElementById('quoteGuideCount').textContent = `${done} of 4 done`;
-  steps.forEach((st, i) => {
-    const li = document.getElementById('qgStep' + (i + 1));
-    if (!li) return;
-    li.className = 'qp-step ' + st.state;
-    li.querySelector('.qp-dot').innerHTML = st.state === 'done' ? tick : st.state === 'skip' ? '–' : String(i + 1);
-    li.querySelector('.qp-title').textContent = st.title;
-    li.querySelector('.qp-text').innerHTML = st.text;
-    const extra = li.querySelector('.qp-extra');
-    const html = st.extra || '';
-    if (extra.dataset.html !== html) { extra.innerHTML = html; extra.dataset.html = html; }
-    extra.hidden = !html;
-  });
+// The quote has reached the client as it stands: sent and not changed
+// since, or answered.
+function quoteHasGone(q) {
+  const a = quoteAnswerState(q);
+  return !!q && (!!(a && !a.stale) || (!!q.sentAt && q.sentHash === quoteContentHash(q)));
 }
 
-// The bar's Send button says what sending does now.
-function renderQuoteSendLabel() {
-  const el = document.getElementById('quoteSendLabel');
+// Accepted and Declined, with Check now and Share the link while the
+// quote's link is out. lead: the job is waiting on the answer and the
+// client has no link to answer from, so Accepted is the filled button.
+function quoteAnswerButtons(q, lead) {
+  const link = !q.answer && quoteLinkCurrent(q) && q.sentHash === quoteContentHash(q);
+  return `<div class="quote-answer-btns">
+      <button type="button" class="quote-btn${lead && !link ? ' primary' : ''}" onclick="openQuoteAnswer('accepted')">Accepted</button>
+      <button type="button" class="quote-btn" onclick="openQuoteAnswer('declined')">Declined</button>
+    </div>${link ? `<div class="qp-links">
+      <button type="button" class="quote-text-btn" onclick="checkQuoteLink(quoteState, true)">Check now</button>
+      <button type="button" class="quote-text-btn" onclick="shareQuoteLink(quoteState)">Share the link</button>
+    </div>` : ''}`;
+}
+
+// What This job's Client's answer step opens to: the way to record it, or
+// what was recorded. On a finalised job it's the record, and changing it
+// starts with Amend.
+function quoteAnswerPanel(q) {
+  const esc = escapeHtml;
+  const a = quoteAnswerState(q);
+  if (!a) {
+    const sentNow = !!q.sentAt && q.sentHash === quoteContentHash(q);
+    const first = (q.client || '').trim().split(/\s+/)[0] || 'the client';
+    const text = sentNow && quoteLinkCurrent(q) ? `The quote went with a link. When ${esc(first)} taps Accept or Decline on their phone, it shows here. Heard back another way? Record it here.`
+      : sentNow ? `Waiting on ${esc(first)}. Record their answer when it comes.`
+      : q.sentAt ? 'The quote changed after it was sent. Send the new version, or record their answer if they\'ve already given it.'
+      : 'Already answered on the spot or by phone? Record it here.';
+    return `<p class="job-fold-text">${text}</p>${quoteAnswerButtons(q, sentNow)}`;
+  }
+  const how = a.status === 'accepted' ? (QUOTE_ANSWER_METHODS[a.method] || '') : a.method === 'link' ? 'from the link on their phone' : '';
+  return `<p class="job-fold-text ${a.stale ? 'warn' : a.status === 'accepted' ? 'good' : 'bad'}"><strong>${a.status === 'accepted' ? 'Accepted' : 'Declined'}</strong> by ${esc(a.by)} on ${esc(formatAnswerDate(a.date))}${how ? `, ${esc(how)}` : ''}</p>
+    ${a.note ? `<div class="quote-answer-note">${esc(a.note)}</div>` : ''}
+    ${isSignatureImage(a.signature) ? `<img class="quote-answer-sig" src="${a.signature}" alt="Client signature">` : ''}
+    ${a.stale ? '<div class="quote-answer-warn">The quote has changed since then. Send the new version and record the client\'s answer again.</div>' : ''}
+    ${isReportLocked() ? '' : `<div class="qp-links"><button type="button" class="quote-text-btn" onclick="clearQuoteAnswer()">${a.stale ? 'Record a new answer' : 'Change answer'}</button></div>`}`;
+}
+
+// Every place that shows where the quote is up to. On the quote screen:
+// the header's pill, the bar, and the cards that step aside once it has
+// gone. On This job (which records the client's answer, the treatment and
+// the bait visits against it): the page.
+let quoteProgressDrawing = false;
+function renderQuoteProgress() {
+  if (quoteProgressDrawing) return;
+  quoteProgressDrawing = true;
+  try {
+    if (quoteScreenOpen()) { renderQuoteHead(); renderQuoteStage(); }
+    else if (document.getElementById('jobOverlay').classList.contains('open')) renderJobPage();
+  } finally { quoteProgressDrawing = false; }
+}
+
+// The quote's first screen shows what it needs now. While it's being
+// written: Say the quote over the work, and the second opinion under it
+// once there are lines. Once it has gone, those two step aside and Send
+// again is the quiet button beside PDF: the next step is on This job.
+let quoteStageDrawn = '';
+function renderQuoteStage() {
   const q = quoteState;
-  if (!el || !q) return;
-  el.textContent = !q.sentAt ? 'Send to client' : q.sentHash === quoteContentHash(q) ? 'Send again' : 'Send new version';
+  if (!q) return;
+  const gone = quoteHasGone(q);
+  document.getElementById('quoteVoice').style.display = gone || isQuoteLocked() ? 'none' : '';
+  // The second opinion is only redrawn when its place changes, so a note
+  // being typed in it isn't lost to a save.
+  const stage = [q.reportKey, gone, isQuoteLocked(), quoteHasItems(q)].join('|');
+  if (stage !== quoteStageDrawn) { quoteStageDrawn = stage; renderTreatmentPlanCard(); }
+  document.getElementById('quoteEmailBtn').classList.toggle('primary', !gone);
+  document.getElementById('quoteSendLabel').textContent = !q.sentAt ? 'Send to client' : q.sentHash === quoteContentHash(q) ? 'Send again' : 'Send new version';
+}
+
+// ── THE JOB'S QUOTE, ON THIS JOB ────────────────────────────────────────────
+// The client's answer, the treatment record and the bait visits are steps
+// of the job, so they're done on This job, but they're stored on the quote
+// and their sheets work on quoteState. While This job is open (and the
+// quote screen isn't), quoteState is the job's saved quote. It stays the
+// same object from one redraw to the next, so a send or a check still in
+// flight marks the copy on screen; when the stored quote has changed under
+// it (another device, a client's answer from the link) it takes that in.
+function useJobQuote(saved) {
+  if (quoteScreenOpen()) return;
+  if (!saved) { quoteState = null; return; }
+  if (!saved.reportKey) saved.reportKey = currentReportId || 'draft';
+  if (!quoteState || quoteState.reportKey !== saved.reportKey) { quoteState = saved; return; }
+  if (quoteState === saved || JSON.stringify(quoteState) === JSON.stringify(saved)) return;
+  Object.keys(quoteState).forEach(k => delete quoteState[k]);
+  Object.assign(quoteState, saved);
+}
+// This job has closed. A sheet still open over it (the answer, the
+// treatment record, a bait visit) keeps the quote until it's saved or shut.
+function releaseJobQuote() {
+  if (quoteScreenOpen() || document.querySelector('#quoteAnswerOverlay.open, #treatmentOverlay.open, #baitOverlay.open, #sitePlanOverlay.open')) return;
+  quoteState = null;
 }
 
 let quoteAnswerPad = null;
@@ -1710,7 +1678,11 @@ function openQuoteAnswer(mode) {
   document.getElementById('qaNote').value = '';
   document.getElementById('qaNote').placeholder = accepted ? 'e.g. Wants the treatment done before 12 Oct' : 'e.g. Going with another company';
   document.getElementById('qaMethodWrap').style.display = accepted ? '' : 'none';
-  document.getElementById('qaMethod').value = 'signed';
+  // On the day the quote was written the client is usually standing there,
+  // so it starts on the signature. Sent on an earlier day, they've rung or
+  // written back since: it starts on "By phone".
+  const sentEarlier = !!quoteState.sentAt && isoDate(new Date(quoteState.sentAt)) < todayIsoDate();
+  document.getElementById('qaMethod').value = sentEarlier ? 'phone' : 'signed';
   document.getElementById('qaAcceptText').textContent = quoteAcceptText(quoteState);
   document.getElementById('quoteAnswerOverlay').classList.add('open');
   if (!quoteAnswerPad) {
@@ -1761,7 +1733,7 @@ function saveQuoteAnswer() {
   persistQuote();
   storeQuoteOnReport(q, true);
   closeQuoteAnswer();
-  renderQuoteAnswer();
+  renderQuoteProgress();
   if (typeof renderIssueState === 'function') renderIssueState();
   refreshJobsList();
   showToast(accepted ? 'Quote accepted' : 'Quote marked as declined', 'success');
@@ -1778,7 +1750,7 @@ function clearQuoteAnswer() {
   clearTimeout(quoteSaveTimer);
   persistQuote();
   storeQuoteOnReport(q, true);
-  renderQuoteAnswer();
+  renderQuoteProgress();
   if (typeof renderIssueState === 'function') renderIssueState();
   refreshJobsList();
 }
@@ -1881,12 +1853,11 @@ function storeSentQuote(q) {
   all[q.reportKey] = q;
   try { localStorage.setItem(quotesStorageKey(), JSON.stringify(all)); } catch (e) {}
   storeQuoteOnReport(q, true);
-  if (quoteState && quoteState.reportKey === q.reportKey) renderQuoteAnswer();
+  if (quoteState && quoteState.reportKey === q.reportKey) renderQuoteProgress();
   if (typeof renderIssueState === 'function') renderIssueState();
 }
 function isQuoteLocked() {
-  const src = currentQuoteSource();
-  const rd = src && (src.key === (currentReportId || 'draft') ? reportData : src.reportData);
+  const rd = quoteReport();
   return !!(rd && rd.issue && !rd.amending);
 }
 function renderQuoteLock() {
@@ -1900,7 +1871,7 @@ function installQuoteLockGuard() {
   quoteLockGuardInstalled = true;
   const editor = document.getElementById('quoteEditor');
   const stop = e => {
-    if (!isQuoteLocked() || e.target.closest('#quotePdfBtn, #quoteEmailBtn, #quoteAnswer, .qi-row, .qi-done, .quote-hero-name, .quote-hero-problem, summary')) return;
+    if (!isQuoteLocked() || e.target.closest('.qi-row, .qi-done, .quote-hero-name, .quote-hero-problem, summary')) return;
     if (e.type === 'touchstart') return;
     e.preventDefault();
     e.stopPropagation();
@@ -2185,7 +2156,7 @@ async function checkQuoteLink(q, byTap) {
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const [row] = await res.json();
-    if (q.linkRequest !== r || q.answer) return;
+    if (!q.linkRequest || q.linkRequest.id !== r.id || q.answer) return;
     const said = applyQuoteLinkRow(q, row);
     if (said) {
       refreshJobsList();

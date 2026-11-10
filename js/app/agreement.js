@@ -486,23 +486,62 @@ async function checkAgreementLink(byTap) {
     // The report may have moved on while the request was out.
     if (reportData.agreementRequest !== r) return;
     if (row && row.status === 'signed') {
-      const v = r.values;
-      reportData.agreement = { method: 'remote', signerName: row.signer_name, signature: row.signature,
-        signedAt: new Date(row.signed_at).getTime(), inspectionDate: v.inspectionDate, fee: v.fee,
-        notes: v.notes, standard: v.standard, text: v.text };
-      delete reportData.agreementRequest;
-      saveDraft();
-      updateProgress();
-      renderAgreementBanner();
-      if (document.getElementById('agreementOverlay').classList.contains('open')) openAgreementSheet();
+      takeOpenAgreement(row);
       showToast(`${row.signer_name} signed the agreement`, 'success');
-      track('agreement_signed', { method: 'remote' });
     } else if (byTap) {
       showToast(row && row.status === 'cancelled' ? 'That link was cancelled' : 'Not signed yet', 'info');
     }
   } catch (e) {
     if (byTap) showToast('Could not check. Try again when you have signal', 'error');
   }
+}
+
+// The signed agreement, from the link's request and the row the client signed.
+function agreementFromLink(r, row) {
+  const v = r.values || {};
+  return { method: 'remote', signerName: row.signer_name, signature: row.signature,
+    signedAt: new Date(row.signed_at).getTime(), inspectionDate: v.inspectionDate, fee: v.fee,
+    notes: v.notes, standard: v.standard, text: v.text };
+}
+
+// The open job's link came back signed: every place that shows the
+// agreement takes it.
+function takeOpenAgreement(row) {
+  reportData.agreement = agreementFromLink(reportData.agreementRequest, row);
+  delete reportData.agreementRequest;
+  saveDraft();
+  updateProgress();
+  renderAgreementBanner();
+  if (document.getElementById('agreementOverlay').classList.contains('open')) openAgreementSheet();
+  if (document.getElementById('jobOverlay').classList.contains('open')) renderJobPage();
+  track('agreement_signed', { method: 'remote' });
+}
+
+// From the Jobs list's check of every link that's out (checkLinksOut in
+// js/app/dashboard.js): the open job's agreement, or one on a saved job.
+// Returns what to say, or '' when it isn't signed yet.
+function takeSignedAgreement(reportId, row) {
+  if (!row || row.status !== 'signed') return '';
+  if (reportId === currentReportId) {
+    const r = reportData.agreementRequest;
+    if (!r || r.id !== row.id || reportData.agreement) return '';
+    takeOpenAgreement(row);
+    saveOpenReportNow();
+  } else {
+    const reports = getSavedReports();
+    const entry = reports.find(x => x.id === reportId);
+    const d = entry && entry.reportData;
+    if (!d || !d.agreementRequest || d.agreementRequest.id !== row.id || d.agreement) return '';
+    d.agreement = agreementFromLink(d.agreementRequest, row);
+    delete d.agreementRequest;
+    // A new save of the report, so another device takes the agreement in.
+    entry.cloudSavedAt = cloudBaseOf(entry);
+    entry.savedAt = Date.now();
+    if (!setSavedReports(reports)) return '';
+    supabaseSave(entry, true);
+    track('agreement_signed', { method: 'remote' });
+  }
+  return `${row.signer_name || 'The client'} signed the agreement`;
 }
 
 async function cancelAgreementLink() {

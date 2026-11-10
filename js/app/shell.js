@@ -190,7 +190,7 @@ function openApp(appName) {
     buildChoiceCards();
     buildSelectCards();
     enhanceFieldsWithNotes();
-    renderSavedList();
+    refreshJobsList();
     const restored = loadDraft();
     restoreSignaturePads(); restoreLicenceField();
     renderFindingsUI();

@@ -110,7 +110,7 @@ function renderReinspectionList(fade) {
             <span class="dash-card-text">
               <span class="dash-card-street">${escapeHtml(cut > 0 ? addr.slice(0, cut) : addr)}</span>
               ${cut > 0 ? `<span class="dash-card-suburb">${escapeHtml(addr.slice(cut + 2))}</span>` : ''}
-              <span class="dash-card-sub"><span>${[it.r.client, reinspectStatusLine(it)].filter(Boolean).map(escapeHtml).join(' · ')}</span></span>
+              <span class="dash-card-sub">${it.r.client ? `<span>${escapeHtml(it.r.client)}</span>` : ''}<span class="dash-card-status">${escapeHtml(reinspectStatusLine(it))}</span></span>
             </span>
             <span class="dash-card-end">
               <span class="dash-card-when">${it.overdue ? 'Was due' : 'Due'}</span>

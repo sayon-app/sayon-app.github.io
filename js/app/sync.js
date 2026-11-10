@@ -23,7 +23,8 @@ function supabaseSave(entry, quiet) {
   const prev = reportSaveChains.get(entry.id) || Promise.resolve();
   const run = prev.catch(() => {}).then(() => supabaseSaveNow(entry, quiet));
   reportSaveChains.set(entry.id, run);
-  run.finally(() => { if (reportSaveChains.get(entry.id) === run) reportSaveChains.delete(entry.id); });
+  // Once it has landed (or been refused), the job's Jobs card says which.
+  run.finally(() => { if (reportSaveChains.get(entry.id) === run) reportSaveChains.delete(entry.id); refreshDashboardIfOpen(); });
   return run;
 }
 
@@ -197,7 +198,8 @@ function sameReportContent(a, b) {
 }
 
 // The account's newer copy takes the report's place. This phone's version,
-// if it differs, is saved as a separate report marked "copy from this phone".
+// if it differs, is saved as a separate job, tagged "Copy from this phone"
+// on its Jobs card.
 async function keepBothCopies(local) {
   const cloud = await cloudReportOf(local.id);
   if (!cloud) return false;
@@ -224,7 +226,7 @@ async function keepBothCopies(local) {
     } catch (e) {}
   }
   if (currentReportId === local.id) loadReport(local.id, true);
-  renderSavedList();
+  refreshJobsList();
   showToast(copy
     ? "This report was changed on another device, so that version is open now. This phone's version is saved beside it as a copy"
     : 'Updated this report with the newer copy from your other device', 'info');
@@ -255,7 +257,7 @@ async function supabaseSyncOnOpen() {
     if (setSavedReports(merged)) {
       const open = newer.find(c => c.id === currentReportId);
       if (open && reportSig() === lastReportSig) loadReport(open.id, true);
-      renderSavedList();
+      refreshJobsList();
       const parts = [];
       if (newFromCloud.length) parts.push(`restored ${newFromCloud.length} report${newFromCloud.length > 1 ? 's' : ''}`);
       if (newer.length) parts.push(`updated ${newer.length} with newer changes`);
@@ -271,6 +273,11 @@ async function supabaseSyncOnOpen() {
 function notInAccount(entry) {
   return !!entry && !isSampleJob(entry) && entry.cloudSavedAt != null && (entry.savedAt || 0) > entry.cloudSavedAt;
 }
+// As the Jobs card tags it: signed in, the account doesn't hold this save,
+// and it isn't on its way there right now.
+function leftOffAccount(entry) {
+  return !!authSession && notInAccount(entry) && !reportSaveChains.has(entry.id);
+}
 function inAccount(entry) {
   return !!entry && !isSampleJob(entry) && entry.cloudSavedAt != null && entry.cloudSavedAt >= (entry.savedAt || 0);
 }
@@ -284,7 +291,7 @@ async function pushUnsyncedReports() {
     const waiting = getSavedReports().filter(r => r && r.reportData && notInAccount(r));
     let landed = 0;
     for (const r of waiting) { if (await supabaseSave(r, true)) landed++; }
-    if (landed) { renderSavedList(); updateSyncStatus(); }
+    if (landed) { refreshJobsList(); updateSyncStatus(); }
   } catch (e) { console.warn('pushUnsyncedReports:', e); }
   finally { pushUnsyncedRunning = false; }
 }
@@ -407,6 +414,8 @@ document.addEventListener('visibilitychange', async () => {
   processPendingNotes();
   pushUnsyncedReports();
   checkAddressMove();
+  // A client may have signed or answered while the phone was away.
+  if (!isRecording) checkLinksOut();
 });
 window.addEventListener('pagehide', saveBeforeLeaving);
 window.addEventListener('beforeunload', saveBeforeLeaving);
@@ -561,7 +570,7 @@ function freeStorageFor(reports) {
   if (!candidates.length) return false;
   const n = Math.max(1, Math.ceil(candidates.length / 2));
   const going = candidates.slice(0, n);
-  const ok = confirm(`This phone's storage is full. Take the ${n === 1 ? 'oldest finished job' : `${n} oldest finished jobs`} off this phone? ${n === 1 ? 'It stays' : 'They stay'} in your account and can be brought back from Saved Reports.`);
+  const ok = confirm(`This phone's storage is full. Take the ${n === 1 ? 'oldest finished job' : `${n} oldest finished jobs`} off this phone? ${n === 1 ? 'It stays' : 'They stay'} in your account and can be brought back from Jobs, under Done.`);
   if (!ok) return false;
   const ids = new Set(going.map(r => r.id));
   for (let i = reports.length - 1; i >= 0; i--) if (ids.has(reports[i].id)) reports.splice(i, 1);
@@ -573,8 +582,7 @@ async function restoreArchivedReports() {
   if (!navigator.onLine) { showToast('No signal. Try again when you have one', 'error'); return; }
   setArchivedReportIds([]);
   await supabaseSyncOnOpen();
-  renderSavedList();
-  refreshDashboardIfOpen();
+  refreshJobsList();
 }
 
 // How far along the open report is, as the Jobs list and the job's page
@@ -582,19 +590,6 @@ async function restoreArchivedReports() {
 // js/app/dashboard.js), so the two never disagree.
 function calculateCompletion() {
   return reportProgress().pct;
-}
-
-// One word for where a saved job is up to: Draft, Ready (every required
-// field filled), Sent, Complete vN or Amending vN.
-function savedReportStatus(r) {
-  const d = r.reportData || {};
-  if (d.issue) {
-    const v = d.issue.version ? ` v${d.issue.version}` : '';
-    return d.amending ? { label: `Amending${v}`, tone: 'amending' } : { label: `Complete${v}`, tone: 'complete' };
-  }
-  if (d.sent) return { label: 'Sent', tone: 'sent' };
-  if ((r.completion || 0) >= 100) return { label: 'Ready', tone: 'ready' };
-  return { label: 'Draft', tone: 'draft' };
 }
 
 // The job's fee. Job details and the agreement share one field
@@ -643,7 +638,7 @@ function isFieldFilled(key) {
 }
 
 // quiet: no toast, for saves the app makes on its own (see processPendingNotes)
-// A report with an address saves itself to Saved Reports (and the
+// A report with an address saves itself to the Jobs list (and the
 // account) a few seconds after each change, so nobody has to dig through
 // the menu for Save Report. reportSig() spots when nothing has changed, so
 // opening a report or the save's own draft write doesn't save it again.
@@ -706,6 +701,9 @@ function saveCurrentReport(quiet) {
   // with it (see the quote builder in js/quote.js).
   const quote = quoteForReport(id, entry.address);
   if (quote) entry.quote = quote;
+  // This phone's side of a sync clash keeps its tag, so the two jobs for
+  // one address can be told apart until one is deleted.
+  if (prev && prev.conflictCopy) entry.conflictCopy = true;
 
   const existingIndex = reports.findIndex(r => r.id === id);
   if (existingIndex >= 0) {
@@ -719,7 +717,7 @@ function saveCurrentReport(quiet) {
     savedIdFor.set(reportData, id);
     lastReportSig = reportSig();
     if (!quiet) showToast('Report saved', 'success');
-    renderSavedList();
+    refreshJobsList();
     saveDraft();
     lastLocalSaveAt = Date.now();
     updateSyncStatus('saved');
@@ -841,21 +839,18 @@ function deleteReport(id, event) {
   const where = deleted.address || 'this property';
   const finished = deleted.reportData && deleted.reportData.issue;
   const extra = notInAccount(deleted) ? ' It isn\'t in your account yet, so it can\'t be brought back.' : '';
-  if (!confirm(finished
-    ? `Delete the finished report for ${where}? Its quote and photos go too.${extra}`
-    : `Delete the job at ${where}? Its report, quote and photos go too.${extra}`)) return;
+  if (!confirm(`Delete the ${finished ? 'finished job' : 'job'} at ${where}? Its report, quote and photos go too.${extra}`)) return;
   if (!setSavedReports(all.filter(r => r.id !== id))) return;
   const wasOpen = currentReportId === id;
   if (wasOpen) startBlankReport();
-  renderSavedList();
-  refreshDashboardIfOpen();
+  refreshJobsList();
 
   const photos = allReportPhotos(deleted.reportData).filter(p => p.path);
   const item = { id, paths: photos.map(p => p.path), photoIds: photos.map(p => p.id) };
   setPendingDeletes([...getPendingDeletes().filter(d => d.id !== id), item]);
   deleteTimers[id] = setTimeout(() => finishDelete(item), DELETE_UNDO_MS);
 
-  showToast('Report deleted', 'info', { label: 'Undo', run: () => {
+  showToast('Job deleted', 'info', { label: 'Undo', run: () => {
     clearTimeout(deleteTimers[id]);
     delete deleteTimers[id];
     setPendingDeletes(getPendingDeletes().filter(d => d.id !== id));
@@ -863,9 +858,8 @@ function deleteReport(id, event) {
     if (!reports.some(r => r.id === id)) reports.splice(Math.min(index, reports.length), 0, deleted);
     setSavedReports(reports);
     if (wasOpen) loadReport(id, true);
-    renderSavedList();
-    refreshDashboardIfOpen();
-    showToast('Report restored', 'success');
+    refreshJobsList();
+    showToast('Job restored', 'success');
   } });
 }
 
@@ -879,8 +873,7 @@ function deleteAllReports() {
   if (!setSavedReports([])) return;
   const wasOpen = all.some(r => r.id === currentReportId) ? currentReportId : null;
   startBlankReport();
-  renderSavedList();
-  refreshDashboardIfOpen();
+  refreshJobsList();
 
   const items = all.map(r => {
     const photos = allReportPhotos(r.reportData).filter(p => p.path);
@@ -896,8 +889,7 @@ function deleteAllReports() {
     const kept = getSavedReports();
     setSavedReports([...all, ...kept.filter(r => !ids.has(r.id))]);
     if (wasOpen) loadReport(wasOpen, true);
-    renderSavedList();
-    refreshDashboardIfOpen();
+    refreshJobsList();
     showToast('Jobs restored', 'success');
   } });
 }
@@ -1011,7 +1003,7 @@ function importAllData(file) {
         if (typeof prefs[key] === 'string') { try { localStorage.setItem(key, prefs[key]); } catch (err) {} }
       });
 
-      renderSavedList();
+      refreshJobsList();
       restoreA11ySettings();
       restoreAudioCaptureSetting();
       restoreTelemetrySetting();

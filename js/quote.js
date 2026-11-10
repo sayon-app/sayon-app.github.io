@@ -1589,7 +1589,7 @@ function formatAnswerDate(iso) {
   return isNaN(d) ? iso : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-// One line for the job banner and the saved reports list, or null when the
+// One line for the banner on a completed job, or null when the
 // job has no quote. tone: 'good' | 'bad' | 'wait' | 'warn'.
 function quoteAnswerSummary(q) {
   if (!quoteHasItems(q)) return null;
@@ -1776,7 +1776,7 @@ function saveQuoteAnswer() {
   closeQuoteAnswer();
   renderQuoteAnswer();
   if (typeof renderIssueState === 'function') renderIssueState();
-  if (typeof renderSavedList === 'function') renderSavedList();
+  refreshJobsList();
   showToast(accepted ? 'Quote accepted' : 'Quote marked as declined', 'success');
   track('quote_answered', { answer: quoteAnswerMode, method: method || 'none' });
 }
@@ -1793,7 +1793,7 @@ function clearQuoteAnswer() {
   storeQuoteOnReport(q, true);
   renderQuoteAnswer();
   if (typeof renderIssueState === 'function') renderIssueState();
-  if (typeof renderSavedList === 'function') renderSavedList();
+  refreshJobsList();
 }
 
 // ── PDF EXPORT ──────────────────────────────────────────────────────────────
@@ -2199,22 +2199,40 @@ async function checkQuoteLink(q, byTap) {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const [row] = await res.json();
     if (q.linkRequest !== r || q.answer) return;
-    if (row && (row.status === 'signed' || row.status === 'declined')) {
-      const accepted = row.status === 'signed';
-      q.answer = { status: accepted ? 'accepted' : 'declined', by: row.signer_name || q.client || '', date: isoDate(new Date(row.signed_at)),
-        method: 'link', note: (row.note || '').trim(), at: Date.now(), hash: r.hash };
-      if (accepted && isSignatureImage(row.signature)) q.answer.signature = row.signature;
-      delete q.linkRequest;
-      storeSentQuote(q);
-      if (typeof renderSavedList === 'function') renderSavedList();
-      showToast(accepted ? `${q.answer.by} accepted the quote` : `${q.answer.by} declined the quote`, accepted ? 'success' : 'info');
-      track('quote_answered', { answer: q.answer.status, method: 'link' });
+    const said = applyQuoteLinkRow(q, row);
+    if (said) {
+      refreshJobsList();
+      showToast(said, q.answer.status === 'accepted' ? 'success' : 'info');
     } else if (byTap) {
       showToast(row && row.status === 'cancelled' ? 'That link was cancelled' : 'No answer yet', 'info');
     }
   } catch (e) {
     if (byTap) showToast('Could not check. Try again when you have signal', 'error');
   }
+}
+
+// A link's row that came back answered becomes the quote's answer, saved.
+// Returns what to say ("Sam Taylor accepted the quote"), or '' when the
+// client hasn't answered.
+function applyQuoteLinkRow(q, row) {
+  if (!row || (row.status !== 'signed' && row.status !== 'declined')) return '';
+  const accepted = row.status === 'signed';
+  q.answer = { status: accepted ? 'accepted' : 'declined', by: row.signer_name || q.client || '', date: isoDate(new Date(row.signed_at)),
+    method: 'link', note: (row.note || '').trim(), at: Date.now(), hash: q.linkRequest.hash };
+  if (accepted && isSignatureImage(row.signature)) q.answer.signature = row.signature;
+  delete q.linkRequest;
+  storeSentQuote(q);
+  track('quote_answered', { answer: q.answer.status, method: 'link' });
+  return `${q.answer.by || 'The client'} ${accepted ? 'accepted' : 'declined'} the quote`;
+}
+
+// From the Jobs list's check of every link that's out (checkLinksOut in
+// js/app/dashboard.js). Returns what to say, or '' when there's no answer.
+function takeQuoteLinkAnswer(reportId, row) {
+  const q = getSavedQuotes()[reportId];
+  if (!q || !q.linkRequest || q.linkRequest.id !== row.id || q.answer) return '';
+  if (!q.reportKey) q.reportKey = reportId;
+  return applyQuoteLinkRow(q, row);
 }
 
 // ── SHARED PDF PARTS (quote and treatment certificate) ──────────────────────

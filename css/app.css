@@ -196,7 +196,6 @@ body.large-touch .mic-fab { width: 68px; height: 68px; }
 body.large-touch .toggle-switch { width: 56px; height: 32px; }
 body.large-touch .toggle-switch::after { width: 28px; height: 28px; }
 body.large-touch .toggle-switch.on::after { transform: translateX(24px); }
-body.large-touch .saved-item-delete { width: 44px; height: 44px; }
 
 /* ── SPLASH SCREEN ── */
 #splash {
@@ -1149,7 +1148,6 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 #jobPanelBody .job-input, #reportBody .job-input { border: 1.5px solid var(--frame); border-radius: 10px; font-size: calc(15px * var(--ts)); min-height: 52px; }
 
 .job-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15); background: var(--surface); }
-.saved-search-input { margin-bottom: 10px; }
 
 .drawer-legal {
   padding: 14px 8px 4px;
@@ -1284,7 +1282,7 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .sync-status.error .sync-status-dot { background: var(--risk); }
 .sync-status.error { color: var(--risk); }
 
-/* Saved Reports */
+/* A panel in the menu */
 .saved-panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1292,20 +1290,7 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   overflow: hidden;
 }
 
-.saved-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 320px;
-  overflow-y: auto;
-}
 
-.saved-empty {
-  font-size: calc(12px * var(--ts));
-  color: var(--text3);
-  padding: 8px 2px;
-  line-height: 1.5;
-}
 
 /* Settings panel. One page in the menu, in groups: Display, Voice, Your data. */
 .settings-group-title {
@@ -1465,81 +1450,18 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 
 .text-size-btn:hover { color: var(--text); }
 
-.saved-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 9px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
 
-.saved-item:hover { border-color: var(--accent); background: rgba(var(--accent-rgb),0.04); }
 
-.saved-item-info { flex: 1; min-width: 0; }
 
-.saved-item-address {
-  font-size: calc(12px * var(--ts));
-  font-weight: 700;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
-.saved-item-meta {
-  font-size: calc(10px * var(--ts));
-  color: var(--text2);
-  margin-top: 1px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
 
-.saved-item-risk {
-  font-size: calc(9px * var(--ts));
-  font-weight: 800;
-  padding: 1px 6px;
-  border-radius: 99px;
-  text-transform: uppercase;
-}
-.saved-item-risk.HIGH   { background: rgba(192,57,43,0.15); color: var(--risk); }
-.saved-item-risk.MEDIUM { background: rgba(255,182,72,0.15); color: var(--yellow-text); }
-.saved-item-risk.LOW    { background: rgba(var(--green-rgb),0.15); color: var(--green); }
-.saved-item-risk.none   { background: var(--surface2); color: var(--text3); }
 
-.saved-item-pending {
-  color: var(--yellow-text);
-  font-weight: 700;
-}
 .auth-inline-link { border: none; background: none; padding: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
 .drawer-help { text-decoration: none; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-top: 8px; }
 /* Send is for the report: off the menu's own pages (Settings, Billing). */
 .settings-row.current-plan { background: rgba(var(--accent-rgb), 0.08); border-radius: 10px; }
 .settings-row.current-plan .settings-primary-btn:disabled { opacity: 1; background: transparent; color: var(--accent2); border-color: transparent; box-shadow: none; }
-.saved-item-unsynced { color: var(--yellow-text); font-weight: 700; }
-.saved-archived { padding: 12px 14px; font-size: calc(13px * var(--ts)); line-height: 1.5; color: var(--text2); }
-.saved-archived .link-btn { display: inline; min-height: 0; padding: 0; font-size: inherit; font-weight: 700; }
 
-.saved-item-delete {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: var(--text3);
-  font-size: calc(14px * var(--ts));
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.15s;
-}
-.saved-item-delete:hover { background: rgba(192,57,43,0.12); color: var(--risk); }
 
 /* ── HORIZONTAL SECTION TABS (in report) ── */
 .section-tabs {
@@ -2560,24 +2482,9 @@ body.dark-screen .warn-note.note-good { background: rgba(var(--green-rgb),0.12);
 body.report-locked #reportBody .report-section,
 body.report-locked #jobPanelBody { opacity: 0.78; }
 body.report-locked #micDock { opacity: 0.4; }
-.saved-item-quote { padding: 1px 6px; border-radius: 5px; font-weight: 700; }
-.saved-item-quote.good { background: rgba(var(--green-rgb),0.12); color: var(--green); }
-.saved-item-quote.bad { background: rgba(192,57,43,0.1); color: var(--risk); }
-.saved-item-quote.wait, .saved-item-quote.warn { background: rgba(212,146,10,0.12); color: var(--yellow-text); }
 .issue-quote-answer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-size: calc(12.5px * var(--ts)); color: var(--text2); }
 .issue-quote-answer.good span { color: var(--green); font-weight: 600; }
 .issue-quote-answer.wait span, .issue-quote-answer.warn span { color: var(--yellow-text); font-weight: 600; }
-.saved-item-status {
-  padding: 1px 6px;
-  border-radius: 5px;
-  font-weight: 700;
-  background: var(--border);
-  color: var(--text2);
-}
-.saved-item-status.ready { background: rgba(var(--accent-rgb),0.12); color: var(--accent2); }
-.saved-item-status.sent { background: rgba(212,146,10,0.12); color: var(--yellow-text); }
-.saved-item-status.complete { background: rgba(var(--green-rgb),0.12); color: var(--green); }
-.saved-item-status.amending { background: rgba(212,146,10,0.12); color: var(--yellow-text); }
 
 /* Pre-inspection agreement */
 .agreement-banner {
@@ -3592,6 +3499,12 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
   color: var(--text);
 }
 .dash-hero-title b { font-weight: 700; color: var(--accent2); }
+/* Under the headline: what's booked for later, and re-inspections that are
+   overdue, which opens the Due tab. */
+.dash-hero-more { margin: 8px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: calc(14px * var(--ts)); line-height: 1.4; color: var(--text2); }
+.dash-hero-more[hidden] { display: none; }
+.dash-hero-more i { font-style: normal; color: var(--text3); }
+.dash-hero-more button { min-height: 32px; padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--risk); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 
 .dash-tabs {
   position: relative;
@@ -3657,13 +3570,17 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 .dash-card-street { font-size: calc(16px * var(--ts)); font-weight: 650; line-height: 1.25; letter-spacing: -0.01em; color: var(--text); overflow-wrap: anywhere; }
 .dash-card-suburb { font-size: calc(13.5px * var(--ts)); color: var(--text2); }
 .dash-card-sub { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: calc(13px * var(--ts)); color: var(--text3); }
-.dash-card.waiting .dash-card-sub > span:last-child { color: var(--yellow-text); font-weight: 600; }
-.dash-card.done:not(.declined) .dash-card-sub > span:last-child { color: var(--green); font-weight: 600; }
+/* Where the job is up to, after the client: one piece, so a long line
+   wraps it whole instead of leaving its date alone on the next line. */
+.dash-card-status { white-space: nowrap; font-weight: 600; color: var(--text2); }
+.dash-card.waiting .dash-card-status { color: var(--yellow-text); }
+.dash-card.done:not(.declined) .dash-card-status { color: var(--green); }
 .dash-card-tag {
   padding: 2px 7px; border-radius: 6px; background: rgba(var(--accent-rgb), 0.12); color: var(--accent2);
   font-size: calc(10.5px * var(--ts)); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
 }
 .dash-card-tag.sample { background: rgba(var(--pink-rgb), 0.12); color: var(--pink-text); }
+.dash-card-tag.warn { background: rgba(255,182,72,0.16); color: var(--yellow-text); }
 .dash-card-end { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; padding-top: 1px; }
 .dash-card-when { font-size: calc(12.5px * var(--ts)); font-weight: 650; color: var(--text3); white-space: nowrap; }
 .dash-card-total { font-size: calc(14.5px * var(--ts)); font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -3680,11 +3597,18 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 }
 .dash-card-act svg { flex: none; }
 .dash-card-act:active { background: var(--accent-pale); }
-.dash-card.waiting .dash-card-act { border-top-color: rgba(240,168,30,0.4); background: rgba(255,182,72,0.12); color: var(--yellow-text); }
+.dash-card.waiting .dash-card-act, .dash-card-act.wait { border-top-color: rgba(240,168,30,0.4); background: rgba(255,182,72,0.12); color: var(--yellow-text); }
 body:not(.dark-screen) .dash-card { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
 body.dark-screen .dash-card-act { border-top-color: var(--border2); background: rgba(var(--accent-rgb), 0.14); }
 
 .dash-none { margin: 0; padding: 36px 12px; text-align: center; font-size: calc(14px * var(--ts)); color: var(--text3); }
+/* To do, in the order the week runs: a heading where the day changes
+   (still open from earlier, today, coming up). */
+.dash-part { margin: 10px 2px -2px; font-size: calc(11px * var(--ts)); font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); }
+.dash-part:first-child { margin-top: 0; }
+/* Finished jobs a full phone handed to the account, under Done. */
+.dash-parked { margin: 16px 2px 0; font-size: calc(13.5px * var(--ts)); line-height: 1.5; color: var(--text2); }
+.dash-parked .link-btn { display: inline; min-height: 0; padding: 0; font-size: inherit; font-weight: 700; }
 .dash-empty { padding-top: 4px; }
 .dash-cards.fade-in, .dash-none.fade-in { animation: dashFade 0.22s ease-out; }
 @keyframes dashFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
@@ -3774,9 +3698,9 @@ body.dark-screen .dash-card-act { border-top-color: var(--border2); background: 
 .dash-detail-links:empty { display: none; }
 
 /* Re-inspections due (js/reinspection.js): the status line in the tile's colour. */
-.reinspect-card .dash-card-sub > span { color: var(--yellow-text); font-weight: 600; }
-.reinspect-card.overdue .dash-card-sub > span { color: var(--risk); }
-.reinspect-card.reminded .dash-card-sub > span { color: var(--accent2); }
+.reinspect-card .dash-card-status { color: var(--yellow-text); }
+.reinspect-card.overdue .dash-card-status { color: var(--risk); }
+.reinspect-card.reminded .dash-card-status { color: var(--accent2); }
 .dash-detail-chip.overdue { background: rgba(192,57,43,0.12); color: var(--risk); }
 .dash-next .dash-detail-links { margin-top: 10px; }
 .reinspect-note { margin: 12px 2px 0; font-size: calc(13px * var(--ts)); line-height: 1.5; color: var(--text3); }
@@ -4612,7 +4536,6 @@ body.dark-screen .findings-more-state.is-none .findings-more-icon { background: 
 /* ── ACCESSIBILITY: focus states ── */
 button:focus-visible,
 .field-val:focus-visible,
-.saved-item:focus-visible,
 .job-input:focus-visible,
 .section-tab:focus-visible {
   outline: 2px solid var(--accent2);
@@ -5370,6 +5293,12 @@ body:has(#quoteScreen.open) .tabbar { display: block; }
   transition: background 0.2s, color 0.2s, box-shadow 0.2s;
 }
 .tabbar-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px; }
+/* Away from the job (Jobs, the menu), This job reads as its street. */
+.tab-job-street { display: none; }
+body:has(#dashboardOverlay.open) .tab-job-street:not(:empty),
+body:has(#sidebarPanel.open) .tab-job-street:not(:empty) { display: block; }
+body:has(#dashboardOverlay.open) .tab-job-street:not(:empty) + .tab-job-label,
+body:has(#sidebarPanel.open) .tab-job-street:not(:empty) + .tab-job-label { display: none; }
 .tab-icon { position: relative; display: flex; }
 .tab .icon { transition: transform 0.2s cubic-bezier(0.34, 1.4, 0.5, 1); }
 .tab:active .icon { transform: scale(0.88); }
@@ -5519,6 +5448,11 @@ body:not(.dark-screen) .sidebar:not(.on-page) { background: var(--backdrop); bac
 body:not(.dark-screen) .dash-hero-date { color: var(--accent-glow); }
 body:not(.dark-screen) .dash-hero-title { color: var(--on-ink); }
 body:not(.dark-screen) .dash-hero-title b { color: var(--pink); }
+body:not(.dark-screen) .dash-hero-more, body:not(.dark-screen) .dash-parked { color: var(--on-ink2); }
+body:not(.dark-screen) .dash-hero-more i { color: var(--on-ink2); }
+body:not(.dark-screen) .dash-hero-more button { color: var(--pink); }
+body:not(.dark-screen) .dash-part { color: var(--accent-glow); }
+body:not(.dark-screen) .dash-parked .link-btn { color: var(--accent-glow); }
 body:not(.dark-screen) .dash-tabs { border-bottom-color: rgba(255,255,255,0.1); }
 body:not(.dark-screen) .dash-tab { color: var(--on-ink2); }
 body:not(.dark-screen) .dash-tab.active { color: var(--on-ink); }
@@ -6246,15 +6180,6 @@ body.dark-screen .send-review-file .link-btn, body.dark-screen .send-review-fixe
 .page-sheet-foot-note { font-size: calc(12.5px * var(--ts)); font-weight: 600; line-height: 1.35; color: var(--yellow-text); text-align: center; }
 .page-sheet-foot-note[hidden] { display: none; }
 
-/* Saved reports, refreshed: cards at reading size, with a delete button
-   big enough to hit. */
-.saved-item { gap: 12px; padding: 14px 10px 14px 16px; border-radius: 14px; background: var(--surface); }
-.saved-item:hover { background: var(--accent-wash); }
-.saved-item-address { font-size: calc(15px * var(--ts)); letter-spacing: -0.01em; }
-.saved-item-meta { margin-top: 4px; flex-wrap: wrap; gap: 4px 8px; font-size: calc(12.5px * var(--ts)); }
-.saved-item-risk, .saved-item-quote, .saved-item-status { font-size: calc(11px * var(--ts)); padding: 2px 8px; border-radius: 99px; }
-.saved-item-delete { width: 40px; height: 40px; border-radius: 10px; font-size: calc(16px * var(--ts)); }
-body.dark-screen .saved-item:hover { background: var(--surface2); }
 
 /* ── YOUR PRICES (js/price-book.js) ─────────────────────────────────────── */
 .pb-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }

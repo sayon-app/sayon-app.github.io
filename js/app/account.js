@@ -1472,6 +1472,10 @@ function enterApp() {
   // New users see onboarding; returning users go straight into the app.
   if (shouldShowOnboarding()) showOnboarding();
   else openApp('inspect');
+  // CRASH GUARD (js/crash-guard.js): reports written with no signal go now,
+  // and if the app closed while in use last time, offer to tell us.
+  sendQueuedProblemReports();
+  maybeOfferCrashReport();
 }
 
 function renderProfileMenu() {

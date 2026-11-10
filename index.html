@@ -235,7 +235,7 @@
         <div class="ob-check-item"><span class="ob-check-num">3</span><span>Say "Stop Sayon" or tap Extract data with AI, and the report fills itself in</span></div>
         <div class="ob-check-item"><span class="ob-check-num">4</span><span>Check the report, then tap Send to client at the end of it</span></div>
       </div>
-      <p style="font-size:calc(12px * var(--ts));color:var(--text3);line-height:1.6;margin-top:4px">Tip: Start recording, pop the phone in your pocket and talk room by room. Say <strong style="color:var(--accent2)">"Stop Sayon"</strong> when you're done and it fills in the report. Say the quote too, like "48 metres of barrier at $50 a metre, 50% deposit", and it fills in the quote.</p>
+      <p style="font-size:calc(12px * var(--ts));color:var(--text3);line-height:1.6;margin-top:4px">Tip: Start recording, pop the phone in your pocket and talk room by room. Say <strong style="color:var(--accent2)">"Fill it in, Sayon"</strong> to fill the report as you go, and <strong style="color:var(--accent2)">"Stop Sayon"</strong> when you're done. Say the quote too, like "48 metres of barrier at $50 a metre, 50% deposit", and it fills in the quote.</p>
       <button class="auth-btn" onclick="obFinish()">Start inspecting →</button>
       <button type="button" class="auth-btn secondary" onclick="obFinish(true)">See a finished sample job first</button>
     </div>
@@ -1241,7 +1241,7 @@
             <p>Every plan has the whole app: voice reports, quotes, treatment certificates, PDFs and sending to clients. Each paid plan gives every inspector 800 AI fills a month, about 40 inspections.</p>
             <p><strong>One AI fill</strong> is one job the AI does for you:</p>
             <ul>
-              <li>filling in the report and quote from what you said (each time you say "Stop Sayon" or tap Extract data with AI)</li>
+              <li>filling in the report and quote from what you said (each time you say "Fill it in, Sayon" or "Stop Sayon", or tap Extract data with AI)</li>
               <li>filling in the agreement or treatment record when you tap Say it instead</li>
               <li>reading a compliance plate from a photo</li>
               <li>checking a photo when you tap Analyse</li>
@@ -1496,6 +1496,13 @@
         <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="m9 15 2 2 4-4"/></svg></span>
         <span class="panel-title">Sample job</span>
         <span class="job-panel-summary">See a finished job</span>
+      </button>
+
+      <!-- Report a problem (js/crash-guard.js): goes straight to the SAYON team. -->
+      <button type="button" class="panel-label drawer-help" onclick="openProblemReport()">
+        <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+        <span class="panel-title">Report a problem</span>
+        <span class="job-panel-summary">Tell the SAYON team</span>
       </button>
 
       <!-- Help: one real address, the same one the legal pages give. -->
@@ -2595,6 +2602,29 @@
   </div>
 </div>
 
+<!-- REPORT A PROBLEM (js/crash-guard.js) -->
+<div class="page-sheet-overlay" id="problemOverlay" onclick="if(event.target===this)closeProblemReport()">
+  <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="problemTitle">
+    <div class="page-sheet-header">
+      <span class="page-sheet-title" id="problemTitle">Report a problem</span>
+      <button class="voice-popover-close" onclick="closeProblemReport()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+    </div>
+    <div class="page-sheet-body">
+      <p class="problem-intro" id="problemIntro"></p>
+      <label class="send-review-label" for="problemMessage">What happened?</label>
+      <textarea class="job-input problem-message" id="problemMessage" rows="5" placeholder="e.g. I was adding a photo to the subfloor and the app froze, then closed"></textarea>
+      <label class="problem-include"><input type="checkbox" id="problemIncludeDetails" checked> Send the technical details too</label>
+      <details class="sheet-more problem-details-wrap">
+        <summary>What the technical details are</summary>
+        <p class="problem-details-note">The phone and app version, where you were in the app, and any errors it kept. Never client names, addresses, report text or photos.</p>
+        <pre class="problem-details" id="problemDetails"></pre>
+      </details>
+      <button class="extract-btn" id="problemSendBtn" onclick="sendProblemReport()">Send to SAYON</button>
+      <button class="link-btn send-review-cancel" onclick="closeProblemReport()">Not now</button>
+    </div>
+  </div>
+</div>
+
 <!-- CHECK BEFORE SENDING -->
 <div class="page-sheet-overlay" id="sendReviewOverlay">
   <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="sendReviewTitle">
@@ -2666,6 +2696,7 @@
 <!-- Error tracking and usage steps, first so they see the app start (TELEMETRY in js/telemetry.js) -->
 <script src="js/vendor/sentry-11.4.0.min.js"></script>
 <script src="js/telemetry.js"></script>
+<script src="js/crash-guard.js"></script>
 <!-- The app: plain scripts that share one global scope, loaded in this order -->
 <script src="js/app/state.js"></script>
 <script src="js/app/areas.js"></script>

@@ -167,7 +167,7 @@ function resetVoicePopoverToDefault() {
   document.getElementById('extractBtn').style.display = 'flex';
   document.getElementById('useTranscriptBtn').style.display = 'none';
   const box = document.getElementById('transcriptBox');
-  box.textContent = 'Tap the mic and start speaking, or tap here to type instead.';
+  box.textContent = transcriptPlaceholder();
   box.classList.remove('active');
   currentTranscript = '';
   lowConfidenceFlagged = false;
@@ -773,12 +773,15 @@ function whisperShowPending() {
   const box = document.getElementById('transcriptBox');
   if (!box) return;
   const waiting = whisperQueue.length || (whisper && whisper.speechMs >= WHISPER_MIN_SPEECH_MS);
-  box.textContent = currentTranscript + (waiting ? '…' : '');
+  box.textContent = (currentTranscript || waiting) ? currentTranscript + (waiting ? '…' : '') : transcriptPlaceholder();
   box.classList.toggle('active', !!(currentTranscript || waiting));
 }
 
 // Returns true when Whisper listening started; false means use Web Speech.
-async function startWhisperListening() {
+// sink: where the phrases go when it isn't the report's note box (a Say box
+// passes { queue, live(), context(), pending(), apply(), failed(status) });
+// the report's own listening passes none.
+async function startWhisperListening(sink = null) {
   const Ctx = window.AudioContext || window.webkitAudioContext;
   // Made inside the tap, before any await, so iPhone lets it run.
   const ctx = new Ctx();
@@ -790,7 +793,7 @@ async function startWhisperListening() {
     console.warn('Whisper listening: no mic stream, using the phone\'s speech instead:', err && err.message);
     return false;
   }
-  if (!isRecording) { stream.getTracks().forEach(t => t.stop()); try { ctx.close(); } catch (e) {} return true; }
+  if (sink ? !sink.live() : !isRecording) { stream.getTracks().forEach(t => t.stop()); try { ctx.close(); } catch (e) {} return true; }
   try { await ctx.resume(); } catch (e) {}
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 1024;
@@ -798,7 +801,7 @@ async function startWhisperListening() {
   const s = whisper = {
     ctx, stream, analyser, buf: new Float32Array(analyser.fftSize),
     recorder: null, chunks: [], startedAt: 0, speechMs: 0, quietMs: 0,
-    floor: 0.01, epoch: voiceJobEpoch, timer: null,
+    floor: 0.01, epoch: voiceJobEpoch, timer: null, sink,
   };
   whisperNewSegment(s);
   s.timer = setInterval(() => whisperTick(s), WHISPER_POLL_MS);
@@ -828,7 +831,7 @@ function whisperTick(s) {
     s.quietMs += WHISPER_POLL_MS;
     s.floor = s.floor * 0.95 + rms * 0.05; // follows the background noise
   }
-  if (s.speechMs >= WHISPER_MIN_SPEECH_MS && s.speechMs < WHISPER_MIN_SPEECH_MS + WHISPER_POLL_MS) whisperShowPending();
+  if (s.speechMs >= WHISPER_MIN_SPEECH_MS && s.speechMs < WHISPER_MIN_SPEECH_MS + WHISPER_POLL_MS) (s.sink ? s.sink.pending() : whisperShowPending());
   const age = Date.now() - s.startedAt;
   // Someone reading straight through barely pauses, so a long phrase ends
   // at the next breath rather than being cut mid-word at the limit.
@@ -842,33 +845,33 @@ function whisperCutSegment(s, last) {
   const rec = s.recorder, chunks = s.chunks, hadSpeech = s.speechMs >= WHISPER_MIN_SPEECH_MS;
   if (!rec) return Promise.resolve();
   if (!last) whisperNewSegment(s);
-  const entry = hadSpeech ? { text: null, done: false, epoch: s.epoch } : null;
-  if (entry) whisperQueue.push(entry);
+  const entry = hadSpeech ? { text: null, done: false, epoch: s.epoch, sink: s.sink } : null;
+  if (entry) (s.sink ? s.sink.queue : whisperQueue).push(entry);
   const finished = new Promise(resolve => {
     rec.onstop = () => resolve(chunks.length ? new Blob(chunks, { type: rec.mimeType || 'audio/mp4' }) : null);
     try { rec.stop(); } catch (e) { resolve(null); }
   });
   if (!entry) return finished;
-  whisperShowPending();
+  if (s.sink) s.sink.pending(); else whisperShowPending();
   return finished.then(blob => whisperSend(entry, blob, 0));
 }
 
 async function whisperSend(entry, blob, tries) {
-  if (!blob) { entry.done = true; whisperApply(); return; }
+  if (!blob) { entry.done = true; whisperDone(entry); return; }
   try {
     const form = new FormData();
     const ext = blob.type.includes('mp4') ? 'mp4' : blob.type.includes('ogg') ? 'ogg' : 'webm';
     form.append('audio', blob, `phrase.${ext}`);
     // The words just before help Whisper with the next phrase.
-    const context = currentTranscript.trim().slice(-300);
+    const context = (entry.sink ? entry.sink.context() : currentTranscript).trim().slice(-300);
     form.append('initial_prompt', (buildTranscriptionVocabHint() + ' Say "Stop Sayon" to finish.' + (context ? ' ' + context : '')).slice(-1000));
     const res = await workerFetch('/transcribe', { method: 'POST', body: form });
-    if (res.status === 502 && /no text/i.test(await res.text().catch(() => ''))) { entry.text = ''; entry.done = true; whisperApply(); return; } // nothing heard
+    if (res.status === 502 && /no text/i.test(await res.text().catch(() => ''))) { entry.text = ''; entry.done = true; whisperDone(entry); return; } // nothing heard
     if (!res.ok) { const err = new Error('HTTP ' + res.status); err.status = res.status; throw err; }
     const data = await res.json();
     entry.text = typeof data?.transcript === 'string' ? data.transcript.trim() : '';
     entry.done = true;
-    whisperApply();
+    whisperDone(entry);
   } catch (err) {
     const status = err && err.status;
     if (!status && tries < 20) {
@@ -887,10 +890,16 @@ async function whisperSend(entry, blob, tries) {
     }
     console.warn('Whisper listening failed, using the phone\'s speech instead:', err && err.message);
     entry.text = ''; entry.done = true;
-    whisperApply();
+    whisperDone(entry);
     // The phrase that failed is lost, so say so: the inspector can repeat it.
+    if (entry.sink) { entry.sink.failed(status); return; }
     whisperFallBack(status === 429 ? 'This month\'s AI fills are used up. The last few words were missed, so say them again' : 'The last few words were missed. Say them again, the phone\'s own speech is listening now');
   }
+}
+
+// A phrase back from Whisper goes to whoever was listening for it.
+function whisperDone(entry) {
+  if (entry.sink) entry.sink.apply(); else whisperApply();
 }
 
 // Adds finished phrases to the transcript in the order they were spoken.
@@ -903,7 +912,13 @@ function whisperApply() {
     text = correctHeard(text);
     const stopAt = text.search(VOICE_STOP_LIVE_RE);
     if (stopAt >= 0) text = text.slice(0, stopAt).trim();
+    // "Fill it in, Sayon": the words before it fill now, the words after
+    // wait for the next fill. Before a stop the stop fills it all anyway.
+    const fill = splitAtFillWords(text);
+    if (fill) text = fill[0];
     if (text) { currentTranscript += text + ' '; speechHeard(text); }
+    if (fill && stopAt < 0) fillWhileListening();
+    if (fill && fill[1]) { currentTranscript += fill[1] + ' '; speechHeard(fill[1]); }
     pulseWave();
     if (stopAt >= 0 && isRecording) {
       stopRecording();
@@ -965,6 +980,7 @@ function driveWave(on) {
 }
 
 function startRecording() {
+  if (typeof sheetVoice !== 'undefined' && sheetVoice) { showToast('Finish the Say box first', 'error'); return; }
   const SR = getSpeechRecognitionCtor();
   const useWhisper = canUseWhisperListening();
   if (!SR && !useWhisper) { showToast('Speech recognition isn\'t supported here. Tap the transcript box to type instead', 'error'); return; }
@@ -1005,7 +1021,7 @@ function startRecording() {
     let pendingInterim = '';
 
     recognition.onresult = (e) => {
-      let interim = '', final = '', stopByVoice = false;
+      let interim = '', final = '', stopByVoice = false, fillAsked = false;
       for (let i = e.resultIndex; i < e.results.length; i++) {
         if (e.results[i].isFinal) {
           if (i <= committedUpTo) continue;
@@ -1026,10 +1042,20 @@ function startRecording() {
           finalChunk = correctHeard(finalChunk);
           // Cut from the stop words on, again if the phone repeated them.
           for (let stopAt; (stopAt = finalChunk.search(VOICE_STOP_RE)) >= 0;) { finalChunk = finalChunk.slice(0, stopAt); stopByVoice = true; }
+          // "Fill it in, Sayon": what came before fills now, the rest waits.
+          const fill = splitAtFillWords(finalChunk);
+          if (fill) {
+            if (fill[0]) final += fill[0] + ' ';
+            if (final) { currentTranscript += final; speechHeard(final); }
+            final = '';
+            fillAsked = true;
+            finalChunk = fill[1];
+          }
           if (finalChunk.trim()) final += finalChunk.trim() + ' ';
         }
         else interim += e.results[i][0].transcript;
       }
+      if (fillAsked && !stopByVoice) fillWhileListening();
       currentTranscript += final;
       pendingInterim = interim;
       // Each phrase goes to the draft as it lands, so a tab the phone kills
@@ -1081,7 +1107,11 @@ function startRecording() {
       if (kept) {
         const stopAt = kept.search(VOICE_STOP_RE);
         if (stopAt >= 0) kept = kept.slice(0, stopAt).trim();
+        const fill = splitAtFillWords(kept);
+        if (fill) kept = fill[0];
         if (kept) currentTranscript += kept + ' ';
+        if (fill && stopAt < 0) fillWhileListening();
+        if (fill && fill[1]) currentTranscript += fill[1] + ' ';
         document.getElementById('transcriptBox').textContent = currentTranscript;
         if (stopAt >= 0) {
           stopRecording();
@@ -1110,6 +1140,8 @@ function startRecording() {
   updateVoiceHud();
   document.getElementById('voiceBtn').classList.add('recording');
   document.getElementById('voiceBtnText').textContent = 'Recording… tap to stop';
+  const emptyBox = document.getElementById('transcriptBox');
+  if (!currentTranscript.trim() && !emptyBox.classList.contains('active')) emptyBox.textContent = transcriptPlaceholder();
   document.getElementById('waveform').classList.add('show');
   driveWave(true);
   document.getElementById('extractBtn').disabled = true;
@@ -1181,6 +1213,8 @@ function stopRecording() {
   updateVoiceHud();
   document.getElementById('voiceBtn').classList.remove('recording');
   document.getElementById('voiceBtnText').textContent = 'Tap to speak';
+  const emptyBox = document.getElementById('transcriptBox');
+  if (!currentTranscript.trim() && !emptyBox.classList.contains('active')) emptyBox.textContent = transcriptPlaceholder();
   document.getElementById('waveform').classList.remove('show');
   driveWave(false);
   if (currentTranscript.trim()) document.getElementById('extractBtn').disabled = false;
@@ -1215,6 +1249,14 @@ function stopRecording() {
 // environment instead of speaking.
 function clearTranscriptPlaceholderIfNeeded(el) {
   if (!el.classList.contains('active')) el.textContent = '';
+}
+
+// What the empty note box says: while the report is listening, how to fill
+// it hands-free; otherwise how to start.
+function transcriptPlaceholder() {
+  return isRecording && !activeNotesTargetKey
+    ? 'Listening. Say "fill it in, Sayon" to fill the report as you go, or "stop Sayon" when you\'re done.'
+    : 'Tap the mic and start speaking, or tap here to type instead.';
 }
 
 // Paste as plain text: a copy from a web page or document would otherwise
@@ -1312,19 +1354,45 @@ function usePrompt(el) {
 // VOICE STOP WORDS
 // ══════════════════════════════════════════════════════════════════════════
 // One voice button. Recording carries on until a tap on Stop or "stop
-// Sayon". The report is filled once, from the whole note: "stop Sayon"
-// fills it straight away, and after a tap the note waits in the box for
-// Extract, so it can be checked first. Filling at every pause was taken out
+// Sayon". "Stop Sayon" fills the report straight away, and after a tap the
+// note waits in the box for Extract, so it can be checked first. "Fill it
+// in, Sayon" (below) fills it along the way. Filling at every pause was taken out
 // on 28 Oct: on an iPhone it mangled the words that followed each fill.
 // Phones punctuate and mishear the name ("Stop. Simon.", "stop saying"),
 // so the words can be split by punctuation and "Sayon" has its common
 // mishearings. It's checked on the live (interim) text as well as the
 // final text, because some phones only finalise a phrase after a pause.
-const VOICE_STOP_LIVE_RE = /\b(?:stop|done|pause|finish)[\s,.!?-]+(?:sayon|say on|sayan|saying|sayin|zion|sion|xion|scion|simon|sean|shaun|cyan|saigon|siam)\b|\bstop listening\b/i;
+const SAYON_HEARD = '(?:sayon|say on|sayan|saying|sayin|zion|sion|xion|scion|simon|sean|shaun|cyan|saigon|siam)';
+const VOICE_STOP_LIVE_RE = new RegExp('\\b(?:stop|done|pause|finish)[\\s,.!?-]+' + SAYON_HEARD + '\\b|\\bstop listening\\b', 'i');
 // "Stops on" and "stop son" (how a phone heard it in the 25 Oct pocket
 // test) are ordinary words too ("the lead stops on the bearer"), so they
 // only count as the last words of a finished phrase, never in live text.
 const VOICE_STOP_RE = new RegExp(VOICE_STOP_LIVE_RE.source + '|\\bstops?[\\s,.!?-]+(?:on|son)[\\s,.!?]*$', 'i');
+
+// "Fill it in, Sayon" fills the report from what's been said so far and
+// keeps listening, so a tech talking a whole job in from the car sees the
+// report follow along without touching the phone. It fills only on these
+// words, never at a pause (see above), so there's no AI call nobody asked
+// for. Checked on finished phrases only: a live copy would fill twice.
+const VOICE_FILL_RE = new RegExp('\\bfill(?:\\s+(?:it|that|this|them))?\\s+(?:in|up)[\\s,.!?-]+' + SAYON_HEARD + '\\b[\\s,.!?]*', 'i');
+const VOICE_FILL_ALL_RE = new RegExp(VOICE_FILL_RE.source, 'gi');
+
+// A phrase cut at "fill it in, Sayon": [words before, words after], or null
+// when the phrase doesn't say it. A repeat of the words is dropped.
+function splitAtFillWords(text) {
+  const m = VOICE_FILL_RE.exec(text || '');
+  if (!m) return null;
+  return [text.slice(0, m.index).trim(), text.slice(m.index + m[0].length).replace(VOICE_FILL_ALL_RE, ' ').replace(/\s+/g, ' ').trim()];
+}
+
+// The words were heard: a higher beep than the stop's, and the report fills
+// from the note so far while the mic carries on.
+function fillWhileListening() {
+  if (!isRecording || activeNotesTargetKey) return; // a field note isn't a report fill
+  playTone(660, 140, 0.2);
+  if (currentTranscript.trim()) processTranscript({ whileRecording: true });
+}
+
 // ── Soft audio tone: a beep the inspector hears with the phone in a pocket ──
 function playTone(freq = 880, duration = 120, vol = 0.3) {
   try {

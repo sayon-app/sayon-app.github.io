@@ -552,7 +552,7 @@ function noteForEarlierJob(target, note) {
   currentTranscript = currentTranscript.startsWith(note) ? currentTranscript.slice(note.length).trimStart() : '';
   saveDraft();
   const box = document.getElementById('transcriptBox');
-  box.textContent = currentTranscript || 'Tap the mic and start speaking, or tap here to type instead.';
+  box.textContent = currentTranscript || transcriptPlaceholder();
   box.classList.toggle('active', !!currentTranscript);
   showToast(`That note will fill in ${entry.address || 'the last job'} next time you open it`, 'info');
 }
@@ -576,18 +576,21 @@ function clearFilledNotes() {
   wrap.hidden = true;
 }
 
-let fillRunning = false, fillAgain = false;
+let fillRunning = false, fillAgain = null;
 async function processTranscript(opts) {
   // One fill at a time, so the same words are never sent twice. A fill
-  // asked for meanwhile runs after, on whatever words are left.
-  if (fillRunning) { fillAgain = true; return false; }
+  // asked for meanwhile runs after, on whatever words are left: a full one
+  // once the mic is off, or another "fill it in, Sayon" while it's still on.
+  if (fillRunning) { fillAgain = { whileRecording: !!(opts && opts.whileRecording) && !(fillAgain && !fillAgain.whileRecording) }; return false; }
   fillRunning = true;
   try { return await runFill(opts); }
   finally {
     fillRunning = false;
-    if (fillAgain) {
-      fillAgain = false;
-      if (!isRecording && currentTranscript.trim()) setTimeout(() => processTranscript(), 0);
+    const again = fillAgain;
+    fillAgain = null;
+    if (again && currentTranscript.trim()) {
+      if (!isRecording) setTimeout(() => processTranscript(), 0);
+      else if (again.whileRecording) setTimeout(() => processTranscript({ whileRecording: true }), 0);
     }
   }
 }
@@ -670,18 +673,77 @@ async function runFill({ whileRecording = false } = {}) {
   currentTranscript = currentTranscript.startsWith(note) ? currentTranscript.slice(note.length).trimStart() : '';
   saveDraft();
   const box = document.getElementById('transcriptBox');
-  box.textContent = currentTranscript || 'Tap the mic and start speaking, or tap here to type instead.';
+  box.textContent = currentTranscript || transcriptPlaceholder();
   box.classList.toggle('active', !!currentTranscript);
   lowConfidenceFlagged = false;
   const warnElDone = document.getElementById('lowConfidenceWarning');
   if (warnElDone) warnElDone.classList.remove('show');
   dismissCleanupSuggestion();
   dismissServerTranscript();
+  const step = extracted ? showFilledStep(before) : null;
   if (extracted && whileRecording) {
     const n = countExtractFilled(before);
-    if (n) showToast(`Filled ${n} field${n !== 1 ? 's' : ''}. Still listening`, 'info');
+    if (n) {
+      playTone(880, 120, 0.2);
+      const tab = step && document.querySelector(`#tab-${step} .tab-label`);
+      showToast(`Filled ${n} field${n !== 1 ? 's' : ''}${tab ? ' in ' + tab.textContent.trim() : ''}. Still listening`, 'info');
+    } else showToast('Nothing new to fill from that. Still listening', 'info');
   } else if (extracted) showExtractSummary(before);
   return extracted;
+}
+
+// After a fill the report turns to the step that took the most of it and
+// scrolls to the first thing filled there, with each new answer outlined
+// for a moment, so the sections follow along as the tech talks. Nothing is
+// focused (a phone would bring up its keyboard), and the report stays put
+// while they're typing in it. Returns the step's id, or null.
+function showFilledStep(before) {
+  if (!before || typeof REPORT_STEPS === 'undefined') return null;
+  const changed = {}; // step id -> the report elements that changed in it
+  const add = (section, el) => {
+    const st = section && stepOf(section);
+    if (!st || !st.sections.includes(section)) return;
+    (changed[st.id] = changed[st.id] || []).push(el);
+  };
+  const fieldEl = k => {
+    const el = document.getElementById('f-' + k);
+    return el && el.classList.contains('choice-source') ? (document.getElementById('choices-' + k) || el) : el;
+  };
+  const sectionOf = el => { const sec = el && el.closest('.report-section'); return sec && sec.id.startsWith('section-') ? sec.id.slice(8) : null; };
+  Object.keys(reportData).forEach(k => {
+    if (k === 'findings' || k === 'pendingNotes' || k === 'noteText' || k === 'heardNotes' || k === 'weatherFilled' || isBlankValue(reportData[k])) return;
+    if (JSON.stringify(reportData[k]) === before.data[k]) return;
+    const el = fieldEl(k);
+    add(Object.keys(SECTIONS).find(s => SECTIONS[s].fields.includes(k)) || sectionOf(el), el);
+  });
+  (reportData.findings || []).forEach(f => {
+    if (f && JSON.stringify(f) !== JSON.stringify(before.findings[f.id] || {})) add('findings', document.getElementById('finding-card-' + f.id));
+  });
+  // The most changed step; a tie goes to the later one, where the talk is up to.
+  let best = null;
+  REPORT_STEPS.forEach(st => { if (changed[st.id] && (!best || changed[st.id].length >= changed[best].length)) best = st.id; });
+  if (!best) return null;
+  const active = document.activeElement;
+  const typing = active && active.closest && active.closest('#reportBody') && (/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.isContentEditable);
+  if (typing) return best;
+  if (best !== currentStep) goStep(best);
+  const els = changed[best].filter(el => el && el.isConnected)
+    .sort((a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
+  if (els.length) {
+    els.forEach(el => openFieldGroups(el));
+    setTimeout(() => {
+      // Its label in view too, just under the report's tabs.
+      const top = els[0].closest('.field') || els[0];
+      const tabs = document.getElementById('sectionTabs'), body = document.getElementById('reportBody');
+      const under = tabs && body ? Math.max(0, tabs.getBoundingClientRect().bottom - body.getBoundingClientRect().top) : 0;
+      top.style.scrollMarginTop = (under + 12) + 'px';
+      top.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setTimeout(() => { top.style.scrollMarginTop = ''; }, 1000);
+      els.forEach(el => el.classList.add('extract-blank-flash'));
+      setTimeout(() => els.forEach(el => el.classList.remove('extract-blank-flash')), 2500);
+    }, 80);
+  }
+  return best;
 }
 
 // ── WAITING NOTES ───────────────────────────────────────────────────────

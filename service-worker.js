@@ -15,6 +15,7 @@
 // drop the old cache and install() to pre-cache the new files, so a redeploy
 // takes effect on the very next load instead of needing an extra refresh.
 const CACHE_VERSION = 'korva-v277';
+const CACHE_VERSION = 'korva-v279';
 
 
 const APP_SHELL = [
@@ -54,6 +55,7 @@ const APP_SHELL = [
   './js/business-sync.js',
   './js/sample-job.js',
   './js/telemetry.js',
+  './js/crash-guard.js',
   './js/vendor/sentry-11.4.0.min.js',
   './manifest.json',
   './icon-192.png?v=3',

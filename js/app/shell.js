@@ -214,6 +214,7 @@ function openApp(appName) {
       const insp = document.getElementById('jobInspector');
       if (insp && !insp.value) insp.value = me.name;
       if (me.licence && !reportData.inspectorLicence) { reportData.inspectorLicence = me.licence; restoreLicenceField(); }
+      if (me.signature && !reportData.inspectorSignature) { reportData.inspectorSignature = me.signature; restoreSignaturePads(); }
       if (!reportData.jobInspectionDate) reportData.jobInspectionDate = todayIsoDate();
     }
     enableKeyboardActivation();
@@ -225,6 +226,7 @@ function openApp(appName) {
     // pull any cloud reports not on this device, then sort out photo storage
     supabaseSyncOnOpen().then(pushUnsyncedReports).finally(tidyPhotoStorage);
     processPendingNotes();
+    fillWeatherOnTheDay();
     // Back and swipe back step through the app, and it reopens where it was (BACK, WHERE YOU WERE).
     installBackNavigation();
     restoreNavPlace();

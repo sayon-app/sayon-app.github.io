@@ -798,6 +798,7 @@ function loadReport(id, quiet) {
 
   if (!quiet) showToast(`Loaded: ${entry.address}`, 'info');
   processPendingNotes();
+  fillWeatherOnTheDay();
   if (document.getElementById('sidebarPanel').classList.contains('open')) {
     toggleDrawer();
   }
@@ -1108,18 +1109,24 @@ function restoreA11ySettings() {
   } catch (e) {}
 }
 
-// A new job starts with the inspector's name and licence from the most
-// recent saved report on this account, so the sign-off isn't retyped on
-// every job.
-function lastInspectorDetails() {
-  const latest = getSavedReports()
-    .filter(r => !isSampleJob(r) && (r.inspector || (r.reportData && r.reportData.inspectorLicence)))
-    .sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))[0];
+// A new job starts with the inspector's name, licence and signature from
+// the most recent saved report on this account, so the sign-off isn't
+// retyped and signed again on every job. The signature is the last one
+// drawn under that name: it stays with the inspector, never with a name it
+// wasn't signed as. exceptId: a report to leave out (the one that's open).
+function lastInspectorDetails(exceptId) {
+  const reports = getSavedReports()
+    .filter(r => !isSampleJob(r) && r.id !== exceptId)
+    .sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+  const latest = reports.find(r => r.inspector || (r.reportData && r.reportData.inspectorLicence));
   // No report yet: the signed-in person's own name is the best guess.
   const meta = (typeof authUser !== 'undefined' && authUser && authUser.user_metadata) || {};
+  const name = (latest ? latest.inspector || '' : '') || (meta.name || '').trim();
+  const signed = name && reports.find(r => r.reportData && r.reportData.inspectorSignature && (r.inspector || '').trim() === name);
   return {
-    name: (latest ? latest.inspector || '' : '') || (meta.name || '').trim(),
+    name,
     licence: latest && latest.reportData ? latest.reportData.inspectorLicence || '' : '',
+    signature: signed ? signed.reportData.inspectorSignature : '',
   };
 }
 
@@ -1149,7 +1156,10 @@ function startBlankReport() {
   const lastInspector = lastInspectorDetails();
   document.getElementById('jobInspector').value = lastInspector.name;
   if (lastInspector.licence) reportData.inspectorLicence = lastInspector.licence;
+  if (lastInspector.signature) reportData.inspectorSignature = lastInspector.signature;
   restoreLicenceField();
+  restoreSignaturePads();
+  updateProgress();
   // A new job is usually inspected the day it's started.
   reportData.jobInspectionDate = todayIsoDate();
   loadJobInfo();
@@ -1162,7 +1172,7 @@ function startBlankReport() {
 function resetReportState() {
   reportData = {};
   speechTimeline = [];
-  setAI('ready', 'AI ready');
+  setAI('ready', 'Ready');
   fieldNotes = {};
   pendingSpeciesMatch = null;
   clearJobInfo();

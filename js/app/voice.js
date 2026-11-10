@@ -163,7 +163,7 @@ function useTranscriptForNotes() {
 function resetVoicePopoverToDefault() {
   activeNotesTargetKey = null;
   const title = document.getElementById('voicePopoverTitleText');
-  if (title) title.textContent = 'Voice capture';
+  if (title) title.textContent = 'Your note';
   document.getElementById('extractBtn').style.display = 'flex';
   document.getElementById('useTranscriptBtn').style.display = 'none';
   const box = document.getElementById('transcriptBox');

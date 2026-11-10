@@ -270,8 +270,8 @@ async function openPhotoViewer(id) {
   if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
   img.dataset.url = URL.createObjectURL(blob);
   img.src = img.dataset.url;
-  document.getElementById('photoViewerInfo').textContent =
-    [(p.caption || '').trim(), p.width && p.height ? `${p.width} × ${p.height}` : ''].filter(Boolean).join('  ·  ');
+  // The caption in the corner, or nothing: the size in pixels isn't for the inspector.
+  document.getElementById('photoViewerInfo').textContent = (p.caption || '').trim();
   setPhotoZoom(1, 0, 0);
   if (typeof updateMarkupButton === 'function') updateMarkupButton(id);
   document.getElementById('photoViewer').hidden = false;
@@ -378,6 +378,14 @@ const MAX_SECTION_PHOTOS = 30;
 // the report cover. Adding another replaces it.
 const SECTION_PHOTO_LIMITS = { general: 1 };
 const sectionPhotoLimit = section => SECTION_PHOTO_LIMITS[section] || MAX_SECTION_PHOTOS;
+// What a photo box says beside its title: how many it holds, and its limit
+// only once that's close. Nothing while it's empty.
+function photoCountText(n, limit) {
+  if (!n) return '';
+  const count = `${n} photo${n === 1 ? '' : 's'}`;
+  const left = limit - n;
+  return left <= 0 ? `${count}, which is all it holds` : left <= 5 ? `${count}, room for ${left} more` : count;
+}
 const SECTION_PHOTO_KEYS = ['general','durable','obstructions','restrictions','findings','conducive','recommendations'];
 
 function getSectionPhotos(section) {
@@ -418,13 +426,26 @@ async function handleSectionPhotoFiles(fileList, section) {
   backUpNewPhotos();
 }
 
-// "Add Photo" asks where the photo comes from, because a plain photo input
-// lets the phone decide and some phones only offer the camera. The chosen
-// file input keeps its own onchange handler.
+// "Add photo" opens the camera straight away: on site it's the camera
+// nearly every time. "Choose one instead", beside it, asks whether the
+// photo is in the photo library or in files, because a plain photo input
+// lets the phone decide and some phones only offer the camera. The file
+// input keeps its own onchange handler. (A computer has no camera to open,
+// so Add photo opens its file picker.)
 let photoSourceInput = null;
-function choosePhotoSource(input) {
+function takePhoto(input) {
+  photoSourceInput = typeof input === 'string' ? document.getElementById(input) : input;
+  pickPhotoSource('camera');
+}
+// The sheet. choosing: opened from "Choose one instead", so the camera isn't
+// offered again and the photo library is the filled button. Without it (one
+// button for a photo, as on the treatment record) the camera leads.
+function choosePhotoSource(input, choosing) {
   photoSourceInput = typeof input === 'string' ? document.getElementById(input) : input;
   if (!photoSourceInput) return;
+  document.getElementById('photoSourceTitle').textContent = choosing ? 'Choose a photo' : 'Add a photo';
+  document.getElementById('photoSourceCamera').hidden = !!choosing;
+  document.getElementById('photoSourceLibrary').classList.toggle('quiet', !choosing);
   document.getElementById('photoSourceOverlay').classList.add('open');
 }
 function closePhotoSource() {
@@ -481,13 +502,13 @@ function renderSectionPhotoGrid(section) {
   if (!grid) return;
   const photos = getSectionPhotos(section);
   const limit = sectionPhotoLimit(section);
-  if (count) count.textContent = limit === 1 ? '' : `${photos.length} of ${limit} photos`;
-  // Areas and Access take photos per spot now; their old boxes only show
-  // for reports that already have photos in them.
+  if (count) count.textContent = limit === 1 ? '' : photoCountText(photos.length, limit);
+  // Areas, Findings and Conducive take photos on each spot, finding and
+  // condition now, and Advice takes none; their old boxes only show for
+  // reports that already have photos in them.
   const box = grid.closest('[data-legacy-photos]');
   if (box) box.hidden = !photos.length;
   if (btn && limit === 1) btn.lastChild.textContent = photos.length ? ' Replace photo' : ' Add photo';
-  else if (btn) btn.disabled = photos.length >= limit;
   if (photos.length === 0) {
     grid.innerHTML = '<div class="section-photo-empty">No photos added</div>';
     return;
@@ -517,12 +538,52 @@ function renderAllSectionPhotoGrids() {
   SECTION_PHOTO_KEYS.forEach(s => renderSectionPhotoGrid(s));
 }
 
+// ── CONDITION PHOTOS ─────────────────────────────────────────────────────
+// A conducive condition answered as a problem takes its own photos, under
+// its answer: photosBySection['cond-<field>'], stored with the other
+// section photos so backup and sync pick them up. They print with the
+// conducive conditions, each captioned with its condition. The strip stays
+// while it holds a photo, so one is never out of sight after the answer
+// changes. In the order the report prints the conditions.
+const CONDITION_PHOTO_LABELS = {
+  moistureReadings: 'Moisture', siteDrainage: 'Site drainage', subfloorDrainage: 'Subfloor drainage', subfloorVentilation: 'Subfloor ventilation',
+  mouldSeen: 'Mould', timberSoil: 'Timber-to-soil contact', slabEdge: 'Slab edge', weepHoles: 'Weep holes', antCapping: 'Ant capping',
+  nonDurableTimber: 'Non-durable timber',
+};
+function conditionPhotoSection(key) { return 'cond-' + key; }
+function conditionIsProblem(key) {
+  const concern = FGROUP_CONCERNS[key];
+  return !!concern && concern[0].includes(reportData[key]);
+}
+function renderConditionPhotos() {
+  Object.keys(CONDITION_PHOTO_LABELS).forEach(key => {
+    const box = document.getElementById('condPhotos-' + key);
+    // Not under a caption being typed.
+    const typing = document.activeElement;
+    if (!box || (typing && typing.classList.contains('spot-photo-caption') && box.contains(typing))) return;
+    const section = conditionPhotoSection(key);
+    const show = conditionIsProblem(key) || ((reportData.photosBySection || {})[section] || []).length > 0;
+    const html = show ? spotPhotosHTML(section) : '';
+    box.hidden = !show;
+    if (box._html === html) return;
+    box.innerHTML = box._html = html;
+    hydrateSpotPhotos(box);
+  });
+}
+// The photos of every condition, in the order the report prints them, each
+// captioned with its condition ahead of the inspector's details.
+function conditionPhotos() {
+  return Object.entries(CONDITION_PHOTO_LABELS).flatMap(([key, label]) =>
+    ((reportData.photosBySection || {})[conditionPhotoSection(key)] || []).map(p => ({ ...p, caption: [label, (p.caption || '').trim()].filter(Boolean).join(': ') })));
+}
+
 // Re-draws the parts of the report that aren't plain fields, after a
 // report is loaded, restored or reset.
 function renderReportWidgets() {
   renderRecLines();
   renderPhotoGrid();
   renderAllSectionPhotoGrids();
+  renderConditionPhotos();
   renderAreaChecklist();
   renderMoistureTable();
   syncFitFields();
@@ -692,9 +753,10 @@ function renderPhotoGrid() {
   if (!grid) return;
 
   const photos = reportData.photos || [];
-  countEl.textContent = `${photos.length} of ${MAX_PHOTOS_PER_REPORT} photos`;
+  countEl.textContent = photoCountText(photos.length, MAX_PHOTOS_PER_REPORT);
   countEl.classList.toggle('at-cap', photos.length >= MAX_PHOTOS_PER_REPORT);
   addBtn.disabled = photos.length >= MAX_PHOTOS_PER_REPORT;
+  document.getElementById('choosePhotoBtn').hidden = addBtn.disabled;
 
   if (photos.length === 0) {
     grid.style.display = 'none';

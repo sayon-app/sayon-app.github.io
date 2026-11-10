@@ -232,7 +232,7 @@
       <div class="ob-checklist">
         <div class="ob-check-item"><span class="ob-check-num">1</span><span>Add the job's address and client in Job details</span></div>
         <div class="ob-check-item"><span class="ob-check-num">2</span><span>Tap the mic at the bottom and talk through the inspection</span></div>
-        <div class="ob-check-item"><span class="ob-check-num">3</span><span>Say "Stop Sayon" or tap Extract data with AI, and the report fills itself in</span></div>
+        <div class="ob-check-item"><span class="ob-check-num">3</span><span>Say "Stop Sayon" or tap Fill in the report, and the report fills itself in</span></div>
         <div class="ob-check-item"><span class="ob-check-num">4</span><span>Check the report, then tap Send to client at the end of it</span></div>
       </div>
       <p style="font-size:calc(12px * var(--ts));color:var(--text3);line-height:1.6;margin-top:4px">Tip: Start recording, pop the phone in your pocket and talk room by room. Say <strong style="color:var(--accent2)">"Fill it in, Sayon"</strong> to fill the report as you go, and <strong style="color:var(--accent2)">"Stop Sayon"</strong> when you're done. Say the quote too, like "48 metres of barrier at $50 a metre, 50% deposit", and it fills in the quote.</p>
@@ -553,15 +553,17 @@
   </div>
 </div>
 
-<!-- ADD A PHOTO: camera, photo library or files. Outside #app so it also
-     shows over the treatment record. -->
+<!-- WHERE A PHOTO COMES FROM. One filled button, the rest quiet: the camera,
+     or the photo library when it's opened from "Choose one instead" (the
+     camera is then the button beside it). Outside #app so it also shows
+     over the treatment record. See choosePhotoSource in js/app/photos.js. -->
 <div class="page-sheet-overlay did-it-send-overlay" id="photoSourceOverlay" onclick="if (event.target === this) closePhotoSource()">
   <div class="did-it-send" role="dialog" aria-modal="true" aria-labelledby="photoSourceTitle">
     <div class="did-it-send-title" id="photoSourceTitle">Add a photo</div>
     <div class="did-it-send-btns photo-source-btns">
-      <button class="extract-btn" onclick="pickPhotoSource('camera')">Take a photo</button>
-      <button class="extract-btn" onclick="pickPhotoSource('library')">Photo library</button>
-      <button class="extract-btn" onclick="pickPhotoSource('files')">Files</button>
+      <button class="extract-btn" id="photoSourceCamera" onclick="pickPhotoSource('camera')">Take a photo</button>
+      <button class="extract-btn" id="photoSourceLibrary" onclick="pickPhotoSource('library')">Photo library</button>
+      <button class="extract-btn quiet" onclick="pickPhotoSource('files')">Files</button>
       <button class="link-btn" onclick="closePhotoSource()">Cancel</button>
     </div>
   </div>
@@ -1077,6 +1079,10 @@
                   <option>ACT</option><option>NT</option>
                 </select>
               </div>
+              <!-- An address inspected before says so here, as soon as it's
+                   typed (LAST VISIT in js/app/). "Start from it" is on the
+                   report's first step, where the report begins. -->
+              <p class="job-last-visit" id="jobLastVisit" hidden></p>
             </section>
 
             <!-- The client -->
@@ -1213,7 +1219,7 @@
             <p>Every plan has the whole app: voice reports, quotes, treatment certificates, PDFs and sending to clients. Each paid plan gives every inspector 800 AI fills a month, about 40 inspections.</p>
             <p><strong>One AI fill</strong> is one job the AI does for you:</p>
             <ul>
-              <li>filling in the report and quote from what you said (each time you say "Fill it in, Sayon" or "Stop Sayon", or tap Extract data with AI)</li>
+              <li>filling in the report and quote from what you said (each time you say "Fill it in, Sayon" or "Stop Sayon", or tap Fill in the report)</li>
               <li>filling in the agreement or treatment record when you tap Say it instead</li>
               <li>reading a compliance plate from a photo</li>
               <li>checking a photo when you tap Analyse</li>
@@ -1572,6 +1578,29 @@
             <h3><span class="sec-num">3.</span>About the property</h3>
             <span class="sec-badge empty" id="sts-property">Not started</span>
           </div>
+          <details class="fgroup" id="fg-day" open>
+            <summary class="fgroup-head">
+              <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/></svg></span>
+              <span class="fgroup-text"><span class="fgroup-title">Visit</span><span class="fgroup-sub"></span></span>
+              <span class="fgroup-count"></span>
+              <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
+          <div class="section-fields">
+            <div class="fsub">Occupancy</div>
+            <div class="field"><div class="field-label">Occupancy status</div><div class="field-val" id="f-occupancyStatus" onclick="startEdit(this,'occupancyStatus','occupancystatus')">—</div></div>
+            <div class="field"><div class="field-label">Furnishing</div><div class="field-val" id="f-furnishing" onclick="startEdit(this,'furnishing','furnishing')">—</div></div>
+            <div class="field field-wide"><div class="field-label">People present</div><div class="field-val" id="f-peoplePresent" onclick="startEdit(this,'peoplePresent','peoplepresent')">—</div></div>
+            <div class="fsub">Weather<button type="button" class="link-btn fsub-action" id="weatherFillBtn" onclick="fillWeather()">Fill from today's weather</button></div>
+            <div class="field"><div class="field-label">Conditions</div><div class="field-val" id="f-weatherConditions" onclick="startEdit(this,'weatherConditions','weatherconditions')">—</div></div>
+            <div class="field"><div class="field-label">Temperature</div><div class="field-val" id="f-temperature" onclick="startEdit(this,'temperature','text')">—</div></div>
+            <div class="field"><div class="field-label">Humidity</div><div class="field-val" id="f-humidity" onclick="startEdit(this,'humidity','text')">—</div></div>
+            <div class="field"><div class="field-label">Recent weather</div><div class="field-val" id="f-recentWeather" onclick="startEdit(this,'recentWeather','recentweather')">—</div></div>
+            <div class="field field-wide"><div class="field-label">Rain in the last 24 hours</div><div class="field-val" id="f-rainLast24h" onclick="startEdit(this,'rainLast24h','text')">—</div></div>
+            <div class="fsub">Standard and tools</div>
+            <div class="field field-wide"><div class="field-label">Applicable standard</div><div class="field-val" id="f-standard" onclick="startEdit(this,'standard','standard')">—</div></div>
+            <div class="field field-wide"><div class="field-label">Tools used</div><div class="field-val" id="f-toolsUsed" onclick="startEdit(this,'toolsUsed','toolsused')">—</div></div>
+          </div>
+          </details>
           <details class="fgroup" id="fg-building" open>
             <summary class="fgroup-head">
               <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9v12h14V9"/><path d="M10 21v-6h4v6"/></svg></span>
@@ -1600,14 +1629,14 @@
                 <span class="section-photo-count" id="sectionPhotoCount-general"></span>
               </div>
               <button class="section-photo-add-btn" id="sectionPhotoBtn-general"
-                onclick="choosePhotoSource('sectionPhotoInput-general')">
+                onclick="takePhoto('sectionPhotoInput-general')">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
                 Add photo
               </button>
               <input type="file" id="sectionPhotoInput-general" accept="image/*" style="display:none"
                 onchange="handleSectionPhotoFiles(this.files,'general')">
             </div>
-            <div class="section-photo-hint">One photo of the front of the house. It goes on the report cover.</div>
+            <div class="section-photo-hint">One photo of the front of the house. It goes on the report cover. <button type="button" class="link-btn photo-choose" onclick="choosePhotoSource('sectionPhotoInput-general', true)">Choose one instead</button></div>
             <div class="section-photo-grid" id="sectionPhotoGrid-general">
               <div class="section-photo-empty">No photos added</div>
             </div>
@@ -1624,29 +1653,6 @@
             <div class="field"><div class="field-label">Surroundings</div><div class="field-val" id="f-siteSurroundings" onclick="startEdit(this,'siteSurroundings','surroundings')">—</div></div>
             <div class="field"><div class="field-label">Site slope</div><div class="field-val" id="f-siteSlope" onclick="startEdit(this,'siteSlope','siteslope')">—</div></div>
             <div class="field field-wide"><div class="field-label">Termite history</div><div class="field-val" id="f-termiteHistory" onclick="startEdit(this,'termiteHistory','termitehistory')">—</div></div>
-          </div>
-          </details>
-          <details class="fgroup" id="fg-day" open>
-            <summary class="fgroup-head">
-              <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/></svg></span>
-              <span class="fgroup-text"><span class="fgroup-title">Visit</span><span class="fgroup-sub"></span></span>
-              <span class="fgroup-count"></span>
-              <svg class="icon fgroup-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-            </summary>
-          <div class="section-fields">
-            <div class="fsub">Occupancy</div>
-            <div class="field"><div class="field-label">Occupancy status</div><div class="field-val" id="f-occupancyStatus" onclick="startEdit(this,'occupancyStatus','occupancystatus')">—</div></div>
-            <div class="field"><div class="field-label">Furnishing</div><div class="field-val" id="f-furnishing" onclick="startEdit(this,'furnishing','furnishing')">—</div></div>
-            <div class="field field-wide"><div class="field-label">People present</div><div class="field-val" id="f-peoplePresent" onclick="startEdit(this,'peoplePresent','peoplepresent')">—</div></div>
-            <div class="fsub">Weather<button type="button" class="link-btn fsub-action" id="weatherFillBtn" onclick="fillWeather()">Fill from today's weather</button></div>
-            <div class="field"><div class="field-label">Conditions</div><div class="field-val" id="f-weatherConditions" onclick="startEdit(this,'weatherConditions','weatherconditions')">—</div></div>
-            <div class="field"><div class="field-label">Temperature</div><div class="field-val" id="f-temperature" onclick="startEdit(this,'temperature','text')">—</div></div>
-            <div class="field"><div class="field-label">Humidity</div><div class="field-val" id="f-humidity" onclick="startEdit(this,'humidity','text')">—</div></div>
-            <div class="field"><div class="field-label">Recent weather</div><div class="field-val" id="f-recentWeather" onclick="startEdit(this,'recentWeather','recentweather')">—</div></div>
-            <div class="field field-wide"><div class="field-label">Rain in the last 24 hours</div><div class="field-val" id="f-rainLast24h" onclick="startEdit(this,'rainLast24h','text')">—</div></div>
-            <div class="fsub">Standard and tools</div>
-            <div class="field field-wide"><div class="field-label">Applicable standard</div><div class="field-val" id="f-standard" onclick="startEdit(this,'standard','standard')">—</div></div>
-            <div class="field field-wide"><div class="field-label">Tools used</div><div class="field-val" id="f-toolsUsed" onclick="startEdit(this,'toolsUsed','toolsused')">—</div></div>
           </div>
           </details>
           <details class="fgroup" id="fg-system" open>
@@ -1672,7 +1678,7 @@
               <div class="section-photo-header">
                 <div class="section-photo-header-left">
                   <span class="section-photo-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>Durable notice</span>
-                  <span class="section-photo-count" id="sectionPhotoCount-durable">0 of 30 photos</span>
+                  <span class="section-photo-count" id="sectionPhotoCount-durable"></span>
                 </div>
               </div>
               <div class="section-photo-hint">Photograph the durable notice and SAYON fills in the system above. The photo is kept here and printed in the report.</div>
@@ -1727,7 +1733,7 @@
                Not applicable, and any obstruction or restricted reason is ticked
                under it. Rendered by renderAreaChecklist(). -->
           <div class="areas-intro">
-            <p class="access-intro">Mark every area and what was found there. If something limited the inspection, tick the kind of reason. You'll add where exactly further down.</p>
+            <p class="access-intro">Mark every area and what was found there. If something limited the inspection, tick the kind of reason, then add where exactly and a photo under it.</p>
             <div class="areas-bar">
               <span class="areas-progress" id="areasProgress"></span>
               <span class="areas-segs" id="areasSegs" aria-hidden="true"></span>
@@ -1743,15 +1749,8 @@
             <div class="section-photo-header">
               <div class="section-photo-header-left">
                 <span class="section-photo-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>Photos</span>
-                <span class="section-photo-count" id="sectionPhotoCount-obstructions">0 of 30 photos</span>
+                <span class="section-photo-count" id="sectionPhotoCount-obstructions"></span>
               </div>
-              <button class="section-photo-add-btn" id="sectionPhotoBtn-obstructions"
-                onclick="choosePhotoSource('sectionPhotoInput-obstructions')">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                Add photo
-              </button>
-              <input type="file" id="sectionPhotoInput-obstructions" accept="image/*" multiple style="display:none"
-                onchange="handleSectionPhotoFiles(this.files,'obstructions')">
             </div>
             <div class="section-photo-grid" id="sectionPhotoGrid-obstructions">
               <div class="section-photo-empty">No photos added</div>
@@ -1767,10 +1766,11 @@
           </div>
 
           <!-- Hindered and restricted access come from the reasons ticked in
-               Section 4, so nothing is entered twice. Rendered by
-               renderAccessSummary(), with an optional exact spot per area. -->
+               Section 4, with the exact spot and photos added on each area's
+               card there, so nothing is entered twice. Rendered by
+               renderAccessSummary(): what the report will print. -->
           <div class="section-fields" id="accessFields">
-            <p class="access-intro" id="accessIntro">Filled in from your ticks in Areas. Tap an area to change it.</p>
+            <p class="access-intro" id="accessIntro">What the report will print, from your ticks in Areas. Tap an area to change it there.</p>
             <div class="access-summary" id="accessHinderedBox"></div>
             <div class="access-summary" id="accessRestrictedBox"></div>
             <input type="file" id="spotPhotoInput" accept="image/*" multiple style="display:none" onchange="handleSpotPhotoFiles(this)">
@@ -1778,8 +1778,8 @@
               The parts of these areas that could not be seen or reached may contain termite activity or damage.
             </div>
 
-            <!-- Voice notes still write the free text here; Section 5 shows it
-                 on each area's row (ACCESS SPOTS in js/app/). -->
+            <!-- Voice notes still write the free text here; it shows on each
+                 area's card in Section 4 (ACCESS SPOTS in js/app/). -->
             <div hidden>
               <div class="field-val" id="f-hinderedAreas">—</div>
               <div class="field-val" id="f-noAccessAreas">—</div>
@@ -1822,20 +1822,13 @@
           </details>
 
 
-          <!-- Older reports only; new photos go on each spot above. -->
+          <!-- Older reports only; new photos go on each area's card. -->
           <div class="section-photo-widget" data-legacy-photos hidden>
             <div class="section-photo-header">
               <div class="section-photo-header-left">
                 <span class="section-photo-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>Photos</span>
-                <span class="section-photo-count" id="sectionPhotoCount-restrictions">0 of 30 photos</span>
+                <span class="section-photo-count" id="sectionPhotoCount-restrictions"></span>
               </div>
-              <button class="section-photo-add-btn" id="sectionPhotoBtn-restrictions"
-                onclick="choosePhotoSource('sectionPhotoInput-restrictions')">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                Add photo
-              </button>
-              <input type="file" id="sectionPhotoInput-restrictions" accept="image/*" multiple style="display:none"
-                onchange="handleSectionPhotoFiles(this.files,'restrictions')">
             </div>
             <div class="section-photo-grid" id="sectionPhotoGrid-restrictions">
               <div class="section-photo-empty">No photos added</div>
@@ -1997,15 +1990,8 @@
             <div class="section-photo-header">
               <div class="section-photo-header-left">
                 <span class="section-photo-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>Photos</span>
-                <span class="section-photo-count" id="sectionPhotoCount-findings">0 of 30 photos</span>
+                <span class="section-photo-count" id="sectionPhotoCount-findings"></span>
               </div>
-              <button class="section-photo-add-btn" id="sectionPhotoBtn-findings"
-                onclick="choosePhotoSource('sectionPhotoInput-findings')">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                Add photo
-              </button>
-              <input type="file" id="sectionPhotoInput-findings" accept="image/*" multiple style="display:none"
-                onchange="handleSectionPhotoFiles(this.files,'findings')">
             </div>
             <div class="section-photo-grid" id="sectionPhotoGrid-findings">
               <div class="section-photo-empty">No photos added</div>
@@ -2041,13 +2027,15 @@
                 <div class="field"><div class="field-label">Water leaks</div><div class="field-val" id="f-waterLeaks" onclick="startEdit(this,'waterLeaks','yesno')">—</div></div>
                 <div class="field" id="leakLocationWrap" style="display:none"><div class="field-label">Location of moisture ingress</div><div class="field-val" id="f-leakLocation" onclick="startEdit(this,'leakLocation','text')">—</div></div>
               </div>
+              <div class="cond-photos" id="condPhotos-moistureReadings" hidden></div>
             </div>
-            <div class="field"><div class="field-label">Site drainage</div><div class="field-val" id="f-siteDrainage" onclick="startEdit(this,'siteDrainage','drainage')">—</div></div>
-            <div class="field"><div class="field-label">Subfloor drainage</div><div class="field-val" id="f-subfloorDrainage" onclick="startEdit(this,'subfloorDrainage','drainage')">—</div></div>
-            <div class="field"><div class="field-label">Subfloor ventilation</div><div class="field-val" id="f-subfloorVentilation" onclick="startEdit(this,'subfloorVentilation','ventilation')">—</div></div>
+            <div class="field"><div class="field-label">Site drainage</div><div class="field-val" id="f-siteDrainage" onclick="startEdit(this,'siteDrainage','drainage')">—</div><div class="cond-photos" id="condPhotos-siteDrainage" hidden></div></div>
+            <div class="field"><div class="field-label">Subfloor drainage</div><div class="field-val" id="f-subfloorDrainage" onclick="startEdit(this,'subfloorDrainage','drainage')">—</div><div class="cond-photos" id="condPhotos-subfloorDrainage" hidden></div></div>
+            <div class="field"><div class="field-label">Subfloor ventilation</div><div class="field-val" id="f-subfloorVentilation" onclick="startEdit(this,'subfloorVentilation','ventilation')">—</div><div class="cond-photos" id="condPhotos-subfloorVentilation" hidden></div></div>
             <div class="field-wide field-pair">
               <div class="field"><div class="field-label">Mould seen</div><div class="field-val" id="f-mouldSeen" onclick="startEdit(this,'mouldSeen','yesno')">—</div></div>
               <div class="field"><div class="field-label">Where</div><div class="field-val" id="f-mouldWhere" onclick="startEdit(this,'mouldWhere','text')">—</div></div>
+              <div class="cond-photos" id="condPhotos-mouldSeen" hidden></div>
             </div>
           </div>
           <!-- Above-ground leak / secondary colony reminder -->
@@ -2075,12 +2063,14 @@
             <div class="field-wide field-pair">
               <div class="field"><div class="field-label">Timber-to-soil contact</div><div class="field-val" id="f-timberSoil" onclick="startEdit(this,'timberSoil','yesno')">—</div></div>
               <div class="field"><div class="field-label">Where and what</div><div class="field-val" id="f-timberSoilDetails" onclick="startEdit(this,'timberSoilDetails','text')">—</div></div>
+              <div class="cond-photos" id="condPhotos-timberSoil" hidden></div>
             </div>
-            <div class="field"><div class="field-label">Slab edge exposure</div><div class="field-val" id="f-slabEdge" onclick="startEdit(this,'slabEdge','slabedge')">—</div></div>
-            <div class="field"><div class="field-label">Weep holes</div><div class="field-val" id="f-weepHoles" onclick="startEdit(this,'weepHoles','weepholes')">—</div></div>
+            <div class="field"><div class="field-label">Slab edge exposure</div><div class="field-val" id="f-slabEdge" onclick="startEdit(this,'slabEdge','slabedge')">—</div><div class="cond-photos" id="condPhotos-slabEdge" hidden></div></div>
+            <div class="field"><div class="field-label">Weep holes</div><div class="field-val" id="f-weepHoles" onclick="startEdit(this,'weepHoles','weepholes')">—</div><div class="cond-photos" id="condPhotos-weepHoles" hidden></div></div>
             <div class="field-wide field-pair">
               <div class="field"><div class="field-label">Ant capping</div><div class="field-val" id="f-antCapping" onclick="startEdit(this,'antCapping','antcapping')">—</div></div>
               <div class="field"><div class="field-label">Where and what</div><div class="field-val" id="f-antCappingDetails" onclick="startEdit(this,'antCappingDetails','text')">—</div></div>
+              <div class="cond-photos" id="condPhotos-antCapping" hidden></div>
             </div>
             <div class="field-wide field-pair">
               <div class="field"><div class="field-label">Non-durable timber in damp areas</div><div class="field-val" id="f-nonDurableTimber" onclick="startEdit(this,'nonDurableTimber','yesno')">—</div></div>
@@ -2088,24 +2078,20 @@
                 <div class="field"><div class="field-label">What</div><div class="field-val" id="f-nonDurableTimberDetails" onclick="startEdit(this,'nonDurableTimberDetails','nondurable')">—</div></div>
                 <div class="field"><div class="field-label">Where</div><div class="field-val" id="f-nonDurableTimberWhere" onclick="startEdit(this,'nonDurableTimberWhere','nondurablewhere')">—</div></div>
               </div>
+              <div class="cond-photos" id="condPhotos-nonDurableTimber" hidden></div>
             </div>
           </div>
           </details>
 
-          <!-- Section photo widget -->
-          <div class="section-photo-widget">
+          <!-- A condition answered as a problem takes its photos under its
+               own answer (CONDITION PHOTOS in js/app/); this box only shows
+               for reports that already have photos in it. -->
+          <div class="section-photo-widget" data-legacy-photos hidden>
             <div class="section-photo-header">
               <div class="section-photo-header-left">
                 <span class="section-photo-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>Photos</span>
-                <span class="section-photo-count" id="sectionPhotoCount-conducive">0 of 30 photos</span>
+                <span class="section-photo-count" id="sectionPhotoCount-conducive"></span>
               </div>
-              <button class="section-photo-add-btn" id="sectionPhotoBtn-conducive"
-                onclick="choosePhotoSource('sectionPhotoInput-conducive')">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                Add photo
-              </button>
-              <input type="file" id="sectionPhotoInput-conducive" accept="image/*" multiple style="display:none"
-                onchange="handleSectionPhotoFiles(this.files,'conducive')">
             </div>
             <div class="section-photo-grid" id="sectionPhotoGrid-conducive">
               <div class="section-photo-empty">No photos added</div>
@@ -2173,20 +2159,15 @@
           </details>
         
 
-          <!-- Section photo widget -->
-          <div class="section-photo-widget">
+          <!-- Advice takes no photos: one belongs on the finding, area or
+               condition it shows, or in Other photos. This box only shows
+               for reports that already have photos in it. -->
+          <div class="section-photo-widget" data-legacy-photos hidden>
             <div class="section-photo-header">
               <div class="section-photo-header-left">
                 <span class="section-photo-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>Photos</span>
-                <span class="section-photo-count" id="sectionPhotoCount-recommendations">0 of 30 photos</span>
+                <span class="section-photo-count" id="sectionPhotoCount-recommendations"></span>
               </div>
-              <button class="section-photo-add-btn" id="sectionPhotoBtn-recommendations"
-                onclick="choosePhotoSource('sectionPhotoInput-recommendations')">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                Add photo
-              </button>
-              <input type="file" id="sectionPhotoInput-recommendations" accept="image/*" multiple style="display:none"
-                onchange="handleSectionPhotoFiles(this.files,'recommendations')">
             </div>
             <div class="section-photo-grid" id="sectionPhotoGrid-recommendations">
               <div class="section-photo-empty">No photos added</div>
@@ -2206,13 +2187,14 @@
           </div>
           <input type="file" id="photoFileInput" accept="image/*" multiple style="display:none" onchange="handlePhotoFiles(this.files)">
           <div class="photo-toolbar">
-            <span class="photo-count" id="photoCount">0 of 100 photos</span>
-            <button class="add-photo-btn" id="addPhotoBtn" onclick="choosePhotoSource('photoFileInput')">
+            <span class="photo-count" id="photoCount"></span>
+            <button type="button" class="link-btn photo-choose" id="choosePhotoBtn" onclick="choosePhotoSource('photoFileInput', true)">Choose one instead</button>
+            <button class="add-photo-btn" id="addPhotoBtn" onclick="takePhoto('photoFileInput')">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>
-              Add photos
+              Add photo
             </button>
           </div>
-          <div class="photo-empty-state" id="photoEmptyState">Photos that don't belong to one section go here. Each section has its own photo box too. Photos are made smaller automatically so the report stays quick.</div>
+          <div class="photo-empty-state" id="photoEmptyState">Photos that don't belong to one finding, area or condition go here. Photos are made smaller automatically so the report stays quick.</div>
           <div class="photo-grid" id="photoGrid" style="display:none"></div>
         </div>
 
@@ -2223,9 +2205,8 @@
             <span class="sec-badge empty" id="sts-signoff">Not started</span>
           </div>
           <div class="section-fields signoff-grid">
-            <div class="fsub">Inspector</div>
             <div class="field"><div class="field-label">Inspector name</div>
-              <input type="text" id="jobInspector" class="job-input" placeholder="Your full name" oninput="saveDraft();updateProgress()"></div>
+              <input type="text" id="jobInspector" class="job-input" placeholder="Your full name" oninput="onInspectorName()"></div>
             <div class="field"><div class="field-label">Pest licence no.</div>
               <input type="text" id="inspectorLicence" class="job-input" placeholder="e.g. PL12345"
                 oninput="reportData.inspectorLicence=this.value.trim();saveDraft();updateProgress()"></div>
@@ -2238,19 +2219,11 @@
               </div>
               <div class="signature-footer">
                 <span class="signature-status" id="sigStatusInspector">Not signed</span>
-                <button class="signature-clear-btn" onclick="clearInspectorSignature()">Clear</button>
-              </div>
-            </div>
-            <div class="fsub">Client</div>
-            <div class="field-wide signature-block">
-              <div class="field-label">Client agreement</div>
-              <div class="signoff-agreement" id="signoffAgreementStatus">Not signed yet. The client signs the agreement before the inspection starts.</div>
-              <div class="signature-footer">
-                <button class="signature-clear-btn" onclick="openAgreementSheet()">Open agreement</button>
+                <button class="signature-clear-btn" id="sigAgainInspector" onclick="clearInspectorSignature()" hidden>Sign again</button>
               </div>
             </div>
           </div>
-          <div class="warn-note note-good"><svg class="icon " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> Signatures are saved with this report, synced to your account when you're signed in, and printed in the PDF.</div>
+          <div class="warn-note note-good"><svg class="icon " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> Your signature is saved with this report and printed in the PDF. It carries on to your next report, until you sign again.</div>
           <!-- The end of the report: Report done ticks it off, then the one
                next step (the quote, or sending) is the big button and the
                rest are quiet. See REPORT DONE in js/app/editing.js. -->
@@ -2309,7 +2282,7 @@
   <!-- VOICE POPOVER -->
   <div class="voice-popover" id="voicePopover">
     <div class="voice-popover-header">
-      <span class="voice-popover-title"><svg class="icon " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span id="voicePopoverTitleText">Voice capture</span><span class="test-mode-badge" id="testModeBadge" hidden>Test mode on</span></span>
+      <span class="voice-popover-title"><svg class="icon " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span id="voicePopoverTitleText">Your note</span><span class="test-mode-badge" id="testModeBadge" hidden>Test mode on</span></span>
       <button class="voice-popover-close" onclick="toggleVoicePopover()"><svg class="icon " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
     </div>
 
@@ -2340,8 +2313,8 @@
     <div class="transcript-box" id="transcriptBox" contenteditable="true" onfocus="rememberTranscriptAtFocus(this); clearTranscriptPlaceholderIfNeeded(this)" onblur="learnFromTranscriptEdit()" oninput="onTranscriptEdited(this)" onpaste="onTranscriptPaste(event)">Tap the mic and start speaking, or tap here to type instead.</div>
 
     <!-- Ready-made sentences for when speaking isn't practical (a noisy roof
-         void). A tap adds the sentence to the note; Extract reads it like
-         dictation. See QUICK PHRASES in js/app/. -->
+         void). A tap adds the sentence to the note; Fill in the report reads
+         it like dictation. See QUICK PHRASES in js/app/. -->
     <details class="quick-phrases" id="quickPhrases">
       <summary>Quick phrases (when you can't talk)</summary>
       <div id="quickPhrasesList"></div>
@@ -2350,7 +2323,7 @@
 
     <div class="low-confidence-warning" id="lowConfidenceWarning">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      <span>Some of that wasn't heard clearly. Check the transcript before extracting</span>
+      <span>Some of that wasn't heard clearly. Check your note before filling in the report</span>
       <button class="cleanup-suggest-btn" id="cleanupSuggestBtn" onclick="suggestTranscriptCleanup()">Try AI cleanup</button>
     </div>
 
@@ -2399,7 +2372,7 @@
     </div>
 
     <button class="extract-btn" id="extractBtn" onclick="processTranscript()" disabled>
-      <svg class="icon " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>Extract data with AI
+      <svg class="icon " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>Fill in the report
     </button>
 
     <button class="extract-btn" id="useTranscriptBtn" onclick="useTranscriptForNotes()" style="display:none">
@@ -2408,7 +2381,7 @@
 
     <div class="ai-bar">
       <div class="ai-dot" id="aiDot"></div>
-      <span id="aiStatus">AI ready</span>
+      <span id="aiStatus">Ready</span>
     </div>
   </div><!-- /voicePopover -->
 

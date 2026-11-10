@@ -152,25 +152,20 @@ function changeAgreementJob() {
   document.getElementById('agreementInspectionType').focus({ preventScroll: true });
 }
 
+// The banner on the report's first step, until the agreement is signed:
+// red while there's nothing, amber once a link is out. A signed agreement
+// has no banner; it is on This job's Agreement step.
 function renderAgreementBanner() {
   const banner = document.getElementById('agreementBanner');
   if (!banner) return;
   const a = reportData.agreement;
-  banner.classList.toggle('signed', !!a);
+  banner.hidden = !!a;
   const sent = !a && reportData.agreementRequest;
   banner.classList.toggle('waiting', !!sent);
-  document.getElementById('agreementBannerText').textContent = a
-    ? `Agreement signed by ${a.signerName} · ${formatAgreementSignedAt(a.signedAt)}`
-    : sent ? `Link sent to ${sent.signerName}, waiting for them to sign` : 'Pre-inspection agreement not signed yet';
+  document.getElementById('agreementBannerText').textContent = sent
+    ? `Link sent to ${sent.signerName}, waiting for them to sign` : 'Pre-inspection agreement not signed yet';
   if (sent) checkAgreementLink(false);
-  document.getElementById('agreementBannerBtn').textContent = a ? 'View' : sent ? 'Open' : 'Get it signed';
-  const so = document.getElementById('signoffAgreementStatus');
-  if (so) {
-    so.textContent = a
-      ? `Signed by ${a.signerName} on ${formatAgreementSignedAt(a.signedAt)}${a.method === 'other' ? ` (${a.otherNote})` : ''}`
-      : 'Not signed yet. The client signs the agreement before the inspection starts.';
-    so.classList.toggle('signed', !!a);
-  }
+  document.getElementById('agreementBannerBtn').textContent = sent ? 'Open' : 'Get it signed';
 }
 
 function openAgreementSheet() {

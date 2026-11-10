@@ -495,7 +495,7 @@ function jobGo(to, from) {
     if (document.getElementById('app').style.display !== 'flex') openApp('inspect');
   }
   if (to === 'agreement') { openAgreementSheet(); rememberSheetFrom('agreementOverlay', from); return; }
-  if (to === 'report') return;
+  if (to === 'report') { fillWeatherOnTheDay(); return; }
   if (to === 'quote') { if (!document.getElementById('quoteScreen').classList.contains('open')) openQuoteFromReport(); return; }
   if (to === 'job') { closeJobPage(); openJobPage(); return; }
   if (!document.getElementById('jobOverlay').classList.contains('open')) openJobPage();
@@ -679,6 +679,7 @@ function formatAddress(street, suburb, state, postcode) {
   return [street, line2].filter(Boolean).join(', ');
 }
 
+let jobHadAddress = false;   // whether the job had an address when updateJob last ran
 function updateJob() {
   const addr = getFullAddress();
   const headerJob = document.getElementById('headerJob');
@@ -703,15 +704,20 @@ function updateJob() {
   syncAllSelectCards();
   renderLastVisitBanner();
   refreshJobNewNext();
+  // The address is one of the report's required answers, so the percentage
+  // and Finish's list follow it the moment it's typed or cleared.
+  const hasAddress = !!document.getElementById('jobAddress').value.trim();
+  if (hasAddress !== jobHadAddress) { jobHadAddress = hasAddress; updateProgress(); }
   saveDraft();
 }
 
 // ── LAST VISIT ──────────────────────────────────────────────────────────
-// An address this account has inspected before. The inspector can start
-// from that report: the property details that don't change from year to
-// year are copied in, the known termite history is written from what was
-// found then, and a sheet shows what changed since. Nothing about this
-// visit's findings is copied: those are inspected afresh.
+// An address this account has inspected before. The job's details say so
+// under the address as soon as it's typed, and the report's first step
+// offers to start from that report: the property details that don't change
+// from year to year are copied in, the known termite history is written
+// from what was found then, and a sheet shows what changed since. Nothing
+// about this visit's findings is copied: those are inspected afresh.
 //   reportData.lastVisit = { id, date, copied }   once started from
 //   reportData.lastVisitDismissed = <id>          when the inspector said not now
 const LAST_VISIT_KEYS = ['structureType', 'height', 'wallConstruction', 'roofType', 'floorType', 'facadeDirection', 'constructionEra',
@@ -801,6 +807,14 @@ function renderLastVisitBanner() {
     btn.textContent = 'Start from it';
     skip.hidden = false;
   } else banner.hidden = true;
+  // The job's details say the same under the address, from the moment it's
+  // typed: a return visit is known before the agreement, not after it.
+  const line = document.getElementById('jobLastVisit');
+  if (line) {
+    line.textContent = started ? `Started from the ${formatIssueDate(started.date)} inspection here.`
+      : prev ? `Inspected here before, on ${formatIssueDate(visitDate(prev))}. The report can start from that one.` : '';
+    line.hidden = !line.textContent;
+  }
 }
 
 function lastVisitAction() {
@@ -1026,12 +1040,47 @@ function onPostcodeTyped(el) {
 // ── WEATHER ON THE DAY ───────────────────────────────────────────────────
 // Temperature, humidity and the last 24 hours of rain at the property, from
 // the Worker's /weather route (Google's Weather API). Picking the address on
-// the day of the inspection fills the empty ones quietly; "Fill from today's
+// the day of the inspection fills the empty ones quietly, and so does
+// opening the job on that day when it was booked ahead; "Fill from today's
 // weather" fills them all, from the picked address or else the phone's
 // location. The inspector can still edit every value.
+const WEATHER_KEYS = ['weatherConditions', 'temperature', 'humidity', 'rainLast24h'];
 function inspectionIsToday() {
   const d = (document.getElementById('jobInspectionDate') || {}).value || reportData.jobInspectionDate;
   return !d || d === todayIsoDate();
+}
+
+// The quiet fill when a job is opened on its inspection day. A job booked
+// ahead had its address picked days before, when there was no weather to
+// take. Once a day for each job, and only while the report is being written.
+const weatherTried = new Set();
+function fillWeatherOnTheDay() {
+  if (!reportData.siteLocation || reportData.jobInspectionDate !== todayIsoDate()) return;
+  if (isReportDone() || isSampleJob(currentReportId)) return;
+  if (WEATHER_KEYS.every(k => reportData[k])) return;
+  const key = (currentReportId || 'draft') + ' ' + todayIsoDate();
+  if (weatherTried.has(key)) return;
+  weatherTried.add(key);
+  fillWeather({ quiet: true });
+}
+
+// The inspection moved to another day. What the weather filled in was the
+// old day's, so it goes (a reading the inspector gave stays), and today's
+// comes in if the new day is today.
+function weatherForNewDay() {
+  const filled = reportData.weatherFilled;
+  if (filled && !isReportDone()) {
+    WEATHER_KEYS.forEach(k => {
+      if (!reportData[k] || reportData[k] !== filled[k]) return;
+      delete reportData[k];
+      delete filled[k];
+      const el = document.getElementById('f-' + k);
+      if (el) { el.classList.remove('filled'); el.textContent = '—'; }
+    });
+    updateProgress();
+  }
+  weatherTried.delete((currentReportId || 'draft') + ' ' + todayIsoDate());
+  fillWeatherOnTheDay();
 }
 
 // Google's condition type as one of the report's Weather Conditions choices.
@@ -1054,11 +1103,13 @@ function phoneLocation() {
     { timeout: 10000, maximumAge: 600000 }));
 }
 
-// quiet: the automatic fill after an address pick. It fills only empty
-// fields, never asks for the phone's location and shows no messages.
+// quiet: the automatic fill (an address picked, or the job opened, on the
+// day). It fills only empty fields, never asks for the phone's location and
+// shows no messages.
 async function fillWeather({ quiet = false } = {}) {
   const btn = document.getElementById('weatherFillBtn');
   const say = (msg, kind) => { if (!quiet) showToast(msg, kind); };
+  const job = reportData;
   if (btn) { btn.disabled = true; btn.textContent = 'Getting the weather…'; }
   try {
     const loc = reportData.siteLocation || (quiet ? null : await phoneLocation());
@@ -1067,6 +1118,8 @@ async function fillWeather({ quiet = false } = {}) {
     if (res.status === 501) { say("Weather isn't set up yet, so enter it by hand", 'info'); return; }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const w = await res.json();
+    // Another job was opened while this one's weather was on its way.
+    if (job !== reportData) return;
     // The button refreshes what the weather filled before, but never a
     // reading the inspector dictated or typed: 65% said on site beats 74%
     // from the nearest station.
@@ -1178,10 +1231,12 @@ const JOB_INFO_FIELDS = ['jobOrderId','jobInspectionType','jobInspectionDate','j
                           'jobFee','jobClientPhone','jobClientEmail','jobNotes'];
 
 function saveJobInfo() {
+  const day = reportData.jobInspectionDate || '';
   JOB_INFO_FIELDS.forEach(id => {
     const el = document.getElementById(id);
     if (el) reportData[id] = el.value;
   });
+  if ((reportData.jobInspectionDate || '') !== day) weatherForNewDay();
   syncAllSelectCards();
   renderDateChips();
   if (typeof renderReportJobCard === 'function') renderReportJobCard();

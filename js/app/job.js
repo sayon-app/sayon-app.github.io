@@ -1025,13 +1025,14 @@ function saveJobInfo() {
   saveDraft();
 }
 
-// The inspection type decides which Australian Standard the report follows:
-// a pre-purchase inspection is reported under AS 4349.3, an inspection of
-// the owner's existing home under AS 3660.2.
+// The inspection type decides which Australian Standard the report follows.
+// AS 4349.3 is the standard for any timber pest inspection, pre-purchase or
+// the owner's annual one (AS 3660.2 points to it for inspections), and the
+// report's termite management advice refers to AS 3660.2 (T&C 10).
 const INSPECTION_TYPE_STANDARD = {
   'Pre-Purchase — Timber Pest': 'AS 4349.3-2010',
   'Pre-Purchase — Combined Building & Pest': 'AS 4349.3-2010',
-  'Annual — Existing Building': 'AS 3660.2-2017',
+  'Annual — Existing Building': 'AS 4349.3-2010',
 };
 // Whether this job is a pre-purchase inspection. The inspection type decides;
 // only a report with no type falls back to the standard it cites. The cover

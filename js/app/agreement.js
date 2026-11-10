@@ -20,7 +20,7 @@ const DEFAULT_AGREEMENT_TEXT = `1. The inspection
 {company} will carry out a {inspectionType} inspection of {address} for {client} on {date}, in line with {standard}.
 
 2. What is inspected
-A visual inspection of the readily accessible areas of the building and site for subterranean and drywood termites, borers of seasoned timber, wood decay fungi and chemical delignification, and for conditions that make timber pest attack more likely. This normally covers the interior, roof space, subfloor, exterior, outbuildings, and the site within 50 m of the building and inside the property boundary, where they can be safely reached.
+A visual inspection of the readily accessible areas of the building and site for subterranean and drywood termites, borers of seasoned timber, wood decay fungi and chemical delignification, and for conditions that make timber pest attack more likely. This normally covers the interior, roof space, subfloor, exterior, outbuildings, and the site within 30 m of the building and inside the property boundary, where they can be safely reached.
 
 3. How we inspect, and the limits
 The inspection is visual and non-invasive. We may tap timbers and use a moisture meter or other tools that do not damage the building. We do not move furniture, stored goods, floor coverings, insulation or vegetation, and we do not cut, drill or remove any part of the building. Areas we cannot reach or see will be recorded in the report, and timber pests or damage may be hidden in them. The inspection cannot guarantee that the property is, or will stay, free of timber pests. It is not a building, structural, asbestos, mould or electrical inspection. If we find timber damage, we may recommend that a builder or engineer assesses it.

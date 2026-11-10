@@ -444,7 +444,7 @@
     <button class="quote-btn quote-bar-pdf" id="quotePdfBtn" onclick="exportQuotePDF()" aria-label="Quote PDF" title="Quote PDF">
       <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>PDF
     </button>
-    <button class="quote-btn primary quote-bar-send" id="quoteEmailBtn" onclick="emailQuoteToClient()">
+    <button class="quote-btn primary quote-bar-send" id="quoteEmailBtn" onclick="openQuoteSendReview()">
       <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg><span id="quoteSendLabel">Send to client</span>
     </button>
   </div>
@@ -518,6 +518,36 @@
       </div>
       <button class="extract-btn" id="qaSaveBtn" onclick="saveQuoteAnswer()">Save</button>
       <button class="link-btn send-review-cancel" onclick="closeQuoteAnswer()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHECK BEFORE SENDING: the report (js/app/send.js) and the quote on its
+     own (js/quote.js). Outside #app so it also opens over the quote screen. -->
+<div class="page-sheet-overlay" id="sendReviewOverlay">
+  <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="sendReviewTitle">
+    <div class="page-sheet-header">
+      <span class="page-sheet-title" id="sendReviewTitle">Check before sending</span>
+      <button class="voice-popover-close" onclick="closeSendReview()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+    </div>
+    <div class="page-sheet-body">
+      <div class="send-review-gaps" id="sendReviewGaps" style="display:none"></div>
+      <div class="send-review-label">To</div>
+      <div class="send-review-card" id="sendReviewTo"></div>
+      <div class="send-review-copy" id="sendReviewCopy"></div>
+      <div class="send-review-label">Attached</div>
+      <div class="send-review-card" id="sendReviewFiles"></div>
+      <div class="send-review-label" id="sendReviewSummaryLabel">What the client reads first</div>
+      <div id="sendReviewSummary"></div>
+      <div class="send-review-label">Message</div>
+      <input class="job-input" id="sendReviewSubject" aria-label="Subject">
+      <textarea class="job-input send-review-body" id="sendReviewBody" rows="9" aria-label="Message"></textarea>
+    </div>
+    <!-- Always in reach, and always saying who it goes to. -->
+    <div class="page-sheet-foot">
+      <div class="page-sheet-foot-note" id="sendReviewOpen" hidden></div>
+      <button class="extract-btn" id="sendReviewBtn" onclick="confirmSendReview()">Open email to send</button>
+      <button class="link-btn send-review-cancel" onclick="closeSendReview()">Not yet</button>
     </div>
   </div>
 </div>
@@ -2297,6 +2327,10 @@
                next step (the quote, or sending) is the big button and the
                rest are quiet. See REPORT DONE in js/app/editing.js. -->
           <div class="finish-next" id="finishNext">
+            <!-- What the report is still missing, each with its way there:
+                 the same list the check before sending shows (WHAT THE
+                 REPORT IS STILL MISSING in js/app/dashboard.js). -->
+            <div class="send-review-gaps finish-gaps" id="finishGaps" hidden></div>
             <div class="finish-done" id="finishDone" hidden>
               <span class="finish-done-tick" aria-hidden="true"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
               <span class="finish-done-text"><b>Report done</b><small id="finishDoneWhen"></small></span>
@@ -2324,6 +2358,14 @@
         </div>
 
       </div><!-- /reportBody -->
+
+      <!-- Walking the list of what's missing: how many are left and Next
+           (SHOW ME in js/app/editing.js). Shows only after "Show me". -->
+      <div class="blank-walk" id="blankWalk" hidden>
+        <span class="blank-walk-text" id="blankWalkText"></span>
+        <button type="button" class="blank-walk-next" id="blankWalkNext" onclick="blankWalkNext()">Next</button>
+        <button type="button" class="blank-walk-close" onclick="stopBlankWalk()" aria-label="Stop showing what's left"><svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+      </div>
     </div><!-- /mainPanel -->
 
   <!-- POCKET LOCK: covers the page while recording, under the voice popover -->
@@ -2656,31 +2698,6 @@
       </details>
       <button class="extract-btn" id="problemSendBtn" onclick="sendProblemReport()">Send to SAYON</button>
       <button class="link-btn send-review-cancel" onclick="closeProblemReport()">Not now</button>
-    </div>
-  </div>
-</div>
-
-<!-- CHECK BEFORE SENDING -->
-<div class="page-sheet-overlay" id="sendReviewOverlay">
-  <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="sendReviewTitle">
-    <div class="page-sheet-header">
-      <span class="page-sheet-title" id="sendReviewTitle">Check before sending</span>
-      <button class="voice-popover-close" onclick="closeSendReview()" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
-    </div>
-    <div class="page-sheet-body">
-      <div class="send-review-gaps" id="sendReviewGaps" style="display:none"></div>
-      <div class="send-review-label">To</div>
-      <div class="send-review-card" id="sendReviewTo"></div>
-      <div class="send-review-copy" id="sendReviewCopy"></div>
-      <div class="send-review-label">Attached</div>
-      <div class="send-review-card" id="sendReviewFiles"></div>
-      <div class="send-review-label">What the client reads first</div>
-      <div id="sendReviewSummary"></div>
-      <div class="send-review-label">Message</div>
-      <input class="job-input" id="sendReviewSubject" aria-label="Subject">
-      <textarea class="job-input send-review-body" id="sendReviewBody" rows="9" aria-label="Message"></textarea>
-      <button class="extract-btn" id="sendReviewBtn" onclick="confirmSendReview()">Open email to send</button>
-      <button class="link-btn send-review-cancel" onclick="closeSendReview()">Not yet</button>
     </div>
   </div>
 </div>

@@ -259,6 +259,8 @@ function renderTreatmentBlock(q) {
   const status = q.certificateSentAt ? `Emailed ${formatIssueDate(q.certificateSentAt)}${who ? ` to ${who}` : ''}`
     : q.certificateHandedAt ? `Given${who ? ` to ${who}` : ''} in person ${formatIssueDate(q.certificateHandedAt)}`
     : to ? `Goes to ${to}` : 'Not sent yet';
+  // What the certificate would go without, said before it's emailed.
+  const missing = treatmentRecordGaps(t).filter(Boolean).map(g => g.missing);
   return `<div class="quote-step">
       <div><strong>Treatment recorded</strong>: done on ${escapeHtml(formatAnswerDate(t.date))}${t.technician ? ` by ${escapeHtml(t.technician)}` : ''}</div>
       ${t.nextInspection ? `<div class="quote-answer-note">Next inspection due ${escapeHtml(formatAnswerDate(t.nextInspection))}</div>` : ''}
@@ -266,6 +268,7 @@ function renderTreatmentBlock(q) {
     <div class="qp-cert ${given ? 'sent' : ''}">
       <div class="qp-cert-title">${many ? 'Treatment and installation certificates' : 'Treatment certificate'}</div>
       <p class="qp-cert-text">${escapeHtml(status)}</p>
+      ${missing.length ? `<div class="qp-cert-gaps"><span>The certificate${many ? 's don\'t' : ' doesn\'t'} say ${escapeHtml(joinWithAnd(missing))} yet.</span><button class="quote-link-btn" onclick="openTreatmentRecord()">Add ${missing.length === 1 ? 'it' : 'them'}</button></div>` : ''}
       ${treatmentSourceReport().propertyState === 'QLD' ? '<div class="quote-answer-note">In Queensland, email alone isn\'t enough: also hand the client a printed copy, or leave one in their letterbox.</div>' : ''}
       <div class="qp-cert-actions">
         <button class="${given ? 'quote-link-btn' : 'quote-btn primary'} qp-cert-email" onclick="emailTreatmentCertificate()">${q.certificateSentAt ? 'Email again' : q.certificateHandedAt ? 'Email a copy' : `Email${first ? ' to ' + escapeHtml(first) : ''}`}</button>
@@ -365,15 +368,25 @@ function openTreatmentRecord() {
 // the rest fold.
 function treatmentFoldLines() {
   const v = id => document.getElementById(id).value.trim();
-  const ticked = document.querySelectorAll('#trMethods input[type=checkbox]:checked').length;
-  const products = readTreatmentProducts().map(p => p.name).filter(Boolean);
-  const notice = v('trNotice');
-  const need = text => ({ warn: true, text });
+  const methods = {};
+  document.querySelectorAll('#trMethods input[type=checkbox]:checked').forEach(box => { methods[box.dataset.key] = ''; });
+  return treatmentRecordGaps({ technician: v('trTech'), licence: v('trLicence'), methods, products: readTreatmentProducts(),
+    areas: v('trAreas'), notice: v('trNotice'), noticeWhere: v('trNoticeWhere'), nextInspection: v('trNext') })
+    .map(g => g ? { warn: true, text: g.need } : {});
+}
+
+// What a record's certificate still needs, part by part (four entries,
+// null where a part is done). need is what the record sheet's fold says;
+// missing is how the certificate card names it once the record is saved,
+// since a record saves with gaps so a technician can finish it later.
+function treatmentRecordGaps(t) {
+  const gap = (need, missing) => ({ need, missing });
+  const products = (t.products || []).map(p => p.name).filter(Boolean);
   return [
-    !v('trTech') ? need('Add the technician') : !v('trLicence') ? need('Add the licence no.') : {},
-    !ticked ? need('Tick what was done') : !products.length ? need('Name the product used') : {},
-    !v('trAreas') ? need('Add the areas treated') : {},
-    notice !== 'none' && !v('trNoticeWhere') ? need('Say where the notice went') : !v('trNext') ? need('Add the next inspection date') : {},
+    !t.technician ? gap('Add the technician', 'the technician\'s name') : !t.licence ? gap('Add the licence no.', 'the technician\'s licence number') : null,
+    !Object.keys(t.methods || {}).length ? gap('Tick what was done', 'what was done') : !products.length ? gap('Name the product used', 'the product used') : null,
+    !t.areas ? gap('Add the areas treated', 'the areas treated') : null,
+    t.notice !== 'none' && !t.noticeWhere ? gap('Say where the notice went', 'where the notice went') : !t.nextInspection ? gap('Add the next inspection date', 'the next inspection date') : null,
   ];
 }
 

@@ -785,51 +785,120 @@ function reportSummary() {
   return { groups, limited, next, basis };
 }
 
-// Gaps in the report itself, shown before sending and before completing.
+// ── WHAT THE REPORT IS STILL MISSING ──
+// One list. Finish, the check before sending, the percentage in the corner
+// and the job's Finalise step all read it, so they can't disagree. It runs
+// in the order a job is done: the job's details, the agreement, then the
+// report's steps. A line is either required answers left blank
+// (REQUIRED_FIELDS, one line a step, so a skipped step isn't eight lines)
+// or something worth a second look (two answers that disagree, a note
+// still waiting). Each has the buttons that fix it there and then, or
+// "Show me", which goes to it in the report.
 function reportPrepItems() { return reportPrepGaps().map(g => g.text); }
 
-// The same list, each with the buttons that fix it from the check sheet
-// (fix: HTML, or '' when it has to be fixed in the report).
-// from: which sheet the fix buttons come back to ('send' or 'extract').
-// key: what kind of gap, so a sheet can leave some out.
+// What the list calls a required answer where the screen's own label
+// needs its heading to make sense.
+const REQUIRED_NAMES = { weatherConditions: 'weather conditions', findings: 'termite activity' };
+// How many required answers a report has: the address, the agreement, the
+// inspector's signature and every REQUIRED_FIELDS answer bar the hindered
+// access one, which is answered by the same taps as the area statuses.
+const reportRequiredCount = () => 1 + Object.values(REQUIRED_FIELDS).flat().filter(k => k !== 'hinderedAreas').length;
+
+// from: the screen the buttons come back to ('send', 'extract' or 'finish').
+// Each line: key (what kind of gap, so a sheet can leave some out), text,
+// fix (the buttons' HTML), targets (the places in the report "Show me" and
+// its Next walk through, in order), n (how many things it stands for),
+// required (they are required answers) and blank (an answer not given, as
+// against one worth a second look).
 function reportPrepGaps(from = 'send') {
   const gaps = [];
-  const push = (key, text, fix) => gaps.push({ key, text, fix: fix || '' });
+  const push = (key, text, fix, more) => gaps.push(Object.assign({ key, text, fix: fix || '', n: 1 }, more));
   const fixBtn = (kind, label) => `<button class="link-btn" onclick="fixReportGap('${kind}', '${from}')">${label}</button>`;
-  if (!document.getElementById('jobAddress').value.trim()) push('address', 'The job has no property address');
+  const show = (target, label) => fixBtn('go:' + target, label || 'Show me');
+  // A step's required answers that are blank, as one line naming them in
+  // the order they sit on the screen.
+  const blanks = (step, title, keys) => {
+    const open = keys.filter(k => !isFieldFilled(k)).map(k => {
+      const el = document.getElementById(k === 'findings' ? 'section-findings' : 'f-' + k);
+      const label = el && el.closest('.field') && el.closest('.field').querySelector('.field-label');
+      return { k, el, name: REQUIRED_NAMES[k] || (label ? lowerFirst(label.childNodes[0].textContent.trim()) : k) };
+    }).filter(b => b.el).sort((a, b) => a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
+    if (!open.length) return;
+    const names = open.map(b => b.name);
+    const text = names.length > 3 ? `${title}: ${names.length} answers are blank, starting with ${names[0]}`
+      : `${title}: ${joinWithAnd(names)} ${names.length === 1 ? 'isn\'t' : 'aren\'t'} answered`;
+    push('blank:' + step, text, show(open[0].el.id), { targets: open.map(b => b.el.id), n: open.length, required: true, blank: true });
+  };
+
+  if (!document.getElementById('jobAddress').value.trim()) push('address', 'The job has no property address', fixBtn('address', 'Add it'), { required: true, blank: true });
+  // The agreement comes before the report is touched, so it leads the list.
+  if (!reportData.agreement && reportData.agreementRequest) push('agreement', `The agreement link is waiting on ${reportData.agreementRequest.signerName || 'the client'} to sign`, fixBtn('agreement', 'Check it'), { required: true, blank: true });
+  else if (!reportData.agreement) push('agreement', 'No pre-inspection agreement is recorded', fixBtn('agreement', 'Get it signed'), { required: true, blank: true });
+
+  blanks('property', 'Property', REQUIRED_FIELDS.property);
+
   const unmarked = Object.keys(OBS_ZONES).filter(z => !areaStatusOf(z));
   // A few areas each get their own answer: "no outbuildings" and "the
   // sleeper wall was looked at" need different taps, and one button for
   // both got one of them wrong. Many at once keep the quick buttons.
   if (unmarked.length && unmarked.length <= 3) {
-    unmarked.forEach(z => push('status', `${zoneName(z)}: no inspection status${areaEvidence(z).length ? ' (a finding mentions it)' : ''}`,
-      fixBtn('inspected:' + z, 'Inspected') + fixBtn('na:' + z, 'Not applicable')));
+    unmarked.forEach((z, i) => push('status', `${zoneName(z)}: no inspection status${areaEvidence(z).length ? ' (a finding mentions it)' : ''}`,
+      fixBtn('inspected:' + z, 'Inspected') + fixBtn('na:' + z, 'Not applicable'), { required: i === 0, blank: true }));
   } else if (unmarked.length) push('status', `${unmarked.length} areas have no inspection status (${joinWithAnd(unmarked.map(z => zoneName(z).toLowerCase()))})`,
-    fixBtn('inspected', 'Mark the rest as inspected') + fixBtn('na', 'Mark the rest not applicable'));
+    fixBtn('inspected', 'Mark the rest as inspected') + fixBtn('na', 'Mark the rest not applicable'), { required: true, blank: true });
   const noResult = areasMissingResult();
   if (noResult.length) push('result', `${noResult.length} area${noResult.length === 1 ? ' has' : 's have'} no result for what was found there (${joinWithAnd(noResult.map(z => zoneName(z).toLowerCase()))})`,
-    fixBtn('clear', 'Mark the rest as nothing found'));
+    fixBtn('clear', 'Mark the rest as nothing found'), { blank: true });
   // "Nothing found" over an area a finding names: the report would contradict itself.
   Object.keys(OBS_ZONES).filter(z => areaResultOf(z) === 'CLEAR' && areaEvidence(z).length).forEach(z =>
     push('contradiction', `${zoneName(z)}: marked "nothing found", but ${areaEvidence(z)[0].replace(/ \(.*$/, '')} is there`, fixBtn('found:' + z, 'Mark evidence found')));
   areasEvidenceUnlinked().forEach(z => push('evidence', `${zoneName(z)}: marked "evidence found", but no finding mentions it`, fixBtn('finding:' + z, 'Say what it was')));
-  findingsMissingReferral().forEach(n => push('referral', `Finding ${n}: "refer to a builder or engineer?" isn't answered`));
-  const pending = (reportData.pendingNotes || []).length;
-  if (pending) push('pending', `${pending} voice note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
+
+  blanks('findings', 'Findings', REQUIRED_FIELDS.findings);
+  findingsMissingReferral().forEach(n => {
+    const f = reportData.findings[n - 1];
+    push('referral', `Finding ${n}: "refer to a builder or engineer?" isn't answered`, f && f.id ? show(`finding-card-${f.id}:referral`) : '', { blank: true, targets: f && f.id ? [`finding-card-${f.id}:referral`] : [] });
+  });
+
+  blanks('conducive', 'Conducive', REQUIRED_FIELDS.conducive);
+  // The three answers a client reads first: each is named when blank.
+  blanks('recommendations', 'Advice', REQUIRED_FIELDS.recommendations);
   // AS 3660.2 recommends a timber pest inspection at least every 12 months,
   // so a longer interval is worth a second look before it goes out.
   const intervalMonths = longestInspectionIntervalMonths(reportData.inspectionFrequency);
   if (intervalMonths > 12) push('interval', `The next inspection is set ${intervalMonths % 12 ? intervalMonths + ' months' : (intervalMonths / 12) + ' years'} away. AS 3660.2 recommends one at least every 12 months`,
     fixBtn('interval12', 'Make it 12 months'));
-  if (!reportData.inspectorSignature) push('signature', 'The inspector hasn\'t signed');
-  if (!reportData.agreement && reportData.agreementRequest) push('agreement', `The agreement link is waiting on ${reportData.agreementRequest.signerName || 'the client'} to sign`, from === 'extract' ? fixBtn('agreement', 'Check it') : '');
-  else if (!reportData.agreement) push('agreement', 'No pre-inspection agreement is recorded', from === 'extract' ? fixBtn('agreement', 'Get it signed') : '');
+
+  if (!isFieldFilled('inspectorLicence')) push('licence', 'Your pest licence number isn\'t on the report', show('inspectorLicence', 'Add it'), { required: true, blank: true, targets: ['inspectorLicence'] });
+  if (!reportData.inspectorSignature) push('signature', 'The inspector hasn\'t signed', show('sigCanvasInspector', 'Sign it'), { required: true, blank: true, targets: ['sigCanvasInspector'] });
+
+  const pending = (reportData.pendingNotes || []).length;
+  if (pending) push('pending', `${pending} voice note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
   // Photos the account never received are only on this phone: the PDF
-  // has them today, but a lost phone or another device's copy won't.
+  // has them today, but a lost phone or another device's copy won't. They
+  // go up on their own with signal, so they don't hold the percentage back.
   const onlyHere = photosOnlyOnThisPhone().length;
   if (onlyHere && authSession) push('photos', `${onlyHere} photo${onlyHere === 1 ? ' is' : 's are'} only on this phone, not in your account yet`,
-    fixBtn('photos', navigator.onLine ? 'Back up now' : 'Back up when online'));
+    fixBtn('photos', navigator.onLine ? 'Back up now' : 'Back up when online'), { n: 0 });
+  // A completed job is locked, so nothing here offers to change it.
+  if (isReportLocked()) gaps.forEach(g => { if (g.key !== 'photos') g.fix = ''; });
   return gaps;
+}
+
+// How far along the report is, off that list: 100% is nothing left on it.
+// Required answers make up the whole; a second look still open adds to it.
+function reportProgress() {
+  const gaps = reportPrepGaps('finish');
+  const open = gaps.reduce((sum, g) => sum + g.n, 0);
+  const blank = gaps.reduce((sum, g) => sum + (g.blank ? g.n : 0), 0);
+  const total = reportRequiredCount() + gaps.reduce((sum, g) => sum + (g.required ? 0 : g.n), 0);
+  return { gaps, open, blank, checks: open - blank, total, pct: Math.max(0, Math.round((total - open) / total * 100)) };
+}
+
+// The list as the amber box Finish and the check sheet both show.
+function reportGapsHtml(gaps) {
+  return `<div class="send-review-label">Worth checking first</div><ul class="send-review-list">${gaps.map(g =>
+    `<li><span class="send-review-gap-text">${escapeHtml(g.text)}</span>${g.fix ? `<span class="send-review-fixes">${g.fix}</span>` : ''}</li>`).join('')}</ul>`;
 }
 
 // The longest interval the re-inspection wording names, in months:
@@ -853,7 +922,7 @@ function photosOnlyOnThisPhone() {
 // "Back up now" on the check sheet: the photos go up, and the sheet is
 // drawn again with the gap gone or a reason it isn't.
 async function backUpPhotosFromGap(from) {
-  const reopen = () => from === 'send' ? openSendReview() : showExtractSummary(extractSummaryBefore);
+  const reopen = () => from === 'send' ? openSendReview() : from === 'extract' ? showExtractSummary(extractSummaryBefore) : updateProgress();
   if (!navigator.onLine) { showToast('You\'re offline. The photos back up on their own once you\'re online', 'warn'); return; }
   const before = photosOnlyOnThisPhone().length;
   showToast(`Backing up ${before} photo${before === 1 ? '' : 's'}…`, 'info');
@@ -870,10 +939,11 @@ async function backUpPhotosFromGap(from) {
 // The same gaps, shown on the after-extract sheet while the inspector is
 // still on site: what the standard asks for that the notes didn't cover,
 // and a minute fixes it in the driveway. Signing and waiting notes are
-// left out: they aren't on-site work. The referral is on the Left blank
-// list already.
+// left out: they aren't on-site work, and nor is the licence number. The
+// referral is on the Left blank list already, and the steps not reached
+// yet aren't gaps mid-inspection.
 function driveawayGaps() {
-  const gaps = reportPrepGaps('extract').filter(g => !['pending', 'signature', 'referral'].includes(g.key));
+  const gaps = reportPrepGaps('extract').filter(g => !['pending', 'signature', 'licence', 'referral'].includes(g.key) && !g.key.startsWith('blank:'));
   const go = (target, label) => `<button class="link-btn" onclick="closeExtractSummary(); goToReportField('${target}')">${label}</button>`;
   if (isBlankValue(reportData.moistureReadings)) gaps.push({ key: 'moisture', text: 'Moisture readings: not recorded', fix: go('f-moistureReadings', 'Record') });
   if (isBlankValue(reportData.durableNoticePresent)) gaps.push({ key: 'notice', text: 'Durable notice in the meter box: not recorded', fix: go('f-durableNoticePresent', 'Record') });
@@ -881,8 +951,10 @@ function driveawayGaps() {
 }
 
 // Anything that should be sorted out before the job is completed and locked.
+// A required answer left blank doesn't hold a job open: the report can go
+// with one (the check sheet says so by name), and so it can be completed.
 function reportAttentionItems() {
-  const items = reportPrepItems();
+  const items = reportPrepGaps().filter(g => !g.key.startsWith('blank:') && g.key !== 'licence').map(g => g.text);
   const amending = reportData.amending;
   if (!reportData.sent) items.push('The report hasn\'t been sent to the client');
   else if (amending && reportData.sent.at < amending.startedAt) items.push('The amended report hasn\'t been sent to the client');

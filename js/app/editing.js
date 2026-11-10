@@ -621,6 +621,9 @@ function showSection(name) {
     const scroller = document.getElementById('reportBody');
     if (scroller) scroller.scrollTop = 0;
   }
+  // On Finish the list of what's missing is right there, so the bar that
+  // walks it goes (SHOW ME).
+  renderBlankWalk();
   track('screen_viewed', { screen: 'report_' + name });
 }
 
@@ -852,10 +855,14 @@ function updateProgress() {
   });
   renderFieldGroups();
 
-  // A completed (locked) job reads Complete whatever the count says.
+  // A completed (locked) job reads Complete whatever the count says. The
+  // percentage is read off the one list of what's missing (reportProgress
+  // in js/app/dashboard.js), so it and Finish can't disagree.
   const locked = isReportLocked();
   const done = isReportDone();
-  const pct = locked || done ? 100 : Math.round((filled / total) * 100);
+  const progress = typeof reportProgress === 'function' ? reportProgress()
+    : { gaps: [], open: total - filled, blank: total - filled, checks: 0, total, pct: Math.round((filled / total) * 100) };
+  const pct = locked || done ? 100 : progress.pct;
   document.getElementById('progressFill').style.width = pct + '%';
   document.getElementById('generateBtn').disabled = filled === 0 && !locked;
   document.getElementById('shareBtn').disabled = filled === 0 && !locked;
@@ -871,13 +878,14 @@ function updateProgress() {
     const wrap = ringFill.closest('.progress-ring-wrap');
     if (wrap) {
       wrap.classList.toggle('locked', locked || done);
-      wrap.title = locked ? 'Job complete' : done ? 'Report done' : `Report ${pct}% complete (required fields)`;
+      wrap.title = locked ? 'Job complete' : done ? 'Report done' : `Report ${pct}% complete`;
       wrap.setAttribute('aria-label', wrap.title);
     }
     const label = document.getElementById('progressRingLabel');
     if (label) { label.style.display = locked || done ? '' : 'none'; label.textContent = locked ? 'Complete' : 'Done'; }
   }
-  renderFinishNext(total - filled);
+  renderFinishNext(progress);
+  renderBlankWalk(progress);
   renderReportJobCard();
   syncDockReport(pct, locked || done);
   syncDockJobs();
@@ -928,17 +936,24 @@ function doneWhen(ts) {
   return w === 'Today' || w === 'Yesterday' ? w.toLowerCase() : formatIssueDate(ts);
 }
 
-// The Finish step's end: Report done until it's ticked (with how many
-// required answers are still blank), then one big button for the next step
-// and the rest quiet. blank: required answers not filled in.
-function renderFinishNext(blank) {
+// The Finish step's end: what the report is still missing, each with its
+// way there, then Report done until it's ticked, then one big button for
+// the next step and the rest quiet. progress: reportProgress().
+function renderFinishNext(progress) {
   const doneBtn = document.getElementById('reportDoneBtn');
   if (!doneBtn || typeof quoteHasItems !== 'function') return;
   const done = isReportDone(), locked = isReportLocked();
-  const { q, hasQuote, wantsQuote, sent, next } = reportNextStep();
+  const { q, hasQuote, wantsQuote, sent, gone, next } = reportNextStep();
   doneBtn.hidden = done;
-  document.getElementById('reportDoneSub').textContent = blank > 0
-    ? `${blank} required answer${blank === 1 ? ' is' : 's are'} still blank. You can tick it off anyway.`
+  // The same list the check before sending shows. Once the report has
+  // gone (or the job is locked) it's the record, and the list goes quiet.
+  const gapsBox = document.getElementById('finishGaps');
+  const gaps = locked || gone ? [] : progress.gaps;
+  gapsBox.hidden = !gaps.length;
+  gapsBox.innerHTML = gaps.length ? reportGapsHtml(gaps) : '';
+  const { blank, checks } = progress;
+  document.getElementById('reportDoneSub').textContent = blank || checks
+    ? `${[blank ? `${blank} still blank` : '', checks ? `${checks} to check` : ''].filter(Boolean).join(' and ')}. You can tick it off anyway.`
     : 'Ticks it off on the job. You can still change it.';
   document.getElementById('finishDone').hidden = !done;
   document.getElementById('finishDoneWhen').textContent = locked ? 'Job complete and locked'
@@ -971,6 +986,60 @@ function renderFinishNext(blank) {
       btn.onclick = next === 'quote' ? () => tabGo('quote') : () => openSendReview();
     }
   }
+}
+
+// ── SHOW ME ──
+// "Show me" on the list of what's missing goes to the answer in the report.
+// A small bar then stays above the dock with how many are left and Next,
+// which goes on to the next one down the report, so the list is walked
+// without going back to Finish each time. The bar goes on its cross, on
+// the Finish step (the list is there), and with the report: it sits
+// inside the report's panel.
+let blankWalk = null; // { last: the place shown last } while it's being walked
+// Every place the list points at, in its order ("id" or "id:referral").
+const blankTargets = gaps => gaps.flatMap(g => g.targets || []);
+const blankTargetEl = t => document.getElementById(String(t).replace(/:referral$/, ''));
+// The places further down the report than the one shown last.
+function blankTargetsAhead(gaps) {
+  const targets = blankTargets(gaps);
+  const last = blankWalk && blankTargetEl(blankWalk.last);
+  if (!last) return targets;
+  return targets.filter(t => { const el = blankTargetEl(t); return el && (last.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) && !last.contains(el); });
+}
+
+function showBlank(target) {
+  if (navPlace() !== 'report') tabGo('report');
+  blankWalk = { last: target };
+  goToReportField(target.replace(/:referral$/, ''), target.endsWith(':referral'));
+  renderBlankWalk();
+}
+
+// On to the next one down the report; past the last, back to Finish,
+// where the list shows whatever is still on it.
+function blankWalkNext() {
+  const next = blankWalk && blankTargetsAhead(reportPrepGaps('finish'))[0];
+  if (next) { showBlank(next); return; }
+  stopBlankWalk();
+  goStep('finish');
+  document.getElementById('finishNext').scrollIntoView({ block: 'start' });
+}
+
+function stopBlankWalk() {
+  blankWalk = null;
+  renderBlankWalk();
+}
+
+function renderBlankWalk(progress) {
+  const bar = document.getElementById('blankWalk');
+  if (!bar) return;
+  if (blankWalk && (currentStep === 'finish' || isReportLocked())) blankWalk = null;
+  bar.hidden = !blankWalk;
+  if (!blankWalk) return;
+  const { blank, checks, gaps } = progress || reportProgress();
+  document.getElementById('blankWalkText').textContent = blank || checks
+    ? [blank ? `${blank} still blank` : '', checks ? `${checks} to check` : ''].filter(Boolean).join(', ')
+    : 'Nothing left on the list';
+  document.getElementById('blankWalkNext').textContent = blankTargetsAhead(gaps).length ? 'Next' : 'Back to Finish';
 }
 
 // The Property step's Job details card: the address and client, then the

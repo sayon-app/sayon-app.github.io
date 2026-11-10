@@ -17,7 +17,7 @@ const sess = { access_token:'a.b.c', refresh_token:'r', expires_at: Math.floor(D
   await ctx.route(/fonts\.g/, r => r.fulfill({ status:200, body:'', contentType:'text/css' }));
   await ctx.route(/workers\.dev/, r => r.fulfill({ json:{ plan:'starter', status:'active', ai_calls_used_this_period:1, limit:150 } }));
   await ctx.route(/supabase\.co/, r => { const u = r.request().url(); if (u.includes('businesses?owner_id')) return r.fulfill({ json:[{ id:'b1', name:'Example Pest Co', owner_id: uid, settings:{} }] }); return r.fulfill({ json:[] }); });
-  await ctx.addInitScript((s) => { localStorage.setItem('korva_session', JSON.stringify(s)); localStorage.setItem('korva_onboarded_v1','1'); }, sess);
+  await ctx.addInitScript((s) => { localStorage.setItem('korva_session', JSON.stringify(s)); localStorage.setItem('korva_onboarded_v1:' + s.user.id, '1'); }, sess);
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(3500);
   await p.evaluate(async () => {
@@ -39,7 +39,7 @@ const sess = { access_token:'a.b.c', refresh_token:'r', expires_at: Math.floor(D
       borerActivity:'NONE', decayFound:'NO', waterLeaks:'NO', moistureReadings:'YES',
       moistureMeterReadings:[{ location:'Back room', reading:'28%' }, { location:'Bathroom', reading:'15%' }, { location:'Kitchen', reading:'14%' }],
       timberSoil:'YES', weepHoles:'CLEAR', durableNoticePresent:'NO', softLandscaping:'YES', treatmentRecommended:'YES',
-      treatmentType:'Treat the active termites in the backyard tree; install a termite management system (chemical barrier or baiting system)',
+      treatmentType:'Treat the active termites in the backyard tree; install a termite baiting system (8 stations)',
       inspectionFrequency:'Next inspection in 3 months, then every 12 months', riskLevel:'HIGH' });
   });
   await p.waitForTimeout(4000);
@@ -47,6 +47,16 @@ const sess = { access_token:'a.b.c', refresh_token:'r', expires_at: Math.floor(D
     const c = document.createElement('canvas'); c.width = 300; c.height = 90; const x = c.getContext('2d'); x.strokeStyle = '#0c121c'; x.lineWidth = 3; x.beginPath(); x.moveTo(10,60); x.bezierCurveTo(60,10,90,90,140,40); x.bezierCurveTo(170,20,200,70,280,30); x.stroke();
     const sig = c.toDataURL('image/png');
     reportData.inspectorLicence = 'NSW 000000'; reportData.inspectorSignature = sig;
+    // The rest of a finished report's answers, so the sample has no blanks:
+    // every area marked with its result and why it was limited, and the
+    // yes/no questions the summary reads.
+    Object.assign(reportData, {
+      areaStatus: Object.assign({}, reportData.areaStatus, { outbuildings:'NA', retainingwalls:'NA', landscapingtimbers:'NA' }),
+      areaResult: { interior:'CLEAR', exterior:'CLEAR', subfloor:'FOUND', roofvoid:'CLEAR', site:'FOUND', fences:'CLEAR' },
+      areaReasons: { interior:['Furniture or fittings'], subfloor:['Stored items'], roofvoid:['Low clearance'] },
+      existingSystem:'No System Found', termiteHistory:'None known', toolsUsed:'Moisture meter and sounding tool',
+      previousTreatment:'NO', delignification:'NO', invasiveInspection:'NO' });
+    (reportData.findings || []).forEach(f => { f.structuralConcern = 'NO'; if (!f.nestLocated) f.nestLocated = 'NO'; });
     const v = agreementFormValues();
     reportData.agreement = { method:'onsite', signerName:'Sam Taylor', signature: sig, signedAt: Date.now() - 3600e3, inspectionDate: v.inspectionDate, fee: v.fee || '350', notes: v.notes, standard: v.standard, text: v.text };
     saveDraft(); renderReportWidgets && renderReportWidgets(); updateProgress();

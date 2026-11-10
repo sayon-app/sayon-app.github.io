@@ -146,7 +146,8 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
   check(/2 came back/.test(said) && /Sam Taylor signed the agreement for 12 Wattle Street/.test(said) && /Jo Lee accepted the quote for 88 Ironbark Road/.test(said), 'and Jobs says so: ' + said);
   list = await cards();
   const sam = list.find(c => c.street === '12 Wattle Street'), jo = list.find(c => c.street === '88 Ironbark Road');
-  check(sam && sam.act === 'Finish the report' && jo && jo.act === 'Record the treatment', 'both jobs move on without being opened: ' + (sam && sam.act) + ', ' + (jo && jo.act));
+  // Jo signed to accept from the link, so the signed copy is owed first.
+  check(sam && sam.act === 'Finish the report' && jo && jo.act === 'Email the signed quote', 'both jobs move on without being opened: ' + (sam && sam.act) + ', ' + (jo && jo.act));
   await p.screenshot({ path: `${OUT}/6-came-back.png` });
 
   // ── 6. The dock names the job, and the mic minds a finished report ──

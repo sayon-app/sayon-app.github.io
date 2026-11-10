@@ -119,7 +119,7 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   fs.writeFileSync(`${OUT}/report-areas-clear.pdf`, Buffer.from(pdf, 'base64'));
   const text = execFileSync('pdftotext', ['-layout', `${OUT}/report-areas-clear.pdf`, '-']).toString().replace(/\s+/g, ' ');
   const findingsText = text.slice(text.lastIndexOf('FINDINGS'), text.lastIndexOf('PREVIOUS TERMITE TREATMENT') + 200);
-  check(/Termite Activity\s+Not recorded/i.test(findingsText) === false && /NO ACTIVITY FOUND/.test(findingsText), 'the PDF prints the termite finding as no activity found');
+  check(/Termite Activity\s+NONE/i.test(findingsText) && !/TERMITE FINDING 1|NO ACTIVITY FOUND|NEST FOUND\?\s+NOT RECORDED/i.test(findingsText), 'the PDF prints no termites as one row, with no numbered card and no nest question');
   check(/Borers of Seasoned Timber\s+NONE/i.test(findingsText) && /Wood Decay Fungi \(Rot\)\s+NO\b/i.test(findingsText) && /Chemical Delignification\s+NO\b/i.test(findingsText), 'the PDF prints borers NONE, rot NO and delignification NO');
 
   // 5. An area changed to evidence found takes those answers back and asks what it was.

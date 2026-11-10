@@ -45,16 +45,20 @@ function jobReportReady() {
   return !!(reportData.issue || reportData.sent || reportData.pdfAt || calculateCompletion() >= 100);
 }
 
-// The parts of the job PDF, in order: { kind, title, note, build() → { blob, fname } }.
+// The parts of the job PDF, in the order they go in: { kind, title, note,
+// build() → { blob, fname } }. The agreement goes in once. The report
+// carries it as its appendix, so with a report its line has no build and
+// points there (inReport); with no report yet it's a document of its own.
 function jobPdfParts() {
   const q = currentJobQuote();
   const parts = [];
   const a = reportData.agreement;
-  if (a) parts.push({ kind: 'agreement', title: 'Pre-inspection agreement', note: `Signed${a.signerName ? ' by ' + a.signerName : ''}, ${formatAgreementSignedAt(a.signedAt)}`,
-    build: () => buildAgreementPdf(a) });
+  const agreement = a && { kind: 'agreement', title: 'Pre-inspection agreement', note: `Signed${a.signerName ? ' by ' + a.signerName : ''}, ${formatAgreementSignedAt(a.signedAt)}` };
+  if (agreement && !jobReportReady()) parts.push(Object.assign(agreement, { build: () => buildAgreementPdf(a) }));
   if (jobReportReady()) {
     const sent = reportData.sent ? `sent ${formatIssueDate(reportData.sent.at)}` : 'not sent yet';
     parts.push({ kind: 'report', title: reportKindTitle().replace(/ \w/g, w => w.toLowerCase()), note: `Report ${ensureReportNumber()}, version ${reportVersion()}, ${sent}`, build: () => buildReportPdf() });
+    if (agreement) parts.push(Object.assign(agreement, { inReport: true, note: agreement.note + '. At the back of the report' }));
   }
   if (quoteHasItems(q)) {
     const ans = quoteAnswerState(q);
@@ -87,9 +91,14 @@ async function buildJobPdf() {
   await ensureJsPDFLoaded();
   const lib = await ensurePdfLibLoaded();
   const parts = jobPdfParts();
+  // One row of the contents each. A part with no build (the agreement, at
+  // the back of the report) adds no pages: `at` is its page in the report.
   const built = [];
+  let reportMade = null;
   for (const part of parts) {
+    if (!part.build) { built.push({ part, pages: 0, at: (reportMade && reportMade.agreementPage) || 1 }); continue; }
     const made = await part.build();
+    if (part.kind === 'report') reportMade = made;
     const src = await lib.PDFDocument.load(await made.blob.arrayBuffer());
     built.push({ part, src, pages: src.getPageCount() });
   }
@@ -124,7 +133,9 @@ async function buildJobPdf() {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7.8); doc.setTextColor(...C.inkLight);
     doc.text(pdfFitText(doc, b.part.note || '', CW - 34), M + 11, y + 4.6);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...C.accentDark);
-    doc.text(`Page ${page}`, M + CW, y, { align: 'right' });
+    // A part inside the one before it: that part's first page, plus where it sits in it.
+    const before = built[i - 1];
+    doc.text(`Page ${b.src ? page : page - before.pages + b.at - 1}`, M + CW, y, { align: 'right' });
     doc.setDrawColor(...C.ruleLight); doc.setLineWidth(0.25); doc.line(M, y + 8.5, M + CW, y + 8.5);
     page += b.pages;
     y += rowH;
@@ -136,13 +147,24 @@ async function buildJobPdf() {
   }
   drawPdfDocFooters(doc, `Job file${company.name ? `  ·  ${company.name}` : ''}`);
 
-  const out = await joinPdfs(lib, [await lib.PDFDocument.load(doc.output('arraybuffer')), ...built.map(b => b.src)]);
+  const out = await joinPdfs(lib, [await lib.PDFDocument.load(doc.output('arraybuffer')), ...built.filter(b => b.src).map(b => b.src)]);
+  // Each document keeps its own "Page 1 of 2", so every page after the
+  // contents also says where it is in the file: small, in the top right
+  // corner, above every document's own header. That's the number the
+  // contents page gives.
+  const font = await out.embedFont(lib.StandardFonts.Helvetica);
+  const MM = 72 / 25.4, grey = lib.rgb(...C.inkMuted.map(v => v / 255));
+  out.getPages().forEach((pg, i) => {
+    if (i < coverPages) return;
+    const text = `Job file page ${i + 1}`;
+    pg.drawText(text, { x: pg.getWidth() - 15 * MM - font.widthOfTextAtSize(text, 6.5), y: pg.getHeight() - 6.5 * MM, size: 6.5, font, color: grey });
+  });
   out.setTitle(`Job file · ${address || 'Property'}`);
   if (company.name) out.setAuthor(company.name);
   const bytes = await out.save();
   return {
     blob: new Blob([bytes], { type: 'application/pdf' }),
-    fname: `SAYON_Job_${fileNamePart(address) || 'Property'}.pdf`,
+    fname: pdfFileName('Job File', address),
   };
 }
 

@@ -146,6 +146,13 @@ function dashboardJob(r, quotes) {
   } else if (a.status !== 'accepted') {
     group = 'done'; status = 'Quote declined';
     hint = who.charAt(0).toUpperCase() + who.slice(1) + ' declined the quote, so there\'s nothing more to do.';
+  } else if (!q.treatment && signedQuoteOwed(q)) {
+    // They signed to accept and have nothing to keep yet (THE CLIENT'S
+    // SIGNED COPY in js/quote.js).
+    const first = who.split(/\s+/)[0];
+    group = 'todo'; status = 'Email the signed quote';
+    hint = who.charAt(0).toUpperCase() + who.slice(1) + ` accepted the quote${a.method === 'link' ? ' from the link' : ''}. Email ${r.client ? first : 'them'} the signed copy to keep. The treatment record comes after the work is done.`;
+    next = { label: `Email ${r.client ? first : 'the client'} the signed quote`, to: 'signedQuote' };
   } else if (!q.treatment) {
     group = 'todo'; status = 'Record the treatment';
     hint = who.charAt(0).toUpperCase() + who.slice(1) + ' accepted the quote. Once the work is done, record what was used and where.';
@@ -788,6 +795,9 @@ function reportSummary() {
   const structural = termiteReferral || borerReferral;
   const unanswered = findingsMissingReferral();
   const conducive = conduciveConditions(reportData);
+  // "None found" is an answer: it's only said once the step's required
+  // questions are answered. Until then it's not recorded, like any blank.
+  const conduciveAnswered = REQUIRED_FIELDS.conducive.every(isFieldFilled);
   const places = list => joinPlaces(list.map(f => f.activityLocation));
   const NR = 'NOT RECORDED';
   // A borer-only recommendation ("Borer treatment of the floorboards") is
@@ -842,7 +852,7 @@ function reportSummary() {
       ['Builder or engineer referral?', structural ? 'YES' : unanswered.length ? 'NOT ANSWERED' : fs.length ? 'NO' : NR,
         structural ? 'bad' : unanswered.length ? 'warn' : fs.length ? 'good' : 'none', REPORT_PARTS.findings,
         !structural && unanswered.length ? `Finding${unanswered.length === 1 ? '' : 's'} ${unanswered.join(', ')}: not answered` : ''],
-      ['Conditions conducive to timber pests?', conducive.length ? `${conducive.length} FOUND` : 'NONE RECORDED', conducive.length ? 'warn' : 'none', REPORT_PARTS.conducive,
+      ['Conditions conducive to timber pests?', conducive.length ? `${conducive.length} FOUND` : conduciveAnswered ? 'NONE FOUND' : NR, conducive.length ? 'warn' : conduciveAnswered ? 'good' : 'none', REPORT_PARTS.conducive,
         conducive.join('; ').replace(/^./, ch => ch.toUpperCase())],
       ['Termite treatment recommended?', { YES: 'YES', NO: 'NO' }[termiteTreatment] || NR,
         { YES: 'bad', NO: 'good' }[termiteTreatment] || 'none', REPORT_PARTS.recommendations, reportData.treatmentType || ''],

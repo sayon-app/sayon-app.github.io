@@ -179,6 +179,14 @@ let shotN = 0;
   check(qans && qans.status === 'accepted' && qans.sig, 'client accepted with a signature: ' + JSON.stringify(qans));
   console.log('toasts', await toasts());
 
+  // Sam signed to accept, so the signed copy is the next step, then the treatment.
+  const owed = await p.evaluate(() => [...document.querySelectorAll('#jobOverlay .job-next button')].filter(b => b.offsetParent).map(b => b.textContent.trim()));
+  check(owed.includes('Email Sam the signed quote') && owed.includes('Sam already has a copy'), 'the signed quote is the next step after a signature: ' + owed.join(' | '));
+  await tap(p.locator('#jobOverlay .job-next button', { hasText: /^Email Sam the signed quote$/ }), 'Email the signed quote'); await p.waitForTimeout(2500); await shot('signed-quote-sent');
+  const copy = await p.evaluate(() => ({ sent: !!(quoteState.answer && quoteState.answer.copySentAt), given: !!(quoteState.answer && quoteState.answer.copyGivenAt) }));
+  check(copy.sent && emails.some(m => /signed quote/i.test(m.subject || '')), 'and one tap emails it: ' + JSON.stringify(copy));
+  console.log('toasts', await toasts());
+
   // 9. Treatment record.
   await tap(p.locator('#jobOverlay .job-next button', { hasText: /^Record (the )?treatment$/i }), 'Record treatment'); await p.waitForTimeout(1000); await shot('treatment-open');
   const tr0 = await p.evaluate(() => [...document.querySelectorAll('#treatmentOverlay input, #treatmentOverlay textarea, #treatmentOverlay select')].filter(e => e.offsetParent && e.type !== 'radio' && e.type !== 'checkbox').map(e => `${e.id}=${e.value}`).join(' | '));

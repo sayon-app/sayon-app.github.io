@@ -104,7 +104,7 @@ const emails = [];
     return { fname: got.fname, pages: await pages(got.blob), treat: await pages((await buildTreatmentCertificatePDF(q)).blob), install: await pages((await buildTreatmentCertificatePDF(q, { install: true })).blob) };
   });
   console.log('certificate pdf:', JSON.stringify(pdf));
-  check(pdf && pdf.pages === pdf.treat + pdf.install && /^SAYON_Certificates_/.test(pdf.fname), 'PDF gives both certificates as one file: ' + JSON.stringify(pdf));
+  check(pdf && pdf.pages === pdf.treat + pdf.install && /^Certificates_TC-/.test(pdf.fname), 'PDF gives both certificates as one file: ' + JSON.stringify(pdf));
   await tap(p.locator('#jobOverlay .job-next .qp-cert-handed'), 'Mark as given'); await p.waitForTimeout(600);
   k = await cert();
   check(k.where === 'step' && /^Given to Jordan Sample in person \d/.test(k.text) && k.buttons.join('|') === 'Email a copy|PDF' && !k.handed, 'marked as given: the card moves under the Treatment step, its line says so and the link goes: ' + k.text);

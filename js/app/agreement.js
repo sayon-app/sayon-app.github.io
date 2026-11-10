@@ -683,8 +683,7 @@ function buildAgreementPdf(a) {
   y += 2;
   y = drawAgreementBody(doc, a, y, { M, CW, onNewPage: header });
   drawPdfDocFooters(doc, `Pre-Inspection Agreement${company.name ? `  ·  ${company.name}` : ''}`);
-  const fname = `Agreement_${fileNamePart(getFullAddress()) || 'Property'}.pdf`;
-  return { blob: doc.output('blob'), fname };
+  return { blob: doc.output('blob'), fname: pdfFileName('Agreement', getFullAddress()) };
 }
 
 // Prints the agreed wording and who signed it, from y down. Used for the

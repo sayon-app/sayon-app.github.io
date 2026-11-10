@@ -168,7 +168,7 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   // 5. The PDF: a summary, the station table and what happens next.
   const pdf = await p.evaluate(async () => { const { blob, fname } = buildBaitVisitPDF(quoteState, quoteState.baitVisits[0]); const buf = new Uint8Array(await blob.arrayBuffer()); let s = ''; for (let i = 0; i < buf.length; i += 32768) s += String.fromCharCode.apply(null, buf.subarray(i, i + 32768)); return { b64: btoa(s), fname, pages: (s.match(/\/Type\s*\/Page[^s]/g) || []).length }; });
   fs.writeFileSync(`${OUT}/visit-report.pdf`, Buffer.from(pdf.b64, 'base64'));
-  check(/^SAYON_Bait_Visit_BV-.*\.pdf$/.test(pdf.fname) && pdf.pages === 1, `the visit report is one page: ${pdf.fname}, ${pdf.pages} page(s)`);
+  check(/^Bait_Visit_BV-.*\.pdf$/.test(pdf.fname) && pdf.pages === 1, `the visit report is one page: ${pdf.fname}, ${pdf.pages} page(s)`);
   let text = '';
   try { text = require('child_process').execFileSync('pdftotext', ['-layout', `${OUT}/visit-report.pdf`, '-']).toString(); } catch (e) {}
   if (text) {

@@ -158,7 +158,7 @@ const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
     group: dashboardJob(getSavedReports().find(r => r.id === currentReportId), getSavedQuotes()).group }));
   j = await job();
   console.log('finalised:', JSON.stringify(j), said);
-  check(st.v === 1 && st.history === 1 && st.at && st.locked && emails.length === 2 && /SAYON_Job_/.test(emails[1].attachments[0].filename), 'Finalise locked the job as version 1 and emailed the job PDF');
+  check(st.v === 1 && st.history === 1 && st.at && st.locked && emails.length === 2 && /^Job_File_/.test(emails[1].attachments[0].filename), 'Finalise locked the job as version 1 and emailed the job PDF');
   check(/Job finalised\. The report and quote are locked/.test(said), 'and says so: ' + said);
   check(j.card && j.card.label === 'Job finalised' && j.card.made && /^Version 1, \d+ \w+ \d{4}\. Job PDF emailed to Jo Lee \d+ \w+ \d{4}\.$/.test(j.card.line), 'the last card is the record: ' + (j.card && j.card.line));
   check(j.card && j.card.buttons.join('|') === 'Email again|Save PDF|Amend' && !j.card.form, 'with the PDF again, and Amend: ' + (j.card && j.card.buttons.join(' | ')));

@@ -1120,6 +1120,7 @@ function createSignaturePad(canvas, placeholder, onSigned) {
     drawing = false;
     if (ink < MIN_INK || !strokeInk) return;
     pad.empty = false;
+    pad.shown = '';
     if (onSigned) onSigned();
   }
   canvas.addEventListener('mousedown', start);
@@ -1134,8 +1135,10 @@ function createSignaturePad(canvas, placeholder, onSigned) {
   pad.clear = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     pad.empty = true; ink = 0;
+    pad.shown = '';
     if (placeholder) placeholder.style.display = 'flex';
   };
+  // shown: the signature the pad was given, until a stroke is drawn on it.
   pad.show = (dataUrl) => {
     pad.clear();
     if (!dataUrl) return;
@@ -1143,9 +1146,46 @@ function createSignaturePad(canvas, placeholder, onSigned) {
     img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     img.src = dataUrl;
     pad.empty = false; ink = MIN_INK;
+    pad.shown = dataUrl;
     if (placeholder) placeholder.style.display = 'none';
   };
   return pad;
+}
+// What a pad holds, as an image: the signature it was given while that's
+// untouched, else what's drawn on it. '' for an empty pad.
+function padSignature(pad) {
+  return !pad || pad.empty ? '' : pad.shown || pad.canvas.toDataURL('image/png');
+}
+
+// ── A SHEET'S SIGNATURE ── The treatment record and the bait station visit
+// are signed by the technician. As on the report's Sign-off, the last
+// signature drawn under the technician's name is already there
+// (lastSignatureOf in js/app/sync.js), kept so a thumb scrolling past can't
+// mark it, with Sign again to draw a new one.
+// saved: the signature already on the record ('' for a new one). name: the
+// technician the sheet opens with.
+function openSheetSignature(pad, saved, name) {
+  const carried = saved ? '' : lastSignatureOf(name);
+  pad.carried = carried ? (name || '').trim() : null;
+  pad.show(saved || carried);
+  keepSheetSignature(pad, !pad.empty);
+}
+function keepSheetSignature(pad, kept) {
+  const wrap = pad.canvas.parentElement;
+  wrap.classList.toggle('kept', kept);
+  const again = wrap.parentElement.querySelector('.agr-sig-clear');
+  if (again) again.hidden = pad.empty;
+}
+function signSheetAgain(pad) {
+  pad.clear();
+  pad.carried = null;
+  keepSheetSignature(pad, false);
+}
+// The technician's name changed. A signature carried over was signed as the
+// name it came with, so it doesn't stay under another one; a signature
+// drawn on this sheet, or saved with the record, does.
+function sheetSignerChanged(pad, name) {
+  if (pad && pad.carried != null && pad.carried !== (name || '').trim()) signSheetAgain(pad);
 }
 
 let inspectorSignaturePad = null;

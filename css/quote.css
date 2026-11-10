@@ -224,16 +224,30 @@ body.dark-screen .treat-product { background: var(--surface2); border-color: var
 .bait-rest-btn { width: auto; flex: none; min-height: 40px; padding: 8px 14px; font-size: calc(13.5px * var(--ts)); }
 .bait-count-btn { width: auto; flex: none; align-self: flex-end; min-height: 48px; }
 .bait-summary { font-size: calc(12.5px * var(--ts)); color: var(--text3); }
-.bait-stations { display: flex; flex-direction: column; gap: 8px; }
-.bait-station { padding: 10px; border: 1px solid var(--border); border-left: 4px solid var(--border2); border-radius: 10px; background: var(--surface); }
+.bait-stations { display: flex; flex-direction: column; gap: 6px; }
+/* One row per station: number, where it is, what was found. A tap opens it. */
+.bait-station { border: 1px solid var(--border); border-left: 4px solid var(--border2); border-radius: 10px; background: var(--surface); }
 .bait-station.clear { border-left-color: var(--green); }
 .bait-station.active, .bait-station.eaten { border-left-color: var(--risk); }
 .bait-station.damaged, .bait-station.missing, .bait-station.noaccess { border-left-color: var(--yellow); }
-.bait-station-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.bait-station-no { flex: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--surface3); color: var(--text); font-size: calc(13px * var(--ts)); font-weight: 800; }
+.bait-station.open { border-color: var(--border2); }
+.bait-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 8px 10px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; border-radius: 8px; }
+.bait-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.bait-station-no { flex: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--surface3); color: var(--text); font-size: calc(13px * var(--ts)); font-weight: 700; }
+.bait-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.bait-row-where { font-size: calc(14px * var(--ts)); font-weight: 600; overflow-wrap: anywhere; }
+.bait-row-where.empty { color: var(--text3); font-weight: 500; }
+.bait-row-more { font-size: calc(12px * var(--ts)); color: var(--text3); overflow-wrap: anywhere; }
+.bait-row-found { flex: none; max-width: 42%; font-size: calc(12.5px * var(--ts)); font-weight: 700; color: var(--text3); text-align: right; }
+.bait-station.clear .bait-row-found { color: var(--green); }
+.bait-station.active .bait-row-found, .bait-station.eaten .bait-row-found { color: var(--risk); }
+.bait-station.damaged .bait-row-found, .bait-station.missing .bait-row-found, .bait-station.noaccess .bait-row-found { color: var(--yellow-text); }
+.bait-row-chev { flex: none; color: var(--text3); transition: transform 0.15s; }
+.bait-station.open .bait-row-chev { transform: rotate(180deg); }
+.bait-row-body { padding: 2px 10px 10px; }
 .bait-station-where { flex: 1; min-height: 40px; padding: 8px 10px; font-size: calc(14px * var(--ts)); }
 .bait-chips { gap: 5px; }
-.bait-chip { min-height: 34px; padding: 5px 10px; font-size: calc(12.5px * var(--ts)); }
+.bait-chip { min-height: 38px; padding: 6px 11px; font-size: calc(13px * var(--ts)); }
 .bait-chip.active.on, .bait-chip.eaten.on { background: rgba(192,57,43,0.1); border-color: rgba(192,57,43,0.5); color: var(--risk); }
 .bait-chip.damaged.on, .bait-chip.missing.on, .bait-chip.noaccess.on { background: rgba(212,146,10,0.12); border-color: rgba(212,146,10,0.55); color: var(--yellow-text); }
 .bait-station-extra { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: calc(12.5px * var(--ts)); color: var(--text3); }

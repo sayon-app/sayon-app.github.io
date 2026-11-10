@@ -47,7 +47,11 @@ function startEdit(el, key, type) {
   const cur = reportData[key] || '';
   const OPTIONS = {
     era:         ['Pre-1920s','1920s-1940s','1945-1965','1965-1985','1985-2003','Post-2003'],
-    standard:    ['AS 3660.1-2014','AS 3660.2-2017','AS 3660.3-2014','AS 4349.0-2007','AS 4349.1-2007','AS 4349.3-2010'],
+    // Only the standards a timber pest report can be done to. AS 3660.1 (new
+    // building work), AS 3660.3 (product test criteria) and AS 4349.0/.1
+    // (building inspections) are not; an older report that saved one keeps
+    // showing it, because the list puts the current value first.
+    standard:    ['AS 4349.3-2010','AS 3660.2-2017'],
     structuretype: [
       'Detached house',
       'Semi-detached',

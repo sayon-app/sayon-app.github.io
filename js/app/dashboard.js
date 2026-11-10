@@ -961,6 +961,11 @@ function reportPrepGaps(from = 'send') {
   findingsMissingReferral().forEach(n => push('referral', `Finding ${n}: "refer to a builder or engineer?" isn't answered`));
   const pending = (reportData.pendingNotes || []).length;
   if (pending) push('pending', `${pending} voice note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
+  // AS 3660.2 recommends a timber pest inspection at least every 12 months,
+  // so a longer interval is worth a second look before it goes out.
+  const intervalMonths = longestInspectionIntervalMonths(reportData.inspectionFrequency);
+  if (intervalMonths > 12) push('interval', `The next inspection is set ${intervalMonths % 12 ? intervalMonths + ' months' : (intervalMonths / 12) + ' years'} away. AS 3660.2 recommends one at least every 12 months`,
+    fixBtn('interval12', 'Make it 12 months'));
   if (!reportData.inspectorSignature) push('signature', 'The inspector hasn\'t signed');
   if (!reportData.agreement && reportData.agreementRequest) push('agreement', `The agreement link is waiting on ${reportData.agreementRequest.signerName || 'the client'} to sign`, from === 'extract' ? fixBtn('agreement', 'Check it') : '');
   else if (!reportData.agreement) push('agreement', 'No pre-inspection agreement is recorded', from === 'extract' ? fixBtn('agreement', 'Get it signed') : '');
@@ -970,6 +975,20 @@ function reportPrepGaps(from = 'send') {
   if (onlyHere && authSession) push('photos', `${onlyHere} photo${onlyHere === 1 ? ' is' : 's are'} only on this phone, not in your account yet`,
     fixBtn('photos', navigator.onLine ? 'Back up now' : 'Back up when online'));
   return gaps;
+}
+
+// The longest interval the re-inspection wording names, in months:
+// "every 2 years" is 24, "3 months, then every 12 months" is 12, and
+// wording with no interval in it is 0.
+function longestInspectionIntervalMonths(freq) {
+  const words = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, twelve: 12, eighteen: 18, 'twenty-four': 24 };
+  let most = 0;
+  for (const m of String(freq || '').matchAll(/(\d+(?:\.\d+)?|one|two|three|four|five|six|twelve|eighteen|twenty-four)\s*(month|year)s?\b/gi)) {
+    const n = words[m[1].toLowerCase()] || parseFloat(m[1]);
+    most = Math.max(most, Math.round(/^year/i.test(m[2]) ? n * 12 : n));
+  }
+  if (/\bevery other year\b|\bbiennial/i.test(freq || '')) most = Math.max(most, 24);
+  return most;
 }
 
 function photosOnlyOnThisPhone() {

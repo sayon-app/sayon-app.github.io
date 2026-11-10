@@ -405,7 +405,7 @@ function renderQuote(doc) {
     try {
       const res = await rpc('submit_sign_request', { p_id: id, p_name: name.value.trim(), p_signature: pad.png(), p_meta: meta_() });
       if (res === 'signed' || res === 'already_signed') {
-        showState('Quote accepted, thank you', `${who} has your acceptance and will be in touch to arrange the work. You can close this page.`, true);
+        showState('Quote accepted, thank you', `${who} has your acceptance and will be in touch to arrange the work. A signed copy comes to you by email. You can close this page.`, true);
       } else if (res === 'expired') showState('This link has expired', `Please ask ${who} to send a new one.`);
       else if (res === 'cancelled') showState('This quote was withdrawn', sentence(`Please contact ${who}`));
       else throw new Error(res);
@@ -440,7 +440,7 @@ function renderQuote(doc) {
     const thing = quote ? 'quote' : 'agreement';
     const who = doc.company || 'your inspector';
     if (!r) showState(`${quote ? 'Quote' : 'Agreement'} not found`, 'Please open the full link you were sent, or ask your inspector for a new one.');
-    else if (r.status === 'signed') showState(quote ? 'Quote accepted' : 'Already signed', `${quote ? 'Accepted' : 'Signed'} by ${r.signer_name} on ${formatDate(r.signed_at)}. There’s nothing more to do.${quote ? '' : ' A copy comes with your report.'}`, true);
+    else if (r.status === 'signed') showState(quote ? 'Quote accepted' : 'Already signed', `${quote ? 'Accepted' : 'Signed'} by ${r.signer_name} on ${formatDate(r.signed_at)}. There’s nothing more to do.${quote ? ' A signed copy comes to you by email.' : ' A copy comes with your report.'}`, true);
     else if (r.status === 'declined') showState('Quote declined', `You let ${who} know on ${formatDate(r.signed_at)} that you’re not going ahead.`, false, r.note ? `Your note: ${r.note}` : '');
     else if (r.status === 'expired') showState('This link has expired', `Please ask ${who} to send a new one.`);
     else if (r.status === 'cancelled') showState(`This ${thing} was withdrawn`, sentence(`Please contact ${who}`));

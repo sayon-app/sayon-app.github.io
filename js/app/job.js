@@ -285,6 +285,7 @@ function jobNextAction(next, q) {
   const to = next.next.to;
   if (to === 'answer' && quoteHasItems(q)) return quoteAnswerButtons(q, true);
   if (to === 'certificate' && q && q.treatment) return treatmentCertificateCard(q);
+  if (to === 'signedQuote' && q) return signedQuoteNext(q);
   const b = to === 'bait' && q && typeof baitProgram === 'function' ? baitProgram(q) : null;
   if (b && b.last && !b.last.sentAt) {
     const first = (q.client || '').trim().split(/\s+/)[0];
@@ -361,6 +362,8 @@ const JOB_ICONS = {
   mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
   directions: '<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
 };
+// Emailing the signed quote is the envelope, not the clock of a step that's waiting.
+JOB_ICONS.signedQuote = JOB_ICONS.mail;
 function jobIcon(name, size) {
   return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${JOB_ICONS[name] || JOB_ICONS.clock}</svg>`;
 }
@@ -497,7 +500,7 @@ function renderJobPage(opening) {
 // (SHEETS OPENED FROM A PAGE in js/app/shell.js).
 function jobGo(to, from) {
   from = from || navPlace();
-  const onJob = to === 'job' || to === 'details' || to === 'agreementLink' || to === 'answer' || to === 'treatment' || to === 'certificate' || to === 'bait';
+  const onJob = to === 'job' || to === 'details' || to === 'agreementLink' || to === 'answer' || to === 'signedQuote' || to === 'treatment' || to === 'certificate' || to === 'bait';
   if (!onJob) closeJobPage();
   if (document.getElementById('quoteScreen').classList.contains('open') && to !== 'quote') {
     closeQuote();
@@ -517,10 +520,10 @@ function jobGo(to, from) {
     const b = baitProgram(q);
     if (b && !b.finished && !(b.last && !b.last.sentAt)) { openBaitVisit(); rememberSheetFrom('baitOverlay', from); }
   }
-  // The certificate's Email button, or the agreement's link button, lit so
-  // it's the obvious next tap.
-  if (to === 'certificate' || to === 'agreementLink') {
-    const btn = document.querySelector(`#jobOverlay .job-next ${to === 'certificate' ? '.qp-cert-email' : '.job-way-link'}`);
+  // The certificate's Email button, the signed quote's, or the agreement's
+  // link button, lit so it's the obvious next tap.
+  if (to === 'certificate' || to === 'agreementLink' || to === 'signedQuote') {
+    const btn = document.querySelector(`#jobOverlay .job-next ${{ certificate: '.qp-cert-email', signedQuote: '.job-signed-email' }[to] || '.job-way-link'}`);
     if (btn) { btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 2400); }
   }
 }
@@ -681,6 +684,13 @@ function fileNamePart(text, max = 40) {
   let s = String(text || '').replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '');
   if (s.length > max) { s = s.slice(0, max + 1); const cut = s.lastIndexOf('_'); s = cut > max / 2 ? s.slice(0, cut) : s.slice(0, max); }
   return s.replace(/_+$/, '');
+}
+
+// One pattern for every PDF a client receives: what it is first, its
+// number if it has one, the address, then a date if it carries one.
+// "Quote_Q-1234_7_Banksia_Drive_Epping_NSW_2121.pdf".
+function pdfFileName(what, address, { ref = '', date = '' } = {}) {
+  return [fileNamePart(what), String(ref).replace(/[^\w-]+/g, ''), fileNamePart(address) || 'Property', fileNamePart(date)].filter(Boolean).join('_') + '.pdf';
 }
 
 function formatAddress(street, suburb, state, postcode) {

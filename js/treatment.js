@@ -930,7 +930,7 @@ function downloadTreatmentCertificate() {
       if (!both) return cert;
       const lib = await ensurePdfLibLoaded();
       const joined = await joinPdfs(lib, [cert.blob, (await buildTreatmentCertificatePDF(q, { install: true })).blob]);
-      return { blob: new Blob([await joined.save()], { type: 'application/pdf' }), fname: cert.fname.replace('_Treatment_Certificate_', '_Certificates_') };
+      return { blob: new Blob([await joined.save()], { type: 'application/pdf' }), fname: cert.fname.replace(/^Treatment_Certificate_/, 'Certificates_') };
     })
     .then(({ blob, fname }) => { track('certificate_pdf_made', { install: both }); return deliverPdfBlob(blob, fname, {
       title: name,
@@ -1274,6 +1274,5 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   }
 
   drawPdfDocFooters(doc, `${install ? 'Installation certificate' : 'Certificate'} ${number}${company.name ? `  ·  ${company.name}` : ''}`, q.reportKey);
-  const safe = fileNamePart(q.address) || 'Property';
-  return { blob: doc.output('blob'), fname: `SAYON_${install ? 'Installation' : 'Treatment'}_Certificate_${number.replace(/[^\w-]+/g, '')}_${safe}.pdf` };
+  return { blob: doc.output('blob'), fname: pdfFileName(install ? 'Installation Certificate' : 'Treatment Certificate', q.address, { ref: number }) };
 }

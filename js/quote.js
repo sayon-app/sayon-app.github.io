@@ -1604,8 +1604,66 @@ function quoteAnswerPanel(q) {
   return `<p class="job-fold-text ${a.stale ? 'warn' : a.status === 'accepted' ? 'good' : 'bad'}"><strong>${a.status === 'accepted' ? 'Accepted' : 'Declined'}</strong> by ${esc(a.by)} on ${esc(formatAnswerDate(a.date))}${how ? `, ${esc(how)}` : ''}</p>
     ${a.note ? `<div class="quote-answer-note">${esc(a.note)}</div>` : ''}
     ${isSignatureImage(a.signature) ? `<img class="quote-answer-sig" src="${a.signature}" alt="Client signature">` : ''}
+    ${signedQuoteLine(q, a)}
     ${a.stale ? '<div class="quote-answer-warn">The quote has changed since then. Send the new version and record the client\'s answer again.</div>' : ''}
     ${isReportLocked() ? '' : `<div class="qp-links"><button type="button" class="quote-text-btn" onclick="clearQuoteAnswer()">${a.stale ? 'Record a new answer' : 'Change answer'}</button></div>`}`;
+}
+
+// ── THE CLIENT'S SIGNED COPY ────────────────────────────────────────────────
+// A client who signs to accept (on this phone, or from the link) gets the
+// quote back with their acceptance on it, to keep. Until it's emailed or
+// marked as given it is the job's next step, ahead of the treatment
+// (dashboardJob in js/app/dashboard.js); once the treatment is recorded
+// it's no longer asked for. The marks sit on the answer, so a changed
+// answer starts again.
+function signedQuoteWanted(q) {
+  const a = quoteAnswerState(q);
+  return !!a && !a.stale && a.status === 'accepted' && (a.method === 'link' || isSignatureImage(a.signature));
+}
+function signedQuoteOwed(q) {
+  return signedQuoteWanted(q) && !q.answer.copySentAt && !q.answer.copyGivenAt;
+}
+// Under the answer: where the signed copy went, or the way to send it.
+function signedQuoteLine(q, a) {
+  if (!signedQuoteWanted(q)) return '';
+  const first = (q.client || '').trim().split(/\s+/)[0];
+  const went = a.copySentAt ? `Signed copy emailed ${formatIssueDate(a.copySentAt)}` : a.copyGivenAt ? `${first || 'The client'} has a signed copy` : '';
+  return `<div class="quote-answer-copy">${went ? `<span>${escapeHtml(went)}</span>` : ''}<button type="button" class="quote-text-btn" onclick="emailSignedQuote()">${a.copySentAt ? 'Email it again' : `Email ${escapeHtml(first || 'the client')} the signed quote`}</button></div>`;
+}
+// The Next step card's buttons while the copy is owed.
+function signedQuoteNext(q) {
+  const first = (q.client || '').trim().split(/\s+/)[0];
+  return `<button type="button" class="dash-detail-primary job-signed-email" onclick="emailSignedQuote()">Email ${escapeHtml(first || 'the client')} the signed quote</button>
+      <div class="dash-detail-links"><button type="button" onclick="markSignedQuoteGiven()">${escapeHtml(first || 'The client')} already has a copy</button></div>`;
+}
+// Built inside the tap, like the certificate's email, because the share
+// sheet won't open after a wait.
+function emailSignedQuote() {
+  const q = quoteState;
+  if (!q || !signedQuoteWanted(q)) return;
+  if (!jsPDF) {
+    ensureJsPDFLoaded()
+      .then(() => showToast('Ready. Tap Email again to send it', 'info'))
+      .catch(e => showToast((e && e.message) || 'Could not load the PDF tools', 'error'));
+    return;
+  }
+  sendPdfsToClient({
+    files: [buildQuotePDF(q)],
+    to: quoteClientEmail(q),
+    subject: `Your signed quote ${q.number || ''} — ${q.address || 'your property'}`.replace(/\s+/g, ' '),
+    body: clientMessage({ client: q.client, address: q.address, docs: 'signed copy of the quote', note: 'Thank you for accepting it.', signOff: inspectorDisplayName() }),
+  }).then(sent => {
+    if (!sent || !q.answer) return;
+    q.answer.copySentAt = Date.now();
+    delete q.answer.copyGivenAt;
+    storeSentQuote(q); refreshJobsList(); track('signed_quote_sent');
+  });
+}
+function markSignedQuoteGiven() {
+  const q = quoteState;
+  if (!q || !q.answer) return;
+  q.answer.copyGivenAt = Date.now();
+  storeSentQuote(q); refreshJobsList();
 }
 
 // Every place that shows where the quote is up to. On the quote screen:
@@ -2565,6 +2623,5 @@ function buildQuotePDF(q) {
 
   drawPdfDocFooters(doc, `Quote ${q.number || ''}${company.name ? `  ·  ${company.name}` : ''}`, q.reportKey);
 
-  const safe = fileNamePart(q.address) || 'Property';
-  return { blob: doc.output('blob'), fname: `SAYON_Quote_${(q.number || '').replace(/[^\w-]+/g, '')}_${safe}.pdf` };
+  return { blob: doc.output('blob'), fname: pdfFileName('Quote', q.address, { ref: q.number }) };
 }

@@ -262,7 +262,7 @@ function renderForm(doc) {
       const res = await rpc('submit_sign_request', { p_id: id, p_name: name.value.trim(), p_signature: pad.png(),
         p_meta: { userAgent: navigator.userAgent.slice(0, 300), tz: Intl.DateTimeFormat().resolvedOptions().timeZone || '' } });
       if (res === 'signed' || res === 'already_signed') {
-        showState('Signed, thank you', `${doc.company || 'Your inspector'} has your signed agreement. You can close this page.`, true);
+        showState('Signed, thank you', `${doc.company || 'Your inspector'} has your signed agreement. A copy comes with your report. You can close this page.`, true);
       } else if (res === 'expired') {
         showState('This link has expired', `Please ask ${doc.company || 'your inspector'} to send a new one.`);
       } else if (res === 'cancelled') {
@@ -440,7 +440,7 @@ function renderQuote(doc) {
     const thing = quote ? 'quote' : 'agreement';
     const who = doc.company || 'your inspector';
     if (!r) showState(`${quote ? 'Quote' : 'Agreement'} not found`, 'Please open the full link you were sent, or ask your inspector for a new one.');
-    else if (r.status === 'signed') showState(quote ? 'Quote accepted' : 'Already signed', `${quote ? 'Accepted' : 'Signed'} by ${r.signer_name} on ${formatDate(r.signed_at)}. There’s nothing more to do.`, true);
+    else if (r.status === 'signed') showState(quote ? 'Quote accepted' : 'Already signed', `${quote ? 'Accepted' : 'Signed'} by ${r.signer_name} on ${formatDate(r.signed_at)}. There’s nothing more to do.${quote ? '' : ' A copy comes with your report.'}`, true);
     else if (r.status === 'declined') showState('Quote declined', `You let ${who} know on ${formatDate(r.signed_at)} that you’re not going ahead.`, false, r.note ? `Your note: ${r.note}` : '');
     else if (r.status === 'expired') showState('This link has expired', `Please ask ${who} to send a new one.`);
     else if (r.status === 'cancelled') showState(`This ${thing} was withdrawn`, sentence(`Please contact ${who}`));

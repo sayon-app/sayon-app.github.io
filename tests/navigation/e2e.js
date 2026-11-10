@@ -148,6 +148,21 @@ async function setup(b, opts) {
   await shot('05-report-job-card');
   await p.click('#reportJobCard'); await p.waitForTimeout(700);
   check(await p.evaluate(() => navPlace() === 'job' && document.getElementById('jobDetailsFold').open), 'the card opens This job with the details open');
+  // The job's order: Job details come first, then the agreement, then the report.
+  const order = await p.evaluate(() => { const top = document.getElementById('jobDetailsHead').getBoundingClientRect().top;
+    const card = document.getElementById('reportJobCard'), banner = document.getElementById('agreementBanner');
+    const j = dashboardJobs.find(x => x.r.id === currentReportId) || currentJobSummary();
+    return { labels: [...document.querySelectorAll('#jobOverlay .job-steps > li')].map(li => li.querySelector('.job-step-label').firstChild.textContent.trim()),
+      first: document.querySelector('#jobOverlay .job-steps > li').className, count: document.querySelector('#jobOverlay .job-hero-count').textContent,
+      inView: top >= 0 && top < innerHeight / 2, bars: (dashCardHTML(currentJobSummary()).match(/<i class=/g) || []).length,
+      cardFirst: !!(card.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING),
+      noName: jobDetailsStep({ r: { address: '1 Test Road', client: '', reportData: {} } }) }; });
+  console.log('job order:', JSON.stringify(order));
+  check(order.labels.slice(0, 3).join('|') === 'Job details|Agreement|Report' && order.first === 'done', 'This job lists Job details first (ticked), then the agreement, then the report: ' + order.labels.join(', '));
+  check(order.count === '1 of 6 done' && order.bars === 6, 'Job details count as a step on the page and on the Jobs card: ' + order.count + ', ' + order.bars + ' bars');
+  check(order.inView, 'the details open in view, at the top of the steps');
+  check(order.cardFirst, 'on the report\'s first step the Job details card sits above the agreement banner');
+  check(order.noName.state === 'todo' && /client's name/.test(order.noName.text), 'a job with no client yet says so, and isn\'t ticked: ' + JSON.stringify(order.noName));
   await p.evaluate(() => jobGo('report')); await p.waitForTimeout(400);
   await p.click('#headerJob'); await p.waitForTimeout(700);
   check(await p.evaluate(() => navPlace() === 'job' && document.getElementById('jobDetailsFold').open), 'so does the address at the top');

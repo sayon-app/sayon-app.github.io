@@ -145,14 +145,28 @@ function jobAgreementStep(d = reportData) {
   return { label: 'Agreement', to: 'agreement', state: 'done', text: `${how}${a.signerName ? ' by ' + a.signerName : ''}` };
 }
 
-// A job's steps as its page shows them: the agreement first, then the
-// report, quote, the client's answer, treatment (and bait visits). Until
-// the agreement is signed, nothing after it is next.
+// A job's steps as its page and its Jobs card show them, in the order the
+// job is done: Job details, the agreement, then the report, quote, the
+// client's answer, treatment (and bait visits). Until the agreement is
+// signed, nothing after it is next.
 function jobPageSteps(j) {
   const d = j.r.reportData || {};
-  const steps = [jobAgreementStep(d), ...j.steps.map(st => ({ ...st }))];
-  if (!d.agreement) steps.slice(1).forEach(st => { if (st.state === 'now') st.state = 'todo'; });
+  const steps = [jobDetailsStep(j), jobAgreementStep(d), ...j.steps.map(st => ({ ...st }))];
+  if (!d.agreement) steps.slice(2).forEach(st => { if (st.state === 'now') st.state = 'todo'; });
   return steps;
+}
+
+// Job details: the job's first step, before the agreement and the report.
+// Done once the job has its address and the client's name (signing the
+// agreement fills in a missing name). Its line is how to reach the client,
+// since the address, the client and the day are in the page's heading.
+function jobDetailsStep(j) {
+  const r = j.r, d = r.reportData || {};
+  const phone = (d.jobClientPhone || '').trim();
+  const email = (d.jobClientEmail || (j.q || {}).clientEmail || '').trim(); // as jobClientEmailOf
+  const named = !!(r.address || '').trim() && !!(r.client || '').trim();
+  const reach = !phone && !email ? 'No phone or email yet' : [phone, email || 'no email yet'].filter(Boolean).join(' · ');
+  return { label: 'Job details', to: 'details', state: named ? 'done' : 'todo', text: named ? reach : 'Still to add: the client\'s name' };
 }
 
 // A step's line: the fuller wording for one that's done or still to come
@@ -168,9 +182,9 @@ function jobStepLine(j, st) {
 }
 
 // The steps as cards, each with its document's icon in the colour of where
-// it's up to. tap(st) is the step's onclick. Shared by the job page and the
-// job's sheet on the Jobs list.
-function jobStepsHTML(j, steps, tap) {
+// it's up to. tap(st) is the step's onclick. details: the Job details
+// step's card, which opens in place instead of going anywhere.
+function jobStepsHTML(j, steps, tap, details) {
   const tick = '<svg class="icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
   const stateWord = { done: 'done', now: 'next', todo: 'to come', skip: 'not needed', bad: 'declined' };
   const chev = '<svg class="icon job-step-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
@@ -178,6 +192,7 @@ function jobStepsHTML(j, steps, tap) {
   return `<ol class="job-steps">
       ${steps.map((st, i) => {
         const line = jobStepLine(j, st);
+        if (st.to === 'details') return `<li class="${st.state}">${details}</li>`;
         return `
         <li class="${st.state}">
           <button type="button" class="job-step" onclick="${tap(st)}" aria-label="${i + 1}. ${escapeHtml(st.label)}, ${stateWord[st.state] || ''}: ${escapeHtml(line)}">
@@ -212,13 +227,6 @@ const JOB_ICONS = {
 };
 function jobIcon(name, size) {
   return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${JOB_ICONS[name] || JOB_ICONS.clock}</svg>`;
-}
-
-// The closed Job details line: the inspection type, the client's phone or
-// email, the order number.
-function jobDetailsSummary() {
-  const v = id => ((document.getElementById(id) || {}).value || '').trim();
-  return [(v('jobInspectionType') || '').split(' — ')[0], v('jobClientPhone') || v('jobClientEmail'), v('jobOrderId')].filter(Boolean).join(' · ');
 }
 
 function renderJobPage() {
@@ -263,18 +271,23 @@ function renderJobPage() {
   const nextIcon = next.next ? (next.next.to.startsWith('jobpdf') ? 'jobpdf' : next.next.to) : j.group === 'done' && addr ? 'tick' : !addr ? 'details' : 'clock';
   const chev = '<svg class="icon job-step-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
   const group = (DASHBOARD_TABS.find(([k]) => k === j.group) || [, ''])[1];
-  // A redraw while the page is open keeps Job details as they were. A new
-  // job's details are the page itself: Property, Client and Booking cards.
+  // Job details come first, as they do on the job: before the agreement and
+  // long before the report. A new job's details are the page itself
+  // (Property, Client and Booking cards) with the steps after them; once
+  // the address is in they're the first step, and open in place. A redraw
+  // while the page is open keeps them open or shut as they were.
   const fold = document.getElementById('jobDetailsFold');
   const detailsOpen = isNew || !!(fold && fold.open && document.getElementById('jobOverlay').classList.contains('open'));
   document.getElementById('jobOverlay').classList.toggle('new-job', isNew);
+  const ds = steps[0];
+  const tick = '<span class="job-tile-tick"><svg class="icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>';
   const detailsHTML = `
     <details class="job-details${isNew ? ' new' : ''}" id="jobDetailsFold"${detailsOpen ? ' open' : ''}>
-      <summary class="job-details-head" id="jobDetailsHead">
-        <span class="job-tile" aria-hidden="true">${jobIcon('details', 20)}</span>
+      <summary class="job-details-head" id="jobDetailsHead" aria-label="1. Job details, ${ds.state === 'done' ? 'done' : 'to finish'}: ${escapeHtml(ds.text)}">
+        <span class="job-tile ${ds.state}" aria-hidden="true">${jobIcon('details', 20)}${ds.state === 'done' ? tick : ''}</span>
         <span class="job-step-main">
           <span class="job-step-label">Job details</span>
-          <span class="job-step-text">${escapeHtml(jobDetailsSummary() || 'Address, client and booking')}</span>
+          <span class="job-step-text">${escapeHtml(ds.text)}</span>
         </span>
         ${chev}
       </summary>
@@ -282,7 +295,7 @@ function renderJobPage() {
     </details>`;
   const stepsHTML = `
     <div class="job-section-head">Job steps</div>
-    ${jobStepsHTML(j, steps, st => `jobGo('${st.to}')`)}`;
+    ${jobStepsHTML(j, isNew ? steps.slice(1) : steps, st => `jobGo('${st.to}')`, detailsHTML)}`;
   // A new job: what to fill in, the form, then the agreement as the next step.
   if (isNew) {
     body.innerHTML = `
@@ -333,7 +346,6 @@ function renderJobPage() {
     </section>
     ${stepsHTML}
     ${typeof jobPdfSectionHTML === 'function' ? jobPdfSectionHTML(j) : ''}
-    ${detailsHTML}
     ${currentReportId && !isSampleJob(currentReportId) && getSavedReports().some(r => r.id === currentReportId) ? `<div class="dash-detail-foot job-delete">
       <button type="button" class="dash-detail-delete" onclick="deleteThisJob()"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete this job</button>
     </div>` : ''}`;

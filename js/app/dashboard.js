@@ -609,7 +609,7 @@ function installToastScreenWatch() {
   // the app (on the quote screen, for one). It belongs to the page.
   const toast = document.getElementById('toast');
   if (toast && toast.parentElement !== document.body) document.body.appendChild(toast);
-  const ids = ['app', 'mainMenu', 'quoteScreen', 'sidebarPanel', 'dashboardOverlay'];
+  const ids = ['app', 'quoteScreen', 'sidebarPanel', 'dashboardOverlay'];
   const targets = ids.map(id => document.getElementById(id))
     .concat([...document.querySelectorAll('.page-sheet-overlay, .menu-page, .saved-panel')])
     .filter(Boolean);

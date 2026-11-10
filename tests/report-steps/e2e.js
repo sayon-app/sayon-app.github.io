@@ -243,7 +243,7 @@ async function backend(ctx) {
   check(words.title === 'Your note' && words.status === 'Ready' && words.fill && !words.old.length, 'the note reads "Your note", its button "Fill in the report": ' + JSON.stringify(words));
 
   // ── 8. The inspector's signature carries to the next report ──
-  const sig = () => p.evaluate(() => ({ signed: !!reportData.inspectorSignature, status: document.getElementById('sigStatusInspector').textContent, again: !document.getElementById('sigAgainInspector').hidden,
+  const sig = () => p.evaluate(() => ({ signed: !!reportData.inspectorSignature, status: document.getElementById('sigStatusInspector').textContent, again: getComputedStyle(document.getElementById('sigAgainInspector')).display !== 'none',
     kept: document.getElementById('sigCanvasInspector').parentElement.classList.contains('kept'), badge: document.getElementById('sts-signoff').textContent }));
   const draw = async (dip = 70) => {
     const box = await p.locator('#sigCanvasInspector').boundingBox();

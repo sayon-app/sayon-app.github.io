@@ -45,13 +45,12 @@ let shotN = 0;
 
   // 1. Sign-up ends with the offer.
   check(await p.evaluate(() => getComputedStyle(document.getElementById('onboardScreen')).display !== 'none'), 'a new account lands on business setup');
-  await p.fill('#ob-companyName', 'Example Pest Co');
   await p.fill('#ob-licence', 'NSW 123456');
   await p.fill('#ob-phone', '0400 000 000');
   await tap(p.locator('#obBusinessSave'), 'Continue (business)');
   await p.fill('#obPriceList .pb-row[data-key="barrier_lm"] .pb-input', '32');
   await p.evaluate(() => obNext(1)); await p.waitForTimeout(300);
-  await p.evaluate(() => obShowPanel(3)); await shot('ready-panel');
+  await p.evaluate(() => obShowPanel(2)); await shot('ready-panel');
   const priceList = () => p.evaluate(() => { const m = Object.assign({}, quotePriceMemory()); delete m.__updatedAt; return JSON.stringify(m); });
   const pricesBefore = await priceList();
   await tap(p.getByRole('button', { name: /See a finished sample job first/i }), 'See a finished sample job first');

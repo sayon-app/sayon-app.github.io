@@ -29,7 +29,7 @@
       <div class="splash-progress-track">
         <div class="splash-progress-fill"></div>
       </div>
-      <div class="splash-status" id="splashStatus">Initialising vocabulary…</div>
+      <div class="splash-status" id="splashStatus" role="status"></div>
     </div>
   </div>
 </div>
@@ -131,12 +131,13 @@
       <button class="auth-btn" onclick="showAuth('authSignIn')">Back to sign in</button>
     </div>
 
-    <p class="auth-footer">By continuing you agree to SAYON's <a href="terms.html" target="_blank">Terms of Service</a> and <a href="privacy.html" target="_blank">Privacy Policy</a></p>
+    <p class="auth-footer" id="authAgreeLine">By continuing you agree to SAYON's <a href="terms.html" target="_blank">Terms of Service</a> and <a href="privacy.html" target="_blank">Privacy Policy</a></p>
     <p class="auth-footer">Need a hand? <a href="mailto:sayon.application@gmail.com?subject=SAYON%20help">Email SAYON</a></p>
   </div>
 </div>
 
-<!-- ONBOARDING -->
+<!-- SET-UP: the business's details, its prices, then how a job runs.
+     A technician joins a business that has the first two, so sees the last. -->
 <div id="onboardScreen" style="display:none">
   <div class="auth-wrap">
     <div class="auth-logo">
@@ -145,55 +146,21 @@
     </div>
 
     <!-- Step indicators -->
-    <div class="ob-steps">
+    <div class="ob-steps" id="obSteps">
       <div class="ob-step active" id="ob-step-0"></div>
       <div class="ob-step" id="ob-step-1"></div>
       <div class="ob-step" id="ob-step-2"></div>
-      <div class="ob-step" id="ob-step-3"></div>
     </div>
 
-    <!-- Step 1: Business setup. The same form edits the details later
-         (account menu › Your business): see openBusinessForm(). -->
+    <!-- Step 1: the business's details. The boxes themselves (#businessFields)
+         belong to Menu › Business details and sit here during set-up: see
+         placeBusinessFields(). -->
     <div class="auth-card ob-panel" id="ob-panel-0">
       <div class="auth-badge" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/><path d="M9 10h.01M15 10h.01"/></svg></div>
       <h2 class="auth-title" id="obBusinessTitle">Set up your business</h2>
-      <p class="auth-subtitle ob-setup-only">This appears on every report, quote and certificate you send to clients. Only the name is needed now; add the rest later from Menu&nbsp;›&nbsp;Your business.</p>
-      <p class="auth-subtitle ob-edit-only">Every report, quote and certificate you send prints these details. Changes show on the next PDF you make.</p>
-      <div class="auth-field">
-        <label class="auth-label" for="ob-companyName">Business name</label>
-        <input class="auth-input" id="ob-companyName" placeholder="e.g. ABC Pest Control">
-      </div>
-      <div class="auth-field">
-        <label class="auth-label" for="ob-licence">Pest licence no. <span class="auth-label-optional ob-setup-only">(can wait)</span></label>
-        <input class="auth-input" id="ob-licence" placeholder="e.g. PL12345">
-      </div>
-      <div class="auth-field">
-        <label class="auth-label" for="ob-phone">Business phone <span class="auth-label-optional ob-setup-only">(can wait)</span></label>
-        <input class="auth-input" id="ob-phone" type="tel" onchange="tidyPhoneInput(this)" placeholder="e.g. 0400 000 000">
-      </div>
-      <div class="auth-field">
-        <label class="auth-label" for="ob-email">Business email <span class="auth-label-optional ob-setup-only">(can wait)</span></label>
-        <input class="auth-input" id="ob-email" type="email" placeholder="e.g. office@abcpest.com.au">
-      </div>
-      <div class="auth-field">
-        <label class="auth-label" for="ob-abn">ABN <span class="auth-label-optional">(optional)</span></label>
-        <input class="auth-input" id="ob-abn" placeholder="e.g. 12 345 678 901">
-      </div>
-      <div class="auth-field">
-        <label class="auth-label">Logo <span class="auth-label-optional">(optional)</span></label>
-        <div class="logo-upload-row">
-          <div class="logo-preview" id="companyLogoPreview">
-            <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.5-3.5a2 2 0 0 0-2.8 0L5 21"/></svg>
-          </div>
-          <div class="logo-upload-actions">
-            <button type="button" class="logo-upload-btn" onclick="document.getElementById('companyLogoInput').click()">Upload logo</button>
-            <button type="button" class="logo-remove-btn" id="companyLogoRemoveBtn" onclick="removeCompanyLogo()" style="display:none">Remove</button>
-          </div>
-          <input type="file" id="companyLogoInput" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="handleCompanyLogoUpload(this)">
-        </div>
-      </div>
+      <p class="auth-subtitle" id="obBusinessSub"></p>
+      <div class="business-fields-slot" id="obBusinessSlot"></div>
       <button class="auth-btn" id="obBusinessSave" onclick="obNext(0)">Continue →</button>
-      <button class="auth-link ob-cancel" id="obBusinessCancel" onclick="closeBusinessForm()" hidden>Cancel</button>
     </div>
 
     <!-- Step 2: Your prices. The lines most quotes use; the full list is
@@ -209,68 +176,22 @@
       <button class="auth-link" onclick="obShowPanel(2)">Skip for now</button>
     </div>
 
-    <!-- Step 3: Voice demo -->
+    <!-- Step 3: Ready. The job's own steps, as This job lists them. -->
     <div class="auth-card ob-panel" id="ob-panel-2" style="display:none">
-      <div class="auth-badge" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v4"/></svg></div>
-      <h2 class="auth-title">Meet the voice</h2>
-      <p class="auth-subtitle">Talk through your inspection, and SAYON's AI fills in the report for you.</p>
-      <div class="ob-demo-box" id="obDemoBox">
-        <div class="ob-demo-text" id="obDemoText">Tap below to see it in action</div>
-      </div>
-      <button class="auth-btn" id="obDemoBtn" onclick="obRunDemo()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        Play the demo
-      </button>
-      <button class="auth-btn secondary" id="obDemoNext" onclick="obNext(2)">Continue →</button>
-    </div>
-
-    <!-- Step 4: Ready -->
-    <div class="auth-card ob-panel" id="ob-panel-3" style="display:none">
       <div class="auth-badge" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg></div>
       <h2 class="auth-title">You're ready</h2>
-      <p class="auth-subtitle">SAYON is set up and ready to go. Here's how a job goes:</p>
+      <p class="auth-subtitle">Every job has its own page, with its steps in the order you do them:</p>
       <div class="ob-checklist">
-        <div class="ob-check-item"><span class="ob-check-num">1</span><span>Add the job's address and client in Job details</span></div>
-        <div class="ob-check-item"><span class="ob-check-num">2</span><span>Tap the mic at the bottom and talk through the inspection</span></div>
-        <div class="ob-check-item"><span class="ob-check-num">3</span><span>Say "Stop Sayon" or tap Fill in the report, and the report fills itself in</span></div>
-        <div class="ob-check-item"><span class="ob-check-num">4</span><span>Check the report, then tap Send to client at the end of it</span></div>
+        <div class="ob-check-item"><span class="ob-check-num">1</span><span><strong>Job details.</strong> The address and the client</span></div>
+        <div class="ob-check-item"><span class="ob-check-num">2</span><span><strong>Agreement.</strong> Signed on site or by email, before you start</span></div>
+        <div class="ob-check-item"><span class="ob-check-num">3</span><span><strong>Report.</strong> Tap the mic, talk through the inspection, and SAYON fills it in</span></div>
+        <div class="ob-check-item"><span class="ob-check-num">4</span><span><strong>Quote.</strong> At your prices, sent for the client's answer</span></div>
+        <div class="ob-check-item"><span class="ob-check-num">5</span><span><strong>Treatment.</strong> The record of the work, and its certificate</span></div>
       </div>
-      <p style="font-size:calc(12px * var(--ts));color:var(--text3);line-height:1.6;margin-top:4px">Tip: Start recording, pop the phone in your pocket and talk room by room. Say <strong style="color:var(--accent2)">"Fill it in, Sayon"</strong> to fill the report as you go, and <strong style="color:var(--accent2)">"Stop Sayon"</strong> when you're done. Say the quote too, like "48 metres of barrier at $50 a metre, 50% deposit", and it fills in the quote.</p>
+      <p class="ob-tip">Tip: say "Fill it in, Sayon" as you go, and "Stop Sayon" when you're done.</p>
       <button class="auth-btn" onclick="obFinish()">Start inspecting →</button>
       <button type="button" class="auth-btn secondary" onclick="obFinish(true)">See a finished sample job first</button>
     </div>
-  </div>
-</div>
-
-<!-- MAIN MENU (platform hub) -->
-<div id="mainMenu">
-  <div class="menu-shell">
-    <div class="menu-header">
-      <div class="menu-logo">
-        <div class="menu-logo-icon"><svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle class="logo-dot" cx="12" cy="4" r="2" fill="currentColor"/></svg></div>
-        <div class="menu-logo-text">SAYON</div>
-      </div>
-      <div class="menu-tagline">Voice-to-report timber pest inspections</div>
-    </div>
-
-    <div class="menu-grid">
-      <button class="menu-tile live" onclick="openApp('inspect')">
-        <div class="menu-tile-icon">
-          <svg class="icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z"/><path d="m21 21-4.3-4.3"/></svg>
-        </div>
-        <div class="menu-tile-text">
-          <div class="menu-tile-name">SAYON</div>
-          <div class="menu-tile-desc">Timber pest inspection reports</div>
-        </div>
-        <div class="menu-tile-arrow">
-          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-        </div>
-      </button>
-      <!-- One way in: every quote starts from an inspection, and each
-           job's quote is on its Dashboard card. -->
-    </div>
-
-    <div class="menu-footer">v1.0 · Australian pest &amp; timber pest field tools<br><a href="terms.html" target="_blank" rel="noopener">Terms of Service</a> · <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a></div>
   </div>
 </div>
 
@@ -528,6 +449,19 @@
     <div class="did-it-send-btns">
       <button class="extract-btn" onclick="answerDidItSend(true)">Yes, it's sent</button>
       <button class="link-btn" onclick="answerDidItSend(false)">Not yet</button>
+    </div>
+  </div>
+</div>
+
+<!-- ASK FIRST: SAYON's own sheet for a question (askFirst in js/app/shell.js). -->
+<div class="page-sheet-overlay did-it-send-overlay" id="askOverlay" onclick="if (event.target === this) answerAsk(null)">
+  <div class="did-it-send" role="alertdialog" aria-modal="true" aria-labelledby="askTitle" aria-describedby="askText">
+    <div class="did-it-send-title" id="askTitle"></div>
+    <dl class="ask-facts" id="askFacts" hidden></dl>
+    <p class="did-it-send-text" id="askText"></p>
+    <div class="did-it-send-btns">
+      <button class="extract-btn" id="askYes" onclick="answerAsk(true)"></button>
+      <button class="link-btn" id="askNo" onclick="answerAsk(false)"></button>
     </div>
   </div>
 </div>
@@ -1178,28 +1112,156 @@
 
       <div class="drawer-scroll">
 
-      <!-- Account: who's signed in, their business, billing and sign out -->
-      <div class="menu-account" id="profileMenuWrap">
-        <div class="menu-account-who">
-          <span class="menu-account-avatar" id="profileInitials">?</span>
-          <div class="menu-account-text">
-            <div class="profile-dropdown-name" id="profileName">—</div>
-            <div class="profile-dropdown-email" id="profileEmail">—</div>
-            <div class="profile-dropdown-business" id="profileBusinessRow" style="display:none"><span id="profileBusinessName"></span></div>
+      <!-- Who's signed in. Opens Your sign-in: name, email, password. -->
+      <button type="button" class="menu-account" id="profileMenuWrap" onclick="openSignInPage()">
+        <span class="menu-account-avatar" id="profileInitials" aria-hidden="true">?</span>
+        <span class="menu-account-text">
+          <span class="profile-dropdown-name" id="profileName">—</span>
+          <span class="profile-dropdown-email" id="profileEmail">—</span>
+          <span class="profile-dropdown-business" id="profileBusinessRow" style="display:none"><span id="profileBusinessName"></span></span>
+        </span>
+        <span class="menu-account-go">Your sign-in</span>
+        <svg class="icon panel-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+
+      <!-- Two lists. The business's own: what it prints, charges, carries,
+           who's on it and its plan. Then the app's. -->
+      <div class="drawer-group-label">Your business</div>
+
+      <!-- Business details: what every report, quote and certificate
+           prints. The owner's; the same boxes sit on the set-up card at
+           sign-up (placeBusinessFields in js/app/state.js). -->
+      <div class="saved-panel settings-panel" id="businessPanel">
+        <button class="panel-label panel-label-toggle" onclick="openBusinessForm()" id="businessPanelToggle">
+          <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/><path d="M9 10h.01M15 10h.01"/></svg></span>
+          <span class="panel-title">Business details</span>
+          <span class="job-panel-summary"></span>
+          <svg class="icon panel-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <div class="job-panel-body">
+          <div class="settings-row-desc pb-intro">Every report, quote and certificate you send prints these details. Changes show on the next PDF you make.</div>
+          <div class="business-fields-slot" id="businessPageSlot">
+            <div class="business-fields" id="businessFields" oninput="businessFormTouched()">
+              <div class="auth-field" id="obNameField">
+                <label class="auth-label" for="ob-companyName">Business name</label>
+                <input class="auth-input" id="ob-companyName" placeholder="e.g. ABC Pest Control">
+              </div>
+              <div class="auth-field">
+                <label class="auth-label" for="ob-licence">Pest licence no. <span class="auth-label-optional ob-setup-only">(can wait)</span></label>
+                <input class="auth-input" id="ob-licence" placeholder="e.g. PL12345">
+              </div>
+              <div class="auth-field">
+                <label class="auth-label" for="ob-phone">Business phone <span class="auth-label-optional ob-setup-only">(can wait)</span></label>
+                <input class="auth-input" id="ob-phone" type="tel" onchange="tidyPhoneInput(this)" placeholder="e.g. 0400 000 000">
+              </div>
+              <div class="auth-field">
+                <label class="auth-label" for="ob-email">Business email <span class="auth-label-optional ob-setup-only">(can wait)</span></label>
+                <input class="auth-input" id="ob-email" type="email" placeholder="e.g. office@abcpest.com.au">
+              </div>
+              <div class="auth-field">
+                <label class="auth-label" for="ob-abn">ABN <span class="auth-label-optional">(optional)</span></label>
+                <input class="auth-input" id="ob-abn" placeholder="e.g. 12 345 678 901">
+              </div>
+              <div class="auth-field">
+                <label class="auth-label">Logo <span class="auth-label-optional">(optional)</span></label>
+                <div class="logo-upload-row">
+                  <div class="logo-preview" id="companyLogoPreview">
+                    <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.5-3.5a2 2 0 0 0-2.8 0L5 21"/></svg>
+                  </div>
+                  <div class="logo-upload-actions">
+                    <button type="button" class="logo-upload-btn" onclick="document.getElementById('companyLogoInput').click()">Upload logo</button>
+                    <button type="button" class="logo-remove-btn" id="companyLogoRemoveBtn" onclick="removeCompanyLogo()" style="display:none">Remove</button>
+                  </div>
+                  <input type="file" id="companyLogoInput" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="handleCompanyLogoUpload(this)">
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="menu-account-actions">
-          <button class="profile-dropdown-item" id="profileYourBusiness" onclick="openBusinessFromProfile()">Your business</button>
-          <button class="profile-dropdown-item" id="profileYourPrices" onclick="openPriceBook()">Your prices</button>
-          <button class="profile-dropdown-item" id="profileYourTeam" onclick="openMenuPage('teamPanel')" hidden>Your team</button>
-          <button class="profile-dropdown-item" onclick="openBillingFromProfile()">Billing</button>
-          <button class="profile-dropdown-item profile-signout" onclick="signOutFromProfile()">Sign out</button>
+          <button type="button" class="job-action-btn settings-primary-btn business-save" id="businessSave" onclick="saveBusinessPage()">Save</button>
         </div>
       </div>
 
-      <!-- Billing: opened from the account (initials) button, so it has no
-           row in the menu list -->
-      <div class="saved-panel settings-panel menu-row-hidden" id="billingPanel">
+      <!-- Your prices: the business's price book, opened from here and from
+           a quote (js/price-book.js) -->
+      <div class="saved-panel settings-panel" id="pricesPanel">
+        <button class="panel-label panel-label-toggle" onclick="openPriceBook()" id="pricesPanelToggle">
+          <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r="1.5" fill="currentColor"/></svg></span>
+          <span class="panel-title">Your prices</span>
+          <span class="job-panel-summary"></span>
+          <svg class="icon panel-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <div class="job-panel-body">
+          <button type="button" class="job-action-btn settings-primary-btn pb-back" id="pbBackToQuote" onclick="backToQuoteFromPrices()" hidden>‹ Back to the quote</button>
+          <div class="settings-row-desc pb-intro">Every new quote starts at these prices, ex GST. Change one and the next quote uses it; quotes you've already made keep their prices. A price you type on a quote is saved here too.</div>
+          <div class="settings-row-desc pb-status" id="pbStatus"></div>
+          <div class="settings-row-desc pb-owner" id="pbOwnerNote" hidden>Your business owner sets these prices. They show on your quotes.</div>
+          <div class="pb-list" id="pbList"></div>
+          <div class="settings-group-title">How you charge</div>
+          <div class="settings-row">
+            <div class="settings-row-text">
+              <div class="settings-row-title">Add GST</div>
+              <div class="settings-row-desc">Adds 10% to every quote. Turn off if you're not registered for GST.</div>
+            </div>
+            <button type="button" class="toggle-switch" id="pbGst" onclick="togglePriceBookGst()" aria-label="Add GST to quotes"></button>
+          </div>
+          <div class="pb-terms">
+            <label class="settings-row-title" for="pbTerms">Payment terms</label>
+            <textarea class="job-input pb-terms-input" id="pbTerms" rows="2" onchange="onPriceBookTerms(this)"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chemical register: the products the business carries, their
+           labels and SDS, and each label use with its rate. A treatment
+           record fills the active constituent and rate from it
+           (js/chemicals.js) -->
+      <div class="saved-panel settings-panel" id="chemicalsPanel">
+        <button class="panel-label panel-label-toggle" onclick="openMenuPage('chemicalsPanel')" id="chemicalsPanelToggle">
+          <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"/><path d="M10 3v6L5 19a1 1 0 0 0 1 2h12a1 1 0 0 0 1-2l-5-10V3"/></svg></span>
+          <span class="panel-title">Chemical register</span>
+          <span class="job-panel-summary"></span>
+          <svg class="icon panel-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <div class="job-panel-body">
+          <div class="settings-row-desc pb-intro">The products you carry. Search for one and tap it: its SDS, label and manufacturer's declaration open with one tap, or send them on. On a treatment record, pick the product and what it's used for, and SAYON fills the active constituent, application rate and life expectancy from the label rates here.</div>
+          <div class="settings-row-desc pb-status" id="chemStatus" hidden></div>
+          <div class="settings-row-desc pb-owner" id="chemOwnerNote" hidden>Your business owner keeps this register. Tap a product to see its label, SDS and rates.</div>
+          <div class="chem-search">
+            <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input class="job-input" id="chemSearch" type="search" placeholder="Search for a product" autocomplete="off" aria-label="Search the chemical register" oninput="onChemicalSearch(this)">
+          </div>
+          <div class="chem-list" id="chemList"></div>
+          <div class="settings-row-desc" id="chemNoMatch" hidden>No product by that name. Add it with "Add a product".</div>
+          <div class="settings-row-desc chem-apvma-note" id="chemApvmaNote" hidden></div>
+          <button type="button" class="job-action-btn settings-primary-btn chem-add" id="chemAdd" onclick="addChemical()">Add a product</button>
+          <button type="button" class="quote-link-btn" id="chemReset" onclick="restoreChemicalStarters()" hidden>Add back SAYON's starting products</button>
+        </div>
+      </div>
+
+      <!-- Your team: the business owner's, once the plan has inspector
+           places (renderProfileMenu shows the row) -->
+      <div class="saved-panel settings-panel menu-row-hidden" id="teamPanel">
+        <button class="panel-label panel-label-toggle" onclick="openMenuPage('teamPanel')" id="teamPanelToggle">
+          <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+          <span class="panel-title">Your team</span>
+          <span class="job-panel-summary"></span>
+          <svg class="icon panel-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <div class="job-panel-body">
+          <div class="settings-row-desc team-places" id="teamPlacesText">Loading…</div>
+          <div class="team-list" id="teamList"></div>
+          <div class="settings-group-title">Add an inspector</div>
+          <div class="team-invite">
+            <input class="job-input" id="teamInviteEmail" type="email" inputmode="email" autocomplete="off" placeholder="Their email address" aria-label="Their email address" onkeydown="if (event.key === 'Enter') inviteTeamMember()">
+            <button class="job-action-btn settings-primary-btn" id="teamInviteBtn" onclick="inviteTeamMember()">Invite</button>
+          </div>
+          <div class="settings-row-desc team-help">Send them the sign-up link SAYON gives you. When they sign up with that email, they join your business: your company details, logo and prices on every PDF, with their own reports and the AI fills shared.</div>
+          <button class="job-action-btn settings-primary-btn team-more" id="teamMorePlaces" onclick="openMenuPage('billingPanel')" hidden>More inspector places in Billing</button>
+        </div>
+      </div>
+
+      <!-- Billing: the plan, then the plans. The owner's to change. -->
+      <div class="saved-panel settings-panel" id="billingPanel">
         <button class="panel-label panel-label-toggle" onclick="openMenuPage('billingPanel')" id="billingPanelToggle">
           <span class="panel-icon"><svg class="icon " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
           <span class="panel-title">Billing</span>
@@ -1213,19 +1275,6 @@
               <div class="settings-row-desc" id="billingStatusText">Sign in to see your plan.</div>
             </div>
             <button class="job-action-btn settings-primary-btn" id="manageBillingBtn" onclick="openBillingPortal()" style="display:none">Manage</button>
-          </div>
-          <div class="billing-explainer">
-            <div class="billing-explainer-title">How plans work</div>
-            <p>Every plan has the whole app: voice reports, quotes, treatment certificates, PDFs and sending to clients. Each paid plan gives every inspector 800 AI fills a month, about 40 inspections.</p>
-            <p><strong>One AI fill</strong> is one job the AI does for you:</p>
-            <ul>
-              <li>filling in the report and quote from what you said (each time you say "Fill it in, Sayon" or "Stop Sayon", or tap Fill in the report)</li>
-              <li>filling in the agreement or treatment record when you tap Say it instead</li>
-              <li>reading a compliance plate from a photo</li>
-              <li>checking a photo when you tap Analyse</li>
-            </ul>
-            <p>Listening while you talk is free and never counts. A typical inspection uses about 10 to 20 AI fills.</p>
-            <p><strong>If you run out,</strong> nothing is lost. Your notes stay in the report and you can keep typing it by hand. AI fills come back on the 1st of each month, and upgrading gives you the bigger number straight away.</p>
           </div>
           <div class="settings-row" data-plan="starter">
             <div class="settings-row-text">
@@ -1260,6 +1309,18 @@
             </div>
             <button class="job-action-btn settings-primary-btn" onclick="choosePlan('business')">Upgrade</button>
           </div>
+          <details class="billing-explainer">
+            <summary>What counts as an AI fill?</summary>
+            <p><strong>One AI fill</strong> is one job the AI does for you:</p>
+            <ul>
+              <li>filling in the report and quote from what you said (each time you say "Fill it in, Sayon" or "Stop Sayon", or tap Fill in the report)</li>
+              <li>filling in the agreement or treatment record when you tap Say it instead</li>
+              <li>reading a compliance plate from a photo</li>
+              <li>writing a photo's caption when you tap Describe</li>
+            </ul>
+            <p>Listening while you talk is free and never counts. A typical inspection uses about 10 to 20 AI fills, and each paid plan gives every inspector 800 a month, about 40 inspections.</p>
+            <p><strong>If you run out,</strong> nothing is lost. Your notes stay in the report and you can keep typing it by hand. AI fills come back on the 1st of each month, and upgrading gives you the bigger number straight away.</p>
+          </details>
           <div class="settings-row" id="billingOwnerOnly" hidden>
             <div class="settings-row-text">
               <div class="settings-row-desc">Your business owner looks after the plan. Ask them if you need more AI fills.</div>
@@ -1275,89 +1336,9 @@
         </div>
       </div>
 
-      <!-- Your prices: the business's price book, opened from the account
-           (initials) button and from a quote, so it has no row in the menu
-           list (js/price-book.js) -->
-      <div class="saved-panel settings-panel menu-row-hidden" id="pricesPanel">
-        <button class="panel-label panel-label-toggle" onclick="openMenuPage('pricesPanel')" id="pricesPanelToggle">
-          <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r="1.5" fill="currentColor"/></svg></span>
-          <span class="panel-title">Your prices</span>
-          <span class="job-panel-summary"></span>
-          <svg class="icon panel-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-        </button>
-        <div class="job-panel-body">
-          <button type="button" class="job-action-btn settings-primary-btn pb-back" id="pbBackToQuote" onclick="backToQuoteFromPrices()" hidden>‹ Back to the quote</button>
-          <div class="settings-row-desc pb-intro">Every new quote starts at these prices, ex GST. Change one and the next quote uses it; quotes you've already made keep their prices. A price you type on a quote is saved here too.</div>
-          <div class="settings-row-desc pb-status" id="pbStatus"></div>
-          <div class="settings-row-desc pb-owner" id="pbOwnerNote" hidden>Your business owner sets these prices. They show on your quotes.</div>
-          <div class="pb-list" id="pbList"></div>
-          <div class="settings-group-title">How you charge</div>
-          <div class="settings-row">
-            <div class="settings-row-text">
-              <div class="settings-row-title">Add GST</div>
-              <div class="settings-row-desc">Adds 10% to every quote. Turn off if you're not registered for GST.</div>
-            </div>
-            <button type="button" class="toggle-switch" id="pbGst" onclick="togglePriceBookGst()" aria-label="Add GST to quotes"></button>
-          </div>
-          <div class="pb-terms">
-            <label class="settings-row-title" for="pbTerms">Payment terms</label>
-            <textarea class="job-input pb-terms-input" id="pbTerms" rows="2" onchange="onPriceBookTerms(this)"></textarea>
-          </div>
-        </div>
-      </div>
-
-      <!-- Your team: opened from the account (initials) button by the
-           business owner, so it has no row in the menu list -->
-      <div class="saved-panel settings-panel menu-row-hidden" id="teamPanel">
-        <button class="panel-label panel-label-toggle" onclick="openMenuPage('teamPanel')" id="teamPanelToggle">
-          <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-          <span class="panel-title">Your team</span>
-          <span class="job-panel-summary"></span>
-          <svg class="icon panel-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-        </button>
-        <div class="job-panel-body">
-          <div class="settings-row-desc team-places" id="teamPlacesText">Loading…</div>
-          <div class="team-list" id="teamList"></div>
-          <div class="settings-group-title">Add an inspector</div>
-          <div class="team-invite">
-            <input class="job-input" id="teamInviteEmail" type="email" inputmode="email" autocomplete="off" placeholder="Their email address" aria-label="Their email address" onkeydown="if (event.key === 'Enter') inviteTeamMember()">
-            <button class="job-action-btn settings-primary-btn" id="teamInviteBtn" onclick="inviteTeamMember()">Invite</button>
-          </div>
-          <div class="settings-row-desc team-help">Send them the sign-up link SAYON gives you. When they sign up with that email, they join your business: your company details, logo and prices on every PDF, with their own reports and the AI fills shared.</div>
-          <button class="job-action-btn settings-primary-btn team-more" id="teamMorePlaces" onclick="openMenuPage('billingPanel')" hidden>More inspector places in Billing</button>
-        </div>
-      </div>
-
       <div class="drawer-group-label">App</div>
 
       <!-- Settings: display, voice, your data and the account -->
-      <!-- Chemical register: the products the business carries, their
-           labels and SDS, and each label use with its rate. A treatment
-           record fills the active constituent and rate from it
-           (js/chemicals.js) -->
-      <div class="saved-panel settings-panel" id="chemicalsPanel">
-        <button class="panel-label panel-label-toggle" onclick="openMenuPage('chemicalsPanel')" id="chemicalsPanelToggle">
-          <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"/><path d="M10 3v6L5 19a1 1 0 0 0 1 2h12a1 1 0 0 0 1-2l-5-10V3"/></svg></span>
-          <span class="panel-title">Chemical register</span>
-          <span class="job-panel-summary"></span>
-          <svg class="icon panel-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-        </button>
-        <div class="job-panel-body">
-          <div class="settings-row-desc pb-intro">The products you carry. Search for one and tap it: its SDS, label and manufacturer's declaration open with one tap, or send them on. On a treatment record, pick the product and what it's used for, and SAYON fills the active constituent, application rate and life expectancy from the label rates here.</div>
-          <div class="settings-row-desc pb-status" id="chemStatus" hidden></div>
-          <div class="settings-row-desc pb-owner" id="chemOwnerNote" hidden>Your business owner keeps this register. Tap a product to see its label, SDS and rates.</div>
-          <div class="chem-search">
-            <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-            <input class="job-input" id="chemSearch" type="search" placeholder="Search for a product" autocomplete="off" aria-label="Search the chemical register" oninput="onChemicalSearch(this)">
-          </div>
-          <div class="chem-list" id="chemList"></div>
-          <div class="settings-row-desc" id="chemNoMatch" hidden>No product by that name. Add it with "Add a product".</div>
-          <div class="settings-row-desc chem-apvma-note" id="chemApvmaNote" hidden></div>
-          <button type="button" class="job-action-btn settings-primary-btn chem-add" id="chemAdd" onclick="addChemical()">Add a product</button>
-          <button type="button" class="quote-link-btn" id="chemReset" onclick="restoreChemicalStarters()" hidden>Add back SAYON's starting products</button>
-        </div>
-      </div>
-
       <div class="saved-panel settings-panel" id="settingsPanel">
         <button class="panel-label panel-label-toggle" onclick="openMenuPage('settingsPanel')" id="settingsPanelToggle">
           <span class="panel-icon"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>
@@ -1412,7 +1393,7 @@
             </select>
           </div>
           <div class="settings-group-title">Voice</div>
-          <div class="settings-row">
+          <div class="settings-row" id="audioCaptureRow" hidden>
             <div class="settings-row-text">
               <div class="settings-row-title">Second transcription (experimental)</div>
               <div class="settings-row-desc">Also sends the recording to a more accurate transcription service and shows its version for you to check. Nothing changes unless you apply it. Off by default while it's tried on more phones.</div>
@@ -1489,6 +1470,37 @@
         <span class="panel-title">Help and support</span>
         <span class="job-panel-summary">Email us</span>
       </a>
+
+      <!-- Your sign-in: opened from the card at the top of the menu, so it
+           has no row of its own (YOUR SIGN-IN in js/app/account.js) -->
+      <div class="saved-panel settings-panel menu-row-hidden" id="signinPanel">
+        <button class="panel-label panel-label-toggle" onclick="openSignInPage()">
+          <span class="panel-title">Your sign-in</span>
+        </button>
+        <div class="job-panel-body">
+          <div class="settings-group-title">Your name</div>
+          <div class="signin-line">
+            <input class="job-input" id="meName" type="text" autocomplete="name" aria-label="Your name" onkeydown="if (event.key === 'Enter') saveMyName()">
+            <button type="button" class="job-action-btn settings-primary-btn" id="meNameSave" onclick="saveMyName()">Save</button>
+          </div>
+          <div class="settings-row-desc">SAYON shows this name in your menu, and starts a new job, treatment record or bait visit with it.</div>
+          <div class="settings-group-title">Email</div>
+          <div class="signin-email" id="meEmail"></div>
+          <div class="settings-row-desc">You sign in with this. It can't be changed here yet: if you need it moved, <a href="mailto:sayon.application@gmail.com?subject=SAYON%20sign-in%20email">email SAYON</a>.</div>
+          <div class="settings-group-title">Change password</div>
+          <div class="signin-pass">
+            <label class="settings-row-title" for="mePassNow">Current password</label>
+            <div class="auth-pass"><input class="job-input" id="mePassNow" type="password" autocomplete="current-password"><button type="button" class="auth-reveal" onclick="toggleAuthReveal(this)" aria-label="Show password" aria-pressed="false">Show</button></div>
+            <label class="settings-row-title" for="mePassNew">New password</label>
+            <div class="auth-pass"><input class="job-input" id="mePassNew" type="password" autocomplete="new-password" placeholder="At least 8 characters"><button type="button" class="auth-reveal" onclick="toggleAuthReveal(this)" aria-label="Show password" aria-pressed="false">Show</button></div>
+            <div class="auth-error" id="mePassError" role="alert"></div>
+            <button type="button" class="job-action-btn settings-primary-btn" id="mePassSave" onclick="changeMyPassword()">Change password</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sign out: last, and quiet. -->
+      <button type="button" class="drawer-signout" onclick="signOutFromProfile()">Sign out</button>
 
       <div class="drawer-legal"><a href="terms.html" target="_blank" rel="noopener">Terms of Service</a> · <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a></div>
 

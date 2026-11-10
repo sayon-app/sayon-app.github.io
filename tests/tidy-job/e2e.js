@@ -33,12 +33,11 @@ const emails = [];
   const tap = async (loc, what) => { try { await loc.scrollIntoViewIfNeeded({ timeout: 3000 }); await loc.tap({ timeout: 5000 }); return true; } catch (e) { check(false, 'tap ' + what + ': ' + e.message.split('\n')[0]); return false; } };
 
   await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(3000);
-  await p.fill('#ob-companyName', 'Example Pest Co');
   await p.fill('#ob-licence', 'NSW 123456');
   await p.fill('#ob-phone', '0400 000 000');
   await tap(p.locator('#obBusinessSave'), 'Continue (business)');
   await p.evaluate(() => obNext(1)); await p.waitForTimeout(300);
-  await p.evaluate(() => obShowPanel(3)); await p.waitForTimeout(300);
+  await p.evaluate(() => obShowPanel(2)); await p.waitForTimeout(300);
   await tap(p.getByRole('button', { name: /See a finished sample job first/i }), 'See a finished sample job first');
   await p.waitForTimeout(1800);
 

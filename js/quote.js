@@ -49,7 +49,7 @@ const QUOTE_DEFAULT_PAYMENT_TERMS = 'Payment is due on completion of the work.';
 
 let quoteState = null;        // the quote being edited
 let quoteSources = [];        // reports the quote can be built from
-let quoteReturnTo = 'menu';   // 'menu' | 'app' — where Back goes
+let quoteReturnTo = 'app';    // where Back goes: the app, the one place a quote opens from
 let quoteSaveTimer = null;
 
 // ── STORAGE ─────────────────────────────────────────────────────────────────
@@ -1066,8 +1066,7 @@ function openQuote(from, preferKey) {
   // This job's copy of the quote (useJobQuote) is let go: the screen reads
   // the stored one.
   if (!quoteScreenOpen()) quoteState = null;
-  quoteReturnTo = from || 'menu';
-  document.getElementById('mainMenu').style.display = 'none';
+  quoteReturnTo = from || 'app';
   document.getElementById('app').style.display = 'none';
   document.getElementById('quoteScreen').classList.add('open');
   installQuoteLockGuard();
@@ -2001,9 +2000,10 @@ function setQuoteClientEmail(value) {
 }
 
 // A fix button on the quote's check: closes the sheet and goes to the
-// place in the quote. The business's details open over it and come back.
+// place in the quote. The business's details are a menu page, which comes
+// back to the quote and its check.
 function fixQuoteGap(kind) {
-  if (kind === 'business') { openBusinessForm(openQuoteSendReview); return; }
+  if (kind === 'business') { openBusinessForm(openQuoteSendReview, closeSendReview); return; }
   closeSendReview();
   const open = id => { const fold = document.getElementById(id); if (fold) fold.open = true; return fold; };
   if (kind === 'client') { openQuoteDetails('qClient'); const el = document.getElementById('qClient'); if (el) el.focus({ preventScroll: true }); return; }

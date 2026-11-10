@@ -112,33 +112,14 @@ window.addEventListener('load', () => {
     });
   }
 
+  // The logo shows for as long as the sign-in check takes, then the app
+  // opens. No fixed wait: there is nothing else to load.
   const statusEl = document.getElementById('splashStatus');
-  const messages = [
-    'Initialising vocabulary…',
-    'Loading the termite species reference…',
-    'Preparing report template…',
-  ];
-  let msgIndex = 0;
-  if (statusEl) {
-    const cycle = setInterval(() => {
-      msgIndex++;
-      if (msgIndex < messages.length) {
-        statusEl.style.opacity = '0';
-        setTimeout(() => {
-          statusEl.textContent = messages[msgIndex];
-          statusEl.style.opacity = '1';
-        }, 150);
-      } else {
-        clearInterval(cycle);
-      }
-    }, 700);
-  }
-
-  setTimeout(async () => {
+  (async () => {
     const splash = document.getElementById('splash');
     const hideSplash = () => new Promise(done => {
       splash.style.opacity = '0';
-      setTimeout(() => { splash.style.display = 'none'; done(); }, 600);
+      setTimeout(() => { splash.style.display = 'none'; done(); }, 250);
     });
 
     // If we arrived here via a "reset your password" email link, Supabase
@@ -156,8 +137,9 @@ window.addEventListener('load', () => {
     }
 
     // The splash stays up while the sign-in and the business load, so the
-    // screen is never blank on a weak signal (see START_NETWORK_WAIT_MS).
-    const slow = setTimeout(() => { if (statusEl) statusEl.textContent = 'Signing in…'; }, 1000);
+    // screen is never blank on a weak signal (see START_NETWORK_WAIT_MS),
+    // and says what it's waiting on once that takes a second.
+    const slow = setTimeout(() => { if (statusEl) statusEl.textContent = 'Signing in…'; splash.classList.add('waiting'); }, 1000);
     const hasSession = await restoreAuthSession();
     clearTimeout(slow);
     await hideSplash();
@@ -168,17 +150,14 @@ window.addEventListener('load', () => {
       showAuth(new URLSearchParams(window.location.search).get('signup') ? 'authSignUp' : 'authSignIn');
       applyInviteToSignUp();
     }
-  }, 2200);
+  })();
 });
 
 // ── PLATFORM NAVIGATION ─────────────────────────────────────────────────
 function openApp(appName) {
-  if (appName === 'quote') { openQuote('menu'); return; }
   if (appName !== 'inspect') return;
 
-  const menu = document.getElementById('mainMenu');
   const app = document.getElementById('app');
-  menu.style.display = 'none';
   app.style.display = 'flex';
   track('screen_viewed', { screen: 'report' });
 
@@ -302,6 +281,7 @@ const NAV_SHEET_BACK = {
   sitePlanOverlay: () => { if (!sitePlanEditor.undo.length || confirm('Close the plan without saving your changes?')) closeSitePlan(); },
   sendReviewOverlay: () => { if (!(sendReview && sendReview.busy)) closeSendReview(); },
   didItSendOverlay: () => answerDidItSend(false),
+  askOverlay: () => answerAsk(null),
   quoteAnswerOverlay: () => closeQuoteAnswer(),
   compassOverlay: () => closeCompass(),
   problemOverlay: () => closeProblemReport(),
@@ -434,6 +414,39 @@ function restoreNavPlace() {
     else if (s.place === 'quote' && currentReportId) jobGo('quote');
     else if (s.place === 'report' && s.step && document.getElementById('tab-' + s.step)) goStep(s.step);
   } catch (e) { /* a place that can't open: the report, as before */ }
+}
+
+// ── ASK FIRST ────────────────────────────────────────────────────────────
+// SAYON's own sheet for a question, in place of the browser's grey box:
+// what will happen, a button that names it, and a quiet way out.
+//   askFirst({ title, text, facts, yes, no, danger })
+// facts: [[label, value], …] set out above the text (a plan and its price).
+// yes: the button's words, which say what it does. no: the quiet one,
+// "Not now" unless given. danger: the button is red (it deletes something).
+// Resolves true for the named button, false for the quiet one, and null
+// when the sheet is closed by back, Esc or a tap outside it.
+let askResolve = null;
+function askFirst({ title, text = '', facts = null, yes, no = 'Not now', danger = false }) {
+  if (askResolve) answerAsk(null);
+  document.getElementById('askTitle').textContent = title;
+  const textEl = document.getElementById('askText');
+  textEl.textContent = text;
+  textEl.hidden = !text;
+  const factsEl = document.getElementById('askFacts');
+  factsEl.hidden = !(facts && facts.length);
+  factsEl.innerHTML = (facts || []).map(([k, v]) => `<div><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd></div>`).join('');
+  const yesBtn = document.getElementById('askYes');
+  yesBtn.textContent = yes;
+  yesBtn.classList.toggle('danger', !!danger);
+  document.getElementById('askNo').textContent = no;
+  document.getElementById('askOverlay').classList.add('open');
+  return new Promise(resolve => { askResolve = resolve; });
+}
+function answerAsk(answer) {
+  document.getElementById('askOverlay').classList.remove('open');
+  const resolve = askResolve;
+  askResolve = null;
+  if (resolve) resolve(answer);
 }
 
 // ── SHEETS OPENED FROM A PAGE ─────────────────────────────────────────────

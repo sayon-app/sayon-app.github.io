@@ -31,7 +31,7 @@ function clientMessage({ client, address, docs, note, signOff, link }) {
 }
 
 // How the client gets back to the business, for the end of an email. An
-// email SAYON sends takes replies at the email under Your business; with
+// email SAYON sends takes replies at the email in Business details; with
 // none there a reply would go to the address SAYON sends from, where nobody
 // reads it, so the line gives the phone number only. An email from the
 // phone's own mail app always takes its replies.
@@ -308,7 +308,7 @@ function showSendReviewLink(r, url) {
 function businessSendGaps(what, fix) {
   const gaps = [];
   const missing = companyDetailGaps();
-  const where = canEditBusiness() ? 'Menu › Your business' : 'the details your business owner set';
+  const where = canEditBusiness() ? 'Menu › Business details' : 'the details your business owner set';
   const addBtn = many => canEditBusiness() ? `<button class="link-btn" onclick="${fix}">Add ${many ? 'them' : 'it'}</button>` : '';
   if (missing.length) gaps.push({ key: 'company', text: `Your ${joinWithAnd(missing)} ${missing.length === 1 ? 'is' : 'are'} missing from ${where}, so ${what} won't show ${missing.length === 1 ? 'it' : 'them'}`, fix: addBtn(missing.length > 1) });
   if (directEmail && !(getCompanyDetails().email || '').trim()) gaps.push({ key: 'reply', text: `Your business email is missing from ${where}, so a client's reply to this email wouldn't reach you. The message gives your phone number instead`, fix: addBtn(false) });
@@ -452,7 +452,7 @@ function fixReportGap(kind, from = 'send') {
     return;
   }
   if (kind === 'photos') { backUpPhotosFromGap(from); return; }
-  if (kind === 'business') { openBusinessForm(reopen); return; }
+  if (kind === 'business') { openBusinessForm(reopen, leave); return; }
   // "Show me": to the answer in the report, and the walk through the rest.
   if (kind.startsWith('go:')) { leave(); showBlank(kind.slice(3)); return; }
   if (kind.startsWith('finding:')) { leave(); showAreaFindingPrompt(kind.slice(8)); return; }

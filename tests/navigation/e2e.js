@@ -44,9 +44,9 @@ async function setup(b, opts) {
   };
 
   await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(3000);
-  await p.fill('#ob-companyName', 'Example Pest Co'); await p.fill('#ob-licence', 'NSW 123456'); await p.fill('#ob-phone', '0400 000 000');
+  await p.fill('#ob-licence', 'NSW 123456'); await p.fill('#ob-phone', '0400 000 000');
   await p.click('#obBusinessSave'); await p.evaluate(() => obNext(1)); await p.waitForTimeout(300);
-  await p.evaluate(() => obShowPanel(3)); await p.waitForTimeout(300);
+  await p.evaluate(() => obShowPanel(2)); await p.waitForTimeout(300);
   await p.getByRole('button', { name: /See a finished sample job first/i }).click(); await p.waitForTimeout(1800);
 
   // A real job of our own, booked with the chips.
@@ -215,9 +215,9 @@ async function setup(b, opts) {
   // Same storage as before isn't carried over, so sign up again quickly.
   const q = await ctx2.newPage(); const errs2 = []; q.on('pageerror', e => errs2.push(e.message));
   await q.goto(`http://localhost:${PORT}/`); await q.waitForTimeout(3000);
-  await q.fill('#ob-companyName', 'Example Pest Co'); await q.fill('#ob-licence', 'NSW 123456'); await q.fill('#ob-phone', '0400 000 000');
+  await q.fill('#ob-licence', 'NSW 123456'); await q.fill('#ob-phone', '0400 000 000');
   await q.click('#obBusinessSave'); await q.evaluate(() => obNext(1)); await q.waitForTimeout(300);
-  await q.evaluate(() => obShowPanel(3)); await q.waitForTimeout(300);
+  await q.evaluate(() => obShowPanel(2)); await q.waitForTimeout(300);
   await q.getByRole('button', { name: /See a finished sample job first/i }).click(); await q.waitForTimeout(1800);
   await q.evaluate(() => jobGo('report')); await q.waitForTimeout(500);
   const swipe = async (x0, x1) => {

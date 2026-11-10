@@ -58,11 +58,10 @@ let shotN = 0;
   const ob = await p.evaluate(() => getComputedStyle(document.getElementById('onboardScreen')).display !== 'none');
   check(ob, 'a new account lands on business setup');
   if (ob) {
-    await p.fill('#ob-companyName', sc.company.name);
+    // The business name came from Create account, so set-up doesn't ask again.
     await p.fill('#ob-phone', '0400000000');
     await tap(p.locator('#obBusinessSave'), 'Continue (business)'); await shot('ob-1');
     await tap(p.locator('#ob-panel-1 .auth-btn'), 'Continue (your prices)'); await shot('ob-prices');
-    await tap(p.locator('#obDemoNext'), 'Continue (demo)'); await shot('ob-2');
     await tap(p.getByRole('button', { name: /Start inspecting/i }), 'Start Inspecting'); await p.waitForTimeout(1200); await shot('after-onboarding');
   }
 

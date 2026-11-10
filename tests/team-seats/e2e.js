@@ -90,7 +90,7 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     const { ctx, p, errs } = await setup(b, { user: OWNER, sub: trial() });
     await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(3200); await openBilling(p);
     check(/starter:Upgrade pro:hidden business:hidden/.test(await rowState(p)), 'old Worker: Team and Business stay hidden: ' + await rowState(p));
-    check(await p.evaluate(() => !document.getElementById('seatPlansSoon').hidden && document.getElementById('profileYourTeam').hidden), 'old Worker: "coming soon" shows and there is no Your team');
+    check(await p.evaluate(() => !document.getElementById('seatPlansSoon').hidden && document.getElementById('teamPanel').classList.contains('menu-row-hidden')), 'old Worker: "coming soon" shows and there is no Your team');
     check(await p.evaluate(() => !document.getElementById('billingTermsRow').hidden), 'the owner sees the prices and cancelling wording');
     check(!errs.length, 'no page errors ' + errs.join('; '));
     await ctx.close();
@@ -119,7 +119,7 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
 
     // Your team: on the trial, 3 places.
     await p.evaluate(() => renderProfileMenu());
-    check(await p.evaluate(() => !document.getElementById('profileYourTeam').hidden), 'the owner has Your team in the account menu');
+    check(await p.evaluate(() => !document.getElementById('teamPanel').classList.contains('menu-row-hidden')), 'the owner has Your team in the menu\'s Your business list');
     await p.evaluate(() => openMenuPage('teamPanel')); await p.waitForTimeout(600);
     check(/1 of 3 places used/.test(await p.textContent('#teamPlacesText')), 'trial: 1 of 3 places: ' + await p.textContent('#teamPlacesText'));
     await p.fill('#teamInviteEmail', 'nope'); await p.click('#teamInviteBtn'); await p.waitForTimeout(200);
@@ -157,7 +157,23 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     check(/starter:Switch pro:Current plan\(off\) business:Switch/.test(await rowState(p)) && await p.inputValue('#seatsPro') === '4', 'Team is current at 4: ' + await rowState(p));
     await p.fill('#seatsPro', '6'); await p.waitForTimeout(100);
     check(/pro:Change to 6/.test(await rowState(p)), 'a new number offers Change to 6');
-    await p.evaluate(() => choosePlan('pro')); await p.waitForTimeout(900);
+    // Paying is asked on SAYON's own sheet: the plan, the price, when it's
+    // charged, and a button that says what it does.
+    const sheet = () => p.evaluate(() => ({ open: document.getElementById('askOverlay').classList.contains('open'), title: document.getElementById('askTitle').textContent, facts: [...document.querySelectorAll('#askFacts > div')].map(d => d.innerText.replace(/\s+/g, ' ').trim()), yes: document.getElementById('askYes').textContent, no: document.getElementById('askNo').textContent }));
+    await p.click('#billingPanel [data-plan="pro"] button'); await p.waitForTimeout(300);
+    const ask = await sheet();
+    check(ask.open && ask.title === 'Pay for 6 inspectors instead of 4?' && ask.yes === 'Pay $474 a month' && ask.no === 'Not now', 'changing the number asks on SAYON\'s sheet, and the button says what it does: ' + JSON.stringify(ask));
+    check(/Plan Team, 6 inspectors/.test(ask.facts[0]) && /Price \$474 a month/.test(ask.facts[1]) && /Charged The extra places now/.test(ask.facts[2]), 'the sheet sets out the plan, the price and when it\'s charged: ' + ask.facts.join(' | '));
+    await p.screenshot({ path: `${OUT}/3a-pay-sheet.png` });
+    await p.click('#askNo'); await p.waitForTimeout(300);
+    check(!(await sheet()).open && !st.calls.some(c => c.path.startsWith('/stripe/update-seats')), '"Not now" closes it and nothing is charged');
+    await p.click('#billingPanel [data-plan="starter"] button'); await p.waitForTimeout(300);
+    const sw = await sheet();
+    check(sw.open && sw.title === 'Switch to Solo?' && sw.yes === 'Pay $89 a month' && /Charged Now, less the unused part/.test(sw.facts[2]), 'switching plan is asked the same way: ' + JSON.stringify(sw));
+    await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+    check(!(await sheet()).open && !st.calls.some(c => c.path.startsWith('/stripe/create-checkout')), 'Esc closes it and nothing is charged');
+    await p.click('#billingPanel [data-plan="pro"] button'); await p.waitForTimeout(300);
+    await p.click('#askYes'); await p.waitForTimeout(900);
     const up = st.calls.find(c => c.path.startsWith('/stripe/update-seats'));
     check(up && up.body.seats === 6 && !st.calls.some(c => c.path.startsWith('/stripe/create-checkout')), 'Change sends 6 to update-seats, not checkout');
     check(/for 6 inspectors/.test(await p.textContent('#billingStatusText')) && /pro:Current plan/.test(await rowState(p)), 'the plan shows 6 afterwards');
@@ -178,8 +194,8 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     const { ctx, p, st, errs } = await setup(b, { user: TECH, sub });
     st.techMember = true;
     await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(3200); await openBilling(p);
-    const t = await p.evaluate(() => ({ rows: [...document.querySelectorAll('#billingPanel [data-plan]')].every(r => r.hidden), note: !document.getElementById('billingOwnerOnly').hidden, manage: document.getElementById('manageBillingBtn').style.display, team: document.getElementById('profileYourTeam').hidden }));
-    check(t.rows && t.note && t.manage === 'none' && t.team, 'technician: no plan rows, no Manage, no Your team, and a note: ' + JSON.stringify(t));
+    const t = await p.evaluate(() => ({ rows: [...document.querySelectorAll('#billingPanel [data-plan]')].every(r => r.hidden), note: !document.getElementById('billingOwnerOnly').hidden, manage: document.getElementById('manageBillingBtn').style.display, team: document.getElementById('teamPanel').classList.contains('menu-row-hidden'), details: document.getElementById('businessPanel').classList.contains('menu-row-hidden') }));
+    check(t.rows && t.note && t.manage === 'none' && t.team && t.details, 'technician: no plan rows, no Manage, no Your team or Business details, and a note: ' + JSON.stringify(t));
     check(await p.evaluate(() => document.getElementById('billingTermsRow').hidden), 'technician: no prices, cancelling or paying wording');
     check(!errs.length, 'no page errors ' + errs.join('; '));
     await ctx.close();
@@ -206,10 +222,10 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     check(su.body.data.terms_version === legal.terms && su.body.data.privacy_version === legal.privacy && su.body.data.terms_accepted_at, 'an invited inspector\'s sign-up records the Terms and Privacy versions too');
     const acc = st.calls.find(c => c.path.includes('/rpc/accept_invite'));
     check(acc && acc.body.p_token === TOKEN, 'sign-in sends the secret to accept_invite');
-    const joined = await p.evaluate(() => ({ biz: authBusiness && authBusiness.id, ob: document.getElementById('onboardScreen').style.display, panel1: document.getElementById('ob-panel-2').style.display, kept: localStorage.getItem('korva_pending_invite'), toasts: window.__toasts.slice() }));
+    const joined = await p.evaluate(() => ({ biz: authBusiness && authBusiness.id, ob: document.getElementById('onboardScreen').style.display, panel1: document.getElementById('ob-panel-2').style.display, dots: getComputedStyle(document.getElementById('obSteps')).display, kept: localStorage.getItem('korva_pending_invite'), toasts: window.__toasts.slice() }));
     check(joined.biz === BIZ_ID && !st.madeBusiness && !joined.kept, 'the new inspector joins Acme, no business of their own is made, the secret is used up');
     check(joined.toasts.some(t => /joined Acme Pest/.test(t)), 'they are told they joined: ' + joined.toasts.join(' | '));
-    check(joined.ob !== 'flex' || joined.panel1 === 'flex', 'they skip the business and price set-up');
+    check(joined.ob !== 'flex' || (joined.panel1 === 'flex' && joined.dots === 'none'), 'they skip the business and price set-up: one card, You\'re ready, with no step dots');
     check(!errs.length, 'no page errors ' + errs.join('; '));
     await ctx.close();
   }

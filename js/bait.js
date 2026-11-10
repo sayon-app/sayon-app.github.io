@@ -295,8 +295,8 @@ function baitStationHTML(s, i) {
 function renderBaitStations() {
   const list = document.getElementById('bvStations');
   const none = !baitDraft.stations.length;
-  document.getElementById('bvCountRow').style.display = none ? '' : 'none';
-  document.getElementById('bvStationTools').style.display = none ? 'none' : '';
+  document.getElementById('bvCountRow').hidden = !none;
+  document.getElementById('bvStationTools').hidden = none;
   list.innerHTML = baitDraft.stations.map(baitStationHTML).join('');
   updateBaitSummary();
 }

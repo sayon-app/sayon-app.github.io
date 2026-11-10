@@ -30,7 +30,6 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
 
   // 1. Onboarding: business, then the prices step with the common lines.
   check(await p.evaluate(() => document.getElementById('onboardScreen').style.display === 'flex'), 'a new business sees onboarding');
-  await p.fill('#ob-companyName', 'Example Pest Co');
   await p.click('#obBusinessSave'); await p.waitForTimeout(400);
   const step = await p.evaluate(() => ({
     shown: document.getElementById('ob-panel-1').style.display,
@@ -45,11 +44,11 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   await p.uncheck('#obGst');
   await p.screenshot({ path: `${OUT}/1-onboarding-prices.png` });
   await p.click('#ob-panel-1 .auth-btn'); await p.waitForTimeout(400);
-  const after = await p.evaluate(() => ({ demo: document.getElementById('ob-panel-2').style.display, mem: quotePriceMemory() }));
-  check(after.demo === 'flex', 'Continue goes on to the voice demo');
+  const after = await p.evaluate(() => ({ ready: document.getElementById('ob-panel-2').style.display, title: document.querySelector('#ob-panel-2 .auth-title').textContent, mem: quotePriceMemory() }));
+  check(after.ready === 'flex' && after.title === 'You\'re ready', 'Continue goes on to You\'re ready, the last card: ' + after.title);
   check(after.mem.barrier_lm === 45.5 && after.mem.bait_install === 150 && after.mem.__gst === false, 'the typed prices and the GST choice are kept: ' + JSON.stringify(after.mem));
   check(!('bait_monitor' in after.mem), 'a line left blank stays at SAYON\'s suggestion');
-  await p.evaluate(() => { obNext(2); obFinish(); }); await p.waitForTimeout(2500);
+  await p.evaluate(() => obFinish()); await p.waitForTimeout(2500);
 
   // 2. Menu › Your prices: every line, grouped, with the onboarding prices in.
   await p.evaluate(() => { closeJobPage(); if (document.getElementById('sidebarPanel').classList.contains('open')) toggleDrawer(); openMenuPage('pricesPanel'); });
@@ -62,7 +61,7 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
     status: document.getElementById('pbStatus').textContent,
     summary: document.querySelector('#pricesPanel .job-panel-summary').textContent,
     gstOn: document.getElementById('pbGst').classList.contains('on'),
-    button: !!document.getElementById('profileYourPrices'),
+    button: (() => { showMenuPage(null); const r = document.getElementById('pricesPanelToggle'); const shown = r.getBoundingClientRect().height > 0; showMenuPage('pricesPanel'); return shown; })(),
   }));
   check(page.title === 'Your prices' && page.rows === 16, 'the page lists all 16 quote lines: ' + page.rows);
   check(page.groups.length === 5, 'in groups: ' + page.groups.join(' / '));

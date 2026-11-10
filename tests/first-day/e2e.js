@@ -1,9 +1,12 @@
 // The first day as a paying customer: the website's trial button lands on
 // sign-up, sign-up checks the email and names a duplicate account, a new
 // person on a used phone still sets up their business, the app opens
-// straight into the report, Billing names each plan state and the current
+// straight into the job, Billing names each plan state and the current
 // plan, payment confirmation waits for Stripe, test mode is hidden, help
-// is reachable. node e2e.js <outDir>  (server on :8765)
+// is reachable. Set-up is three cards (the business name isn't asked for
+// twice, there's no voice demo, You're ready lists the job's own steps) and
+// ends on the job with no start menu in between.
+// node e2e.js <outDir>  (server on :8765)
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2] || '/tmp/first-day'; fs.mkdirSync(OUT, { recursive: true });
 const PORT = '8765', SP = process.env.JSPDF_DIR || '/tmp/jspdf';
@@ -46,6 +49,13 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   check(card.signup === 'flex' && card.signin === 'none', '?signup=1 opens the sign-up card');
   check(/14 days free, no card needed/.test(card.sub), 'sign-up says 14 days free, no card needed');
   check(card.help, 'the sign-in screen has an email-us link');
+  // Create account has a tick box for the Terms and Privacy Policy, so the
+  // "By continuing you agree" line is only for Sign in.
+  const agree = async () => p.evaluate(() => getComputedStyle(document.getElementById('authAgreeLine')).display !== 'none');
+  check(!(await agree()), 'Create account doesn\'t say "By continuing you agree" under its tick box');
+  await p.evaluate(() => showAuth('authSignIn'));
+  check(await agree(), 'Sign in still says it');
+  await p.evaluate(() => showAuth('authSignUp'));
   await p.screenshot({ path: `${OUT}/1-signup.png` });
 
   // 2. A typo in the email is caught; a duplicate account points to sign in.
@@ -74,15 +84,30 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   const sent = state.signupCalls[state.signupCalls.length - 1].data;
   const legal = await p.evaluate(() => LEGAL_VERSIONS);
   check(sent.terms_version === legal.terms && sent.privacy_version === legal.privacy && !isNaN(Date.parse(sent.terms_accepted_at)), 'the sign-up records which Terms and Privacy versions were agreed to, and when: ' + JSON.stringify(sent));
-  const labels = await p.evaluate(() => [...document.querySelectorAll('#ob-panel-0 .auth-label')].map(l => l.textContent.trim()));
+  const labels = await p.evaluate(() => [...document.querySelectorAll('#ob-panel-0 .auth-label')].filter(l => l.getBoundingClientRect().height > 0).map(l => l.textContent.trim()));
   check(labels.some(l => /licence.*can wait/i.test(l)) && labels.some(l => /phone.*can wait/i.test(l)), 'licence and phone are marked as able to wait');
-  await p.evaluate(() => { obNext(0); obNext(1); obFinish(); }); await p.waitForTimeout(1200);
-  const landed = await p.evaluate(() => ({ app: document.getElementById('app').style.display, menu: getComputedStyle(document.getElementById('mainMenu')).display, ob: localStorage.getItem('korva_onboarded_v1:u-sam') }));
-  check(landed.app === 'flex' && landed.menu === 'none' && landed.ob === '1', 'after set-up the report screen opens and the flag is per account');
-  // Reload: straight into the app, not a one-tile menu.
+  // The business name was typed on Create account: the card doesn't ask again.
+  const first = await p.evaluate(() => ({ title: document.getElementById('obBusinessTitle').textContent, sub: document.getElementById('obBusinessSub').textContent, name: document.getElementById('ob-companyName').value, dots: document.querySelectorAll('#obSteps .ob-step').length, cards: document.querySelectorAll('#onboardScreen .ob-panel').length, demo: !!document.getElementById('obDemoBtn') }));
+  check(!labels.some(l => /^Business name/i.test(l)) && /^Pest licence/i.test(labels[0]) && first.name === 'Newby Pest Management', 'the set-up card opens on the licence number, not the business name again: ' + labels.join(' / '));
+  check(first.title === 'Your licence and contact details' && /Newby Pest Management sends/.test(first.sub) && /Menu\s›\sBusiness details/.test(first.sub), 'it is titled for the rest of the details and names the business: ' + first.title);
+  check(first.dots === 3 && first.cards === 3 && !first.demo, 'set-up is three cards, with no voice demo');
+  await p.screenshot({ path: `${OUT}/2b-setup-business.png` });
+  await p.fill('#ob-licence', 'NSW 123456');
+  await p.evaluate(() => { obNext(0); obNext(1); }); await p.waitForTimeout(300);
+  const ready = await p.evaluate(() => ({ shown: document.getElementById('ob-panel-2').style.display, steps: [...document.querySelectorAll('#ob-panel-2 .ob-check-item strong')].map(s => s.textContent.replace('.', '')), text: document.getElementById('ob-panel-2').innerText, tip: document.querySelector('#ob-panel-2 .ob-tip').getBoundingClientRect().height, saved: getCompanyDetails() }));
+  check(ready.shown === 'flex' && ready.steps.join() === 'Job details,Agreement,Report,Quote,Treatment', 'You\'re ready lists the job\'s own steps in order: ' + ready.steps.join(', '));
+  check(!/Extract data with AI|Send to client/.test(ready.text) && ready.tip < 45, 'with no out-of-date button names, and a tip of a line or two');
+  check(ready.saved.name === 'Newby Pest Management' && ready.saved.licence === 'NSW 123456', 'the name from Create account and the licence typed here are saved');
+  await p.screenshot({ path: `${OUT}/2c-setup-ready.png` });
+  await p.evaluate(() => obFinish()); await p.waitForTimeout(150);
+  const landed = await p.evaluate(() => ({ app: document.getElementById('app').style.display, job: document.getElementById('jobOverlay').classList.contains('open'), menu: !!document.getElementById('mainMenu'), ob: localStorage.getItem('korva_onboarded_v1:u-sam'), fields: document.getElementById('businessFields').parentElement.id }));
+  check(landed.app === 'flex' && landed.job && !landed.menu && landed.ob === '1', 'set-up goes straight to the job, with no start menu in between, and the flag is per account: ' + JSON.stringify(landed));
+  check(landed.fields === 'businessPageSlot', 'the business\'s boxes are back on Menu › Business details');
+  await p.waitForTimeout(1000);
+  // Reload: straight into the app.
   await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(3200); await hookToasts();
-  const reopened = await p.evaluate(() => ({ app: document.getElementById('app').style.display, menu: getComputedStyle(document.getElementById('mainMenu')).display, ob: document.getElementById('onboardScreen').style.display }));
-  check(reopened.app === 'flex' && reopened.menu === 'none' && reopened.ob !== 'flex', 'reopening lands in the report screen, with no set-up and no hub');
+  const reopened = await p.evaluate(() => ({ app: document.getElementById('app').style.display, ob: document.getElementById('onboardScreen').style.display }));
+  check(reopened.app === 'flex' && reopened.ob !== 'flex', 'reopening lands in the app, with no set-up');
   await p.screenshot({ path: `${OUT}/3-reopened.png` });
 
   // 4. Another person signs up on this phone: they still set up their business.
@@ -127,6 +152,24 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   const misc = await p.evaluate(() => { restoreTestModeSetting(); return { testRow: document.getElementById('testModeRow').hidden, help: !!document.querySelector('.drawer-help[href^="mailto:"]'), owner: isBusinessOwner() }; });
   check(misc.owner && misc.testRow, 'test mode is hidden for an ordinary owner');
   check(await p.evaluate(() => { authBusiness.settings = { testMode: true }; restoreTestModeSetting(); const shown = !document.getElementById('testModeRow').hidden; authBusiness.settings = {}; restoreTestModeSetting(); return shown; }), 'and shown where settings.testMode is on');
+  // Second transcription is still being tried, so it's hidden the same way,
+  // except on a phone that already has it on (so it can be turned off).
+  const second = await p.evaluate(() => {
+    const row = document.getElementById('audioCaptureRow');
+    const seen = () => { showMenuPage('settingsPanel'); return getComputedStyle(row).display !== 'none'; };
+    toggleDrawer();
+    const out = { plain: seen() };
+    authBusiness.settings = { testMode: true }; out.allowed = seen(); authBusiness.settings = {};
+    audioCaptureEnabled = true; out.alreadyOn = seen(); audioCaptureEnabled = false; out.offAgain = seen();
+    showMenuPage(null); toggleDrawer();
+    return out;
+  });
+  check(!second.plain && second.allowed && second.alreadyOn && !second.offAgain, 'Second transcription is hidden like Test mode, and stays for a phone that has it on: ' + JSON.stringify(second));
+  // The delete-account box names the button it means.
+  let asked = '';
+  p.once('dialog', d => { asked = d.message(); d.dismiss(); });
+  await p.evaluate(() => deleteMyAccount()); await p.waitForTimeout(300);
+  check(/use Download a copy first/.test(asked) && !/Export your data/.test(asked), 'the delete-account box says "Download a copy", the button\'s own name');
   check(misc.help, 'Help and support is in the drawer');
 
   // 8. The client's page shows who sent it and how to reach them.

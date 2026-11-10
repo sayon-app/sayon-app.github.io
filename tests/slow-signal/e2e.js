@@ -56,7 +56,8 @@ async function open(b, { kept, unfinished, expired, failLogout, limit = 30 }) {
   const at = () => (Date.now() - t0) / 1000;
   const screen = () => p.evaluate(() => {
     const shown = id => { const el = document.getElementById(id); return !!el && getComputedStyle(el).display !== 'none'; };
-    return { splash: shown('splash') ? document.getElementById('splashStatus').textContent : null, app: document.getElementById('app').style.display === 'flex',
+    // The splash's line is empty until the wait has taken a second: the logo is what shows.
+    return { splash: shown('splash') ? document.getElementById('splashStatus').textContent || 'logo' : null, app: document.getElementById('app').style.display === 'flex',
       setup: shown('onboardScreen'), signIn: shown('authScreen'), business: typeof authBusiness !== 'undefined' && authBusiness ? authBusiness.id : null,
       phone: getCompanyDetails().phone || '', token: typeof authSession !== 'undefined' && authSession ? authSession.access_token : null,
       stored: !!localStorage.getItem('korva_session'), reports: typeof getSavedReports === 'function' && authUser ? getSavedReports().map(x => x.id) : [] };
@@ -81,6 +82,9 @@ async function open(b, { kept, unfinished, expired, failLogout, limit = 30 }) {
   let opened = r.seen.find(([, s]) => s.app);
   check(!r.blank, 'the screen is never blank while it signs in');
   check(r.seen.some(([t, s]) => s.splash === 'Signing in…'), 'the splash says "Signing in…" while it waits');
+  // Nothing made up on the way: the logo alone, then what it's waiting on.
+  const lines = [...new Set(r.seen.map(([, s]) => s.splash).filter(Boolean))];
+  check(lines.join() === 'logo,Signing in…', 'the splash shows the logo, then says only what it is waiting on: ' + lines.join(' / '));
   check(opened && opened[0] < 10, `the app opens in a few seconds with the business kept on the phone (${opened ? opened[0].toFixed(1) + ' s' : 'not opened'})`);
   check(opened && opened[1].business === 'b1' && !opened[1].setup, 'with the business, and no "Set up your business"');
   await r.p.screenshot({ path: `${OUT}/1-opened.png` });

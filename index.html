@@ -1582,6 +1582,16 @@
           <button class="agreement-banner-btn issue-primary" id="reportDoneBannerBtn">Send to client</button>
         </div>
 
+        <!-- The job's details (address, client, booking), one tap back to
+             edit them on the job's page. Property step only. They sit above
+             the agreement and the last visit, in the order a job is done:
+             details, agreement, then the report. -->
+        <button type="button" class="report-job-card" id="reportJobCard" onclick="jobGo('details')">
+          <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span>
+          <span class="report-job-text"><span class="report-job-title">Job details</span><span class="report-job-sub" id="reportJobSub">Address, client and booking</span></span>
+          <span class="report-job-edit">Edit</span>
+        </button>
+
         <!-- Pre-inspection agreement: signed before the job (see the
              PRE-INSPECTION AGREEMENT block in js/app/) -->
         <div class="agreement-banner" id="agreementBanner">
@@ -1597,14 +1607,6 @@
           <button class="link-btn last-visit-skip" id="lastVisitSkip" onclick="dismissLastVisit()">Not now</button>
           <button class="agreement-banner-btn" id="lastVisitBtn" onclick="lastVisitAction()">Start from it</button>
         </div>
-
-        <!-- The job's details (address, client, booking), one tap back to
-             edit them on the job's page. Property step only. -->
-        <button type="button" class="report-job-card" id="reportJobCard" onclick="jobGo('details')">
-          <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span>
-          <span class="report-job-text"><span class="report-job-title">Job details</span><span class="report-job-sub" id="reportJobSub">Address, client and booking</span></span>
-          <span class="report-job-edit">Edit</span>
-        </button>
 
         <!-- PROPERTY -->
         <div class="report-section grouped" id="section-property">

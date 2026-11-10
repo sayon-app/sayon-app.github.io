@@ -1221,14 +1221,6 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .logo-upload-btn:hover { border-color: var(--accent); color: var(--accent2); }
 .logo-remove-btn:hover { border-color: var(--risk); color: var(--risk); }
 
-.job-actions {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-  padding: 12px 14px 0;
-  border-top: 1px solid var(--border);
-}
-
 .job-action-btn {
   min-height: 44px;
   padding: 8px 14px;
@@ -1246,18 +1238,6 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   justify-content: center;
   gap: 6px;
 }
-
-.job-action-btn.save {
-  border-color: rgba(var(--accent-rgb), 0.35);
-  background: rgba(var(--accent-rgb), 0.08);
-  color: var(--accent2);
-}
-.job-action-btn.save:hover { background: rgba(var(--accent-rgb), 0.16); }
-
-.job-action-btn.new {
-  white-space: nowrap;
-}
-.job-action-btn.new:hover { border-color: var(--accent); color: var(--accent2); }
 
 .sync-status {
   display: flex;
@@ -2445,7 +2425,8 @@ body.dark-screen .warn-note.note-good { background: rgba(var(--green-rgb),0.12);
 .warn-note .icon { margin-top: 1px; }
 .warn-note.note-info { background: var(--surface2); border-color: var(--border); color: var(--text2); }
 
-/* Job completion (COMPLETED JOBS in js/app/) */
+/* A finalised job (FINALISED JOBS in js/app/): the one line at the top of
+   a locked report, and the Amend form on the job's card. */
 .issue-banner {
   margin: 0 0 12px;
   padding: 10px 12px;
@@ -2461,11 +2442,10 @@ body.dark-screen .warn-note.note-good { background: rgba(var(--green-rgb),0.12);
 }
 .issue-banner-row { display: flex; align-items: center; gap: 8px; }
 .issue-banner-text { flex: 1; min-width: 0; line-height: 1.45; }
-.issue-banner .issue-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.issue-attention { margin: 8px 0 2px 18px; padding: 0; color: var(--yellow-text); font-weight: 600; line-height: 1.6; }
-.issue-links { display: flex; gap: 14px; flex-wrap: wrap; }
-.issue-links:empty { display: none; }
-.issue-amend-form { margin-top: 10px; }
+.issue-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.issue-amend-form { margin: 12px 0 0 58px; }
+.issue-amend-form[hidden] { display: none; }
+.issue-amend-form label { display: block; margin: 0 0 6px; font-size: calc(13px * var(--ts)); font-weight: 650; color: var(--text); }
 .issue-amend-form textarea {
   width: 100%;
   box-sizing: border-box;
@@ -2482,9 +2462,6 @@ body.dark-screen .warn-note.note-good { background: rgba(var(--green-rgb),0.12);
 body.report-locked #reportBody .report-section,
 body.report-locked #jobPanelBody { opacity: 0.78; }
 body.report-locked #micDock { opacity: 0.4; }
-.issue-quote-answer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-size: calc(12.5px * var(--ts)); color: var(--text2); }
-.issue-quote-answer.good span { color: var(--green); font-weight: 600; }
-.issue-quote-answer.wait span, .issue-quote-answer.warn span { color: var(--yellow-text); font-weight: 600; }
 
 /* Pre-inspection agreement */
 .agreement-banner {
@@ -3792,7 +3769,9 @@ body.dark-screen .dash-card-act { border-top-color: var(--border2); background: 
 
 .toast-icon { font-size: calc(15px * var(--ts)); flex-shrink: 0; }
 /* A toast with a button (Undo) takes taps; plain toasts let them through. */
-.toast.toast-has-action { pointer-events: auto; padding-right: 8px; }
+/* Only while it's on screen: one that has faded would still catch taps. */
+.toast.toast-has-action { padding-right: 8px; }
+.toast.show.toast-has-action { pointer-events: auto; }
 .toast-action {
   flex-shrink: 0;
   min-height: 44px;
@@ -4605,12 +4584,6 @@ body[data-voice="thinking"] .voice-hud { animation: hudPulse 0.6s ease-in-out in
 .move-steps li + li { margin-top: 4px; }
 #moveOverlay a.extract-btn { display: block; text-align: center; text-decoration: none; }
 #moveOverlay .did-it-send-btns [hidden] { display: none; }
-.doc-sent-lines { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
-.doc-sent { display: flex; justify-content: space-between; gap: 12px; font-size: calc(12.5px * var(--ts)); color: var(--text2); }
-.doc-sent strong { font-weight: 700; }
-.doc-sent.sent strong { color: var(--green); }
-.doc-sent.stale strong { color: var(--yellow-text); }
-.doc-sent.unsent strong { color: var(--text3, var(--text2)); }
 
 /* After Extract: what was filled and what's still blank */
 .extract-summary-sheet { top: auto; bottom: 0; max-height: 80vh; max-height: 80dvh; border-radius: 16px 16px 0 0; }
@@ -5218,7 +5191,7 @@ body:not(.dark-screen) .ai-dot { width: 7px; height: 7px; box-shadow: 0 0 8px cu
 body:not(.dark-screen) .next-section-btn,
 body:not(.dark-screen) .cleanup-apply-btn,
 body:not(.dark-screen) .profile-btn,
-body:not(.dark-screen) .issue-banner .issue-primary {
+body:not(.dark-screen) .issue-primary {
   background: var(--accent-grad);
   border-color: transparent;
   color: #fff;
@@ -5532,6 +5505,8 @@ body:not(.dark-screen) .sidebar:not(.on-page) .drawer-legal a { color: var(--on-
 .finish-done-text b { font-size: calc(15.5px * var(--ts)); font-weight: 700; }
 .finish-done-text small { font-size: calc(12.5px * var(--ts)); color: var(--text2); }
 .finish-done .link-btn { flex: none; font-size: calc(12.5px * var(--ts)); }
+.finish-done .link-btn[hidden], .finish-resend[hidden] { display: none; }
+.finish-resend { align-self: center; font-size: calc(13px * var(--ts)); }
 .finish-next-label[hidden], .finish-next-btn[hidden] { display: none; }
 /* What the report is still missing, above Report done: the check sheet's
    own amber box (.send-review-gaps), so the two read as one list. */
@@ -5913,7 +5888,7 @@ body:not(.dark-screen) .agreement-banner.last-visit-banner .agreement-banner-btn
 .job-page #jobPanel > .panel-label { display: none; }
 .job-page #jobPanel { border-radius: 16px; margin-bottom: 8px; }
 .job-page .job-panel-body { padding: 14px 16px 6px; }
-.job-page .job-actions, .job-page .sync-status { padding-left: 16px; padding-right: 16px; }
+.job-page .sync-status { padding-left: 16px; padding-right: 16px; }
 .job-page .sync-status { padding-bottom: 14px; }
 body:not(.dark-screen) .job-hero-addr { color: var(--on-ink); }
 body:not(.dark-screen) .job-hero-sub,
@@ -6001,6 +5976,20 @@ body:not(.dark-screen) .job-page #jobPanel { border-color: transparent; box-shad
 .job-pdf .dash-detail-links button { min-height: 48px; }
 .job-pdf .dash-detail-links button.primary { border-color: transparent; background: var(--accent-grad); color: #fff; }
 .job-pdf.made .job-step-label { color: var(--green); }
+.job-pdf.amending { border-color: #F0B43C; }
+.job-pdf .dash-detail-links { flex-wrap: wrap; }
+/* Amend is the quiet one of the row. */
+.job-pdf .dash-detail-links .job-pdf-amend { flex: 0 0 auto; padding: 0 16px; border-color: transparent; background: none; color: var(--text2); text-decoration: underline; text-underline-offset: 3px; }
+/* Finalise as the next step: Email, Save, then what's in it. */
+.job-next .job-pdf-more { margin: 6px 0 -8px; }
+.job-next .job-pdf-btn:disabled, .job-pdf .job-pdf-btn:disabled { opacity: 0.6; }
+/* What the job skipped: quiet lines under its steps, each with the one
+   thing that can still be done about it. */
+.job-skipped { margin: 12px 4px 0; }
+.job-skipped p { margin: 0; padding: 4px 0; font-size: calc(13.5px * var(--ts)); line-height: 1.45; color: var(--text3); }
+.job-skipped button { min-height: 32px; padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--accent2); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+body:not(.dark-screen) .job-skipped p { color: var(--on-ink2); }
+body:not(.dark-screen) .job-skipped button { color: var(--accent-glow); }
 /* What went in, folded under the buttons. */
 .job-pdf-more { margin: 4px 0 -6px 58px; }
 .job-pdf-more > summary { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; list-style: none;
@@ -6055,9 +6044,6 @@ body:not(.dark-screen) .job-page .job-step:active { background: var(--surface2);
 #cards-jobInspectionType .choice-card { min-height: 58px; gap: 2px; padding-top: 7px; padding-bottom: 7px; }
 #cards-jobInspectionType .choice-card-desc { font-size: calc(12px * var(--ts)); }
 body.large-touch #jobPanel .select-cards .choice-card { min-height: 64px; }
-.job-page .job-actions { grid-template-columns: 1fr; }
-.job-page .job-action-btn.new { display: none; }
-#jobOverlay.new-job .topbar-new { display: none; }
 
 .job-hero.new { padding-bottom: 2px; }
 .job-hero.new .job-hero-sub { font-size: calc(15.5px * var(--ts)); line-height: 1.45; }
@@ -6070,7 +6056,7 @@ body .job-page .job-details.new #jobPanel:not(.menu-page-active) { border: none;
 .job-details.new .job-group,
 .job-details.new .job-group + .job-group { margin: 0 0 12px; padding: 16px 16px 6px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); }
 .job-details.new .job-group:last-of-type { margin-bottom: 0; }
-.job-details.new .job-actions, .job-details.new .sync-status { display: none; }
+.job-details.new .sync-status { display: none; }
 .job-next-new { margin-top: 12px; }
 body:not(.dark-screen) .job-hero-tip { color: var(--on-ink2); }
 body:not(.dark-screen) .job-hero-tip svg { color: var(--accent-glow); }

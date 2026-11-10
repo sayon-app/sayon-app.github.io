@@ -548,7 +548,7 @@ function withSpokenNotes(notes, rd) {
 }
 
 // A quote made before the latest spoken quote details takes them in when
-// it's opened, unless the client has answered it or the job is complete.
+// it's opened, unless the client has answered it or the job is finalised.
 // Returns whether it changed.
 function applySpokenQuote(q, rd) {
   const sq = spokenQuote(rd);
@@ -573,7 +573,7 @@ function applySpokenQuote(q, rd) {
 // Uses the report's "Say it instead" recorder (SAY IT INSTEAD in js/app/).
 function sayQuote() {
   if (!quoteState) return;
-  if (isQuoteLocked()) { showToast('This job is complete, so the quote is locked', 'info'); return; }
+  if (isQuoteLocked()) { sayLocked(); return; }
   if (quoteState.answer) { showToast('The client has answered this quote. Change it and they\'ll need to answer again', 'info'); }
   toggleSheetVoice('quote');
 }
@@ -1568,7 +1568,7 @@ function rebuildQuoteFromReport() {
 // method, signature?, note, at, hash }. hash is the quote's content when the
 // client answered, so a later change to the quote shows the answer is for an
 // older version. Recording an answer doesn't change the quote itself, so it
-// works on a completed (locked) job.
+// works on a finalised (locked) job.
 const QUOTE_ANSWER_METHODS = {
   signed: 'signed on the phone',
   link: 'signed on their phone from the link',
@@ -1587,19 +1587,6 @@ function formatAnswerDate(iso) {
   if (!iso) return '';
   const d = new Date(iso + 'T00:00:00');
   return isNaN(d) ? iso : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-// One line for the banner on a completed job, or null when the
-// job has no quote. tone: 'good' | 'bad' | 'wait' | 'warn'.
-function quoteAnswerSummary(q) {
-  if (!quoteHasItems(q)) return null;
-  const a = quoteAnswerState(q);
-  if (!a && q.linkRequest) checkQuoteLink(q, false);
-  if (!a) return q.sentAt ? { short: 'Quote sent', text: quoteLinkCurrent(q) ? 'Quote sent with a link to accept it. Waiting on the client' : 'Waiting on the client\'s answer to the quote', tone: 'wait' } : null;
-  if (a.stale) return { short: 'Quote changed', text: 'The quote changed after the client answered. Get their answer on the new version', tone: 'warn' };
-  if (a.status === 'accepted' && q.treatment) return { short: 'Treatment recorded', text: `Treatment recorded, done on ${formatAnswerDate(q.treatment.date)}. ${certificateGiven(q) ? 'Certificate given' : 'Send the client the certificate'}`, tone: 'good' };
-  if (a.status === 'accepted') return { short: 'Quote accepted', text: `Quote accepted by ${a.by} on ${formatAnswerDate(a.date)}. Record the treatment once it's done`, tone: 'good' };
-  return { short: 'Quote declined', text: `Quote declined on ${formatAnswerDate(a.date)}${a.note ? ` · ${a.note}` : ''}`, tone: 'bad' };
 }
 
 // The job's progress, at the foot of the quote: priced, sent, the client's
@@ -1836,8 +1823,8 @@ function rememberQuotePrices(q) {
 
 // ── SENT AND LOCKED ─────────────────────────────────────────────────────────
 // A quote records when it went to the client and a hash of what it said, so
-// the job can only be completed once the client has the current quote (see
-// COMPLETED JOBS in js/app/). Once the job is complete the quote is locked
+// the job can only be finalised once the client has the current quote (see
+// FINALISED JOBS in js/app/). Once the job is finalised the quote is locked
 // with its report until the job is amended.
 function quoteHasItems(q) { return !!(q && q.items && q.items.length); }
 function quoteContentHash(q) {
@@ -1918,7 +1905,7 @@ function installQuoteLockGuard() {
     e.preventDefault();
     e.stopPropagation();
     if (e.type === 'focusin' && e.target.blur) e.target.blur();
-    if (e.type === 'click') showToast('This job is complete and locked. Amend it from the report to change the quote', 'info');
+    if (e.type === 'click') sayLocked();
   };
   ['mousedown', 'click', 'focusin', 'keydown'].forEach(t => editor.addEventListener(t, stop, true));
 }
@@ -1949,7 +1936,7 @@ function quoteSendGaps(q) {
     else if (!p.service) push('plan', 'The plan doesn\'t give a service period', fixBtn('plan', 'Set it'));
   }
   if (!(q.paymentTerms || '').trim()) push('terms', 'There are no payment terms', fixBtn('terms', 'Add them'));
-  // A completed job's quote is locked with it: the list still says what
+  // A finalised job's quote is locked with it: the list still says what
   // it went without, but nothing offers to change it.
   if (isQuoteLocked()) items.forEach(it => { it.fix = ''; });
   return items.concat(businessSendGaps('the quote', "fixQuoteGap('business')"));

@@ -361,7 +361,9 @@ async function buildReportPdf() {
   const reportNumber = ensureReportNumber();
   const version = reportVersion();
   const reportId = `${reportNumber} · Version ${version}`;
-  const fingerprint = reportFingerprint();
+  // A locked report carries the code it was locked under, so the same
+  // version made again reads the same.
+  const fingerprint = isReportLocked() && reportData.issue.fingerprint || reportFingerprint();
   let y = 0;
 
   const STANDARD_NAMES = {
@@ -1786,8 +1788,8 @@ async function buildReportPdf() {
   }
 
   // ── Version history ─────────────────────────────────────────────────────
-  // Every earlier completed version, and why each amendment was made (see
-  // COMPLETED REPORTS), so a reader can see this isn't the first issue.
+  // Every earlier finalised version, and why each amendment was made (see
+  // FINALISED JOBS), so a reader can see this isn't the first issue.
   const history = reportData.issueHistory || [];
   if (version > 1 && history.length) {
     if (y + 20 > 270) newPage();

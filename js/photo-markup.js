@@ -40,7 +40,7 @@ function loadImageFromBlob(blob) {
 }
 
 // The photo viewer shows the button only for a photo in the open report,
-// and not while the job is complete and locked.
+// and not while the job is finalised and locked.
 function updateMarkupButton(id) {
   const btn = document.getElementById('photoViewerMarkup');
   if (!btn) return;
@@ -53,7 +53,7 @@ async function openPhotoMarkup(id) {
   id = id || document.getElementById('photoViewerMarkup')?.dataset.photoId;
   const p = allReportPhotos(reportData).find(ph => ph.id === id);
   if (!p) return;
-  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  if (isReportLocked()) { sayLocked(); return; }
   let original = null;
   try { original = await getPhotoBlob(markupOriginalId(id)); } catch (e) {}
   const current = original || await getPhotoImage(p);
@@ -286,7 +286,7 @@ async function savePhotoMarkup() {
   const p = markupState.photo;
   if (!p || !markupState.base) return;
   if (markupState.pendingLabel) addMarkupLabel();
-  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  if (isReportLocked()) { sayLocked(); return; }
   const btn = document.getElementById('markupSave');
   btn.disabled = true;
   try {

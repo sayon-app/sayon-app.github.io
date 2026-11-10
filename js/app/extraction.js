@@ -1370,7 +1370,7 @@ function updatePhotoAiUI(id) {
 
 async function describePhoto(id) {
   if (describingPhotos.has(id)) return;
-  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  if (isReportLocked()) { sayLocked(); return; }
   const found = findReportPhoto(id);
   if (!found) return;
   if (!navigator.onLine) { showToast(photoAiProblem({ noSignal: true }), 'info'); return; }
@@ -1412,7 +1412,7 @@ async function describePhoto(id) {
 // Use puts the suggestion in the caption, after any words already there;
 // the caption box stays editable as always.
 function useSuggestedCaption(id) {
-  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  if (isReportLocked()) { sayLocked(); return; }
   const found = findReportPhoto(id);
   if (!found || !found.photo.suggested) return;
   const p = found.photo;

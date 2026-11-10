@@ -5,7 +5,7 @@
 
 // ── EDITING ───────────────────────────────────────────────────────────────
 // There's no Edit Mode: any field opens for editing when tapped, unless the
-// job is complete and locked.
+// job is finalised and locked.
 
 // Global species list — used by both startEdit and startFindingEdit
 const SPECIES_LIST = [
@@ -38,7 +38,7 @@ function wireInlineTextEdit(input, onSave, onCancel, onBlur) {
 // The last choice in a list that opens a typing box instead of saving.
 const OTHER_TYPE_IT = 'Other (type it)';
 function startEdit(el, key, type) {
-  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  if (isReportLocked()) { sayLocked(); return; }
   if (el.classList.contains('editing')) return;
   commitActive();
   activeEditEl = el;
@@ -878,16 +878,16 @@ function updateProgress() {
     const wrap = ringFill.closest('.progress-ring-wrap');
     if (wrap) {
       wrap.classList.toggle('locked', locked || done);
-      wrap.title = locked ? 'Job complete' : done ? 'Report done' : `Report ${pct}% complete`;
+      wrap.title = locked ? 'Job finalised' : done ? 'Report done' : `Report ${pct}% complete`;
       wrap.setAttribute('aria-label', wrap.title);
     }
     const label = document.getElementById('progressRingLabel');
-    if (label) { label.style.display = locked || done ? '' : 'none'; label.textContent = locked ? 'Complete' : 'Done'; }
+    if (label) { label.style.display = locked || done ? '' : 'none'; label.textContent = locked ? 'Finalised' : 'Done'; }
   }
   renderFinishNext(progress);
   renderBlankWalk(progress);
   renderReportJobCard();
-  syncDockReport(pct, locked || done);
+  syncDockReport();
   syncDockJobs();
   renderDocStrips();
   syncNothingFoundButtons();
@@ -911,6 +911,7 @@ function setReportDone(on) {
   if (on) reportData.doneAt = Date.now(); else delete reportData.doneAt;
   if (document.getElementById('jobAddress').value.trim()) saveCurrentReport(true); else saveDraft();
   updateProgress();
+  renderLastVisitBanner();
   if (on) {
     showToast('Report done', 'success');
     track('report_marked_done', {});
@@ -921,12 +922,12 @@ function setReportDone(on) {
 
 // What comes after the report: the quote while the report recommends a
 // treatment and there's none yet, else sending. 'sent' once it has gone
-// (and hasn't changed for an amendment since).
+// and hasn't changed since (gone: the client has it as it stands).
 function reportNextStep() {
   const q = currentJobQuote(), hasQuote = quoteHasItems(q);
   const wantsQuote = reportData.treatmentRecommended === 'YES' && !reportData.noQuoteNeeded;
-  const sent = reportData.sent, amending = reportData.amending;
-  const gone = !!sent && !(amending && sent.at < amending.startedAt);
+  const sent = reportData.sent;
+  const gone = !!sent && (isReportLocked() || reportMatches(sent.fingerprint));
   return { q, hasQuote, wantsQuote, sent, gone, next: wantsQuote && !hasQuote ? 'quote' : gone ? 'sent' : 'send' };
 }
 
@@ -956,21 +957,28 @@ function renderFinishNext(progress) {
     ? `${[blank ? `${blank} still blank` : '', checks ? `${checks} to check` : ''].filter(Boolean).join(' and ')}. You can tick it off anyway.`
     : 'Ticks it off on the job. You can still change it.';
   document.getElementById('finishDone').hidden = !done;
-  document.getElementById('finishDoneWhen').textContent = locked ? 'Job complete and locked'
+  document.getElementById('finishDoneWhen').textContent = locked ? 'Job finalised and locked'
+    : sent && !gone ? `Changed since it was sent ${doneWhen(sent.at)}`
     : sent ? `Sent ${doneWhen(sent.at)}` : reportData.doneAt ? `Ticked off ${doneWhen(reportData.doneAt)}` : '';
   // Only a plain mark comes off; a sent or completed report stays done.
   document.getElementById('finishDoneUndo').hidden = !reportData.doneAt || !!sent || !!reportData.issue;
-  document.getElementById('finishNextLabel').hidden = !done;
+  // Once the report has gone (and nothing's waiting on a quote), there's
+  // nothing more to do here: one button back to the job, where the next
+  // step is, and sending again as a quiet link.
+  const away = done && next === 'sent';
+  document.getElementById('finishNextLabel').hidden = !done || away;
   const quoteBtn = document.getElementById('finishQuoteBtn');
   const shareBtn = document.getElementById('shareBtn');
-  quoteBtn.hidden = !done || !(hasQuote || wantsQuote);
-  shareBtn.hidden = !done;
+  quoteBtn.hidden = !done || away || !(hasQuote || wantsQuote);
+  shareBtn.hidden = !done || away;
+  document.getElementById('finishJobBtn').hidden = !away;
+  document.getElementById('finishResend').hidden = !away;
   document.getElementById('finishQuoteTitle').textContent = hasQuote ? 'Open the quote' : 'Write the quote';
   document.getElementById('finishQuoteSub').textContent = hasQuote ? (q.sentAt ? 'Sent ' + formatIssueDate(q.sentAt) : 'Check it before it goes') : 'Starts from what the report found';
-  document.getElementById('shareTitle').textContent = next === 'sent' ? 'Send it again' : 'Send to client';
-  document.getElementById('shareSub').textContent = next === 'sent' ? 'Only if something changed since it went'
+  document.getElementById('shareTitle').textContent = sent && !gone ? 'Send it again' : 'Send to client';
+  document.getElementById('shareSub').textContent = sent && !gone ? 'So the client has it as it is now'
     : hasQuote ? 'Check the report, then email it with the quote' : 'Check the report, then email it';
-  // One big button. Once everything has gone, nothing shouts.
+  // One big button.
   quoteBtn.classList.toggle('primary', done && next === 'quote');
   shareBtn.classList.toggle('primary', done && next === 'send');
   if (next === 'quote') quoteBtn.after(shareBtn); else shareBtn.after(quoteBtn);

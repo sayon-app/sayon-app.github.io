@@ -619,7 +619,7 @@ function renderRecLines() {
 }
 
 function toggleRecLine(id) {
-  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  if (isReportLocked()) { sayLocked(); return; }
   const line = REC_LINES.find(l => l[0] === id);
   if (!line) return;
   const list = getRecLines();

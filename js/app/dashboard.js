@@ -103,6 +103,9 @@ function dashboardJob(r, quotes) {
   // Ready: every required field filled, or a PDF made. Done: completed or sent.
   const reportSent = !!(d.issue || d.sent);
   const reportDone = reportSent || !!d.doneAt || !!d.pdfAt || (r.completion || 0) >= 100;
+  // The client's copy is behind: the report changed after it went
+  // (r.reportStale, set as it's saved), in an amendment or without one.
+  const reportStale = reportSent && !(d.issue && !d.amending) && !!r.reportStale;
   // The quote's link carries the report too, so a quote sent that way gave
   // the client the report.
   const reportWentWithQuote = !!(hasQuote && q.sentAt && q.linkRequest && q.linkRequest.files && q.linkRequest.files.report);
@@ -115,7 +118,7 @@ function dashboardJob(r, quotes) {
   let onlyReportUnsent = false;
   if (!reportDone) {
     group = 'todo'; status = 'Finish the report';
-    hint = 'Fill in the rest of the report, then make the PDF from its Finish tab.';
+    hint = 'Fill in the rest of the report, then tick Report done on its last step.';
     next = { label: 'Open report', to: 'report' };
   } else if (!hasQuote && needsQuote) {
     group = 'todo'; status = 'Write the quote';
@@ -127,6 +130,10 @@ function dashboardJob(r, quotes) {
     onlyReportUnsent = !reportSent;
     hint = reportSent ? 'The report has gone to ' + who + (clientNotGoingAhead ? ' and they aren\'t going ahead with treatment.' : ' and no treatment was recommended.') : 'The report is ready. Send it to ' + who + '.';
     if (!reportSent) next = { label: 'Open report', to: 'report' };
+  } else if (!a && q.sentAt && q.sentHash && q.sentHash !== quoteContentHash(q)) {
+    group = 'todo'; status = 'Send the quote again';
+    hint = 'The quote changed after it went to ' + who + '. Send the new version.';
+    next = { label: 'Open quote', to: 'quote' };
   } else if (!a) {
     group = q.sentAt ? 'waiting' : 'todo';
     status = q.sentAt ? `Quote sent ${dashDate(q.sentAt)}` : 'Send the quote';
@@ -153,11 +160,14 @@ function dashboardJob(r, quotes) {
   }
 
   // Everything else is finished (a declined quote, say) but the report
-  // itself never went: that's still the inspector's to do.
-  if (group === 'done' && reportDone && !reportSent && !reportWentWithQuote) {
+  // itself never went, or changed after it did: that's still the
+  // inspector's to do.
+  if (group === 'done' && reportDone && (reportStale || !reportSent && !reportWentWithQuote)) {
     onlyReportUnsent = true;
-    group = 'todo'; status = 'Send the report';
-    hint = 'The report is ready but hasn\'t gone to ' + who + '. Send it from the report\'s Finish tab.';
+    group = 'todo'; status = reportStale ? 'Send the report again' : 'Send the report';
+    hint = reportStale && d.amending ? 'The amended report hasn\'t gone to ' + who + '. Send it, then finalise the new version.'
+      : reportStale ? 'The report changed after it went to ' + who + '. Send it again so they have it as it is now.'
+      : 'The report is ready but hasn\'t gone to ' + who + '. Send it from the report\'s last step.';
     next = { label: 'Open report', to: 'report' };
   }
 
@@ -189,7 +199,7 @@ function dashboardJob(r, quotes) {
   const sentOn = d.issue ? d.issue.completedAt : d.sent ? d.sent.at : null;
   const steps = [
     { label: 'Report', to: 'report', state: reportDone ? 'done' : 'todo',
-      text: d.issue ? `Completed${sentOn ? ' ' + dashDate(sentOn) : ''}` : d.sent ? `Sent ${dashDate(d.sent.at)}`
+      text: d.sent ? `Sent ${dashDate(d.sent.at)}` : d.issue ? `Completed${sentOn ? ' ' + dashDate(sentOn) : ''}`
         : d.pdfAt ? `PDF made ${dashDate(d.pdfAt)}, not sent yet`
         : reportDone ? 'Ready to send' : 'In progress' },
     { label: 'Quote', to: 'quote', state: hasQuote && (q.sentAt || answered) ? 'done' : !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
@@ -212,6 +222,9 @@ function dashboardJob(r, quotes) {
   // hasn't got it (unless it went on the quote's link), so the step says so
   // instead of "Completed".
   if (!reportSent && reportDone && !reportWentWithQuote) Object.assign(steps[0], { state: 'now', ready: true, text: d.pdfAt ? 'PDF made, not sent yet' : 'Ready to send' });
+  // Sent, then changed: the step says so, and it's the next one once
+  // nothing else on the job is.
+  else if (reportStale) { const line = d.amending ? 'Amended, not sent yet' : 'Changed since it was sent'; Object.assign(steps[0], { full: line }, onlyReportUnsent ? { state: 'now', ready: true, text: line } : {}); }
   // Recorded but the certificate hasn't gone: the treatment isn't finished.
   if (q && q.treatment && !certificateGiven(q) && steps[3].state === 'done') Object.assign(steps[3], { state: 'now', text: 'Certificate not emailed yet' });
   // Bait station visits, as a fifth stage once a baiting system is in.
@@ -224,7 +237,7 @@ function dashboardJob(r, quotes) {
   // Everything the job needs is done (bait checks may still be coming):
   // the job page offers to finalise it into one PDF.
   const finished = group === 'done' || baitWaiting || onlyReportUnsent;
-  return { r, q, group, status, hint, next, steps, total, time: dashboardJobTime(r), finished, onlyReportUnsent, clientNotGoingAhead };
+  return { r, q, group, status, hint, next, steps, total, time: dashboardJobTime(r), finished, onlyReportUnsent, reportStale, clientNotGoingAhead };
 }
 
 function setDashboardTab(tab) {
@@ -314,7 +327,7 @@ function dashCardHTML(j) {
           <span class="dash-card-when">${dashCardWhen(j)}</span>
           ${j.total ? `<span class="dash-card-total">${formatAUD(j.total).replace(/\.00$/, '')}</span>` : ''}
         </span>
-        <span class="dash-card-progress" aria-hidden="true">${steps.map(st => `<i class="${st.state}"></i>`).join('')}</span>
+        <span class="dash-card-progress" aria-hidden="true">${jobStepsCounted(steps).map(st => `<i class="${st.state}"></i>`).join('')}</span>
       </button>
       ${act ? `<button type="button" class="dash-card-act${next.sent ? ' wait' : ''}" onclick="openDashboardJob('${id}', '${next.next.to}')"><span>${escapeHtml(act)}</span>${arrow}</button>` : ''}
     </div>`;
@@ -595,21 +608,27 @@ function installToastScreenWatch() {
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installToastScreenWatch);
 else installToastScreenWatch();
 
-// ── COMPLETED JOBS ────────────────────────────────────────────────────────
-// Nothing locks until the whole job is done: the report is signed and sent,
-// the quote is sent (or marked not needed), and the inspector taps "Complete
-// job". Then the report and its quote lock together, so what's saved always
-// matches what the client received. Changing anything afterwards means
-// "Amend" with a reason; sending again and completing again makes it
-// version 2, and the PDF lists every version with its reason.
+// ── FINALISED JOBS ────────────────────────────────────────────────────────
+// A job has one ending: Finalise, on This job, once its steps are done
+// (jobCanFinalise). It locks the report and its quote together, so what's
+// saved always matches what the client received, and makes the job PDF
+// (makeJobPdf in js/job-pack.js). Changing anything afterwards means Amend,
+// from This job, with a reason; sending again and finalising again makes
+// it version 2, and the report PDF lists every version with its reason.
 //   reportData.reportNumber  stable reference printed on every PDF
 //   reportData.sent          { at, fingerprint, version } - last send
 //   reportData.issue         { version, completedAt, completedBy, fingerprint, fieldHashes }
 //   reportData.issueHistory  [{ version, completedAt, completedBy, reason, changed[], fingerprint }]
 //   reportData.amending      { reason, startedAt } - unlocked for an amendment
-//   reportData.noQuoteNeeded true when the job needs no quote
+//   reportData.noQuoteNeeded true when the client isn't going ahead with a quote
 // The quote's own sent state lives on the quote (see SENT AND LOCKED in js/quote.js).
-const ISSUE_META_KEYS = ['reportNumber', 'sent', 'issue', 'issueHistory', 'amending', 'pendingNotes', 'noQuoteNeeded', 'noteText', 'heardNotes', 'weatherFilled', 'naFromHouse', 'jobPdfAt', 'jobPdfSentAt', 'copyTo', 'copySent', 'doneAt'];
+// Kept on the job but not part of the report as the client reads it, so a
+// change to one isn't a change to the report.
+const ISSUE_META_KEYS_FIRST = ['reportNumber', 'sent', 'issue', 'issueHistory', 'amending', 'pendingNotes', 'noQuoteNeeded', 'noteText', 'heardNotes', 'weatherFilled', 'naFromHouse', 'jobPdfAt', 'jobPdfSentAt', 'copyTo', 'copySent', 'doneAt'];
+// Added on 10 Nov 2026, when a report started saying it had changed since
+// it was sent. A fingerprint from before then was taken with these in.
+const ISSUE_META_KEYS_LATER = ['pdfAt', 'agreementRequest', 'quoteSpoken', 'lastVisit', 'lastVisitDismissed', 'jobFee', 'aiFilled', 'treatmentAutoSet', 'noneFromAreas'];
+const ISSUE_META_KEYS = [...ISSUE_META_KEYS_FIRST, ...ISSUE_META_KEYS_LATER];
 const ISSUE_SECTION_NAMES = { job:'Job details', quote:'Quote', property:'Property', obstructions:'Areas inspected', restrictions:'Areas unable to be inspected',
   findings:'Findings', conducive:'Conducive', recommendations:'Recommendations', photos:'Photos', signoff:'Sign-off' };
 
@@ -653,14 +672,29 @@ function stableJson(v) {
 }
 
 // The report's content, keyed by field, plus the job details from the menu.
-function reportContentParts() {
+// asBefore: as fingerprints were taken before ISSUE_META_KEYS_LATER.
+function reportContentParts(asBefore) {
   const parts = {};
-  Object.keys(reportData).forEach(k => { if (!ISSUE_META_KEYS.includes(k)) parts[k] = reportData[k]; });
+  const meta = asBefore ? ISSUE_META_KEYS_FIRST : ISSUE_META_KEYS;
+  Object.keys(reportData).forEach(k => { if (!meta.includes(k)) parts[k] = reportData[k]; });
   parts.job = ['jobAddress','jobSuburb','jobState','jobPostcode','jobClient','jobInspector']
     .map(id => (document.getElementById(id) || {}).value || '');
   return parts;
 }
-function reportFingerprint() { return sha256Hex(stableJson(reportContentParts())); }
+// The last one worked out is kept: it's asked for on every save and every
+// redraw of the Finish step once a report has gone, and the hashing is the
+// slow part.
+let fingerprintKept = { json: '', hash: '' };
+function reportFingerprint() {
+  const json = stableJson(reportContentParts());
+  if (json !== fingerprintKept.json) fingerprintKept = { json, hash: sha256Hex(json) };
+  return fingerprintKept.hash;
+}
+// Whether the report still reads as it did when a fingerprint was taken
+// (when it was sent, or finalised).
+function reportMatches(fingerprint) {
+  return !fingerprint || fingerprint === reportFingerprint() || fingerprint === sha256Hex(stableJson(reportContentParts(true)));
+}
 function formatFingerprint(fp) { return (fp || '').slice(0, 16).toUpperCase().match(/.{4}/g).join('-'); }
 function reportFieldHashes() {
   const parts = reportContentParts(), out = {};
@@ -673,7 +707,7 @@ function changedSections(before, after) {
   const keys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
   const names = new Set();
   keys.forEach(k => {
-    if ((before || {})[k] === (after || {})[k]) return;
+    if (ISSUE_META_KEYS.includes(k) || (before || {})[k] === (after || {})[k]) return;
     let sec = (k === 'job' || k === 'quote') ? k : Object.keys(SECTIONS).find(s => SECTIONS[s].fields.includes(k));
     if (!sec) {
       const el = document.getElementById('f-' + k);
@@ -1007,25 +1041,6 @@ function driveawayGaps() {
   return gaps;
 }
 
-// Anything that should be sorted out before the job is completed and locked.
-// A required answer left blank doesn't hold a job open: the report can go
-// with one (the check sheet says so by name), and so it can be completed.
-function reportAttentionItems() {
-  const items = reportPrepGaps().filter(g => !g.key.startsWith('blank:') && g.key !== 'licence').map(g => g.text);
-  const amending = reportData.amending;
-  if (!reportData.sent) items.push('The report hasn\'t been sent to the client');
-  else if (amending && reportData.sent.at < amending.startedAt) items.push('The amended report hasn\'t been sent to the client');
-  else if (reportData.sent.fingerprint !== reportFingerprint()) items.push('The report changed after it was sent. Send it again');
-  const quote = currentJobQuote();
-  if (quoteHasItems(quote)) {
-    if (!quote.sentAt) items.push('The quote hasn\'t been sent to the client');
-    else if (quote.sentHash !== quoteContentHash(quote)) items.push('The quote changed after it was sent. Send it again');
-  } else if (!reportData.noQuoteNeeded) {
-    items.push('No quote yet. Make one, or tap "No quote needed"');
-  }
-  return items;
-}
-
 function setNoQuoteNeeded(on) {
   if (on) reportData.noQuoteNeeded = true; else delete reportData.noQuoteNeeded;
   saveDraft();
@@ -1052,13 +1067,25 @@ function recordReportSent(fingerprint, version) {
   renderIssueState();
 }
 
-function markReportComplete() {
-  if (isReportLocked()) return;
-  const items = reportAttentionItems();
-  if (items.length) { renderIssueState(); showToast(items[0], 'error'); return; }
+// The one note for anything a locked job stops, with the way to Amend.
+function sayLocked() {
+  showToast('This job is finalised and locked. Amend it from This job', 'info', { label: 'This job', run: () => tabGo('job') });
+}
+
+// A job can be finalised once its steps are done (j: currentJobSummary()),
+// which takes the client having the report as it stands: one that hasn't
+// gone, or changed after it went, is still the next step.
+function jobCanFinalise(j) {
+  return !!j && j.finished && !j.onlyReportUnsent;
+}
+
+// Locks the report and quote as the next version. Returns a function that
+// takes the lock back off, for a job PDF that then couldn't be made or sent.
+function lockJob() {
+  const before = { issue: reportData.issue, issueHistory: reportData.issueHistory, amending: reportData.amending };
   const fingerprint = reportFingerprint(), fieldHashes = reportFieldHashes();
   const quote = currentJobQuote();
-  if (quoteHasItems(quote)) fieldHashes.quote = quote.sentHash.slice(0, 12);
+  if (quoteHasItems(quote)) fieldHashes.quote = quoteContentHash(quote).slice(0, 12);
   const prev = reportData.issue, amending = reportData.amending;
   const version = reportVersion();
   const entry = { version, completedAt: Date.now(), completedBy: inspectorDisplayName(), fingerprint };
@@ -1069,29 +1096,35 @@ function markReportComplete() {
   reportData.issueHistory = [...(reportData.issueHistory || []), entry];
   reportData.issue = { version, completedAt: entry.completedAt, completedBy: entry.completedBy, fingerprint, fieldHashes };
   delete reportData.amending;
-  saveCurrentReport(true);
   renderIssueState();
-  showToast(version > 1 ? `Version ${version} complete. Report and quote locked` : 'Job complete. Report and quote locked', 'success');
-  track('report_completed', { version });
+  return () => {
+    ['issue', 'issueHistory', 'amending'].forEach(k => { if (before[k] === undefined) delete reportData[k]; else reportData[k] = before[k]; });
+    saveCurrentReport(true);
+    renderIssueState();
+  };
 }
 
+// Amend, from the finalised job's card on This job: why, then unlock.
 function openAmendForm() {
+  if (navPlace() !== 'job') tabGo('job');
   const form = document.getElementById('issueAmendForm');
   if (!form) return;
-  form.style.display = '';
-  document.getElementById('issueAmendReason').focus();
+  form.hidden = false;
+  form.scrollIntoView({ block: 'center' });
+  document.getElementById('issueAmendReason').focus({ preventScroll: true });
 }
 function closeAmendForm() {
   const form = document.getElementById('issueAmendForm');
-  if (form) form.style.display = 'none';
+  if (form) form.hidden = true;
 }
 function startAmendment() {
   const reason = document.getElementById('issueAmendReason').value.trim();
-  if (!reason) { showToast('Say why the report is being changed', 'error'); return; }
+  if (!reason) { showToast('Say why the job is being changed', 'error'); return; }
   reportData.amending = { reason, startedAt: Date.now() };
   track('report_unlocked');
   saveCurrentReport(true);
   renderIssueState();
+  renderJobPage();
   showToast(`Unlocked. Changes become version ${reportVersion()}`, 'info');
 }
 // Back out of an amendment, only while nothing has been changed.
@@ -1099,13 +1132,14 @@ function cancelAmendment() {
   if (!reportData.amending || !reportData.issue) return;
   const quote = currentJobQuote();
   const quoteChanged = quoteHasItems(quote) && (reportData.issue.fieldHashes || {}).quote !== quoteContentHash(quote).slice(0, 12);
-  if (reportFingerprint() !== reportData.issue.fingerprint || quoteChanged) {
-    showToast('Changes have been made. Send them and complete the job to finish the amendment', 'error');
+  if (!reportMatches(reportData.issue.fingerprint) || quoteChanged) {
+    showToast('Changes have been made. Send them and finalise the job to finish the amendment', 'error');
     return;
   }
   delete reportData.amending;
   saveCurrentReport(true);
   renderIssueState();
+  renderJobPage();
 }
 
 function formatIssueDate(ts) {
@@ -1121,46 +1155,23 @@ function formatClockTime(t) {
   return `${h % 12 === 0 ? 12 : h % 12}:${String(m || 0).padStart(2, '0')} ${h >= 12 ? 'pm' : 'am'}`;
 }
 
+// The lock on the screen: the report and its job details go quiet, and one
+// line at the top of the report says why. Finalising and Amend are on This
+// job; nothing else of the job's progress is told here.
 function renderIssueState() {
   const banner = document.getElementById('issueBanner');
   if (!banner) return;
   const locked = isReportLocked();
   document.body.classList.toggle('report-locked', locked);
   if (locked) commitActive();
-  const issue = reportData.issue, amending = reportData.amending, sent = reportData.sent;
-  let html = '';
-  if (locked) {
-    html = `<div class="issue-banner-row"><span class="issue-banner-text"><strong>Job complete · version ${issue.version}</strong>
-      · ${formatIssueDate(issue.completedAt)}. The report and quote are locked so they match what the client received.</span>
-      <button class="agreement-banner-btn" onclick="openAmendForm()">Amend</button></div>
-      <div class="issue-amend-form" id="issueAmendForm" style="display:none">
-        <textarea id="issueAmendReason" rows="2" placeholder="Why is it changing? e.g. Client asked for the garage to be added"></textarea>
-        <div class="issue-amend-actions">
-          <button class="link-btn" onclick="closeAmendForm()">Cancel</button>
-          <button class="agreement-banner-btn issue-primary" onclick="startAmendment()">Unlock for version ${issue.version + 1}</button>
-        </div>
-      </div>`;
-    html += renderSentLines(reportData, currentJobQuote());
-    const answer = quoteAnswerSummary(currentJobQuote());
-    if (answer) html += `<div class="issue-quote-answer ${answer.tone}"><span>${escapeHtml(answer.text)}</span>
-      <button class="link-btn" onclick="openQuoteFromReport()">${answer.tone === 'good' ? 'View quote' : 'Record answer'}</button></div>`;
-  } else if (sent || amending) {
-    const items = reportAttentionItems();
-    const head = amending
-      ? `<strong>Amending to version ${reportVersion()}</strong> · ${escapeHtml(amending.reason)}.`
-      : '';
-    const next = items.length ? 'Before the job can be completed:' : 'Everything\'s done. Complete the job to lock it.';
-    const noQuote = !quoteHasItems(currentJobQuote());
-    html = `${renderSentLines(reportData, currentJobQuote())}<div class="issue-banner-row"><span class="issue-banner-text">${head} ${next}</span>
-      ${items.length ? '' : '<button class="agreement-banner-btn issue-primary" onclick="markReportComplete()">Complete job</button>'}</div>
-      ${items.length ? `<ul class="issue-attention">${items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : ''}
-      <div class="issue-links">
-        ${noQuote ? `<button class="link-btn" onclick="setNoQuoteNeeded(${!reportData.noQuoteNeeded})">${reportData.noQuoteNeeded ? 'A quote is needed' : 'No quote needed'}</button>` : ''}
-        ${amending ? '<button class="link-btn" onclick="cancelAmendment()">Cancel amendment</button>' : ''}
-      </div>`;
-  } else if (sentDocs(reportData, currentJobQuote()).some(d => d.at)) {
-    html = renderSentLines(reportData, currentJobQuote());
-  }
+  renderLastVisitBanner();
+  const issue = reportData.issue, amending = reportData.amending;
+  const html = locked
+    ? `<div class="issue-banner-row"><span class="issue-banner-text"><strong>Job finalised ${formatIssueDate(issue.completedAt)}</strong> · version ${issue.version}. Locked, so it matches what the client received.</span>
+      <button class="agreement-banner-btn" onclick="openAmendForm()">Amend</button></div>`
+    : amending && issue
+    ? `<div class="issue-banner-row"><span class="issue-banner-text"><strong>Amending to version ${reportVersion()}</strong> · ${escapeHtml(amending.reason)}</span></div>`
+    : '';
   banner.innerHTML = html;
   banner.style.display = html ? '' : 'none';
   banner.classList.toggle('locked', locked);
@@ -1183,7 +1194,7 @@ function installReportLockGuard() {
     if (e.type === 'focusin' && e.target.blur) e.target.blur();
     if (e.type === 'click' && Date.now() - lockToastAt > 2500) {
       lockToastAt = Date.now();
-      showToast('This job is complete and locked. Tap Amend to change it', 'info');
+      sayLocked();
     }
   };
   ['reportBody', 'jobPanelBody', 'micDock'].forEach(id => {

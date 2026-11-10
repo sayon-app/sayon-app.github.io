@@ -74,7 +74,7 @@ function dashboardJob(r, quotes) {
   const a = hasQuote ? quoteAnswerState(q) : null;
   // Ready: every required field filled, or a PDF made. Done: completed or sent.
   const reportSent = !!(d.issue || d.sent);
-  const reportDone = reportSent || !!d.pdfAt || (r.completion || 0) >= 100;
+  const reportDone = reportSent || !!d.doneAt || !!d.pdfAt || (r.completion || 0) >= 100;
   // The quote's link carries the report too, so a quote sent that way gave
   // the client the report.
   const reportWentWithQuote = !!(hasQuote && q.sentAt && q.linkRequest && q.linkRequest.files && q.linkRequest.files.report);
@@ -697,7 +697,7 @@ else installToastScreenWatch();
 //   reportData.amending      { reason, startedAt } - unlocked for an amendment
 //   reportData.noQuoteNeeded true when the job needs no quote
 // The quote's own sent state lives on the quote (see SENT AND LOCKED in js/quote.js).
-const ISSUE_META_KEYS = ['reportNumber', 'sent', 'issue', 'issueHistory', 'amending', 'pendingNotes', 'noQuoteNeeded', 'noteText', 'heardNotes', 'weatherFilled', 'naFromHouse', 'jobPdfAt', 'jobPdfSentAt', 'copyTo', 'copySent'];
+const ISSUE_META_KEYS = ['reportNumber', 'sent', 'issue', 'issueHistory', 'amending', 'pendingNotes', 'noQuoteNeeded', 'noteText', 'heardNotes', 'weatherFilled', 'naFromHouse', 'jobPdfAt', 'jobPdfSentAt', 'copyTo', 'copySent', 'doneAt'];
 const ISSUE_SECTION_NAMES = { job:'Job details', quote:'Quote', property:'Property', obstructions:'Areas inspected', restrictions:'Areas unable to be inspected',
   findings:'Findings', conducive:'Conducive', recommendations:'Recommendations', photos:'Photos', signoff:'Sign-off' };
 

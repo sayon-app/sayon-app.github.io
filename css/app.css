@@ -5615,6 +5615,15 @@ body:not(.dark-screen) .sidebar:not(.on-page) .drawer-legal a { color: var(--on-
   border: none; background: none; font: 600 calc(13.5px * var(--ts)) 'Inter', sans-serif; color: var(--accent2); cursor: pointer;
 }
 .finish-next-pdf:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Report done: the tick that replaces the Done button once it's tapped. */
+.finish-done { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--green-edge); background: var(--green-wash); color: var(--green); }
+.finish-done[hidden] { display: none; }
+.finish-done-tick { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--green); color: #FFFFFF; }
+.finish-done-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.finish-done-text b { font-size: calc(15.5px * var(--ts)); font-weight: 700; }
+.finish-done-text small { font-size: calc(12.5px * var(--ts)); color: var(--text2); }
+.finish-done .link-btn { flex: none; font-size: calc(12.5px * var(--ts)); }
+.finish-next-label[hidden], .finish-next-btn[hidden] { display: none; }
 body.dark-screen .finish-next-btn { border: 2px solid var(--border2); }
 body.dark-screen .finish-next-btn.primary { background: var(--accent-glow); color: #000000; box-shadow: none; }
 body.dark-screen .finish-next-btn.primary .finish-next-icon { background: rgba(0,0,0,0.12); color: #000000; }
@@ -5704,6 +5713,36 @@ body.large-touch .section-tab { flex: 0 0 auto; }
 /* The agreement banner shows where it's acted on: before the inspection and
    at sign-off. */
 #reportBody:not([data-step="property"]):not([data-step="finish"]) > #agreementBanner { display: none !important; }
+/* The Property step's Job details card: back to the address and booking. */
+.report-job-card {
+  display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 12px; padding: 12px 14px; text-align: left;
+  border-radius: 14px; border: 1px solid var(--card-edge); background: var(--surface); color: var(--text);
+  box-shadow: 0 6px 20px rgba(13,40,60,0.08); cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent;
+}
+.report-job-card:active { transform: scale(0.99); }
+.report-job-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#reportBody:not([data-step="property"]) > #reportJobCard { display: none; }
+.report-job-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.report-job-title { font: 700 calc(15px * var(--ts)) 'Space Grotesk', sans-serif; letter-spacing: -0.2px; }
+.report-job-sub { font-size: calc(12.5px * var(--ts)); line-height: 1.4; color: var(--text3); white-space: pre-line; overflow-wrap: anywhere; }
+.report-job-edit { flex: none; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border2); font-size: calc(13px * var(--ts)); font-weight: 700; color: var(--accent2); }
+body.dark-screen .report-job-card { border: 2px solid var(--border2); box-shadow: none; }
+
+/* The header's address opens the job's details. */
+button.header-job { border: none; background: none; padding: 0; text-align: left; font-family: inherit; cursor: pointer; }
+button.header-job.has-job { text-decoration: underline; text-decoration-color: rgba(255,255,255,0.25); text-underline-offset: 3px; }
+
+/* DATE CHIPS: today, tomorrow and the next few days under the date. */
+.date-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: -2px 0 12px; padding: 2px 0; }
+.date-chips::-webkit-scrollbar { display: none; }
+.date-chips:empty { display: none; }
+.date-chip {
+  flex: none; min-height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border2); background: var(--surface2);
+  color: var(--text); font: 600 calc(13px * var(--ts)) 'Inter', sans-serif; cursor: pointer; white-space: nowrap;
+}
+.date-chip.on { border-color: transparent; background: var(--accent-grad); color: #FFFFFF; }
+body.dark-screen .date-chip.on { background: var(--accent-glow); color: #000000; }
+
 
 /* Next: always there, so the steps can be walked in order; quieter until
    the section is complete. */

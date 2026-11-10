@@ -110,6 +110,7 @@ function openJobPage() {
   const overlay = document.getElementById('jobOverlay');
   if (!overlay) return;
   renderJobPage();
+  renderDateChips();
   overlay.classList.add('open');
   document.getElementById('jobPageBody').scrollTop = 0;
   track('screen_viewed', { screen: 'job' });
@@ -526,6 +527,7 @@ function updateJob() {
   const headerJob = document.getElementById('headerJob');
   headerJob.textContent = addr || 'No job loaded';
   headerJob.classList.toggle('has-job', !!addr);
+  if (typeof renderReportJobCard === 'function') renderReportJobCard();
   document.getElementById('reportSubtitle').textContent = addr
     ? `${addr} · Speak to populate fields`
     : 'Enter job details and speak to populate fields';
@@ -1022,7 +1024,33 @@ function saveJobInfo() {
     if (el) reportData[id] = el.value;
   });
   syncAllSelectCards();
+  renderDateChips();
+  if (typeof renderReportJobCard === 'function') renderReportJobCard();
   saveDraft();
+}
+
+// ── DATE CHIPS ───────────────────────────────────────────────────────────
+// Today, tomorrow and the next few days as one-tap chips under the date,
+// the chosen one lit. The date field stays for anything further out.
+function renderDateChips() {
+  const wrap = document.getElementById('jobDateChips');
+  const input = document.getElementById('jobInspectionDate');
+  if (!wrap || !input) return;
+  const iso = isoDate;
+  const now = new Date();
+  const days = Array.from({ length: 7 }, (_, i) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + i));
+  wrap.innerHTML = days.map((d, i) => {
+    const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric' });
+    const on = input.value === iso(d);
+    return `<button type="button" class="date-chip${on ? ' on' : ''}" aria-pressed="${on}" onclick="pickJobDate('${iso(d)}')">${label}</button>`;
+  }).join('');
+}
+
+function pickJobDate(iso) {
+  const input = document.getElementById('jobInspectionDate');
+  if (!input || isReportLocked()) return;
+  input.value = iso;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 // The inspection type decides which Australian Standard the report follows.
@@ -1072,6 +1100,7 @@ function loadJobInfo() {
     if (el && reportData[id] !== undefined) el.value = reportData[id];
   });
   syncAllSelectCards();
+  renderDateChips();
 }
 
 function clearJobInfo() {
@@ -1081,6 +1110,7 @@ function clearJobInfo() {
     delete reportData[id];
   });
   syncAllSelectCards();
+  renderDateChips();
 }
 // Stored separately from report data, per-business, used on every report.
 //

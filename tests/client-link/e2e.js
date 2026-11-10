@@ -1,5 +1,6 @@
 // The client link, end to end, against canned Supabase and Worker routes:
-//   1. the quote screen's Send makes the link, uploads the PDFs and emails
+//   1. the quote screen's Send opens the check sheet, which makes the link,
+//      uploads the PDFs and, on its button, emails
 //      the quote with the link in the message;
 //   2. the report's Check-before-sending sheet reuses that link;
 //   3. the client opens sign.html, reads the quote and accepts with a
@@ -68,7 +69,11 @@ async function backend(ctx) {
   await p.waitForTimeout(2000);
 
   // 1. Send from the quote screen.
-  await p.evaluate(() => { quoteState.clientEmail = 'sam@example.com'; persistQuote(); emailQuoteToClient(); });
+  await p.evaluate(() => { quoteState.clientEmail = 'sam@example.com'; persistQuote(); openQuoteSendReview(); });
+  // Send opens the check before sending; its button is what sends.
+  await p.waitForFunction(() => sendReview && sendReview.kind === 'quote', null, { timeout: 60000 });
+  check(await p.evaluate(() => !quoteState.sentAt) && emails.length === 0, 'quote Send opens the check first: nothing has gone yet');
+  await p.evaluate(() => { confirmSendReview(); });
   await p.waitForFunction(() => quoteState && quoteState.sentAt, null, { timeout: 60000 });
   await p.waitForTimeout(600);
   const q1 = await p.evaluate(() => ({ link: quoteState.linkRequest, sentAt: quoteState.sentAt, hash: quoteContentHash(quoteState), client: quoteState.client }));
@@ -152,7 +157,7 @@ async function backend(ctx) {
   // A changed quote needs a new link: the old one is cancelled.
   await p.evaluate(() => { quoteState.items[0].price = String(parseFloat(quoteState.items[0].price) + 10); delete quoteState.answer; quoteState.linkRequest = { id: Object.keys({})[0] }; });
   const oldId = q1.link.id; rows[oldId].status = 'pending';
-  await p.evaluate((id) => { quoteState.linkRequest = { id, sentAt: 1, hash: 'old' }; persistQuote(); emailQuoteToClient(); }, oldId);
+  await p.evaluate((id) => { quoteState.linkRequest = { id, sentAt: 1, hash: 'old' }; persistQuote(); openQuoteSendReview(); }, oldId);
   await p.waitForFunction((id) => quoteState.linkRequest && quoteState.linkRequest.id !== id, oldId, { timeout: 60000 });
   await p.waitForTimeout(500);
   check(rows[oldId].status === 'cancelled', 'a changed quote cancels the old link');

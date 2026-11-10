@@ -202,7 +202,8 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     await p.fill('#suName', 'Tia Tech'); await p.fill('#suPassword', 'longenough1'); await p.check('#suConsent'); await p.click('#suBtn'); await p.waitForTimeout(2800);
     const su = st.calls.find(c => c.path.includes('/auth/v1/signup'));
     check(su && !su.body.data.business_name, 'the sign-up doesn\'t name a business of their own');
-    check(su.body.data.terms_version === 3 && su.body.data.privacy_version === 7 && su.body.data.terms_accepted_at, 'an invited inspector\'s sign-up records the Terms and Privacy versions too');
+    const legal = await p.evaluate(() => LEGAL_VERSIONS);
+    check(su.body.data.terms_version === legal.terms && su.body.data.privacy_version === legal.privacy && su.body.data.terms_accepted_at, 'an invited inspector\'s sign-up records the Terms and Privacy versions too');
     const acc = st.calls.find(c => c.path.includes('/rpc/accept_invite'));
     check(acc && acc.body.p_token === TOKEN, 'sign-in sends the secret to accept_invite');
     const joined = await p.evaluate(() => ({ biz: authBusiness && authBusiness.id, ob: document.getElementById('onboardScreen').style.display, panel1: document.getElementById('ob-panel-2').style.display, kept: localStorage.getItem('korva_pending_invite'), toasts: window.__toasts.slice() }));

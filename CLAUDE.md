@@ -48,14 +48,14 @@ They are plain scripts, not modules: every top-level name is shared across all o
 | `voice.js` | FIELD NOTES, NATIVE SPEECH RECOGNITION ADAPTER, VOICE, AI TRANSCRIPT CLEANUP, EXPERIMENTAL AUDIO CAPTURE, WHISPER LISTENING, QUICK PHRASES, VOICE HUD |
 | `extraction.js` | AI EXTRACTION, LEARNED CORRECTIONS, TEST MODE, WAITING NOTES, EXTRACT SUMMARY, SPOKEN READ-BACK, COMPLIANCE PLATE SCAN, INSECT / SPECIES PHOTO ID, ASK THE AI ABOUT A PHOTO (`askAiAboutPhoto`, shared by the photo calls), PHOTO DESCRIPTION (Describe: the AI's suggested photo caption) |
 | `fields.js` | FIELD RENDERING, MULTI-FINDING ENGINE, CHOICE CARDS, SELECT CARDS, BORER FINDINGS, COMPASS, MOISTURE METER READINGS |
-| `editing.js` | EDITING, REPORT STEPS, PROGRESS, REPORT DONE (the Done mark and the one next step), SIGNATURE PADS, SAY IT INSTEAD |
+| `editing.js` | EDITING, REPORT STEPS, PROGRESS, REPORT DONE (the Done mark and the one next step), SHOW ME (walking what's still blank), SIGNATURE PADS, SAY IT INSTEAD |
 | `agreement.js` | PRE-INSPECTION AGREEMENT, REMOTE SIGNING |
 | `photos.js` | PHOTO ATTACHMENTS, photo store, PHOTO VIEWER, SECTION-AWARE PHOTO SYSTEM, READY-MADE RECOMMENDATIONS |
 | `job.js` | DRAWER, MENU, BOTTOM DOCK, THIS JOB, LAST VISIT, ADDRESS SUGGESTIONS, WEATHER, APPLICABLE STANDARD, JOB INFO, DATE CHIPS, PERSISTENCE — SAVED REPORTS |
 | `account.js` | AUTH STATE, BILLING / STRIPE, SIGN UP / IN / OUT, PASSWORD RESET, DELETE MY ACCOUNT, YOUR TEAM, BUSINESS LOAD, ENTER APP, SESSION RESTORE |
 | `sync.js` | SUPABASE REPORT SYNC, SYNC BETWEEN DEVICES, SYNC / SAVE STATUS INDICATOR, OLDER JOBS, DATA EXPORT / IMPORT, ACCESSIBILITY SETTINGS |
-| `dashboard.js` | DASHBOARD, STATUS / TOAST, COMPLETED JOBS, GAPS BEFORE YOU LEAVE |
-| `send.js` | SEND TO CLIENT, CHECK BEFORE SENDING |
+| `dashboard.js` | DASHBOARD, STATUS / TOAST, WHAT THE REPORT IS STILL MISSING (the one list Finish, the check sheet and the percentage read), COMPLETED JOBS, GAPS BEFORE YOU LEAVE |
+| `send.js` | SEND TO CLIENT, CHECK BEFORE SENDING (the report's, and the quote's own from `js/quote.js`) |
 | `pdf.js` | jsPDF loading (`ensureJsPDFLoaded`), SHARED PDF PIECES, the inspection report PDF (`buildReportPdf`) |
 
 ## Rules that aren't obvious from the code
@@ -70,4 +70,4 @@ They are plain scripts, not modules: every top-level name is shared across all o
 
 ## Testing
 
-Serve the repo with `python3 -m http.server 8765` and drive it with Playwright (Chromium is at `/opt/pw-browsers`). Block the service worker in tests. Run `node --check` on every changed JS file.
+Serve the repo with `python3 -m http.server 8765` and drive it with Playwright (Chromium is at `/opt/pw-browsers`). Block the service worker in tests. Run `node --check` on every changed JS file. `node tests/run-all.js` runs every `tests/*/e2e.js` (after `sh tests/visual/setup.sh`, with `NODE_PATH` pointing at Playwright).

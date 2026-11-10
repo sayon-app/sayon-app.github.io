@@ -5599,6 +5599,25 @@ body:not(.dark-screen) .sidebar:not(.on-page) .drawer-legal a { color: var(--on-
 .finish-done-text small { font-size: calc(12.5px * var(--ts)); color: var(--text2); }
 .finish-done .link-btn { flex: none; font-size: calc(12.5px * var(--ts)); }
 .finish-next-label[hidden], .finish-next-btn[hidden] { display: none; }
+/* What the report is still missing, above Report done: the check sheet's
+   own amber box (.send-review-gaps), so the two read as one list. */
+.finish-gaps { margin-bottom: 4px; }
+.finish-gaps[hidden] { display: none; }
+
+/* Walking that list (SHOW ME in js/app/editing.js): a slim bar under the
+   report, above the dock, with how many are left and Next. */
+.blank-walk {
+  flex: none; display: flex; align-items: center; gap: 8px; margin: 6px 12px 4px; padding: 5px 5px 5px 16px;
+  border-radius: 99px; border: 1px solid rgba(212,146,10,0.45); background: #FDF7EA; box-shadow: 0 8px 22px rgba(0,0,0,0.3);
+}
+.blank-walk[hidden] { display: none; }
+.blank-walk-text { flex: 1; min-width: 0; font-size: calc(13px * var(--ts)); font-weight: 650; color: var(--yellow-text); }
+.blank-walk-next {
+  flex: none; min-height: 38px; padding: 0 16px; border: 1px solid var(--border2); border-radius: 99px; background: var(--surface);
+  font-family: inherit; font-size: calc(13.5px * var(--ts)); font-weight: 700; color: var(--accent2); cursor: pointer;
+}
+.blank-walk-close { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--yellow-text); cursor: pointer; }
+body.dark-screen .blank-walk { background: rgba(255,176,0,0.10); }
 body.dark-screen .finish-next-btn { border: 2px solid var(--border2); }
 body.dark-screen .finish-next-btn.primary { background: var(--accent-glow); color: #000000; box-shadow: none; }
 body.dark-screen .finish-next-btn.primary .finish-next-icon { background: rgba(0,0,0,0.12); color: #000000; }
@@ -5609,6 +5628,14 @@ body.dark-screen .finish-next-btn.primary small, body.dark-screen .finish-next-b
 .qp-cert.sent { border-color: var(--border); }
 .qp-cert-title { font-size: calc(13.5px * var(--ts)); font-weight: 700; color: var(--text); }
 .qp-cert-text { margin: 3px 0 0; font-size: calc(13px * var(--ts)); line-height: 1.5; color: var(--text2); }
+/* What the certificate would go without, above its Email button. */
+.qp-cert-gaps {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 8px; padding: 8px 12px; border-radius: 10px;
+  border: 1px solid rgba(212,146,10,0.45); background: #FDF7EA; font-size: calc(13px * var(--ts)); line-height: 1.45; color: var(--yellow-text);
+}
+.qp-cert-gaps span { flex: 1 1 60%; min-width: 0; }
+.qp-cert-gaps .quote-link-btn { flex: none; min-height: 36px; }
+body.dark-screen .qp-cert-gaps { background: rgba(255,176,0,0.10); }
 .qp-cert .quote-step-actions, .qp-cert .qp-cert-actions { margin-top: 10px; }
 .qp-cert-actions .qp-cert-email { flex: 1 1 auto; }
 /* Given in person: a quiet line under the buttons, still a full-size tap. */
@@ -6203,6 +6230,21 @@ body:not(.dark-screen) .doc-chip.done::after { background: var(--green-fill); }
   content: ''; position: absolute; left: 2px; top: 17px; width: 7px; height: 7px; border-radius: 99px; background: var(--yellow);
 }
 body.dark-screen .send-review-file .link-btn, body.dark-screen .send-review-fixes .link-btn { background: var(--surface2); }
+/* A line and its button side by side; two buttons drop under the line. */
+.send-review-gaps .send-review-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.send-review-gap-text { flex: 1 1 58%; min-width: 0; }
+.send-review-gaps .send-review-fixes { flex: none; max-width: 100%; margin-top: 0; }
+
+/* The foot of a sheet: its one action, always in reach while the page
+   above it scrolls, with who it goes to on the button. */
+.page-sheet-foot {
+  flex: none; display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 16px calc(8px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border); background: var(--surface);
+}
+.page-sheet-foot .extract-btn { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-sheet-foot .link-btn { align-self: center; min-height: 36px; margin: 0; }
+.page-sheet-foot-note { font-size: calc(12.5px * var(--ts)); font-weight: 600; line-height: 1.35; color: var(--yellow-text); text-align: center; }
+.page-sheet-foot-note[hidden] { display: none; }
 
 /* Saved reports, refreshed: cards at reading size, with a delete button
    big enough to hit. */

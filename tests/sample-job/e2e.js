@@ -102,7 +102,9 @@ let shotN = 0;
   // Sending the quote again also goes to the business, with no client link,
   // and still leaves the price list alone.
   await p.evaluate(() => { closeJobPage(); jobGo('quote'); }); await p.waitForTimeout(1200);
-  await tap(p.locator('#quoteEmailBtn'), 'Send again'); await p.waitForTimeout(5000);
+  // Send opens the check before sending; its button is what sends.
+  await tap(p.locator('#quoteEmailBtn'), 'Send again'); await p.waitForTimeout(1500);
+  await tap(p.locator('#sendReviewBtn'), 'Send (check sheet)'); await p.waitForTimeout(5000);
   const qmail = emails[1] || {};
   check(emails.length === 2 && qmail.to === 'owner@example.com' && /^Sample: Quote /.test(qmail.subject || ''), 'the sample\'s quote goes to the business: ' + (qmail.subject || 'none'));
   check(!/sign\.html|\?r=/.test(qmail.text || ''), 'the sample\'s quote email has no link for a client to accept');

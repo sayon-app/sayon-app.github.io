@@ -24,11 +24,27 @@ function clientMessage({ client, address, docs, note, signOff, link }) {
     '',
     // The client link: read the quote and accept or decline it on a phone.
     ...(link ? ['You can read the quote and accept or decline it on your phone here:', link, ''] : []),
-    `If you have any questions, just reply to this email${company.phone ? ` or call us on ${company.phone}` : ''}.`,
-    '',
+    ...questionsLine(),
     'Kind regards,',
     ...[signOff, company.name].filter(Boolean),
   ].join('\n');
+}
+
+// How the client gets back to the business, for the end of an email. An
+// email SAYON sends takes replies at the email under Your business; with
+// none there a reply would go to the address SAYON sends from, where nobody
+// reads it, so the line gives the phone number only. An email from the
+// phone's own mail app always takes its replies.
+function contactWays() {
+  const company = getCompanyDetails();
+  const reply = !directEmail || !!(company.email || '').trim();
+  return [reply ? 'just reply to this email' : '', company.phone ? `call us on ${company.phone}` : ''].filter(Boolean).join(' or ');
+}
+// "If you have any questions…" and the blank line after it, or nothing
+// when there's no way to give.
+function questionsLine() {
+  const ways = contactWays();
+  return ways ? [`If you have any questions, ${ways}.`, ''] : [];
 }
 
 // Whether the Worker can send email: null until checked, then true or
@@ -179,6 +195,8 @@ function sendFailureReason(e) {
 // inspector confirms, so what goes is the report as it is then. If the
 // build takes too long for the share sheet, the built files are kept and
 // the next tap sends them at once.
+// The quote sent on its own opens the same sheet (CHECK BEFORE THE QUOTE
+// GOES in js/quote.js): sendReview.kind is 'report' or 'quote'.
 let sendReview = null;
 
 function openSendReview() {
@@ -199,7 +217,9 @@ function openSendReview() {
   const answer = quoteHasItems(quote) && typeof quoteAnswerState === 'function' ? quoteAnswerState(quote) : null;
   const declined = !!(answer && !answer.stale && answer.status !== 'accepted');
   const withQuote = quoteHasItems(quote) && !declined;
-  sendReview = { files: null, quote: withQuote ? quote : null };
+  sendReview = { kind: 'report', files: null, quote: withQuote ? quote : null };
+  document.getElementById('sendReviewSummaryLabel').hidden = false;
+  document.getElementById('sendReviewSummary').hidden = false;
 
   const esc = escapeHtml;
   document.getElementById('sendReviewTo').innerHTML =
@@ -232,13 +252,12 @@ function openSendReview() {
       `<div class="send-review-tile tone-${tone}"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join('') + '</div>').join('') +
     (limited.length ? `<div class="send-review-sub">Not fully inspected</div><ul class="send-review-list">${limited.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : '');
 
-  const gaps = reportPrepGaps();
-  const companyGaps = companyDetailGaps();
-  if (companyGaps.length) gaps.push({ text: `Your ${joinWithAnd(companyGaps)} ${companyGaps.length === 1 ? 'is' : 'are'} missing from ${canEditBusiness() ? 'Menu › Your business' : 'the details your business owner set'}, so the PDFs won't show ${companyGaps.length === 1 ? 'it' : 'them'}`, fix: '' });
+  // What the report is still missing (the list Finish shows), then what
+  // the business's own details are missing.
+  const gaps = reportPrepGaps().concat(businessSendGaps('the PDFs', "fixSendGap('business')"));
   const gapsWrap = document.getElementById('sendReviewGaps');
   gapsWrap.style.display = gaps.length ? '' : 'none';
-  gapsWrap.innerHTML = `<div class="send-review-label">Worth checking first</div><ul class="send-review-list">${gaps.map(g =>
-    `<li>${esc(g.text)}${g.fix ? `<span class="send-review-fixes">${g.fix}</span>` : ''}</li>`).join('')}</ul>`;
+  gapsWrap.innerHTML = reportGapsHtml(gaps);
 
   document.getElementById('sendReviewSubject').value =
     `${withQuote ? 'Timber pest inspection report and quote' : 'Timber pest inspection report'} — ${address || 'your property'}`;
@@ -251,11 +270,15 @@ function openSendReview() {
   document.getElementById('sendReviewBody').value = sendReview.defaultBody;
   // A quote the client already accepted goes as a copy, without a link to accept it again.
   if (withQuote && !(answer && !answer.stale)) prepareSendReviewLink(sendReview);
-  sendReview.label = gaps.length ? 'Send anyway'
-    : directEmail && email ? `Send to ${email}` : 'Open email to send';
+  // The button stays at the foot of the sheet and always says who it goes
+  // to. With something still open above, a line over it says how many.
+  sendReview.label = directEmail && email ? `Send to ${email}` : 'Open email to send';
   const btn = document.getElementById('sendReviewBtn');
   btn.textContent = sendReview.label;
   btn.disabled = false;
+  const open = document.getElementById('sendReviewOpen');
+  open.hidden = !gaps.length;
+  open.textContent = gaps.length === 1 ? '1 thing at the top is still open' : `${gaps.length} things at the top are still open`;
   document.getElementById('sendReviewOverlay').classList.add('open');
   const body = document.querySelector('#sendReviewOverlay .page-sheet-body');
   if (body) body.scrollTop = 0;
@@ -275,14 +298,38 @@ async function prepareSendReviewLink(r) {
     reportError(e, 'send_review_link');
   }
   if (!link || sendReview !== r) return;
-  r.link = quoteLinkUrl(link.id);
+  showSendReviewLink(r, quoteLinkUrl(link.id));
+}
+
+// The link, once it's made: into the message and onto the Attached list.
+// A message the inspector has already changed keeps their words, with the
+// link's two lines added above the sign-off.
+function showSendReviewLink(r, url) {
+  r.link = url;
   const body = document.getElementById('sendReviewBody');
-  const withLink = clientMessage(Object.assign({}, r.message, { link: r.link }));
+  const withLink = clientMessage(Object.assign({}, r.message, { link: url }));
   if (body.value === r.defaultBody) body.value = withLink;
+  else if (!body.value.includes(url)) {
+    const lines = `You can read the quote and accept or decline it on your phone here:\n${url}\n\n`;
+    const at = body.value.lastIndexOf('Kind regards,');
+    body.value = at > -1 ? body.value.slice(0, at) + lines + body.value.slice(at) : `${body.value.replace(/\s+$/, '')}\n\n${lines}`;
+  }
   r.defaultBody = withLink;
-  const files = document.getElementById('sendReviewFiles');
-  files.insertAdjacentHTML('beforeend', `<div class="send-review-file"><div><div class="send-review-file-name">Link to accept the quote</div>` +
+  document.getElementById('sendReviewFiles').insertAdjacentHTML('beforeend', `<div class="send-review-file"><div><div class="send-review-file-name">Link to accept the quote</div>` +
     `<div class="send-review-file-meta">In the message. The client reads the quote and accepts or declines it on their phone</div></div></div>`);
+}
+
+// What the business's own details are missing, for a check sheet: they
+// print on every PDF, and the email is where a client's reply goes.
+// what: 'the PDFs' or 'the quote'. fix: what its Add button runs.
+function businessSendGaps(what, fix) {
+  const gaps = [];
+  const missing = companyDetailGaps();
+  const where = canEditBusiness() ? 'Menu › Your business' : 'the details your business owner set';
+  const addBtn = many => canEditBusiness() ? `<button class="link-btn" onclick="${fix}">Add ${many ? 'them' : 'it'}</button>` : '';
+  if (missing.length) gaps.push({ key: 'company', text: `Your ${joinWithAnd(missing)} ${missing.length === 1 ? 'is' : 'are'} missing from ${where}, so ${what} won't show ${missing.length === 1 ? 'it' : 'them'}`, fix: addBtn(missing.length > 1) });
+  if (directEmail && !(getCompanyDetails().email || '').trim()) gaps.push({ key: 'reply', text: `Your business email is missing from ${where}, so a client's reply to this email wouldn't reach you. The message gives your phone number instead`, fix: addBtn(false) });
+  return gaps;
 }
 
 // Saves the email typed on the check sheet to the job, then redraws the
@@ -293,6 +340,7 @@ function addSendReviewEmail() {
     showToast("That email address doesn't look right", 'error');
     return;
   }
+  if (sendReview && sendReview.kind === 'quote') { setQuoteClientEmail(value); openQuoteSendReview(); return; }
   document.getElementById('jobClientEmail').value = value;
   saveJobInfo();
   openSendReview();
@@ -375,8 +423,7 @@ async function sendReportCopy(file, to) {
     '',
     `Please find attached a copy of the timber pest inspection report for ${address || 'the property'}${client ? `, sent to ${client} today at their request` : ', sent at the client\'s request'}.`,
     '',
-    `If you have any questions, just reply to this email${company.phone ? ` or call us on ${company.phone}` : ''}.`,
-    '',
+    ...questionsLine(),
     'Kind regards,',
     ...[signOff, company.name].filter(Boolean),
   ].join('\n');
@@ -405,13 +452,26 @@ async function sendReportCopy(file, to) {
 
 // The fix buttons on the check sheet. Each changes the report, then the
 // sheet is redrawn from the report as it now is.
+// from: 'send' (the check sheet), 'extract' (the sheet after a note) or
+// 'finish' (the report's Finish step, which redraws itself).
 function fixSendGap(kind) { fixReportGap(kind, 'send'); }
 function fixReportGap(kind, from = 'send') {
-  const reopen = () => from === 'send' ? openSendReview() : showExtractSummary(extractSummaryBefore);
-  const leave = () => from === 'send' ? closeSendReview() : closeExtractSummary();
+  const reopen = () => from === 'send' ? openSendReview() : from === 'extract' ? showExtractSummary(extractSummaryBefore) : updateProgress();
+  const leave = () => from === 'send' ? closeSendReview() : from === 'extract' ? closeExtractSummary() : null;
   if (kind === 'quote') { leave(); sendAfterQuote = true; openQuoteFromReport(); return; }
   if (kind === 'agreement') { leave(); openAgreementSheet(); return; }
+  if (kind === 'address') {
+    leave();
+    jobGo('details');
+    const el = document.getElementById('jobAddress');
+    el.scrollIntoView({ block: 'center' });
+    el.focus({ preventScroll: true });
+    return;
+  }
   if (kind === 'photos') { backUpPhotosFromGap(from); return; }
+  if (kind === 'business') { openBusinessForm(reopen); return; }
+  // "Show me": to the answer in the report, and the walk through the rest.
+  if (kind.startsWith('go:')) { leave(); showBlank(kind.slice(3)); return; }
   if (kind.startsWith('finding:')) { leave(); showAreaFindingPrompt(kind.slice(8)); return; }
   if (kind === 'interval12') {
     reportData.inspectionFrequency = '12 months';
@@ -448,6 +508,7 @@ function closeSendReview() {
 // Builds this send's PDFs once and keeps them for a second tap.
 async function sendReviewFiles(r) {
   if (r.files) return r.files;
+  if (r.kind === 'quote') { r.files = [buildQuotePDF(r.quote)]; return r.files; }
   const report = await buildReportPdf();
   const files = [{ blob: report.blob, fname: report.fname }];
   if (r.quote) files.push(buildQuotePDF(r.quote));
@@ -483,14 +544,24 @@ async function confirmSendReview() {
       showToast((e && e.message) || 'Could not make the PDF', 'error');
       return;
     }
+    // The quote on its own waits for its link, which the client accepts from.
+    if (r.linkPending) { btn.textContent = 'Making the link…'; await r.linkPending; }
     btn.textContent = r.label;
     const sent = await sendPdfsToClient({
       files,
-      to: (reportData.jobClientEmail || '').trim(),
+      to: r.kind === 'quote' ? (r.quote.clientEmail || '').trim() : (reportData.jobClientEmail || '').trim(),
       subject: document.getElementById('sendReviewSubject').value.trim(),
       body: document.getElementById('sendReviewBody').value,
     });
     if (!sent || sendReview !== r) return;
+    if (r.kind === 'quote') {
+      closeSendReview();
+      // Sent at these prices, so they're the business's own from here on.
+      rememberQuotePrices(r.quote);
+      markQuoteSent(r.quote);
+      track('quote_sent', { with_link: !!r.link });
+      return;
+    }
     const copy = sendCopyTo();
     if (copy && directEmail && !isSampleJob(currentReportId)) await sendReportCopy(files[0], copy);
     closeSendReview();

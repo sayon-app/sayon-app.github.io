@@ -185,6 +185,8 @@ function reinspectEmailText(it) {
   const first = greetingName(r.client);
   const me = typeof lastInspectorDetails === 'function' ? lastInspectorDetails().name : '';
   const address = r.address || 'your property';
+  // A reply only reaches the business with its email set (contactWays).
+  const ways = contactWays() || 'get in touch';
   const whenLine = it.overdue
     ? `Your last timber pest inspection at ${address} was on ${formatLongDate(it.last)}, and the next one was due on ${formatLongDate(it.due)}.`
     : `Your next timber pest inspection at ${address} is due on ${formatLongDate(it.due)}. The last one was on ${formatLongDate(it.last)}.`;
@@ -197,7 +199,7 @@ function reinspectEmailText(it) {
       '',
       'Regular inspections are the best way to find termites early, before they cause much damage. Australian Standard AS 3660.2 recommends an inspection at least every 12 months.',
       '',
-      `Just reply to this email${company.phone ? ` or call us on ${company.phone}` : ''} and we'll book a time that suits you.`,
+      `${ways.charAt(0).toUpperCase()}${ways.slice(1)} and we'll book a time that suits you.`,
       '',
       'Kind regards,',
       ...[me, company.name].filter(Boolean),

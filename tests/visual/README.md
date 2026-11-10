@@ -78,3 +78,11 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 ## Findings shown when prompted
 
 `tests/findings-prompted/e2e.js <outDir>` checks that Termites, Borers and Timber decay stay out of sight until something calls for them: a fresh report shows the quick fill and "Found something? Add it", "No timber pests found" answers all none and Undo takes it back, Termites comes in open from its button, areas that all say nothing found answer the timber pests none (and the report PDF prints NONE / NO), an area changed to evidence found takes those answers back and asks "What was it?", Borers and Rot from that question start the write-up for that area, an answer given by hand isn't taken back, and "Say what it was" on the check before sending goes to the question. It also checks the finding number on a card's tile: none on a lone or unanswered card. `MODES=light,dark` adds dark shots.
+
+## Every test at once
+
+`node tests/run-all.js` runs every `tests/*/e2e.js`, three at a time, and ends with a count (`node tests/run-all.js navigation send-gaps` runs just those). It starts the server on :8765 if nothing is there. Each test's output is kept in `/tmp/sayon-tests/<name>.log`.
+
+## Before it goes
+
+`tests/before-it-goes/e2e.js <outDir>` checks that nothing leaves with a hole in it: Finish and the check before sending show one list of what the report is still missing, and the percentage reads off it; Show me goes to a blank answer and Next walks the rest; the Send button stays at the foot of the sheet and names who it goes to; a business with no email is told replies won't reach it; the quote's Send to client opens the same check and nothing goes until its button is tapped; the certificate card says what the certificate would go without.

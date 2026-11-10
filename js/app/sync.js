@@ -577,13 +577,11 @@ async function restoreArchivedReports() {
   refreshDashboardIfOpen();
 }
 
+// How far along the open report is, as the Jobs list and the job's page
+// show it: the same number as the ring on the report (reportProgress in
+// js/app/dashboard.js), so the two never disagree.
 function calculateCompletion() {
-  let filled = 0, total = 0;
-  Object.values(REQUIRED_FIELDS).forEach(req => {
-    filled += req.filter(k => isFieldFilled(k)).length;
-    total += req.length;
-  });
-  return Math.round((filled / total) * 100);
+  return reportProgress().pct;
 }
 
 // One word for where a saved job is up to: Draft, Ready (every required
@@ -621,6 +619,8 @@ function isFieldFilled(key) {
   // Answered from the areas in Section 4 (see hinderedAnswer).
   if (key === 'hinderedAreas') return !!hinderedAnswer();
   if (reportData[key] === undefined || reportData[key] === null) return false;
+  // An answer typed and then cleared (the licence number) is blank again.
+  if (typeof reportData[key] === 'string' && !reportData[key].trim()) return false;
   if (key === 'findings') {
     return Array.isArray(reportData.findings) &&
       reportData.findings.some(f => f && (f.termiteActivity || f.species || f.damageDescription || f.activityLocation));

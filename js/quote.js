@@ -1923,45 +1923,135 @@ function installQuoteLockGuard() {
   ['mousedown', 'click', 'focusin', 'keydown'].forEach(t => editor.addEventListener(t, stop, true));
 }
 
-// Emails the quote PDF to the client. The PDF is built right here, inside
-// the tap, because the share sheet won't open after a wait.
-function emailQuoteToClient() {
+// ── CHECK BEFORE THE QUOTE GOES ─────────────────────────────────────────────
+// Send to client on the quote opens the same check sheet the report sends
+// from (CHECK BEFORE SENDING in js/app/send.js): who it goes to, the quote
+// and its link, what the quote still needs with a button to each, and the
+// message. Nothing goes until the button at its foot is tapped.
+
+// What the quote still needs, each with the way to fix it: the same notes
+// its sections show (quoteFoldNotes), said in full, then the system not
+// picked and the business's own details.
+function quoteSendGaps(q) {
+  const items = [];
+  const fixBtn = (kind, label) => `<button class="link-btn" onclick="fixQuoteGap('${kind}')">${label}</button>`;
+  const push = (key, text, fix) => items.push({ key, text, fix });
+  const n = q.items.length, starting = q.items.filter(isStartingPrice).length;
+  if (!(q.client || '').trim()) push('client', 'The quote has no client name', fixBtn('client', 'Add it'));
+  const c = quoteSystemChoice(q);
+  if (c && Array.isArray(c.options) && c.options.length && !c.picked) push('system', 'No system is picked yet, so the quote doesn\'t price one', fixBtn('system', 'Pick one'));
+  if (!n) push('work', 'The quote has no lines of work', fixBtn('work', 'Add a line'));
+  else if (starting) push('prices', `${starting === 1 ? 'One price is' : starting + ' prices are'} still SAYON's starting price, not one you've set`, fixBtn('work', starting === 1 ? 'Check it' : 'Check them'));
+  if (quotePlanShown(q)) {
+    const p = q.plan;
+    if (!p) push('plan', 'There\'s no treatment plan on the quote', fixBtn('plan', 'Add a plan'));
+    else if (!p.time) push('plan', 'The plan doesn\'t say how long you\'ll be on site', fixBtn('plan', 'Set it'));
+    else if (!p.service) push('plan', 'The plan doesn\'t give a service period', fixBtn('plan', 'Set it'));
+  }
+  if (!(q.paymentTerms || '').trim()) push('terms', 'There are no payment terms', fixBtn('terms', 'Add them'));
+  // A completed job's quote is locked with it: the list still says what
+  // it went without, but nothing offers to change it.
+  if (isQuoteLocked()) items.forEach(it => { it.fix = ''; });
+  return items.concat(businessSendGaps('the quote', "fixQuoteGap('business')"));
+}
+
+function openQuoteSendReview() {
   if (!quoteState) return;
   clearTimeout(quoteSaveTimer);
   persistQuote();
   storeQuoteOnReport(quoteState, true);
-  rememberQuotePrices(quoteState);
   if (!jsPDF) {
-    ensureJsPDFLoaded()
-      .then(() => showToast('Ready. Tap the send button again', 'info'))
+    ensureJsPDFLoaded().then(openQuoteSendReview)
       .catch(e => showToast((e && e.message) || 'Could not load the PDF tools', 'error'));
     return;
   }
   const q = quoteState;
-  const btn = document.getElementById('quoteEmailBtn');
-  (async () => {
-    // The link the client accepts from goes in the message. Making it needs
-    // signal and a moment; without either the quote still goes as before.
-    let link = null;
-    if (authSession && navigator.onLine && !quoteLinkCurrent(q) && !isSampleJob(q.reportKey)) {
-      btn.disabled = true;
-      document.getElementById('quoteSendLabel').textContent = 'Making the link…';
-      const files = { quote: buildQuotePDF(q) };
-      if (q.reportKey === (currentReportId || 'draft')) {
-        try { files.report = await buildReportPdf(); } catch (e) { reportError(e, 'quote_link_report'); }
-      }
-      link = await ensureQuoteLink(q, files);
-      btn.disabled = false;
-      renderQuoteSendLabel();
-    } else link = quoteLinkCurrent(q);
-    const sent = await sendPdfsToClient({
-      files: [buildQuotePDF(q)],
-      to: (q.clientEmail || '').trim(),
-      subject: `Quote ${q.number || ''} — ${q.address || 'your property'}`.replace('  ', ' '),
-      body: clientMessage({ client: q.client, address: q.address, docs: 'treatment quote', signOff: q.inspector, link: link ? quoteLinkUrl(link.id) : '' }),
-    });
-    if (sent) { markQuoteSent(q); track('quote_sent', { with_link: !!link }); }
-  })();
+  const esc = escapeHtml;
+  track('screen_viewed', { screen: 'check_before_quote_send' });
+  const sampleTo = isSampleJob(q.reportKey) && typeof sampleJobSendTo === 'function' ? sampleJobSendTo() : '';
+  const email = sampleTo || (q.clientEmail || '').trim();
+  const client = (q.client || '').trim();
+  const r = sendReview = { kind: 'quote', files: null, quote: q };
+
+  document.getElementById('sendReviewTo').innerHTML =
+    `<div class="send-review-name">${esc(sampleTo ? 'You, not a client: this is the sample job' : client || 'No client name')}</div>` +
+    (email ? `<div class="send-review-email">${esc(email)}</div>`
+      : `<div class="send-review-warn">No client email. Add it so SAYON can send it for you.</div>
+         <div class="send-review-add-email"><input class="job-input" id="sendReviewEmail" type="email" placeholder="client@email.com" autocomplete="off">
+         <button class="agreement-banner-btn" onclick="addSendReviewEmail()">Add</button></div>`);
+  const copy = document.getElementById('sendReviewCopy');
+  copy.innerHTML = ''; copy.hidden = true;
+  document.getElementById('sendReviewFiles').innerHTML =
+    `<div class="send-review-file"><div><div class="send-review-file-name">Treatment quote</div>` +
+    `<div class="send-review-file-meta">${esc(q.number || '')} · ${formatAUD(quoteTotals(q).total)}${q.gst !== false ? ' inc GST' : ''}</div></div>` +
+    `<button class="link-btn" onclick="previewSendFile(0)">Preview</button></div>`;
+  // The report sheet's "What the client reads first" is the report's summary.
+  document.getElementById('sendReviewSummaryLabel').hidden = true;
+  const summary = document.getElementById('sendReviewSummary');
+  summary.hidden = true; summary.innerHTML = '';
+
+  const gaps = quoteSendGaps(q);
+  const gapsWrap = document.getElementById('sendReviewGaps');
+  gapsWrap.style.display = gaps.length ? '' : 'none';
+  gapsWrap.innerHTML = reportGapsHtml(gaps);
+
+  document.getElementById('sendReviewSubject').value = `Quote ${q.number || ''} — ${q.address || 'your property'}`.replace('  ', ' ');
+  r.message = { client: q.client, address: q.address, docs: 'treatment quote', signOff: q.inspector };
+  // The link the client accepts from goes in the message. Making it needs
+  // signal and a moment, so it's made while the sheet is read.
+  const current = quoteLinkCurrent(q);
+  r.defaultBody = clientMessage(r.message);
+  document.getElementById('sendReviewBody').value = r.defaultBody;
+  if (current) showSendReviewLink(r, quoteLinkUrl(current.id));
+  else if (authSession && navigator.onLine && !isSampleJob(q.reportKey)) r.linkPending = prepareQuoteSendLink(r);
+
+  r.label = directEmail && email ? `Send to ${email}` : 'Open email to send';
+  const btn = document.getElementById('sendReviewBtn');
+  btn.textContent = r.label;
+  btn.disabled = false;
+  const open = document.getElementById('sendReviewOpen');
+  open.hidden = !gaps.length;
+  open.textContent = gaps.length === 1 ? '1 thing at the top is still open' : `${gaps.length} things at the top are still open`;
+  document.getElementById('sendReviewOverlay').classList.add('open');
+  const body = document.querySelector('#sendReviewOverlay .page-sheet-body');
+  if (body) body.scrollTop = 0;
+}
+
+// The link for a quote going on its own: the client's page offers the
+// quote PDF, and the report too when this quote belongs to the open job.
+async function prepareQuoteSendLink(r) {
+  const q = r.quote;
+  let link = null;
+  try {
+    const files = { quote: (await sendReviewFiles(r))[0] };
+    if (q.reportKey === (currentReportId || 'draft')) {
+      try { files.report = await buildReportPdf(); } catch (e) { reportError(e, 'quote_link_report'); }
+    }
+    link = await ensureQuoteLink(q, files);
+  } catch (e) {
+    reportError(e, 'quote_send_link');
+  }
+  r.linkPending = null;
+  if (link && sendReview === r) showSendReviewLink(r, quoteLinkUrl(link.id));
+}
+
+// The client's email typed on the check sheet, onto the quote and the job.
+function setQuoteClientEmail(value) {
+  const el = document.getElementById('qClientEmail');
+  if (el) el.value = value;
+  onQuoteFieldInput();
+}
+
+// A fix button on the quote's check: closes the sheet and goes to the
+// place in the quote. The business's details open over it and come back.
+function fixQuoteGap(kind) {
+  if (kind === 'business') { openBusinessForm(openQuoteSendReview); return; }
+  closeSendReview();
+  const open = id => { const fold = document.getElementById(id); if (fold) fold.open = true; return fold; };
+  if (kind === 'client') { openQuoteDetails('qClient'); const el = document.getElementById('qClient'); if (el) el.focus({ preventScroll: true }); return; }
+  const target = kind === 'system' ? (open('quoteWorkFold'), document.getElementById('quoteSystemChoice'))
+    : kind === 'work' ? open('quoteWorkFold') : kind === 'plan' ? open('quotePlanFold') : open('quoteTermsFold');
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ── CLIENT LINK ─────────────────────────────────────────────────────────────

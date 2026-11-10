@@ -172,7 +172,7 @@ async function setup(b, opts) {
   const before = await p.evaluate(() => ({ done: !document.getElementById('reportDoneBtn').hidden, quote: !document.getElementById('finishQuoteBtn').hidden, send: !document.getElementById('shareBtn').hidden, sub: document.getElementById('reportDoneSub').textContent }));
   console.log('finish before:', JSON.stringify(before));
   check(before.done && !before.quote && !before.send, 'before it\'s done, Finish shows one big button: Report done');
-  check(/required answers are still blank/.test(before.sub), 'it says how many required answers are still blank');
+  check(/^\d+ still blank\. You can tick it off anyway\.$/.test(before.sub), 'it says how many answers are still blank: ' + before.sub);
   await p.evaluate(() => document.getElementById('finishNext').scrollIntoView({ block: 'center' })); await shot('06-finish-not-done');
   await p.evaluate(() => { reportData.treatmentRecommended = 'YES'; updateProgress(); });
   await p.click('#reportDoneBtn'); await p.waitForTimeout(800);

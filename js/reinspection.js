@@ -4,15 +4,19 @@
 // months"), and a treatment record can set its own date. The Jobs screen's
 // Due tab lists each property whose next inspection is coming up or has
 // passed, with an email to the client offering to book it and a button to
-// start the new report.
+// book it in (a new job at the address).
 //
 // One row per property: the latest report at the address decides. A newer
 // report there (even a draft) means the re-inspection has started, so the
 // property drops off the list by itself.
 //
 // What the inspector did about a reminder (emailed, taken off the list) is
-// kept on this phone under korva_reinspect_<user id>, not in the report, so
-// a completed, locked report is never changed by it.
+// kept under korva_reinspect_<user id>, not in the report, so a finalised,
+// locked report is never changed by it. The marks also go to the account
+// with the business's other settings (businesses.settings.reinspect,
+// js/business-sync.js), so the office computer and a second phone show the
+// same and a client isn't reminded twice. Only the owner's devices can
+// write those settings today; a technician's marks stay on their phone.
 
 const REINSPECT_AHEAD_DAYS = 30;
 
@@ -22,10 +26,32 @@ function reinspectStorageKey() {
 function getReinspectMarks() {
   try { return JSON.parse(localStorage.getItem(reinspectStorageKey()) || '{}') || {}; } catch (e) { return {}; }
 }
+function storeReinspectMarks(marks) {
+  try { localStorage.setItem(reinspectStorageKey(), JSON.stringify(marks)); } catch (e) {}
+}
 function setReinspectMark(id, patch) {
   const marks = getReinspectMarks();
   marks[id] = { ...(marks[id] || {}), ...patch };
-  try { localStorage.setItem(reinspectStorageKey(), JSON.stringify(marks)); } catch (e) {}
+  storeReinspectMarks(marks);
+  if (typeof scheduleBusinessSync === 'function') scheduleBusinessSync();
+}
+// Two copies of the marks (this phone's and the account's) put together:
+// each mark is a time, and the later one is kept.
+function mergeReinspectMarks(a, b) {
+  const out = {};
+  [a || {}, b || {}].forEach(src => Object.keys(src).forEach(id => {
+    const m = src[id] || {}, o = out[id] || (out[id] = {});
+    if ((m.sentAt || 0) > (o.sentAt || 0)) { o.sentAt = m.sentAt; if (m.to) o.to = m.to; else delete o.to; }
+    if ((m.dismissedAt || 0) > (o.dismissedAt || 0)) o.dismissedAt = m.dismissedAt;
+  }));
+  return out;
+}
+// This phone has a mark the other copy doesn't, or a later one.
+function reinspectMarksAhead(mine, theirs) {
+  return Object.keys(mine || {}).some(id => {
+    const m = mine[id] || {}, t = (theirs || {})[id] || {};
+    return (m.sentAt || 0) > (t.sentAt || 0) || (m.dismissedAt || 0) > (t.dismissedAt || 0);
+  });
 }
 
 function reinspectDaysBetween(fromIso, toIso) {
@@ -68,7 +94,10 @@ function reinspectionsDue() {
     if (mark.dismissedAt) return;
     const days = reinspectDaysBetween(today, info.due);
     if (days > REINSPECT_AHEAD_DAYS) return;
-    out.push({ r, ...info, days, overdue: days < 0, mark });
+    // A pre-purchase report's client may never have bought the house. One
+    // who then had it treated did.
+    const prePurchase = !info.fromTreatment && isPrePurchaseJob(r.reportData);
+    out.push({ r, ...info, days, overdue: days < 0, mark, prePurchase });
   });
   return out.sort((a, b) => a.due < b.due ? -1 : a.due > b.due ? 1 : 0);
 }
@@ -133,7 +162,7 @@ const REINSPECT_CLOSE_BTN = `<button type="button" class="dash-detail-close" onc
         <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
       </button>`;
 
-// One property's sheet: when it's due and why, the email, starting the new report.
+// One property's sheet: when it's due and why, the email, booking it in.
 function openReinspectDetail(id) {
   const it = reinspectItem(id);
   const sheet = document.getElementById('dashboardDetailSheet');
@@ -163,10 +192,11 @@ function openReinspectDetail(id) {
     <section class="dash-next ${it.overdue ? '' : 'waiting'}">
       <div class="dash-next-label">Next step</div>
       <div class="dash-next-title">Book the re-inspection</div>
+      ${it.prePurchase ? `<p class="dash-next-hint reinspect-prepurchase"><strong>This was a pre-purchase inspection.</strong> Check ${escapeHtml(first || 'the client')} bought it before you email.</p>` : ''}
       <p class="dash-next-hint">${escapeHtml(why)}${sent}</p>
       <button type="button" class="dash-detail-primary" onclick="openReinspectEmail('${r.id}')">${it.mark.sentAt ? 'Email them again' : `Email ${escapeHtml(first || 'the client')} to book it`}</button>
       <div class="dash-detail-links">
-        <button type="button" onclick="startReinspection('${r.id}')">Start the report</button>
+        <button type="button" onclick="startReinspection('${r.id}')">Book it in</button>
         <button type="button" onclick="openDashboardJob('${r.id}', 'report')">Open last report</button>
       </div>
     </section>
@@ -187,7 +217,12 @@ function reinspectEmailText(it) {
   const address = r.address || 'your property';
   // A reply only reaches the business with its email set (contactWays).
   const ways = contactWays() || 'get in touch';
-  const whenLine = it.overdue
+  // After a pre-purchase inspection the email doesn't take the purchase as read.
+  const whenLine = it.prePurchase
+    ? (it.overdue
+      ? `If you went ahead with the purchase of ${address}, its next timber pest inspection was due on ${formatLongDate(it.due)}. Our pre-purchase inspection there was on ${formatLongDate(it.last)}.`
+      : `If you went ahead with the purchase of ${address}, its next timber pest inspection is due on ${formatLongDate(it.due)}. Our pre-purchase inspection there was on ${formatLongDate(it.last)}.`)
+    : it.overdue
     ? `Your last timber pest inspection at ${address} was on ${formatLongDate(it.last)}, and the next one was due on ${formatLongDate(it.due)}.`
     : `Your next timber pest inspection at ${address} is due on ${formatLongDate(it.due)}. The last one was on ${formatLongDate(it.last)}.`;
   return {
@@ -303,8 +338,9 @@ function dismissReinspection(id) {
   showToast('Taken off the Due list', 'info');
 }
 
-// A new report at the same address, with the client's details carried over.
-// The report then offers "Inspected here before … Start from it" as usual.
+// Book it in: a new job at the same address, with the client's details
+// carried over, open on its Job details for the day to be set. The report
+// then offers "Inspected here before … Start from it" as usual.
 function startReinspection(id) {
   const r = getSavedReports().find(x => x.id === id);
   if (!r) return;
@@ -327,6 +363,6 @@ function startReinspection(id) {
   setStandard(INSPECTION_TYPE_STANDARD[reportData.jobInspectionType]);
   updateJob();
   if (typeof track === 'function') track('reinspection_started');
-  showToast('Re-inspection started', 'info');
+  showToast('New job for the re-inspection. Set the day', 'info');
   jobGo('details');
 }

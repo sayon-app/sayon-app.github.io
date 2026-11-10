@@ -1,5 +1,5 @@
 /* ── QUOTE SCREEN ──────────────────────────────────────────────────────────
-   Full-screen sibling of #mainMenu and #app. Builds a treatment quote from an
+   Full-screen sibling of #app. Builds a treatment quote from an
    inspection report; see js/quote.js. Uses the design tokens in css/app.css. */
 
 #quoteScreen {
@@ -455,13 +455,11 @@ body:not(.dark-screen) .quote-card-title { color: var(--text); }
   padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px;
   background: var(--surface2); cursor: pointer;
 }
-.qlist[hidden] { display: none; }
 .qlist:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .qlist ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .qlist li { position: relative; padding-left: 16px; font-size: calc(14px * var(--ts)); line-height: 1.45; color: var(--text); }
 .qlist li::before { content: ''; position: absolute; left: 2px; top: 8px; width: 6px; height: 6px; border-radius: 99px; background: var(--accent); }
 .qlist-empty { font-size: calc(13px * var(--ts)); color: var(--text3); }
-textarea.quote-input[hidden] { display: none; }
 
 /* The plan's timing: on the day, after, then. Each point has a dot and
    the line runs down to the next. */
@@ -580,7 +578,6 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-system-choice { background:
 .bait-plan { margin: 8px 0 10px; }
 .bait-plan .site-plan-svg { border: 1px solid var(--border); }
 .bait-plan-caption { margin-top: 4px; font-size: calc(12px * var(--ts)); font-weight: 600; color: var(--text3); }
-.sp-finish[hidden] { display: none; }
 .sp-zoom { min-width: 44px; font-size: calc(18px * var(--ts)); font-weight: 800; }
 .sp-zoom:disabled { opacity: 0.4; }
 .sp-size { margin-top: 8px; font-size: calc(13px * var(--ts)); color: var(--text2); }
@@ -589,7 +586,6 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-system-choice { background:
 .sp-bg { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 12px; border: 1px dashed var(--border2); border-radius: 12px; }
 .sp-bg-btn { cursor: pointer; }
 .sp-bg .quote-hint { flex-basis: 100%; margin: 0; }
-.sp-selrow[hidden], #spBgRemove[hidden] { display: none; }
 .sp-turn { margin-top: 8px; font-size: calc(13px * var(--ts)); color: var(--text2); }
 .sp-turn-label { flex: 1; }
 .sp-turn .job-input { flex: 0 0 64px; max-width: 64px; text-align: center; }
@@ -598,13 +594,11 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-system-choice { background:
 .sp-part .sp-size { margin-top: 0; margin-bottom: 8px; }
 .sp-part-btns { display: flex; flex-wrap: wrap; gap: 8px; }
 .sp-part-btns .quote-link-btn { min-height: 40px; }
-.sp-part[hidden], .sp-part-btns .quote-link-btn[hidden] { display: none; }
 .sp-views { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1.5px solid var(--accent); border-radius: 12px; overflow: hidden; }
 .sp-view { min-height: 40px; border: 0; background: var(--surface); font: inherit; font-size: calc(14px * var(--ts)); font-weight: 800; color: var(--accent2); cursor: pointer; }
 .sp-view.on { background: var(--accent); color: #fff; }
 .treat-plan-sub { margin-top: 14px; }
 .treat-plan-caption { margin: 0 0 6px; font-size: calc(13px * var(--ts)); font-weight: 800; color: var(--text); }
-.sp-bg[hidden] { display: none; }
 
 /* Treatment record: the other kinds of treatment, folded under the ticked ones */
 .treat-more { margin-top: 2px; }
@@ -734,7 +728,6 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-system-choice { background:
 .tp-again .quote-btn { width: 100%; flex: none; }
 .tp-foot { margin-top: 8px; font-size: calc(11.5px * var(--ts)); color: var(--text3); }
 .tp-report-link { display: flex; align-items: center; gap: 12px; width: calc(100% - 28px); margin: 4px 14px 14px; padding: 12px 14px; min-height: 44px; text-align: left; border-radius: 12px; border: 1px dashed rgba(var(--accent-rgb),0.45); background: transparent; color: var(--text); font: inherit; cursor: pointer; }
-.tp-report-link[hidden] { display: none; }
 .tp-report-link .icon { flex-shrink: 0; color: var(--accent); }
 .tp-report-link span { display: flex; flex-direction: column; gap: 2px; }
 .tp-report-link strong { font-size: calc(14px * var(--ts)); }

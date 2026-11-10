@@ -536,6 +536,14 @@ function toggleAudioCaptureSetting() {
   if (audioCaptureEnabled) audioCaptureFailedThisSession = false;
 }
 
+// The switch is still being tried, so it shows only on a business set up
+// for trying things (the one Test mode shows on), and on a phone that
+// already has it on, so it can be turned off there.
+function showAudioCaptureRow() {
+  const row = document.getElementById('audioCaptureRow');
+  if (row) row.hidden = !(audioCaptureEnabled || !!(authBusiness && authBusiness.settings && authBusiness.settings.testMode));
+}
+
 function restoreAudioCaptureSetting() {
   try {
     audioCaptureEnabled = localStorage.getItem('korva_audio_capture_enabled') === '1';

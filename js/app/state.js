@@ -1,4 +1,4 @@
-// SAYON app: Shared state, onboarding and Your business.
+// SAYON app: Shared state, set-up and the business's details.
 // One of the js/app/ files, which share one global scope: they load as plain
 // scripts in the order index.html lists them, so a top-level name declared in
 // any of them can be used from the others once the page has loaded.
@@ -71,22 +71,49 @@ function shouldShowOnboarding() {
 function showOnboarding() {
   document.getElementById('authScreen').style.display   = 'none';
   document.getElementById('onboardScreen').style.display = 'flex';
-  // A technician gets the owner's business details and prices, so starts at the voice demo
-  if (canEditBusiness()) { fillBusinessForm(); obShowPanel(0); }
-  else obShowPanel(2);
+  // A technician joins a business that has its details and prices, so sees
+  // how a job runs and starts.
+  const owner = canEditBusiness();
+  document.getElementById('obSteps').style.display = owner ? '' : 'none';
+  if (!owner) { obShowPanel(2); return; }
+  placeBusinessFields(true);
+  fillBusinessForm();
+  // The name was typed on Create account, so it isn't asked for again. It
+  // stays editable in Menu › Business details.
+  const name = document.getElementById('ob-companyName').value.trim();
+  document.getElementById('obNameField').hidden = !!name;
+  document.getElementById('obBusinessTitle').textContent = name ? 'Your licence and contact details' : 'Set up your business';
+  document.getElementById('obBusinessSub').innerHTML = name
+    ? `These print on every report, quote and certificate <strong>${escapeHtml(name)}</strong> sends. Any of them can wait: add them later from Menu&nbsp;›&nbsp;Business details.`
+    : 'This appears on every report, quote and certificate you send to clients. Only the name is needed now; add the rest later from Menu&nbsp;›&nbsp;Business details.';
+  obShowPanel(0);
 }
 
 // ── YOUR BUSINESS ─────────────────────────────────────────────────────────
-// The business details every report, quote and certificate prints. They're
-// entered at sign-up (onboarding step 0) and changed later from the account
-// menu, through that same form; there's no separate menu page.
-let businessFormEditing = null; // null while onboarding, else { onSaved }
+// The business details every report, quote and certificate prints. There is
+// one set of boxes (#businessFields): they live on Menu › Business details,
+// and sit on the set-up card while a new business is set up.
 // A logo picked in the form, kept until Save: undefined while unchanged,
 // null once removed, else { logo, logoWidth, logoHeight }.
 let businessFormLogo;
 // The licence the form opened with. Only a licence typed at sign-up is the
 // inspector's own (see obNext).
 let businessFormLicence = '';
+// Something on the page has been changed and not saved.
+let businessFormDirty = false;
+// Where the page was opened from when it wasn't the menu (a check before
+// sending that found a detail missing): { place, then }. Save and Back both
+// go back there, and then() opens the check again.
+let businessPageFrom = null;
+
+function placeBusinessFields(inSetup) {
+  const fields = document.getElementById('businessFields');
+  const slot = document.getElementById(inSetup ? 'obBusinessSlot' : 'businessPageSlot');
+  if (fields.parentElement !== slot) slot.appendChild(fields);
+  if (!inSetup) document.getElementById('obNameField').hidden = false;
+}
+
+function businessFormTouched() { businessFormDirty = true; }
 
 function fillBusinessForm() {
   const d = getCompanyDetails();
@@ -101,6 +128,7 @@ function fillBusinessForm() {
   set('ob-abn', d.abn);
   businessFormLogo = undefined;
   businessFormLicence = d.licence || '';
+  businessFormDirty = false;
   renderCompanyLogoPreview(d.logo);
 }
 
@@ -110,51 +138,73 @@ function canEditBusiness() {
   return !authBusiness || isBusinessOwner();
 }
 
-function openBusinessForm(onSaved) {
+// Opens Menu › Business details. From a check that found a detail missing,
+// then() opens the check again once the page is left, saved or not;
+// before() closes the check's sheet so the page can show.
+function openBusinessForm(then, before) {
   // Without the business loaded (no signal at launch) an edit would land
   // in the wrong place on this phone and never reach the account.
   if (!authBusiness) { showToast('Your business details load when you have signal. Try again then', 'info'); return; }
   if (!canEditBusiness()) { showToast('Your business owner sets these details', 'info'); return; }
-  businessFormEditing = { onSaved };
+  if (before) before();
+  const place = navPlace();
+  // The menu lives on the report screen, so a quote closes first (as it
+  // does for Your prices) and opens again on the way back.
+  if (place === 'quote') closeQuote();
+  placeBusinessFields(false);
   fillBusinessForm();
-  document.getElementById('obBusinessTitle').textContent = 'Your business';
-  document.getElementById('obBusinessSave').textContent = 'Save';
-  document.getElementById('obBusinessCancel').hidden = false;
-  const screen = document.getElementById('onboardScreen');
-  screen.classList.add('ob-edit');
-  screen.style.display = 'flex';
-  obShowPanel(0);
+  openMenuPage('businessPanel');
+  businessPageFrom = then && place && place !== 'menu' ? { place, then } : null;
 }
 
-function closeBusinessForm() {
-  const screen = document.getElementById('onboardScreen');
-  screen.style.display = 'none';
-  screen.classList.remove('ob-edit');
-  document.getElementById('obBusinessTitle').textContent = 'Set up your business';
-  document.getElementById('obBusinessSave').textContent = 'Continue →';
-  document.getElementById('obBusinessCancel').hidden = true;
-  businessFormEditing = null;
+function saveBusinessPage() {
+  if (!saveBusinessForm(true)) return;
+  businessFormDirty = false;
+  renderProfileMenu();
+  showToast('Business details saved', 'success');
+  leaveBusinessPage();
 }
 
-function openBusinessFromProfile() {
-  openBusinessForm();
+// Back from the page: to the menu's list, or to where it was opened from.
+// Changes that haven't been saved are asked about first.
+async function leaveBusinessPage() {
+  if (businessFormDirty) {
+    const save = await askFirst({ title: 'Save your changes?', text: 'You\'ve changed your business details and not saved them.', yes: 'Save', no: 'Don\'t save' });
+    if (save === null) return;
+    if (save) { saveBusinessPage(); return; }
+    businessFormDirty = false;
+  }
+  const from = businessPageFrom;
+  businessPageFrom = null;
+  if (!from) { showMenuPage(null); return; }
+  navGo(from.place);
+  from.then();
 }
 
-// Saves the form. Returns false (and says why) when the business name is missing.
-function saveBusinessForm() {
+// The page was left some other way (a dock tab, another menu page).
+function businessPageLeft() {
+  businessPageFrom = null;
+  if (!businessFormDirty) return;
+  businessFormDirty = false;
+  showToast('Your changes to Business details weren\'t saved', 'info');
+}
+
+// Saves the form. Returns false (and says why) when the business name is
+// missing. editing: the menu page writes the form as it stands, so a box
+// can be cleared. Sign-up only fills in what was typed, so blanks never
+// wipe details that already exist for this business (from another phone).
+function saveBusinessForm(editing) {
   const val = id => document.getElementById(id).value.trim();
   const form = { name: val('ob-companyName'), licence: val('ob-licence'), phone: val('ob-phone'), email: val('ob-email'), abn: val('ob-abn') };
   if (!form.name) {
     showToast('Add your business name', 'error');
+    document.getElementById('obNameField').hidden = false;
     document.getElementById('ob-companyName').focus();
     return false;
   }
   if (!canEditBusiness()) return true;
   const d = getCompanyDetails();
-  // Editing writes the form as it stands, so a field can be cleared. Sign-up
-  // only fills in what was typed, so blanks never wipe details that already
-  // exist for this business (from another phone).
-  Object.entries(form).forEach(([k, v]) => { if (businessFormEditing || v) d[k] = v; });
+  Object.entries(form).forEach(([k, v]) => { if (editing || v) d[k] = v; });
   if (businessFormLogo === null) { delete d.logo; delete d.logoWidth; delete d.logoHeight; }
   else if (businessFormLogo) Object.assign(d, businessFormLogo);
   if (!storeCompanyDetails(d)) {
@@ -165,10 +215,10 @@ function saveBusinessForm() {
   return true;
 }
 
-// 0 business, 1 prices, 2 voice demo, 3 ready
+// 0 business, 1 prices, 2 ready
 function obShowPanel(idx) {
   if (idx === 1) renderOnboardPrices();
-  [0,1,2,3].forEach(i => {
+  [0,1,2].forEach(i => {
     document.getElementById(`ob-panel-${i}`).style.display = i === idx ? 'flex' : 'none';
     const step = document.getElementById(`ob-step-${i}`);
     step.classList.remove('active','done');
@@ -179,15 +229,8 @@ function obShowPanel(idx) {
 
 function obNext(currentStep) {
   if (currentStep === 0) {
-    if (!saveBusinessForm()) return;
-    if (businessFormEditing) {
-      const { onSaved } = businessFormEditing;
-      closeBusinessForm();
-      renderProfileMenu();
-      showToast('Business details saved', 'success');
-      if (onSaved) onSaved();
-      return;
-    }
+    if (!saveBusinessForm(false)) return;
+    businessFormDirty = false;
     // A licence typed at sign-up is usually the inspector's own, so the first
     // report starts with it. One that came from the account copy may not be.
     const licence = document.getElementById('ob-licence').value.trim();
@@ -200,48 +243,13 @@ function obNext(currentStep) {
   obShowPanel(currentStep + 1);
 }
 
-function obRunDemo() {
-  const btn      = document.getElementById('obDemoBtn');
-  const demoText = document.getElementById('obDemoText');
-  const nextBtn  = document.getElementById('obDemoNext');
-
-  btn.disabled = true;
-  btn.textContent = 'Running…';
-  demoText.classList.add('active');
-
-  const phrase = 'Detached house, single storey, brick veneer walls, Colorbond roof, concrete slab on ground, north facing, fine and dry, owner occupied.';
-  let i = 0;
-  demoText.textContent = '';
-
-  // Typewriter effect
-  const typeInterval = setInterval(() => {
-    demoText.textContent = phrase.slice(0, i);
-    i++;
-    if (i > phrase.length) {
-      clearInterval(typeInterval);
-      // Flash each field as if populating
-      setTimeout(() => {
-        demoText.textContent = '✓ Filled in: structure type, height, wall construction, roof type, floor type, orientation, weather and occupancy';
-        demoText.style.color = 'var(--green)';
-        btn.style.display   = 'none';
-        nextBtn.textContent  = 'Continue →';
-        nextBtn.style.background  = 'var(--accent)';
-        nextBtn.style.color       = 'white';
-        nextBtn.style.border      = 'none';
-      }, 600);
-    }
-  }, 22);
-}
-
 // sample: open the finished sample job (js/sample-job.js) instead of a new one.
 function obFinish(sample) {
   try { localStorage.setItem(obKey(), '1'); } catch (e) {}
   document.getElementById('onboardScreen').style.display = 'none';
-  document.getElementById('mainMenu').style.display      = 'flex';
-  // Open the job details so they can start a new job immediately
-  setTimeout(() => {
-    openApp('inspect');
-    if (sample && typeof openSampleJob === 'function') openSampleJob('signup');
-    else openJobDetails();
-  }, 400);
+  placeBusinessFields(false);
+  // Straight to the job: its details, so a new job can start now.
+  openApp('inspect');
+  if (sample && typeof openSampleJob === 'function') openSampleJob('signup');
+  else openJobDetails();
 }

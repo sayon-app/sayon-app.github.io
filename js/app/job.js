@@ -9,13 +9,14 @@ function toggleDrawer() {
   const overlay = document.getElementById('drawerOverlay');
   const isOpen = sidebar.classList.toggle('open');
   if (isOpen) { showMenuPage(null); renderProfileMenu(); }
+  else if (document.getElementById('businessPanel').classList.contains('menu-page-active')) businessPageLeft();
   overlay.classList.toggle('open', isOpen);
 }
 
 // ── MENU ─────────────────────────────────────────────────────────────────
-// Full screen. It opens on a list of groups (This job, Jobs, Account, App);
-// tapping an item opens it as its own page, with Back to return to the list.
-// Each item is a drawer panel: its header is the list row, its body the page.
+// Full screen. It opens on who's signed in and two lists, Your business and
+// App; tapping a row opens it as its own page, with Back to return to the
+// list. Each row is a drawer panel: its header is the row, its body the page.
 function openMenuPage(panelId) {
   if (!document.getElementById('sidebarPanel').classList.contains('open')) {
     // The Jobs list and This job sit above the menu, so they close first
@@ -30,7 +31,10 @@ function openMenuPage(panelId) {
 function showMenuPage(panelId) {
   const sidebar = document.getElementById('sidebarPanel');
   const panel = panelId ? document.getElementById(panelId) : null;
-  sidebar.querySelectorAll('.menu-page-active').forEach(el => el.classList.remove('menu-page-active'));
+  sidebar.querySelectorAll('.menu-page-active').forEach(el => {
+    el.classList.remove('menu-page-active');
+    if (el.id === 'businessPanel' && el !== panel) businessPageLeft();
+  });
   if (panel) panel.classList.add('menu-page-active');
   sidebar.classList.toggle('on-page', !!panel);
   const title = panel && panel.querySelector('.panel-title');
@@ -43,7 +47,7 @@ function showMenuPage(panelId) {
   if (panelId === 'teamPanel') loadTeam();
   if (panelId === 'pricesPanel') renderPriceBook();
   if (panelId === 'chemicalsPanel') renderChemicalRegister();
-  if (panelId === 'settingsPanel') { restoreTestModeSetting(); renderLearnedList(); }
+  if (panelId === 'settingsPanel') { restoreTestModeSetting(); showAudioCaptureRow(); renderLearnedList(); }
   if (panel) track('screen_viewed', { screen: 'menu_' + panelId });
 }
 
@@ -69,7 +73,6 @@ function tabGo(to) {
   }
   if (isOpen('quoteScreen')) {
     closeQuote();
-    // A quote opened from the start menu goes back there; the tabs go to the app.
     if (document.getElementById('app').style.display !== 'flex') openApp('inspect');
   }
   if (to === 'menu') { openAccountMenu(); return; }
@@ -93,7 +96,13 @@ function openAccountMenu() {
   if (!isOpen('sidebarPanel')) toggleDrawer(); else showMenuPage(null);
 }
 function drawerBackTap() {
-  if (document.getElementById('sidebarPanel').classList.contains('on-page')) { showMenuPage(null); return; }
+  if (document.getElementById('sidebarPanel').classList.contains('on-page')) {
+    // Business details asks about unsaved changes, and can go back to the
+    // check it was opened from.
+    if (document.getElementById('businessPanel').classList.contains('menu-page-active')) leaveBusinessPage();
+    else showMenuPage(null);
+    return;
+  }
   toggleDrawer();
   openDashboard();
 }
@@ -1307,10 +1316,10 @@ function reportKindTitle() {
   return timberPest ? 'Timber Pest Inspection Report' : 'Termite Inspection Report';
 }
 
-function isPrePurchaseJob() {
-  const type = reportData.jobInspectionType || '';
+function isPrePurchaseJob(d = reportData) {
+  const type = d.jobInspectionType || '';
   if (type) return /pre-purchase/i.test(type);
-  return (reportData.standard || '') === 'AS 4349.3-2010';
+  return (d.standard || '') === 'AS 4349.3-2010';
 }
 
 function onInspectionTypeChange() {

@@ -21,7 +21,7 @@ function appIsBusy() {
 // visit, the client's answer, the site plan, the agreement, an email being
 // checked, a photo being marked up). What's on it isn't saved until its
 // button is tapped, so an update waits until it's closed.
-const FORM_SHEETS = ['treatmentOverlay', 'baitOverlay', 'quoteAnswerOverlay', 'sitePlanOverlay', 'agreementOverlay', 'sendReviewOverlay'];
+const FORM_SHEETS = ['treatmentOverlay', 'baitOverlay', 'quoteAnswerOverlay', 'sitePlanOverlay', 'agreementOverlay', 'sendReviewOverlay', 'problemOverlay'];
 function formSheetOpen() {
   const markup = document.getElementById('photoMarkup');
   return FORM_SHEETS.some(id => { const el = document.getElementById(id); return !!el && el.classList.contains('open'); })

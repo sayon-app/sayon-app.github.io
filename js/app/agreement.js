@@ -153,7 +153,19 @@ function openAgreementSheet() {
     document.getElementById('agreementOtherNote').value = '';
     document.getElementById('agreementOtherWrap').style.display = 'none';
     if (agreementSignaturePad) agreementSignaturePad.clear();
+    // What was typed and signed before the app closed comes back (UNSAVED
+    // SHEETS in js/quote.js). Signing or closing the sheet drops the copy.
+    const sheetKey = 'agreement|' + (currentReportId || 'draft');
+    const copy = unsavedSheetCopy(sheetKey);
+    if (copy && copy.data) restoreAgreementForm(copy.data);
     refreshAgreementPreview();
+    const overlay = document.getElementById('agreementOverlay');
+    if (!overlay.dataset.keeps) {
+      overlay.dataset.keeps = '1';
+      ['input', 'change'].forEach(ev => overlay.addEventListener(ev, unsavedSheetChanged));
+    }
+    watchUnsavedSheet(sheetKey, readAgreementForm);
+    if (copy && copy.data) showToast('Picked up where you left off', 'info');
   }
   renderAgreementRemote();
   checkAgreementLink(false);
@@ -234,7 +246,28 @@ function onAgreementFeeInput() {
   refreshAgreementPreview();
 }
 
+// What's on the unsigned sheet, kept on the phone while it's open.
+function readAgreementForm() {
+  const val = id => document.getElementById(id).value;
+  return {
+    signerName: val('agreementSignerName'), notes: val('agreementNotes'),
+    otherNote: val('agreementOtherNote'), agreed: document.getElementById('agreementAgree').checked,
+    signature: agreementSignaturePad && !agreementSignaturePad.empty ? agreementSignaturePad.canvas.toDataURL('image/png') : '',
+  };
+}
+function restoreAgreementForm(d) {
+  if (d.signerName) document.getElementById('agreementSignerName').value = d.signerName;
+  if (d.notes) document.getElementById('agreementNotes').value = d.notes;
+  if (d.otherNote) {
+    document.getElementById('agreementOtherNote').value = d.otherNote;
+    document.getElementById('agreementOtherWrap').style.display = '';
+  }
+  document.getElementById('agreementAgree').checked = !!d.agreed;
+  if (d.signature && agreementSignaturePad) agreementSignaturePad.show(d.signature);
+}
+
 function closeAgreementSheet() {
+  if (typeof dropUnsavedSheet === 'function') dropUnsavedSheet();
   cancelSheetVoice('agreement');
   document.getElementById('agreementOverlay').classList.remove('open');
 }

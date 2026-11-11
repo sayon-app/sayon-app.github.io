@@ -22,6 +22,7 @@ One name for each thing, everywhere: on the screens, in the emails and PDFs, on 
 | **treatment certificate** | The one certificate for the work done. A system left in place (a barrier, bait stations, reticulation) has its own row on it, System installed, and its own care lines. | `Certificate of Installation`, `Certificate of installation`, `installation certificate` |
 | **site plan** | The drawing of the property: started on the report if the inspector wants one, and the treatment record adds the treatment and stations to it. | |
 | **client** | The person the job is for. | |
+| **Recheck later** | The areas to check again once they're unlocked, cleared or reachable (the report's High risk areas). Each area inspected with limits or not inspected is on it, with its own switch on the area's card. | |
 
 The agreement's own wording (its numbered clauses) and the Terms and Privacy Policy are legal text: change them only with their version number, and they may say "voice notes" where they mean the recordings.
 

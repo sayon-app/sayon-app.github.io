@@ -334,6 +334,35 @@ function markRemainingAreasInspected(status = 'INSPECTED') {
   syncObstructionData();
 }
 
+// The button over the areas: every area not yet marked is inspected, and
+// every inspected area with nothing under Found here is "nothing found"
+// (or "evidence found" where a finding names it, markRemainingAreasClear),
+// so a clean house isn't nine areas opened one by one.
+function markRemainingAreasDone() {
+  if (!reportData.areaStatus) reportData.areaStatus = {};
+  Object.keys(OBS_ZONES).forEach(z => { if (!reportData.areaStatus[z]) reportData.areaStatus[z] = 'INSPECTED'; });
+  markRemainingAreasClear();
+}
+
+// RECHECK LATER FROM THE AREA'S CARD: an area inspected with limits or not
+// inspected goes on the Recheck later list (High risk areas) unless the
+// inspector turns it off on its card. reportData.recheckAreas keeps the
+// choice by area; nothing stored means on, which is what the report has
+// always listed.
+function areaRecheckOn(zoneId) { return (reportData.recheckAreas || {})[zoneId] !== false; }
+function toggleAreaRecheck(zoneId) {
+  if (!reportData.recheckAreas) reportData.recheckAreas = {};
+  reportData.recheckAreas[zoneId] = !areaRecheckOn(zoneId);
+  syncObstructionData();
+}
+function areaRecheckHTML(zoneId) {
+  const on = areaRecheckOn(zoneId);
+  return `<div class="area-recheck"><span class="area-recheck-text"><span class="area-recheck-title">Recheck later</span>
+      <small>${on ? 'Listed under Recheck later, to check again once it\'s unlocked, cleared or reachable' : 'Left off the Recheck later list'}</small></span>
+    <button type="button" class="toggle-switch${on ? ' on' : ''}" role="switch" aria-checked="${on}" aria-label="Recheck the ${zoneName(zoneId).toLowerCase()} later"
+      onclick="toggleAreaRecheck('${zoneId}')"></button></div>`;
+}
+
 function toggleObsItem(zoneId, item) {
   if (!reportData.areaReasons) reportData.areaReasons = {};
   const list = reportData.areaReasons[zoneId] || (reportData.areaReasons[zoneId] = []);
@@ -355,7 +384,12 @@ function renderAreaChecklist() {
   migrateLegacyObstructions();
   const zones = Object.keys(OBS_ZONES);
   const markAll = document.getElementById('markAllAreasBtn');
-  if (markAll) markAll.hidden = zones.every(z => areaStatusOf(z));
+  if (markAll) {
+    const unmarked = zones.some(z => !areaStatusOf(z));
+    markAll.hidden = !unmarked && !areasMissingResult().length;
+    const label = markAll.querySelector('span');
+    if (label) label.textContent = unmarked ? 'Mark the rest inspected, nothing found' : 'Mark the rest nothing found';
+  }
   const marked = zones.filter(z => areaStatusOf(z)).length;
   const prog = document.getElementById('areasProgress');
   if (prog) prog.textContent = marked === zones.length ? `All ${zones.length} areas marked` : `${marked} of ${zones.length} areas marked`;
@@ -384,6 +418,7 @@ function renderAreaChecklist() {
         ? `<div class="obs-reasons obs-reasons-${kind}"><div class="obs-items-label">${ACCESS_GROUP_ICONS[kind]}<span>${title}</span></div><div class="obs-items">${items.map(btn).join('')}</div>${accessZones(kind).includes(zoneId) ? areaSpotHTML(kind, zoneId) : ''}</div>` : '';
       reasons = group('hindered', 'Obstructions: in the way today', zone.items.filter(i => !RESTRICTED_REASONS.has(i)))
         + group('restricted', 'Restricted: permanent or locked', zone.items.filter(i => RESTRICTED_REASONS.has(i)));
+      if (['PARTIAL', 'NOT'].includes(status)) reasons += areaRecheckHTML(zoneId);
     }
     let result = '';
     if (areaWasEntered(zoneId)) {
@@ -879,7 +914,10 @@ function renderAccessSummary() {
   const hint = document.getElementById('accessHighRiskHint');
   if (hint) {
     const fallback = accessLimits().highRisk;
-    hint.textContent = isBlankValue(reportData.highRiskAreas) && fallback ? `Left blank, the report lists: ${fallback}` : '';
+    const typed = isBlankValue(reportData.highRiskAreas) ? '' : String(reportData.highRiskAreas);
+    const extra = typed ? recheckFromAreas(typed) : [];
+    hint.textContent = !typed && fallback ? `Left blank, the report lists: ${fallback}. Turn an area off on its card to leave it out.`
+      : extra.length ? `Also listed, from the areas: ${zoneList(extra.map(z => OBS_ZONES[z].label))}` : '';
     hint.hidden = !hint.textContent;
   }
   syncAccessGroups();
@@ -974,6 +1012,13 @@ function syncAccessGroups() {
   if (box._html !== html) { box.innerHTML = html; box._html = html; }  // not under a tap
 }
 
+// The limited areas left on for a recheck (their cards' switch), less any
+// the inspector's own words already name.
+function recheckFromAreas(typed) {
+  const words = String(typed || '').toLowerCase();
+  return areasNotFullyInspected().filter(z => areaRecheckOn(z) && !(words && words.includes(zoneName(z).toLowerCase())));
+}
+
 // Every access limit the report prints, as [label, text] rows: hindered
 // (temporary) and restricted (permanent or locked), from each area's
 // reasons and the inspector's own where-and-why, plus the high risk areas
@@ -1005,9 +1050,13 @@ function accessLimits() {
   // dictated reason isn't lost behind the per-area rows.
   if (detail && !hinderedTextIsNil()) hindered.push(['What obstructed it', detail]);
   if (rOther) restricted.push([restricted.length ? 'Other spots' : 'Where and why', cap(rOther)]);
-  const limited = areasNotFullyInspected();
-  const highRisk = !isBlankValue(reportData.highRiskAreas) ? reportData.highRiskAreas
-    : joinPlaces([!isBlankValue(reportData.noAccessAreas) && !saysNoAccessLimit(reportData.noAccessAreas) ? reportData.noAccessAreas : '', zoneList(limited.map(z => OBS_ZONES[z].label))]);
+  // Recheck later: the inspector's own words, then each limited area left
+  // on for a recheck on its card that the words don't already name.
+  const typed = isBlankValue(reportData.highRiskAreas) ? '' : String(reportData.highRiskAreas);
+  const recheck = recheckFromAreas(typed);
+  const fromAreas = recheck.length ? zoneList(recheck.map(z => OBS_ZONES[z].label)) : '';
+  const highRisk = typed ? (fromAreas ? (saysNoAccessLimit(typed) ? fromAreas : joinPlaces([typed, fromAreas])) : typed)
+    : joinPlaces([!isBlankValue(reportData.noAccessAreas) && !saysNoAccessLimit(reportData.noAccessAreas) ? reportData.noAccessAreas : '', fromAreas]);
   const allMarked = Object.keys(OBS_ZONES).every(z => areaStatusOf(z));
   return { hindered, restricted, highRisk, allMarked };
 }

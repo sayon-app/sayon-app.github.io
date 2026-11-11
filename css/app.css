@@ -7,10 +7,8 @@
 
 :root {
   --bg:        #D6E4EF;
-  /* Daylight keeps the intro's look: white cards with a soft blue edge.
-     --frame is the field border, --card-edge the edge of each section
-     card. The heavy black frames and amber dashes only appear in the dark
-     screen (body.dark-screen), where safety amber reads 11.5:1 on black. */
+  /* The intro's look: white cards with a soft blue edge. --frame is the
+     field border, --card-edge the edge of each section card. */
   --frame:     #C8D5E3;
   --need:      #C8D5E3;
   --card-edge: rgba(47,107,255,0.26);
@@ -86,68 +84,6 @@ input, textarea, select, [contenteditable] { text-wrap-style: auto; }
 h1, h2, h3, h4, .auth-title, .section-header h3, .job-hero-addr { text-wrap: balance; }
 
 /* ── ACCESSIBILITY MODES ── */
-
-/* Dark screen: for subfloors, roof voids and night work. Most colours
-   come from the tokens above, so this swaps the tokens; the rules after
-   it cover the few light tints that are written out. Signature pads stay
-   white so the ink reads. */
-body.dark-screen {
-  color-scheme: dark;
-  --bg:        #06090D;
-  --surface:   #10161D;
-  --surface2:  #161E27;
-  --surface3:  #1D2733;
-  --text:      #E8EEF4;
-  --text2:     #B4C2CF;
-  --text3:     #93A3B3;
-  --border:    #2A3644;
-  --border2:   #3B4959;
-  --silver:    #7F8E9D;
-  --yellow-text: #FFB000;
-  --risk:      #FF5A4F;
-  --green:     #4ADE80;
-  --green-rgb: 74,222,128;
-  --accent2:   #7DA2FF;
-  --pink-text: #FF7AB0;
-  --frame:     #FFB000;
-  --need:      #FFB000;
-}
-body.dark-screen.high-contrast { --border: #5B6B7C; --border2: #7A8C9E; --text2: #D4DEE7; --text3: #B4C2CF; }
-body.dark-screen .choice-panel { box-shadow: inset 0 0 0 1px var(--border2); }
-body.dark-screen .risk-high   { background: rgba(255,90,79,0.16);  color: #FF8A80; border-color: rgba(255,90,79,0.5); }
-body.dark-screen .risk-medium { background: rgba(255,176,0,0.14);  color: #FFC53D; border-color: rgba(255,176,0,0.5); }
-body.dark-screen .risk-low    { background: rgba(var(--green-rgb),0.14); color: var(--green); border-color: rgba(var(--green-rgb),0.5); }
-body.dark-screen header { background: var(--surface); border-bottom-color: var(--border); box-shadow: none; }
-body.dark-screen .section-tabs { background: var(--surface2); border-bottom-color: var(--border); }
-body.dark-screen .report-body { background: var(--bg); }
-body.dark-screen .report-section { border: 3px solid var(--frame); border-radius: 6px; box-shadow: none; }
-body.dark-screen .section-header { background: #000000; border-bottom: 2px solid var(--frame); }
-body.dark-screen .section-header h3, body.dark-screen .section-header h3 .sec-num { color: #FFFFFF; }
-body.dark-screen .section-header .sec-badge { background: transparent; border-color: currentColor; }
-body.dark-screen .section-header .sec-badge.done    { color: var(--green); }
-body.dark-screen .section-header .sec-badge.partial { color: #FFC53D; }
-body.dark-screen .section-header .sec-badge.empty   { color: #B4C2CF; }
-body.dark-screen #jobPanel:not(.menu-page-active) { border: 3px solid var(--frame); border-radius: 6px; }
-body.dark-screen .field-val, body.dark-screen #jobPanelBody .job-input, body.dark-screen #reportBody .job-input { border-width: 2px; border-radius: 4px; }
-body.dark-screen .field-val:not(.filled):not(.choice-source) { border-style: dashed; }
-body.dark-screen .drawer-subhead { background: #000000; color: #FFFFFF; box-shadow: inset 0 -2px 0 var(--frame); }
-body.dark-screen .field-val, body.dark-screen #jobPanelBody .job-input, body.dark-screen #reportBody .job-input { border-color: #5B6B7C; background: #000000; }
-body.dark-screen .field-val:not(.filled):not(.choice-source) { border-color: var(--need); }
-body.dark-screen .field-val.filled { border-color: #E8EEF4; background: #000000; }
-body.dark-screen .section-photo-widget { border-color: var(--border2); }
-body.dark-screen .obs-zone-btn:not(.active) { background: var(--surface2); border-color: var(--border2); color: var(--text2); }
-body.dark-screen .obs-zone-panel-header { background: var(--surface2); border-bottom-color: var(--border); }
-body.dark-screen .warn-note:not(.note-good),
-body.dark-screen .toast.toast-error { background: rgba(255,90,79,0.12); }
-body.dark-screen .send-review-tile.tone-bad  { background: rgba(255,90,79,0.10); }
-body.dark-screen .send-review-tile.tone-warn,
-body.dark-screen .send-review-gaps          { background: rgba(255,176,0,0.10); }
-body.dark-screen .send-review-tile.tone-good { background: rgba(var(--green-rgb),0.10); }
-body.dark-screen .pill-green { background: rgba(var(--green-rgb),0.14); color: var(--green); }
-.icon-sun { display: none; }
-body.dark-screen #darkScreenBtn .icon-moon { display: none; }
-body.dark-screen #darkScreenBtn .icon-sun { display: block; }
-body.dark-screen #darkScreenBtn { color: var(--tone-warn, #FFB000); }
 
 /* Text size (Menu › Settings). A size set on the body alone doesn't reach
    text set in px, so every font size in the app is calc(Npx * var(--ts))
@@ -473,7 +409,7 @@ body.large-touch .toggle-switch.on::after { transform: translateX(24px); }
 .auth-logo-name { font-family:'Space Grotesk',sans-serif; font-size: calc(24px * var(--ts)); font-weight:800; letter-spacing:1.5px; color:#F4F8FB; }
 .auth-tagline { font-size: calc(14px * var(--ts)); line-height:1.5; color:rgba(232,240,246,0.7); text-align:center; max-width:300px; margin:0; }
 .auth-card { width:100%; background:#FFFFFF; color:#0D1117; border:1px solid rgba(255,255,255,0.6); border-radius:20px; padding:28px 24px 22px; box-shadow:0 1px 0 rgba(255,255,255,0.08) inset, 0 28px 64px rgba(0,0,0,0.5); display:flex; flex-direction:column; gap:16px; color-scheme: light;
-  /* The card stays light in dark mode too: reset the tokens inside it. */
+  /* The card is always light: its own tokens, whatever the page sets. */
   --surface:#FFFFFF; --surface2:#F4F7FA; --text:#0D1117; --text2:#3D5166; --text3:#566A7F; --border:#D8E2ED; --border2:#C8D5E3; --accent2:#1D4ED8; }
 .auth-title { font-family:'Space Grotesk',sans-serif; font-size: calc(23px * var(--ts)); font-weight:700; color:#0D1117; letter-spacing:-0.4px; margin:0; }
 .auth-subtitle { font-size: calc(14px * var(--ts)); color:#4A5D70; margin-top:-8px; line-height:1.5; }
@@ -915,7 +851,7 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 /* At 320 wide a half-width date keeps room for the whole date beside its icon. */
 @media (max-width: 360px) { #jobPanelBody input.job-input[type="date"], #jobPanelBody input.job-input[type="time"] { padding-left: 10px; padding-right: 6px; } }
 /* Job details: big fields for gloves, in the same soft card style as the
-   rest of the app (the heavy frame is dark screen only). */
+   rest of the app. */
 #jobPanel:not(.menu-page-active) { border: 1px solid var(--card-edge); border-radius: 16px; }
 #jobPanelBody .job-input, #reportBody .job-input { border: 1.5px solid var(--frame); border-radius: 10px; font-size: calc(15px * var(--ts)); min-height: 52px; }
 
@@ -2163,7 +2099,6 @@ body.pocket-lock .voice-btn { user-select: none; -webkit-user-select: none; -web
 .risk-low    { background:var(--green-wash); color:var(--green); border:1px solid rgba(var(--green-rgb),0.35); }
 
 .warn-note.note-good { background: var(--green-wash); border-color: rgba(var(--green-rgb),0.35); color: var(--green); }
-body.dark-screen .warn-note.note-good { background: rgba(var(--green-rgb),0.12); color: var(--green); }
 .warn-note {
   margin: 0 14px 12px;
   padding: 8px 10px;
@@ -2531,20 +2466,17 @@ body.report-locked #micDock { opacity: 0.4; }
    (which read as grey on grey) for a plain white card with a clear edge.
    Fields are white with a firm border, labels dark, so each one stands out
    from the card it sits on, in sunlight too. */
-body:not(.dark-screen) .sheet-folds .sheet-fold {
+body .sheet-folds .sheet-fold {
   background: var(--surface); border: 1px solid var(--border2); box-shadow: 0 1px 3px rgba(13,40,60,0.08);
 }
-body:not(.dark-screen) .sheet-folds .sheet-fold > summary { background: none; }
-body:not(.dark-screen) .sheet-folds .sheet-fold[open] { border-color: rgba(var(--accent-rgb),0.45); box-shadow: 0 2px 10px rgba(13,40,60,0.10); }
-body:not(.dark-screen) .sheet-folds .sheet-fold[open] > summary { border-bottom-color: var(--border2); }
+body .sheet-folds .sheet-fold > summary { background: none; }
+body .sheet-folds .sheet-fold[open] { border-color: rgba(var(--accent-rgb),0.45); box-shadow: 0 2px 10px rgba(13,40,60,0.10); }
+body .sheet-folds .sheet-fold[open] > summary { border-bottom-color: var(--border2); }
 .sheet-folds .sheet-fold .fgroup-icon { background: var(--accent-wash); color: var(--accent2); }
-body.dark-screen .sheet-folds .sheet-fold .fgroup-icon { background: rgba(var(--accent-rgb),0.18); color: var(--accent-glow); }
 .sheet-folds .job-field-label { font-size: calc(13px * var(--ts)); font-weight: 600; color: var(--text); margin-bottom: 6px; }
-body:not(.dark-screen) .sheet-folds .job-input { background: var(--surface); border: 1.5px solid var(--border2); border-radius: 10px; }
-body:not(.dark-screen) .sheet-folds .job-input:hover { border-color: #A9BACB; }
-body.dark-screen .sheet-folds .job-input { background: var(--bg); border-color: var(--border2); }
+body .sheet-folds .job-input { background: var(--surface); border: 1.5px solid var(--border2); border-radius: 10px; }
+body .sheet-folds .job-input:hover { border-color: #A9BACB; }
 .sheet-folds .job-input::placeholder { color: #6B7C8E; }
-body.dark-screen .sheet-folds .job-input::placeholder { color: #75879A; }
 .sheet-folds .sheet-more { border-color: var(--border2); }
 /* A finished fold (the treatment record's, the quote's) shows a green tick
    beside its chevron and no line under its title; one that still needs
@@ -2553,7 +2485,6 @@ body.dark-screen .sheet-folds .job-input::placeholder { color: #75879A; }
 .fold-tick { display: none; flex-shrink: 0; width: 24px; height: 24px; border-radius: 99px; place-items: center; background: var(--green); color: #fff; }
 .quote-fold.done .fold-tick { display: grid; }
 .quote-fold:not(.done) .fold-tick-text { display: none; }
-body.dark-screen .fold-tick { color: #000; }
 .sheet-folds .sheet-more > summary { color: var(--text); }
 
 /* Check before sending */
@@ -2715,7 +2646,6 @@ body.dark-screen .fold-tick { color: #000; }
 .signature-clear-btn:hover { border-color: rgba(var(--accent-rgb), 0.5); }
 .signature-clear-btn:active { transform: scale(0.97); background: var(--surface2); }
 .signature-clear-btn:focus-visible { outline: 3px solid rgba(var(--accent-rgb), 0.45); outline-offset: 2px; }
-body.dark-screen .signature-clear-btn { background: var(--surface2); border-color: var(--border2); }
 
 /* Photo attachment grid */
 .photo-toolbar {
@@ -2748,7 +2678,7 @@ body.dark-screen .signature-clear-btn { background: var(--surface2); border-colo
 /* On Finish, Report done or Send is the step's one filled button. */
 .add-photo-btn.quiet:not(:disabled) { background: var(--surface); color: var(--accent2); border: 1px solid var(--border2); }
 /* A done report's banner offers the next step, so Next steps aside. */
-#mainPanel.done-waiting .next-section-btn, body:not(.dark-screen) #mainPanel.done-waiting .next-section-btn {
+body #mainPanel.done-waiting .next-section-btn {
   background: var(--surface); color: var(--text); border: 1px solid var(--border2); box-shadow: none;
 }
 
@@ -2843,9 +2773,8 @@ body.dark-screen .signature-clear-btn { background: var(--surface2); border-colo
 .choice-field { grid-column: 1 / -1; }
 #waterLeakWrap { grid-column: 1 / -1; display: grid; gap: 12px; }
 .choice-source { display: none !important; }
-/* Daylight: white cards on a light panel, each with a coloured edge, and
-   the picked one filled in its colour. The dark screen swaps in the black
-   panel (body.dark-screen .choice-panel below). */
+/* White cards on a light panel, each with a coloured edge, and the picked
+   one filled in its colour. */
 .choice-panel {
   --act-panel:   var(--surface2);
   --act-steel:   var(--border2);
@@ -2860,17 +2789,6 @@ body.dark-screen .signature-clear-btn { background: var(--surface2); border-colo
   background: var(--act-panel);
   border-radius: 12px;
 }
-body.dark-screen .choice-panel {
-  --act-panel:   #10161D;
-  --act-steel:   #5B6B7C;
-  --act-ink:     #E8EEF4;
-  --act-dim:     #A9B6C3;
-  --act-card:    transparent;
-  --tone-neutral:#E8EEF4;
-  border-radius: 6px;
-}
-body.dark-screen .choice-card { border-width: 3px; border-radius: 4px; }
-body.dark-screen .choice-card.tone-neutral { --tone-ink: #10161D; }
 .choice-grid {
   display: grid;
   grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
@@ -2918,8 +2836,6 @@ body.dark-screen .choice-card.tone-neutral { --tone-ink: #10161D; }
   content: ''; position: absolute; left: -1.5px; top: -1.5px; bottom: -1.5px; width: 5px;
   border-radius: 10px 0 0 10px; background: var(--tone); display: none;
 }
-body.dark-screen .choice-card::before { display: block; }
-body.dark-screen .choice-card::before { left: -3px; top: -3px; bottom: -3px; width: 6px; border-radius: 4px 0 0 4px; }
 .choice-card.tone-bad     { --tone: var(--tone-bad);     --tone-ink: #FFFFFF; }
 .choice-card.tone-warn    { --tone: var(--tone-warn);    --tone-ink: #10161D; }
 .choice-card.tone-good    { --tone: var(--tone-good);    --tone-ink: #10161D; }
@@ -3345,8 +3261,7 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 .dash-card-act svg { flex: none; }
 .dash-card-act:active { background: var(--accent-pale); }
 .dash-card.waiting .dash-card-act, .dash-card-act.wait { border-top-color: rgba(240,168,30,0.4); background: rgba(255,182,72,0.12); color: var(--yellow-text); }
-body:not(.dark-screen) .dash-card { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
-body.dark-screen .dash-card-act { border-top-color: var(--border2); background: rgba(var(--accent-rgb), 0.14); }
+body .dash-card { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
 
 .dash-none { margin: 0; padding: 36px 12px; text-align: center; font-size: calc(14px * var(--ts)); color: var(--text3); }
 /* To do, in the order the week runs: a heading where the day changes
@@ -3866,7 +3781,6 @@ body.ai-busy:has(#app[style*="flex"]) .ai-busy-bar { display: block; }
 .area-status-btn.status-partial { background: rgba(245,162,35,0.14); border-color: var(--yellow); color: var(--yellow-text); }
 .area-status-btn.status-not { background: rgba(192,57,43,0.12); border-color: var(--risk); color: var(--risk); }
 .area-status-btn.status-na { background: rgba(86,106,127,0.16); border-color: var(--text3); color: var(--text); box-shadow: inset 0 0 0 1px var(--text3); }
-body.dark-screen .area-status-btn.status-na { background: rgba(147,163,179,0.2); }
 .area-status + .obs-items, .area-result + .obs-items { padding-top: 0; }
 .area-result { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0 12px 10px; }
 .area-result-label { font-size: calc(11.5px * var(--ts)); font-weight: 600; color: var(--text2); margin-right: 2px; }
@@ -3879,11 +3793,9 @@ body.dark-screen .area-status-btn.status-na { background: rgba(147,163,179,0.2);
 .area-finding-text strong { color: var(--text); font-weight: 650; }
 .area-finding-prompt .area-finding-add { flex: none; }
 @media (max-width: 459px) { .area-finding-prompt { flex-wrap: wrap; } .area-finding-text { flex-basis: calc(100% - 68px); } .area-finding-prompt .area-finding-add { margin-left: 56px; } }
-body.dark-screen .area-finding-prompt .area-tile { background: rgba(255,90,79,0.12); border-color: rgba(255,90,79,0.35); }
 /* The same prompt inside the open finding card: "Write it up here?" */
 .finding-area-slot { margin: 10px 6px 0; background: rgba(192,57,43,0.05); border-color: rgba(192,57,43,0.28); }
 .finding-area-slot .area-finding-add { min-width: 76px; justify-content: center; }
-body.dark-screen .finding-area-slot { background: rgba(255,90,79,0.07); border-color: rgba(255,90,79,0.3); }
 /* "What was it?" under an area's evidence: termites, borers, rot or
    delignification, two to a row on a phone. */
 .area-finding-prompt.has-picks { flex-wrap: wrap; }
@@ -3911,8 +3823,6 @@ body.dark-screen .finding-area-slot { background: rgba(255,90,79,0.07); border-c
 .findings-more-text small { font-size: calc(13px * var(--ts)); line-height: 1.4; color: var(--text3); }
 .findings-more-label { display: block; margin-bottom: 10px; font-size: calc(13px * var(--ts)); font-weight: 600; color: var(--text2); }
 .findings-more-btns { display: flex; flex-wrap: wrap; gap: 8px; }
-body.dark-screen .findings-more { border-width: 2px; box-shadow: none; }
-body.dark-screen .findings-more-state.is-none .findings-more-icon { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.35); }
 .area-evidence .link-btn { display: inline; margin-left: 4px; }
 .area-result-btn.result-found { background: rgba(192,57,43,0.12); border-color: var(--risk); color: var(--risk); }
 /* A moisture reading: where, the reading and a bin, at field size. */
@@ -4341,7 +4251,7 @@ body[data-voice="thinking"] .voice-hud { animation: hudPulse 0.6s ease-in-out in
 .ask-facts dd { flex: 1; margin: 0; color: var(--text); font-weight: 600; }
 .photo-source-btns { margin-top: 14px; }
 /* One filled button on the sheet; the others are quiet. */
-.photo-source-btns .extract-btn.quiet, body:not(.dark-screen) .photo-source-btns .extract-btn.quiet {
+body .photo-source-btns .extract-btn.quiet {
   background: var(--surface); color: var(--text); border: 1px solid var(--border2); box-shadow: none; font-weight: 600;
 }
 .photo-source-btns .extract-btn.quiet::after { content: none; }
@@ -4387,8 +4297,8 @@ body[data-voice="thinking"] .voice-hud { animation: hudPulse 0.6s ease-in-out in
 /* ── ONE THEME: the sign-in look everywhere ──
    Every screen sits on the sign-in backdrop (deep ink with a blue glow),
    with white cards on top and blue for actions. Bars are ink, not white,
-   and text on the backdrop is light. The dark screen (body.dark-screen)
-   keeps its own near-black rules, which win on specificity. */
+   and text on the backdrop is light. These rules start with body, so they
+   win over the plain rules earlier in the file. */
 :root {
   --ink:        #0B141C;
   --ink2:       #111D27;
@@ -4398,77 +4308,76 @@ body[data-voice="thinking"] .voice-hud { animation: hudPulse 0.6s ease-in-out in
     radial-gradient(120% 40% at 50% -8%, rgba(var(--accent-rgb),0.34), rgba(var(--accent-rgb),0) 62%),
     linear-gradient(180deg, #0B141C 0%, #070B10 100%);
 }
-body:not(.dark-screen) { background: var(--backdrop); background-color: #070B10; }
-body:not(.dark-screen) #splash,
-body:not(.dark-screen) #quoteScreen { background: var(--backdrop); background-color: #070B10; color-scheme: dark; }
-body:not(.dark-screen) .splash-logo { color: var(--on-ink); }
+body { background: var(--backdrop); background-color: #070B10; }
+body #splash,
+body #quoteScreen { background: var(--backdrop); background-color: #070B10; color-scheme: dark; }
+body .splash-logo { color: var(--on-ink); }
 
 /* Top bar and section tabs: ink, light text, blue for the active tab. */
-body:not(.dark-screen) header { background: var(--ink); border-bottom: none; box-shadow: none; }
-body:not(.dark-screen) .header-job,
-body:not(.dark-screen) .header-job span,
-body:not(.dark-screen) .header-job.has-job { color: var(--on-ink2); }
-body:not(.dark-screen) .header-icon-btn { color: var(--on-ink2); }
-body:not(.dark-screen) .header-icon-btn:hover,
-body:not(.dark-screen) .hamburger-btn:hover { background: rgba(255,255,255,0.08); color: var(--accent-glow); }
-body:not(.dark-screen) .hamburger-btn span { background: var(--on-ink); }
-body:not(.dark-screen) header .progress-ring-bg { stroke: rgba(255,255,255,0.18); }
-body:not(.dark-screen) header .progress-ring-wrap { color: var(--on-ink2); }
-body:not(.dark-screen) .section-tabs { background: transparent; border-bottom: none; box-shadow: none; }
-body:not(.dark-screen) .section-tab { color: var(--on-ink2); }
-body:not(.dark-screen) .section-tab:hover { color: var(--on-ink); background: rgba(255,255,255,0.06); }
-body:not(.dark-screen) .section-tab .tab-label { color: inherit; }
-body:not(.dark-screen) .section-tab.active { color: #FFFFFF; }
-body:not(.dark-screen) .section-tab .tab-dot:not(.partial):not(.done):not(.current) { border-color: rgba(255,255,255,0.4); }
-body:not(.dark-screen) .progress-wrap { background: rgba(255,255,255,0.06); }
-body:not(.dark-screen) .report-body { background: transparent; }
+body header { background: var(--ink); border-bottom: none; box-shadow: none; }
+body .header-job,
+body .header-job span,
+body .header-job.has-job { color: var(--on-ink2); }
+body .header-icon-btn { color: var(--on-ink2); }
+body .header-icon-btn:hover,
+body .hamburger-btn:hover { background: rgba(255,255,255,0.08); color: var(--accent-glow); }
+body .hamburger-btn span { background: var(--on-ink); }
+body header .progress-ring-bg { stroke: rgba(255,255,255,0.18); }
+body header .progress-ring-wrap { color: var(--on-ink2); }
+body .section-tabs { background: transparent; border-bottom: none; box-shadow: none; }
+body .section-tab { color: var(--on-ink2); }
+body .section-tab:hover { color: var(--on-ink); background: rgba(255,255,255,0.06); }
+body .section-tab .tab-label { color: inherit; }
+body .section-tab.active { color: #FFFFFF; }
+body .section-tab .tab-dot:not(.partial):not(.done):not(.current) { border-color: rgba(255,255,255,0.4); }
+body .progress-wrap { background: rgba(255,255,255,0.06); }
+body .report-body { background: transparent; }
 
 /* Cards on the backdrop: white, no edge line, a soft shadow for lift. */
-body:not(.dark-screen) .report-section,
-body:not(.dark-screen) #jobPanel:not(.menu-page-active) { border-color: transparent; box-shadow: 0 14px 36px rgba(0,0,0,0.35); }
+body .report-section,
+body #jobPanel:not(.menu-page-active) { border-color: transparent; box-shadow: 0 14px 36px rgba(0,0,0,0.35); }
 /* Banners on the backdrop need a solid face to stay readable. */
 /* Unsigned agreement: light red, as no job should start without it. */
-body:not(.dark-screen) .agreement-banner { background: linear-gradient(135deg, #FFE4E4 0%, #FFF1F1 60%, #FFF7F7 100%); border-color: #F2A3A3; color: #9B1C1C; box-shadow: 0 0 0 1px rgba(215,38,30,0.08), 0 6px 22px -6px rgba(215,38,30,0.45); }
-body:not(.dark-screen) .agreement-banner:not(.signed) .agreement-banner-btn { background: #D7261E; border-color: #D7261E; color: #FFFFFF; box-shadow: 0 3px 10px rgba(215,38,30,0.35); }
-body:not(.dark-screen) .agreement-banner.signed { background: var(--green-wash); border-color: var(--green-edge); color: var(--green); box-shadow: none; }
+body .agreement-banner { background: linear-gradient(135deg, #FFE4E4 0%, #FFF1F1 60%, #FFF7F7 100%); border-color: #F2A3A3; color: #9B1C1C; box-shadow: 0 0 0 1px rgba(215,38,30,0.08), 0 6px 22px -6px rgba(215,38,30,0.45); }
+body .agreement-banner:not(.signed) .agreement-banner-btn { background: #D7261E; border-color: #D7261E; color: #FFFFFF; box-shadow: 0 3px 10px rgba(215,38,30,0.35); }
+body .agreement-banner.signed { background: var(--green-wash); border-color: var(--green-edge); color: var(--green); box-shadow: none; }
 /* Link sent: it's on the client now, so amber rather than the red "get it signed". */
-body:not(.dark-screen) .agreement-banner.waiting { background: rgba(212,146,10,0.1); border-color: var(--yellow); color: var(--yellow-text); box-shadow: none; }
-body:not(.dark-screen) .agreement-banner.waiting .agreement-banner-btn { background: transparent; border-color: currentColor; color: inherit; box-shadow: none; }
-body:not(.dark-screen) .issue-banner { background: #FFFFFF; border-color: transparent; box-shadow: 0 14px 36px rgba(0,0,0,0.35); }
-body:not(.dark-screen) .issue-banner.locked { background: #FFFFFF; border-color: var(--accent-edge); }
+body .agreement-banner.waiting { background: rgba(212,146,10,0.1); border-color: var(--yellow); color: var(--yellow-text); box-shadow: none; }
+body .agreement-banner.waiting .agreement-banner-btn { background: transparent; border-color: currentColor; color: inherit; box-shadow: none; }
+body .issue-banner { background: #FFFFFF; border-color: transparent; box-shadow: 0 14px 36px rgba(0,0,0,0.35); }
+body .issue-banner.locked { background: #FFFFFF; border-color: var(--accent-edge); }
 /* ── BLUE GLOW DETAILS ──
    The intro's look carried into the report: fades from bright blue into
    nothing, soft blue glows, and a title that runs from ink into blue. One
-   colour throughout; amber, red and green keep their meanings, and the
-   dark screen keeps its own plain look. */
+   colour throughout; amber, red and green keep their meanings. */
 :root { --glow: 47,107,255; --glow-hi: 125,162,255; --glow-ink: 31,79,224; }
 
 /* Progress bar: blue into a lighter blue, with a glow. */
-body:not(.dark-screen) .progress-fill {
+body .progress-fill {
   height: 3px;
   background: linear-gradient(90deg, rgb(var(--glow)), rgb(var(--glow-hi)));
   box-shadow: 0 0 10px rgba(var(--glow-hi),0.6);
 }
 /* Active tab: lit from the top like the logo, with a glow under it. */
-body:not(.dark-screen) .section-tab.active {
+body .section-tab.active {
   background: var(--accent-grad);
   border-color: transparent;
   box-shadow: 0 4px 18px rgba(var(--glow),0.45), inset 0 1px 0 rgba(255,255,255,0.35);
 }
 /* Cards: a faint blue ring and a glow rising off the top edge. */
-body:not(.dark-screen) .report-section {
+body .report-section {
   box-shadow: 0 14px 36px rgba(0,0,0,0.35), 0 0 0 1px rgba(var(--glow),0.18), 0 -10px 40px -14px rgba(var(--glow),0.7);
 }
 /* Section header: a bright line above and a fine line below, both fading
    out to the right, over a blue wash that fades the same way. */
-body:not(.dark-screen) .report-section .section-header {
+body .report-section .section-header {
   border-top: 3px solid rgb(var(--glow));
   border-image: linear-gradient(90deg, rgb(var(--glow)), rgb(var(--glow-hi)) 45%, rgba(var(--glow-hi),0)) 1;
   background: linear-gradient(135deg, rgba(var(--glow),0.16) 0%, rgba(var(--glow-hi),0.06) 45%, rgba(var(--glow),0) 80%);
 }
-body:not(.dark-screen) .report-section .section-header h3 .sec-num { color: rgb(var(--glow-ink)); }
+body .report-section .section-header h3 .sec-num { color: rgb(var(--glow-ink)); }
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  body:not(.dark-screen) .report-section .section-header h3 {
+  body .report-section .section-header h3 {
     background: linear-gradient(90deg, var(--text) 0%, var(--text) 45%, rgb(var(--glow-ink)) 100%);
     -webkit-background-clip: text;
     background-clip: text;
@@ -4478,29 +4387,29 @@ body:not(.dark-screen) .report-section .section-header h3 .sec-num { color: rgb(
 }
 /* Cards inside a section (area rows, access groups) take the same fading
    line under their heading. */
-body:not(.dark-screen) .obs-zone-panel[open] > .obs-zone-panel-header,
-body:not(.dark-screen) .access-group-head {
+body .obs-zone-panel[open] > .obs-zone-panel-header,
+body .access-group-head {
   border-bottom: 1px solid rgba(var(--glow),0.5);
   border-image: linear-gradient(90deg, rgba(var(--glow),0.75), rgba(var(--glow-hi),0.35) 50%, rgba(var(--glow-hi),0)) 1;
 }
 /* A picked answer glows in its own colour (red, amber, green or grey). */
 @supports (color: color-mix(in srgb, red 50%, transparent)) {
-  body:not(.dark-screen) .choice-card:has(input:checked),
-  body:not(.dark-screen) .choice-card.active {
+  body .choice-card:has(input:checked),
+  body .choice-card.active {
     box-shadow: 0 4px 14px color-mix(in srgb, var(--tone) 45%, transparent), inset 0 1px 0 rgba(255,255,255,0.25);
   }
 }
 /* In edit mode a field lights up blue under the finger or pointer. */
-body:not(.dark-screen) .edit-mode .field-val:hover { box-shadow: 0 0 0 3px rgba(var(--glow),0.14), 0 0 16px rgba(var(--glow),0.18); }
+body .edit-mode .field-val:hover { box-shadow: 0 0 0 3px rgba(var(--glow),0.14), 0 0 16px rgba(var(--glow),0.18); }
 /* The same blue glow on the home screen, top bar, menu and dashboard. */
 /* Logo boxes fade like the intro's: near-white at the top into blue. */
-body:not(.dark-screen) .auth-logo-icon {
+body .auth-logo-icon {
   background: linear-gradient(180deg, #F4F7FA 0%, var(--accent-pale) 40%, var(--accent-hi) 78%, var(--accent) 100%);
   color: var(--accent-ink);
   box-shadow: 0 0 14px rgba(var(--glow-hi),0.4), inset 0 1px 1px rgba(255,255,255,0.6), inset 0 -2px 3px rgba(var(--accent-deep-rgb),0.35);
 }
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  body:not(.dark-screen) .auth-logo-name {
+  body .auth-logo-name {
     background: linear-gradient(180deg, #F4F7FA 0%, var(--accent-pale) 45%, var(--accent-hi) 100%);
     -webkit-background-clip: text;
     background-clip: text;
@@ -4509,45 +4418,45 @@ body:not(.dark-screen) .auth-logo-icon {
   }
 }
 /* A fine blue line under the top bars, fading out to the right. */
-body:not(.dark-screen) header,
-body:not(.dark-screen) .quote-topbar {
+body header,
+body .quote-topbar {
   border-bottom: 1px solid rgba(var(--glow),0.5);
   border-image: linear-gradient(90deg, rgba(var(--glow-hi),0.8), rgba(var(--glow),0.4) 45%, rgba(var(--glow),0)) 1;
 }
-body:not(.dark-screen) .panel-label .panel-icon {
+body .panel-label .panel-icon {
   background: linear-gradient(180deg, rgba(var(--glow-hi),0.28), rgba(var(--glow),0.14));
   border-color: rgba(var(--glow),0.3);
   color: rgb(var(--glow-ink));
   box-shadow: 0 2px 10px rgba(var(--glow),0.22), inset 0 1px 0 rgba(255,255,255,0.6);
 }
 /* Menu: group labels trail a fading line. */
-body:not(.dark-screen) .drawer-group-label { display: flex; align-items: center; gap: 10px; color: rgb(var(--glow-ink)); }
-body:not(.dark-screen) .drawer-group-label::after {
+body .drawer-group-label { display: flex; align-items: center; gap: 10px; color: rgb(var(--glow-ink)); }
+body .drawer-group-label::after {
   content: ''; flex: 1; height: 1px;
   background: linear-gradient(90deg, rgba(var(--glow),0.6), rgba(var(--glow-hi),0.25) 50%, rgba(var(--glow-hi),0));
 }
 /* A picked plain answer (storey, roof, inspection type) fades like the
    active tab instead of sitting flat in the old blue. */
-body:not(.dark-screen) .choice-card.tone-neutral:has(input:checked),
-body:not(.dark-screen) .choice-card.tone-neutral.active {
+body .choice-card.tone-neutral:has(input:checked),
+body .choice-card.tone-neutral.active {
   background: var(--accent-grad);
   border-color: transparent;
   box-shadow: 0 4px 16px rgba(var(--glow),0.4), inset 0 1px 0 rgba(255,255,255,0.35);
 }
 /* Mic button: the same bright blue fade, with a light blue glow breathing round it. */
-body:not(.dark-screen) .mic-fab:not(.recording):not(.open) {
+body .mic-fab:not(.recording):not(.open) {
   background: linear-gradient(180deg, var(--accent-glow) 0%, var(--accent-hi) 30%, var(--accent) 65%, var(--accent-deep) 100%);
   color: #FFFFFF;
   animation-name: fabBreatheGlow;
 }
-body:not(.dark-screen) .mic-fab:not(.recording):not(.open) svg { filter: drop-shadow(0 1px 1px rgba(var(--accent-deep-rgb),0.5)); }
-body:not(.dark-screen) .mic-fab:not(.recording):not(.open):hover { box-shadow: 0 10px 28px rgba(var(--glow),0.55), 0 0 0 8px rgba(var(--glow-hi),0.14); }
+body .mic-fab:not(.recording):not(.open) svg { filter: drop-shadow(0 1px 1px rgba(var(--accent-deep-rgb),0.5)); }
+body .mic-fab:not(.recording):not(.open):hover { box-shadow: 0 10px 28px rgba(var(--glow),0.55), 0 0 0 8px rgba(var(--glow-hi),0.14); }
 @keyframes fabBreatheGlow {
   0%, 100% { box-shadow: 0 8px 24px rgba(var(--glow),0.45), 0 0 18px rgba(var(--glow-hi),0.35), 0 0 0 0 rgba(var(--glow-hi),0.3); }
   50%      { box-shadow: 0 8px 28px rgba(var(--glow),0.55), 0 0 26px rgba(var(--glow-hi),0.5), 0 0 0 8px rgba(var(--glow-hi),0); }
 }
 
-body:not(.dark-screen) .choice-card { transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s, color 0.3s, transform 0.08s; }
+body .choice-card { transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s, color 0.3s, transform 0.08s; }
 
 /* Areas (Section 4) */
 .areas-intro { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 14px 6px; }
@@ -4709,23 +4618,6 @@ body:not(.dark-screen) .choice-card { transition: background-color 0.3s, border-
 #areaChecklist .access-spot-input { min-height: 48px; border-radius: 12px; }
 #section-restrictions .spot-photos, #areaChecklist .spot-photos { margin-top: 0; }
 #section-restrictions .spot-photo img, #areaChecklist .spot-photo img { border-radius: 10px; }
-body.dark-screen .access-item-partial .area-tile { background: rgba(255,176,0,0.12); border-color: rgba(255,176,0,0.35); }
-body.dark-screen .access-item-not .area-tile { background: rgba(255,90,79,0.12); border-color: rgba(255,90,79,0.35); }
-body.dark-screen #section-restrictions .access-group { box-shadow: none; }
-body.dark-screen .spot-photo-add, body.dark-screen .section-photo-add-btn, body.dark-screen .findings-add-btn { background: var(--surface2); border-color: var(--border2); }
-body.dark-screen .finding-card { box-shadow: none; }
-body.dark-screen .finding-head-active .area-tile { background: rgba(255,90,79,0.12); border-color: rgba(255,90,79,0.35); }
-body.dark-screen .finding-head-inactive .area-tile { background: rgba(255,176,0,0.12); border-color: rgba(255,176,0,0.35); }
-body.dark-screen .finding-head-none .area-tile { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.35); }
-
-/* Dark screen: tinted tiles and buttons on the dark cards. */
-body.dark-screen #areaChecklist .obs-zone-panel { box-shadow: none; }
-body.dark-screen .area-node-inspected .area-tile { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.35); }
-body.dark-screen .area-node-partial .area-tile { background: rgba(255,176,0,0.12); border-color: rgba(255,176,0,0.35); }
-body.dark-screen .area-node-not .area-tile { background: rgba(255,90,79,0.12); border-color: rgba(255,90,79,0.35); }
-body.dark-screen #areaChecklist .area-status-btn.status-inspected { background: rgba(74,222,128,0.12); }
-body.dark-screen #areaChecklist .area-status-btn.status-na { background: rgba(147,163,179,0.2); }
-body.dark-screen .areas-mark-all { background: var(--surface2); border-color: var(--border2); }
 
 /* Address suggestions under the street address box */
 .addr-wrap { position: relative; }
@@ -4844,8 +4736,8 @@ img[data-photo-id][src] { cursor: zoom-in; }
    The voice panel in the intro's look: a white card glowing blue along the
    top, a big speak button with the mic in a glowing blue disc (red while
    recording), the note in plain readable type, and the fill-in button
-   lit like the active tab. The dark screen keeps its plain look. */
-body:not(.dark-screen) .voice-popover {
+   lit like the active tab. */
+body .voice-popover {
   background: linear-gradient(180deg, rgba(var(--glow),0.13) 0, rgba(var(--glow-hi),0.04) 70px, rgba(255,255,255,0) 130px), #FFFFFF;
   border: 0;
   border-radius: 20px;
@@ -4853,18 +4745,18 @@ body:not(.dark-screen) .voice-popover {
   gap: 12px;
   box-shadow: 0 24px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(var(--glow),0.28), 0 -14px 44px -18px rgba(var(--glow),0.85);
 }
-body:not(.dark-screen) .voice-popover-header {
+body .voice-popover-header {
   padding-bottom: 10px;
   border-bottom: 1px solid rgba(var(--glow),0.5);
   border-image: linear-gradient(90deg, rgba(var(--glow),0.8), rgba(var(--glow-hi),0.35) 50%, rgba(var(--glow-hi),0)) 1;
 }
-body:not(.dark-screen) .voice-popover-title { font-size: calc(15px * var(--ts)); letter-spacing: -0.2px; color: rgb(var(--glow-ink)); }
-body:not(.dark-screen) #voicePopoverTitleText { color: var(--text); }
-body:not(.dark-screen) .voice-popover-close { border-radius: 50%; border-color: transparent; background: rgba(var(--glow),0.08); color: var(--text2); }
-body:not(.dark-screen) .toggle-switch.on { background: linear-gradient(180deg, var(--accent-hi), var(--accent-deep)); }
-body:not(.dark-screen) .toggle-switch.on::after { background: #FFFFFF; box-shadow: 0 1px 4px rgba(0,0,0,0.25); }
+body .voice-popover-title { font-size: calc(15px * var(--ts)); letter-spacing: -0.2px; color: rgb(var(--glow-ink)); }
+body #voicePopoverTitleText { color: var(--text); }
+body .voice-popover-close { border-radius: 50%; border-color: transparent; background: rgba(var(--glow),0.08); color: var(--text2); }
+body .toggle-switch.on { background: linear-gradient(180deg, var(--accent-hi), var(--accent-deep)); }
+body .toggle-switch.on::after { background: #FFFFFF; box-shadow: 0 1px 4px rgba(0,0,0,0.25); }
 
-body:not(.dark-screen) .voice-btn {
+body .voice-btn {
   min-height: 66px;
   padding: 10px 14px;
   justify-content: flex-start;
@@ -4877,19 +4769,19 @@ body:not(.dark-screen) .voice-btn {
   color: var(--text);
   box-shadow: 0 4px 16px rgba(var(--glow),0.14);
 }
-body:not(.dark-screen) .voice-btn .mic-svg {
+body .voice-btn .mic-svg {
   width: 22px; height: 22px; padding: 11px; box-sizing: content-box; border-radius: 50%;
   background: linear-gradient(180deg, var(--accent-glow) 0%, var(--accent-hi) 30%, var(--accent) 65%, var(--accent-deep) 100%);
   color: #FFFFFF;
   box-shadow: 0 4px 14px rgba(var(--glow),0.45), inset 0 1px 1px rgba(255,255,255,0.5);
 }
-body:not(.dark-screen) .voice-btn:hover { border-color: rgba(var(--glow),0.7); background: linear-gradient(180deg, #FFFFFF 0%, rgba(var(--glow-hi),0.2) 100%); }
-body:not(.dark-screen) .voice-btn.recording { border-color: rgba(215,38,30,0.55); background: linear-gradient(180deg, #FFFFFF 0%, #FFE9E7 100%); color: #9B1C1C; }
-body:not(.dark-screen) .voice-btn.recording .mic-svg { background: linear-gradient(180deg, #FF8A80 0%, #E5483E 45%, #C0392B 100%); box-shadow: 0 4px 14px rgba(215,38,30,0.45), inset 0 1px 1px rgba(255,255,255,0.45); }
+body .voice-btn:hover { border-color: rgba(var(--glow),0.7); background: linear-gradient(180deg, #FFFFFF 0%, rgba(var(--glow-hi),0.2) 100%); }
+body .voice-btn.recording { border-color: rgba(215,38,30,0.55); background: linear-gradient(180deg, #FFFFFF 0%, #FFE9E7 100%); color: #9B1C1C; }
+body .voice-btn.recording .mic-svg { background: linear-gradient(180deg, #FF8A80 0%, #E5483E 45%, #C0392B 100%); box-shadow: 0 4px 14px rgba(215,38,30,0.45), inset 0 1px 1px rgba(255,255,255,0.45); }
 
-body:not(.dark-screen) .wave-bar { width: 4px; border-radius: 3px; background: linear-gradient(180deg, rgb(var(--glow-hi)), rgb(var(--glow))); box-shadow: 0 0 8px rgba(var(--glow),0.55); }
+body .wave-bar { width: 4px; border-radius: 3px; background: linear-gradient(180deg, rgb(var(--glow-hi)), rgb(var(--glow))); box-shadow: 0 0 8px rgba(var(--glow),0.55); }
 
-body:not(.dark-screen) .transcript-box {
+body .transcript-box {
   min-height: 96px;
   padding: 12px 14px;
   border-radius: 14px;
@@ -4901,10 +4793,10 @@ body:not(.dark-screen) .transcript-box {
   color: var(--text3);
   transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
 }
-body:not(.dark-screen) .transcript-box.active { color: var(--text); background: #FFFFFF; border-color: rgba(var(--glow),0.55); }
-body:not(.dark-screen) .transcript-box:focus { outline: none; background: #FFFFFF; border-color: rgb(var(--glow)); box-shadow: 0 0 0 3px rgba(var(--glow),0.16), 0 0 18px rgba(var(--glow),0.18); }
+body .transcript-box.active { color: var(--text); background: #FFFFFF; border-color: rgba(var(--glow),0.55); }
+body .transcript-box:focus { outline: none; background: #FFFFFF; border-color: rgb(var(--glow)); box-shadow: 0 0 0 3px rgba(var(--glow),0.16), 0 0 18px rgba(var(--glow),0.18); }
 
-body:not(.dark-screen) .extract-btn {
+body .extract-btn {
   min-height: 52px;
   border-radius: 14px;
   font-size: calc(15px * var(--ts));
@@ -4912,24 +4804,24 @@ body:not(.dark-screen) .extract-btn {
   background: var(--accent-grad);
   box-shadow: 0 6px 20px rgba(var(--glow),0.4), inset 0 1px 0 rgba(255,255,255,0.35);
 }
-body:not(.dark-screen) .extract-btn:disabled { opacity: 0.4; box-shadow: none; }
-body:not(.dark-screen) .ai-bar { justify-content: center; border: 0; background: transparent; padding: 2px 10px 0; font-size: calc(11.5px * var(--ts)); color: var(--text3); }
-body:not(.dark-screen) .ai-dot { width: 7px; height: 7px; box-shadow: 0 0 8px currentColor; color: var(--green); }
+body .extract-btn:disabled { opacity: 0.4; box-shadow: none; }
+body .ai-bar { justify-content: center; border: 0; background: transparent; padding: 2px 10px 0; font-size: calc(11.5px * var(--ts)); color: var(--text3); }
+body .ai-dot { width: 7px; height: 7px; box-shadow: 0 0 8px currentColor; color: var(--green); }
 
 /* ── ONE BLUE ──
    Buttons take the logo's blue fade, the same as the open tab and Extract,
    instead of the older flat blue and green. */
-body:not(.dark-screen) .next-section-btn,
-body:not(.dark-screen) .cleanup-apply-btn,
-body:not(.dark-screen) .profile-btn,
-body:not(.dark-screen) .issue-primary {
+body .next-section-btn,
+body .cleanup-apply-btn,
+body .profile-btn,
+body .issue-primary {
   background: var(--accent-grad);
   border-color: transparent;
   color: #fff;
   text-shadow: 0 1px 1px rgba(var(--accent-deep-rgb),0.45);
   box-shadow: 0 4px 14px rgba(var(--glow),0.35), inset 0 1px 0 rgba(255,255,255,0.35);
 }
-body:not(.dark-screen) .next-section-btn:hover { background: linear-gradient(180deg, var(--accent-glow) 0%, var(--accent) 50%, var(--accent-deep) 100%); border-color: transparent; }
+body .next-section-btn:hover { background: linear-gradient(180deg, var(--accent-glow) 0%, var(--accent) 50%, var(--accent-deep) 100%); border-color: transparent; }
 
 /* ── COMPASS (Orientation) ── */
 .compass-body { align-items: center; text-align: center; }
@@ -4949,7 +4841,7 @@ body:not(.dark-screen) .next-section-btn:hover { background: linear-gradient(180
 body .compass-body .compass-main.locked { background: var(--accent3); box-shadow: 0 0 0 3px var(--accent); text-shadow: none; }
 .compass-main:disabled { opacity: 0.6; cursor: default; }
 .compass-note { font-size: calc(13px * var(--ts)); line-height: 1.45; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; max-width: 360px; }
-.compass-body .extract-btn { max-width: 360px; margin-top: 4px; padding: 16px; font-size: calc(17px * var(--ts)); }
+.compass-body .extract-btn { max-width: 360px; margin-top: 4px; padding: 16px; }
 
 /* ── BOTTOM DOCK ──
    Three things in a rounded glass dock that floats above the bottom edge:
@@ -5047,8 +4939,8 @@ body:not(:has(#dashboardOverlay.open)):not(:has(#sidebarPanel.open)) .tab[data-t
 .mic-fab .mic-fab-close, .mic-fab .mic-fab-stop { display: none; }
 .tabbar .mic-fab:hover { transform: none; }
 .tabbar .mic-fab:active { transform: scale(0.94); }
-body:not(.dark-screen) .tabbar .mic-fab:not(.recording):not(.open) { color: var(--accent-ink); }
-body:not(.dark-screen) .tabbar .mic-fab:not(.recording):not(.open) svg { filter: none; }
+body .tabbar .mic-fab:not(.recording):not(.open) { color: var(--accent-ink); }
+body .tabbar .mic-fab:not(.recording):not(.open) svg { filter: none; }
 body.large-touch .tabbar .mic-fab { width: 62px; height: 62px; }
 /* Open, not listening: a quiet button with a down mark that closes the panel. */
 .tabbar .mic-fab.open { background: rgba(255,255,255,0.12); color: var(--on-ink); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2); }
@@ -5099,7 +4991,7 @@ body:has(#quoteScreen.open) .toast { bottom: calc(var(--tabbar-h) + var(--mic-cl
    Dashboard, Quote and Menu open under one kind of bar: the place's name
    and nothing to close, since the tabs below are the way between places.
    A menu page adds a back button to the menu's list. Ink like the report's
-   top bar, plain on the dark screen. */
+   top bar. */
 .page-topbar {
   flex-shrink: 0; box-sizing: border-box;
   display: flex; align-items: center; gap: 10px;
@@ -5112,13 +5004,13 @@ body:has(#quoteScreen.open) .toast { bottom: calc(var(--tabbar-h) + var(--mic-cl
   font: 700 calc(19px * var(--ts)) 'Space Grotesk', sans-serif; letter-spacing: -0.2px; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-body:not(.dark-screen) .page-topbar {
+body .page-topbar {
   background: var(--ink);
   border-bottom: 1px solid rgba(var(--glow),0.5);
   border-image: linear-gradient(90deg, rgba(var(--glow-hi),0.8), rgba(var(--glow),0.4) 45%, rgba(var(--glow),0)) 1;
 }
-body:not(.dark-screen) .page-topbar-title { color: var(--on-ink); }
-body:not(.dark-screen) .page-topbar .drawer-back { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
+body .page-topbar-title { color: var(--on-ink); }
+body .page-topbar .drawer-back { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
 
 /* The account and settings button on the Jobs bar. */
 .topbar-account {
@@ -5129,7 +5021,7 @@ body:not(.dark-screen) .page-topbar .drawer-back { background: rgba(255,255,255,
   width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   background: linear-gradient(145deg, var(--accent-hi), var(--accent2)); color: #fff; font: 800 calc(12px * var(--ts)) 'Inter', sans-serif;
 }
-body:not(.dark-screen) .page-topbar .topbar-account { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
+body .page-topbar .topbar-account { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
 /* This job's New job: the one place a new job starts, kept in sight
    rather than at the foot of Job details. */
 .topbar-new {
@@ -5138,36 +5030,36 @@ body:not(.dark-screen) .page-topbar .topbar-account { background: rgba(255,255,2
 }
 .topbar-new svg { color: var(--accent2); }
 .topbar-new:active { transform: scale(0.97); }
-body:not(.dark-screen) .page-topbar .topbar-new { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
-body:not(.dark-screen) .page-topbar .topbar-new svg { color: var(--accent-glow); }
+body .page-topbar .topbar-new { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
+body .page-topbar .topbar-new svg { color: var(--accent-glow); }
 
 /* The dashboard and the menu's list sit on the backdrop like the report
    and the quote, white cards on ink, so the four places read as one app.
    A menu page keeps its light page, as its forms sit straight on it. */
-body:not(.dark-screen) .dashboard-overlay,
-body:not(.dark-screen) .job-overlay,
-body:not(.dark-screen) .sidebar:not(.on-page) { background: var(--backdrop); background-color: #070B10; color-scheme: dark; }
-body:not(.dark-screen) .dash-hero-date { color: var(--accent-glow); }
-body:not(.dark-screen) .dash-hero-title { color: var(--on-ink); }
-body:not(.dark-screen) .dash-hero-title b { color: var(--pink); }
-body:not(.dark-screen) .dash-hero-more, body:not(.dark-screen) .dash-parked { color: var(--on-ink2); }
-body:not(.dark-screen) .dash-hero-more i { color: var(--on-ink2); }
-body:not(.dark-screen) .dash-hero-more button { color: var(--pink); }
-body:not(.dark-screen) .dash-part { color: var(--accent-glow); }
-body:not(.dark-screen) .dash-parked .link-btn { color: var(--accent-glow); }
-body:not(.dark-screen) .dash-tabs { border-bottom-color: rgba(255,255,255,0.1); }
-body:not(.dark-screen) .dash-tab { color: var(--on-ink2); }
-body:not(.dark-screen) .dash-tab.active { color: var(--on-ink); }
-body:not(.dark-screen) .dash-tab span { background: rgba(255,255,255,0.1); color: var(--on-ink2); }
-body:not(.dark-screen) .dash-tab.active span { background: rgba(var(--accent-glow-rgb),0.18); color: var(--accent-glow); }
-body:not(.dark-screen) .dash-tabs.searching .dash-tab.active { color: var(--on-ink2); }
-body:not(.dark-screen) .dash-tab-line { background: var(--accent-glow); box-shadow: 0 0 10px rgba(var(--glow-hi),0.6); }
-body:not(.dark-screen) .dash-none,
-body:not(.dark-screen) .dash-search,
-body:not(.dark-screen) .sidebar:not(.on-page) .drawer-group-label { color: var(--accent-glow); }
-body:not(.dark-screen) .sidebar:not(.on-page) .drawer-group-label::after { background: linear-gradient(90deg, rgba(var(--glow-hi),0.6), rgba(var(--glow-hi),0)); }
-body:not(.dark-screen) .sidebar:not(.on-page) .drawer-legal,
-body:not(.dark-screen) .sidebar:not(.on-page) .drawer-legal a { color: var(--on-ink2); }
+body .dashboard-overlay,
+body .job-overlay,
+body .sidebar:not(.on-page) { background: var(--backdrop); background-color: #070B10; color-scheme: dark; }
+body .dash-hero-date { color: var(--accent-glow); }
+body .dash-hero-title { color: var(--on-ink); }
+body .dash-hero-title b { color: var(--pink); }
+body .dash-hero-more, body .dash-parked { color: var(--on-ink2); }
+body .dash-hero-more i { color: var(--on-ink2); }
+body .dash-hero-more button { color: var(--pink); }
+body .dash-part { color: var(--accent-glow); }
+body .dash-parked .link-btn { color: var(--accent-glow); }
+body .dash-tabs { border-bottom-color: rgba(255,255,255,0.1); }
+body .dash-tab { color: var(--on-ink2); }
+body .dash-tab.active { color: var(--on-ink); }
+body .dash-tab span { background: rgba(255,255,255,0.1); color: var(--on-ink2); }
+body .dash-tab.active span { background: rgba(var(--accent-glow-rgb),0.18); color: var(--accent-glow); }
+body .dash-tabs.searching .dash-tab.active { color: var(--on-ink2); }
+body .dash-tab-line { background: var(--accent-glow); box-shadow: 0 0 10px rgba(var(--glow-hi),0.6); }
+body .dash-none,
+body .dash-search,
+body .sidebar:not(.on-page) .drawer-group-label { color: var(--accent-glow); }
+body .sidebar:not(.on-page) .drawer-group-label::after { background: linear-gradient(90deg, rgba(var(--glow-hi),0.6), rgba(var(--glow-hi),0)); }
+body .sidebar:not(.on-page) .drawer-legal,
+body .sidebar:not(.on-page) .drawer-legal a { color: var(--on-ink2); }
 
 /* ── MENU: ACCOUNT ── who's signed in, at the top of the menu. The card
    is the way in to Your sign-in. */
@@ -5198,7 +5090,7 @@ body:not(.dark-screen) .sidebar:not(.on-page) .drawer-legal a { color: var(--on-
   font: 600 calc(13px * var(--ts)) 'Inter', sans-serif; color: var(--text2);
   text-decoration: underline; text-underline-offset: 3px;
 }
-body:not(.dark-screen) .sidebar:not(.on-page) .drawer-signout { color: var(--on-ink2); }
+body .sidebar:not(.on-page) .drawer-signout { color: var(--on-ink2); }
 /* Your sign-in (Menu › the card on top) */
 .signin-line { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
 .signin-line .job-input { flex: 1; min-width: 0; }
@@ -5272,11 +5164,6 @@ body:not(.dark-screen) .sidebar:not(.on-page) .drawer-signout { color: var(--on-
   font-family: inherit; font-size: calc(13.5px * var(--ts)); font-weight: 700; color: var(--accent2); cursor: pointer;
 }
 .blank-walk-close { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--yellow-text); cursor: pointer; }
-body.dark-screen .blank-walk { background: rgba(255,176,0,0.10); }
-body.dark-screen .finish-next-btn { border: 2px solid var(--border2); }
-body.dark-screen .finish-next-btn.primary { background: var(--accent-glow); color: #000000; box-shadow: none; }
-body.dark-screen .finish-next-btn.primary .finish-next-icon { background: rgba(0,0,0,0.12); color: #000000; }
-body.dark-screen .finish-next-btn.primary small, body.dark-screen .finish-next-btn.primary .finish-next-chev { color: rgba(0,0,0,0.75); }
 
 /* The treatment certificate on This job (its Next step card, then under Treatment), and its Email button lit when arriving from the Jobs list. */
 .qp-cert { margin-top: 8px; padding: 12px; border-radius: 12px; border: 1px solid rgba(var(--accent-rgb), 0.35); background: var(--surface); }
@@ -5290,7 +5177,6 @@ body.dark-screen .finish-next-btn.primary small, body.dark-screen .finish-next-b
 }
 .qp-cert-gaps span { flex: 1 1 60%; min-width: 0; }
 .qp-cert-gaps .quote-link-btn { flex: none; min-height: 36px; }
-body.dark-screen .qp-cert-gaps { background: rgba(255,176,0,0.10); }
 .qp-cert .quote-step-actions, .qp-cert .qp-cert-actions { margin-top: 10px; }
 /* Email and PDF are one row of buttons the same height. */
 .qp-cert .qp-cert-actions { align-items: stretch; }
@@ -5374,8 +5260,7 @@ body.large-touch .section-tab { flex: 0 0 auto; }
    own next step. On Property, an agreement still to sign comes first: its
    button is the filled one, and the done banner's goes quiet. */
 #reportBody[data-step="finish"] > #reportDoneBanner { display: none !important; }
-#reportBody[data-step="property"]:has(> #agreementBanner:not([hidden]):not(.waiting)) #reportDoneBannerBtn,
-body:not(.dark-screen) #reportBody[data-step="property"]:has(> #agreementBanner:not([hidden]):not(.waiting)) #reportDoneBannerBtn {
+body #reportBody[data-step="property"]:has(> #agreementBanner:not([hidden]):not(.waiting)) #reportDoneBannerBtn {
   background: transparent; border-color: currentColor; color: inherit; box-shadow: none;
 }
 /* The Property step's Job details card: back to the address and booking. */
@@ -5391,10 +5276,9 @@ body:not(.dark-screen) #reportBody[data-step="property"]:has(> #agreementBanner:
 .report-job-title { font: 700 calc(15px * var(--ts)) 'Space Grotesk', sans-serif; letter-spacing: -0.2px; }
 .report-job-sub { font-size: calc(12.5px * var(--ts)); line-height: 1.4; color: var(--text3); white-space: pre-line; overflow-wrap: anywhere; }
 .report-job-edit { flex: none; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border2); font-size: calc(13px * var(--ts)); font-weight: 700; color: var(--accent2); }
-body.dark-screen .report-job-card { border: 2px solid var(--border2); box-shadow: none; }
 
 /* The report's top row: back to This job, the address, the ring. */
-body:not(.dark-screen) header .header-back { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
+body header .header-back { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
 .header-job { font-size: calc(14px * var(--ts)); }
 /* The header's address opens the job's details. */
 button.header-job { border: none; background: none; padding: 0; text-align: left; font-family: inherit; cursor: pointer; }
@@ -5409,13 +5293,10 @@ button.header-job.has-job { text-decoration: underline; text-decoration-color: r
   color: var(--text); font: 600 calc(13px * var(--ts)) 'Inter', sans-serif; cursor: pointer; white-space: nowrap;
 }
 .date-chip.on { border-color: transparent; background: var(--accent-grad); color: #FFFFFF; }
-body.dark-screen .date-chip.on { background: var(--accent-glow); color: #000000; }
 #jobDateChips { margin-bottom: 6px; }
 
 /* Report done, not sent yet: the line at the top of every step. */
-.report-done-banner .agreement-banner-btn,
-body:not(.dark-screen) .report-done-banner .agreement-banner-btn { background: var(--accent2); border-color: var(--accent2); color: #FFFFFF; box-shadow: none; }
-body.dark-screen .report-done-banner .agreement-banner-btn { background: var(--accent-glow); border-color: var(--accent-glow); color: #000000; }
+body .report-done-banner .agreement-banner-btn { background: var(--accent2); border-color: var(--accent2); color: #FFFFFF; box-shadow: none; }
 
 /* The job page's Delete, at the very bottom. */
 .job-delete { margin: 18px 4px 0; }
@@ -5435,11 +5316,11 @@ body.dark-screen .report-done-banner .agreement-banner-btn { background: var(--a
    the section is complete. */
 .next-section-btn { width: auto; margin: 4px 14px 14px; }
 .next-section-btn.pending { background: transparent; }
-body:not(.dark-screen) .next-section-btn.pending {
+body .next-section-btn.pending {
   background: var(--surface); color: var(--accent2); text-shadow: none;
   border: 1px solid rgba(var(--accent-rgb), 0.45); box-shadow: none;
 }
-body:not(.dark-screen) .next-section-btn.pending:hover { background: rgba(var(--accent-rgb), 0.08); }
+body .next-section-btn.pending:hover { background: rgba(var(--accent-rgb), 0.08); }
 
 /* ── QUESTION GROUPS ──
    Long steps fold into groups. The header counts what's answered; folded,
@@ -5491,7 +5372,7 @@ body:not(.dark-screen) .next-section-btn.pending:hover { background: rgba(var(--
 /* Grouped steps: each group is a card of its own on a soft panel, with a
    tinted header, so the groups read apart at a glance. */
 .report-section.grouped { background: var(--surface2); }
-body:not(.dark-screen) .report-section.grouped > .section-header { background-color: var(--surface); }
+body .report-section.grouped > .section-header { background-color: var(--surface); }
 .report-section.grouped > details.fgroup {
   margin: 10px 8px 0; background: var(--surface);
   border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
@@ -5507,7 +5388,6 @@ body:not(.dark-screen) .report-section.grouped > .section-header { background-co
 .report-section.grouped > details.fgroup > .section-photo-widget { margin: 2px 12px 4px; }
 .report-section.grouped > .section-photo-widget { margin: 10px 8px 0; background: var(--surface); }
 .report-section.grouped > .next-section-btn { margin-top: 14px; }
-body.dark-screen .report-section.grouped > details.fgroup { border-width: 2px; box-shadow: none; }
 
 /* Sub-headings inside a group: a blue bullet, the topic, a fading rule. */
 .fsub {
@@ -5557,13 +5437,11 @@ body.dark-screen .report-section.grouped > details.fgroup { border-width: 2px; b
 @keyframes sheetVoicePulse { 50% { box-shadow: 0 0 0 6px rgba(215,38,30,0.18); } }
 .sheet-voice[data-state="listening"] .sheet-voice-hint, .sheet-voice[data-state="hearing"] .sheet-voice-hint, .sheet-voice[data-state="filling"] .sheet-voice-hint { display: none; }
 @media (prefers-reduced-motion: reduce) { .sheet-voice[data-state="listening"] .sheet-voice-btn svg { animation: none; } }
-body.dark-screen .sheet-voice { background: var(--surface2); }
 
 /* ── LAST VISIT: an address inspected before ── */
-body:not(.dark-screen) .agreement-banner.last-visit-banner, .agreement-banner.last-visit-banner { border-color: var(--accent-edge); background: var(--accent-wash); color: var(--accent2); box-shadow: none; }
-body.dark-screen .agreement-banner.last-visit-banner { border-color: rgba(var(--accent-rgb),0.45); background: rgba(var(--accent-rgb),0.1); color: var(--accent2); }
+body .agreement-banner.last-visit-banner { border-color: var(--accent-edge); background: var(--accent-wash); color: var(--accent2); box-shadow: none; }
 .last-visit-skip { flex-shrink: 0; padding: 0 6px; min-height: 32px; font-size: calc(12px * var(--ts)); font-weight: 700; color: inherit; opacity: 0.8; }
-body:not(.dark-screen) .agreement-banner.last-visit-banner .agreement-banner-btn { background: var(--accent2); border-color: var(--accent2); color: #fff; box-shadow: none; }
+body .agreement-banner.last-visit-banner .agreement-banner-btn { background: var(--accent2); border-color: var(--accent2); color: #fff; box-shadow: none; }
 .last-visit-rows { display: flex; flex-direction: column; gap: 8px; }
 .last-visit-row { padding: 10px 12px; border-radius: 10px; background: var(--bg); border-left: 3px solid transparent; }
 .last-visit-row.changed { border-left-color: var(--yellow); }
@@ -5637,11 +5515,11 @@ body:not(.dark-screen) .agreement-banner.last-visit-banner .agreement-banner-btn
 .job-page .job-panel-body { padding: 14px 16px 6px; }
 .job-page .sync-status { padding-left: 16px; padding-right: 16px; }
 .job-page .sync-status { padding-bottom: 14px; }
-body:not(.dark-screen) .job-hero-addr { color: var(--on-ink); }
-body:not(.dark-screen) .job-hero-sub,
-body:not(.dark-screen) .job-section-head { color: var(--on-ink2); }
-body:not(.dark-screen) .job-section-head { color: var(--accent-glow); }
-body:not(.dark-screen) .job-page #jobPanel { border-color: transparent; box-shadow: 0 14px 36px rgba(0,0,0,0.35); }
+body .job-hero-addr { color: var(--on-ink); }
+body .job-hero-sub,
+body .job-section-head { color: var(--on-ink2); }
+body .job-section-head { color: var(--accent-glow); }
+body .job-page #jobPanel { border-color: transparent; box-shadow: 0 14px 36px rgba(0,0,0,0.35); }
 
 /* The job page's look: a hero with what the job is, how far along it is
    and one-tap Call, Email and Directions; the next step with its
@@ -5735,8 +5613,8 @@ body:not(.dark-screen) .job-page #jobPanel { border-color: transparent; box-shad
 .job-skipped { margin: 12px 4px 0; }
 .job-skipped p { margin: 0; padding: 4px 0; font-size: calc(13.5px * var(--ts)); line-height: 1.45; color: var(--text3); }
 .job-skipped button { min-height: 32px; padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--accent2); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-body:not(.dark-screen) .job-skipped p { color: var(--on-ink2); }
-body:not(.dark-screen) .job-skipped button { color: var(--accent-glow); }
+body .job-skipped p { color: var(--on-ink2); }
+body .job-skipped button { color: var(--accent-glow); }
 /* What went in, folded under the buttons. */
 .job-pdf-more { margin: 4px 0 -6px 58px; }
 .job-pdf-more > summary { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; list-style: none;
@@ -5765,7 +5643,7 @@ body .job-page .job-details #jobPanel:not(.menu-page-active) { margin: 0; border
 .job-fold-body .qp-links { margin-top: 0; }
 .job-fold-body .qp-cert, .job-fold-body .bait-card { margin-top: 4px; }
 .job-steps li.now > .job-fold { border: 2px solid var(--accent); }
-body:not(.dark-screen) .job-page .job-steps li.now > .job-fold { border-color: var(--accent-hi); }
+body .job-page .job-steps li.now > .job-fold { border-color: var(--accent-hi); }
 /* A step that can't be started yet is a line, not a button. */
 .job-step-still { box-sizing: border-box; cursor: default; }
 /* The Next step card does a step that's done on this page: the client's
@@ -5775,26 +5653,26 @@ body:not(.dark-screen) .job-page .job-steps li.now > .job-fold { border-color: v
 .job-next .qp-links { margin-top: 6px; }
 .job-next .qp-cert { margin-top: 14px; }
 
-/* On the ink backdrop (the light screen): white cards with a shadow, the
+/* On the ink backdrop: white cards with a shadow, the
    hero's text and buttons light. */
-body:not(.dark-screen) .job-hero-eyebrow { color: var(--accent-glow); }
-body:not(.dark-screen) .job-hero-count { color: var(--on-ink2); }
-body:not(.dark-screen) .job-progress i { background: rgba(255,255,255,0.14); }
-body:not(.dark-screen) .job-progress i.done { background: var(--green-fill); }
-body:not(.dark-screen) .job-progress i.now { background: var(--accent-hi); }
-body:not(.dark-screen) .job-progress i.bad { background: #FF5A4F; }
-body:not(.dark-screen) .job-progress i.skip { background: rgba(255,255,255,0.07); }
-body:not(.dark-screen) .job-act { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.16); color: var(--on-ink); }
-body:not(.dark-screen) .job-act svg { color: var(--accent-glow); }
-body:not(.dark-screen) .job-page .job-step,
-body:not(.dark-screen) .job-pdf,
-body:not(.dark-screen) .job-details { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
-body:not(.dark-screen) .job-page .job-steps li.now .job-step { border-color: var(--accent-hi); }
-body:not(.dark-screen) .job-page .job-steps li:not(:last-child)::after { background: rgba(255,255,255,0.2); }
-body:not(.dark-screen) .job-page .job-steps li.done:not(:last-child)::after { background: var(--green-fill); }
+body .job-hero-eyebrow { color: var(--accent-glow); }
+body .job-hero-count { color: var(--on-ink2); }
+body .job-progress i { background: rgba(255,255,255,0.14); }
+body .job-progress i.done { background: var(--green-fill); }
+body .job-progress i.now { background: var(--accent-hi); }
+body .job-progress i.bad { background: #FF5A4F; }
+body .job-progress i.skip { background: rgba(255,255,255,0.07); }
+body .job-act { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.16); color: var(--on-ink); }
+body .job-act svg { color: var(--accent-glow); }
+body .job-page .job-step,
+body .job-pdf,
+body .job-details { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
+body .job-page .job-steps li.now .job-step { border-color: var(--accent-hi); }
+body .job-page .job-steps li:not(:last-child)::after { background: rgba(255,255,255,0.2); }
+body .job-page .job-steps li.done:not(:last-child)::after { background: var(--green-fill); }
 /* Touch keeps hover after a tap: a card keeps its white. */
-body:not(.dark-screen) .job-page .job-step:hover { background: var(--surface); }
-body:not(.dark-screen) .job-page .job-step:active { background: var(--surface2); }
+body .job-page .job-step:hover { background: var(--surface); }
+body .job-page .job-step:active { background: var(--surface2); }
 
 /* Job details in three parts: Property, Client and Booking, each under its
    own head. On a new job they're the page itself, a card each, with the
@@ -5831,20 +5709,11 @@ body .job-page .job-details.new #jobPanel:not(.menu-page-active) { border: none;
 /* Under the two ways to sign: coming back to it later is a quiet line. */
 .job-next .job-next-later { margin-top: 4px; }
 .job-next .job-next-later button { border-color: transparent; background: none; color: var(--text2); text-decoration: underline; text-underline-offset: 3px; }
-body:not(.dark-screen) .job-hero-tip { color: var(--on-ink2); }
-body:not(.dark-screen) .job-hero-tip svg { color: var(--accent-glow); }
-body:not(.dark-screen) .job-page .job-details.new,
-body:not(.dark-screen) .job-page .job-details.new #jobPanel { box-shadow: none; }
-body:not(.dark-screen) .job-details.new .job-group { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
-body.dark-screen .job-page .job-details.new { border: none; }
-body.dark-screen .job-details.new .job-group { border: 3px solid var(--frame); border-radius: 6px; }
-
-/* Dark screen: tinted tiles, and the amber frame round Job details. */
-body.dark-screen .job-tile.done { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.35); }
-body.dark-screen .job-tile.bad { background: rgba(255,90,79,0.12); border-color: rgba(255,90,79,0.35); }
-body.dark-screen .job-tile-tick { color: #04210F; }
-body.dark-screen .job-act { background: var(--surface); border-color: var(--border2); }
-body.dark-screen .job-details { border: 3px solid var(--frame); border-radius: 6px; }
+body .job-hero-tip { color: var(--on-ink2); }
+body .job-hero-tip svg { color: var(--accent-glow); }
+body .job-page .job-details.new,
+body .job-page .job-details.new #jobPanel { box-shadow: none; }
+body .job-details.new .job-group { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
 
 /* The logo's dot is the brand's pink. */
 .logo-dot { fill: var(--pink); stroke: var(--pink); }
@@ -5894,7 +5763,6 @@ body.dark-screen .job-details { border: 3px solid var(--frame); border-radius: 6
 .send-review-gaps .send-review-list li::before {
   content: ''; position: absolute; left: 2px; top: 17px; width: 7px; height: 7px; border-radius: 99px; background: var(--yellow);
 }
-body.dark-screen .send-review-file .link-btn, body.dark-screen .send-review-fixes .link-btn { background: var(--surface2); }
 /* A line and its button side by side; two buttons drop under the line. */
 .send-review-gaps .send-review-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 .send-review-gap-text { flex: 1 1 58%; min-width: 0; }
@@ -5918,7 +5786,6 @@ body.dark-screen .send-review-file .link-btn, body.dark-screen .send-review-fixe
 .pb-row-title { font-size: calc(13px * var(--ts)); font-weight: 650; color: var(--text); line-height: 1.35; }
 .pb-row-unit { font-size: calc(11.5px * var(--ts)); color: var(--text3); line-height: 1.4; }
 .pb-start { color: #8a5a00; font-weight: 600; }
-body.dark-screen .pb-start { color: var(--yellow); }
 .pb-price { position: relative; flex: none; width: 104px; }
 .pb-dollar { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: calc(14px * var(--ts)); color: var(--text3); pointer-events: none; }
 .pb-price .pb-input { width: 100%; padding-left: 24px; text-align: right; font-variant-numeric: tabular-nums; font-size: calc(15px * var(--ts)); min-height: 44px; }
@@ -5955,7 +5822,6 @@ body.dark-screen .pb-start { color: var(--yellow); }
 .treat-use .chem-links { margin-top: 4px; }
 .treat-use-pest { font-weight: 500; color: var(--text3); }
 .treat-use-note { font-size: calc(12px * var(--ts)); color: #8a5a00; line-height: 1.4; margin-top: 4px; }
-body.dark-screen .treat-use-note { color: var(--yellow); }
 .treat-keep-rate { margin-top: 4px; }
 .chem-nolink { color: var(--text3); font-weight: 500; }
 .chem-unreg { color: var(--risk, #b42318); font-weight: 700; }
@@ -5971,7 +5837,6 @@ body.dark-screen .treat-use-note { color: var(--yellow); }
 .chem-doc-exp { font-weight: 600; color: var(--text3); }
 .chem-doc-exp.soon { color: #8a5a00; }
 .chem-doc-exp.expired { color: var(--risk, #b42318); }
-body.dark-screen .chem-doc-exp.soon { color: var(--yellow); }
 .chem-doc-row { display: flex; align-items: stretch; gap: 8px; }
 .chem-doc-link { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 10px; border-radius: 8px; background: rgba(var(--accent-rgb),0.06); color: var(--accent2); font-size: calc(13px * var(--ts)); font-weight: 600; text-decoration: none; }
 .chem-doc-link span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -5986,7 +5851,6 @@ body.dark-screen .chem-doc-exp.soon { color: var(--yellow); }
 .chem-rate-use { font-size: calc(12.5px * var(--ts)); color: var(--text2, var(--text)); line-height: 1.4; }
 .chem-rate-val { font-size: calc(13px * var(--ts)); font-weight: 650; color: var(--text); }
 .chem-rate-val.none { color: #8a5a00; font-weight: 600; }
-body.dark-screen .chem-rate-val.none { color: var(--yellow); }
 .chem-edit-body { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
 .chem-edit-body .quote-link-btn { align-self: flex-start; }
 
@@ -6059,7 +5923,7 @@ button.drawer-help { width: 100%; font-family: inherit; text-align: left; cursor
 #voicePopover .voice-popover-close { margin: -6px -6px -6px 0; }
 #voicePopover > .waveform { grid-row: 1; grid-column: 2; align-self: center; height: 22px; margin-right: 4px; }
 #voicePopover > .voice-btn { grid-column: 1; min-height: 52px; padding: 6px 12px; gap: 12px; border-radius: 14px; font-size: calc(14px * var(--ts)); }
-body:not(.dark-screen) #voicePopover .voice-btn .mic-svg { width: 20px; height: 20px; padding: 8px; }
+body #voicePopover .voice-btn .mic-svg { width: 20px; height: 20px; padding: 8px; }
 #voicePopover > .voice-photo-btn { grid-column: 2; position: relative; width: 52px; min-height: 52px; margin: 0; padding: 0; border-radius: 14px; }
 #voicePopover .voice-photo-btn svg { width: 20px; height: 20px; }
 #voicePopover .voice-photo-btn[data-count]:not([data-count=""])::after {

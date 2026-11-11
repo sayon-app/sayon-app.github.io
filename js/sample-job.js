@@ -157,7 +157,7 @@ function sampleSitePlan(treated = true) {
     { id: 'ps_drive', k: 'driveway', x: 160, y: 120, w: 100, h: 330, label: 'Driveway' },
     { id: 'ps_house', k: 'house', x: 300, y: 200, w: 400, h: 275, label: 'House' },
     { id: 'ps_garden', k: 'garden', x: 728, y: 205, w: 45, h: 130, label: '' },
-    { id: 'ps_bridge', k: 'bridge', x: 800, y: 255, label: 'Weep holes bridged' },
+    { id: 'ps_bridge', k: 'bridge', x: 752, y: 300, label: 'Weep holes bridged' },
     { id: 'ps_found', k: 'activity', x: 688, y: 395, label: 'Laundry' },
     { id: 'ps_tap', k: 'tap', x: 740, y: 490, label: 'Dripping' },
     { id: 'ps_meter', k: 'notice', x: 310, y: 240, label: 'Meter box' },

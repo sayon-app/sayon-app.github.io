@@ -2,12 +2,11 @@
 // Finalising a job, its one ending: the report and quote lock as a version
 // (lockJob in js/app/dashboard.js) and every document the job made is
 // joined into one PDF behind a contents page: the agreement, the report,
-// the quote, the treatment and installation certificates and the bait
-// station visit reports. Each part keeps its own PDF. Steps the job skipped
-// (no quote, a declined quote, no treatment) are left out, so a report-only
-// job still gets its PDF. It's offered on This job once the job's steps are
-// done and the client has the report as it stands (jobCanFinalise), not
-// before.
+// the quote, the treatment certificate and the bait station visit reports.
+// Each part keeps its own PDF. Steps the job skipped (no quote, a declined
+// quote, no treatment) are left out, so a report-only job still gets its
+// PDF. It's offered on This job once the job's steps are done and the
+// client has the report as it stands (jobCanFinalise), not before.
 //   reportData.jobPdfAt      when the job PDF was last made
 //   reportData.jobPdfSentAt  when it was last emailed
 // The pages are joined with pdf-lib (js/vendor), loaded the first time.
@@ -25,7 +24,7 @@ function ensurePdfLibLoaded() {
 }
 
 // The pages of each PDF (a Blob, its bytes or a loaded PDFDocument), one
-// after another, as one new PDFDocument. Also joins the two certificates.
+// after another, as one new PDFDocument.
 async function joinPdfs(lib, pdfs) {
   const out = await lib.PDFDocument.create();
   for (const p of pdfs) {
@@ -69,7 +68,6 @@ function jobPdfParts() {
   if (q && q.treatment) {
     const t = q.treatment;
     parts.push({ kind: 'cert', title: 'Treatment certificate', note: `Treated ${formatAnswerDate(t.date)}${t.technician ? ' by ' + t.technician : ''}`, build: () => buildTreatmentCertificatePDF(q) });
-    if (installedSystems(t).length) parts.push({ kind: 'cert', title: 'Certificate of installation', note: installedSystems(t).map(k => (TREATMENT_METHODS[k] || {}).label || k).join(', '), build: () => buildTreatmentCertificatePDF(q, { install: true }) });
   }
   if (q && typeof baitVisitsOf === 'function') baitVisitsOf(q).forEach(v => {
     parts.push({ kind: 'bait', title: `Bait station visit, ${formatAnswerDate(v.date)}`, note: baitVisitShort(v), build: () => buildBaitVisitPDF(q, v) });
@@ -228,12 +226,12 @@ function renderJobPdfButtons(busy) {
   document.querySelectorAll('.job-pdf-btn').forEach(b => { b.disabled = !!busy; if (busy && b.dataset.busy) b.textContent = b.dataset.busy; });
 }
 
-// What's in it, in a few words: "Agreement, report, quote, 2 certificates
-// and a bait visit report".
+// What's in it, in a few words: "Agreement, report, quote, certificate
+// and 2 bait visit reports".
 function jobPdfContentsLine(parts) {
   const n = kind => parts.filter(p => p.kind === kind).length;
   const words = [n('agreement') && 'agreement', n('report') && 'report', n('quote') && 'quote',
-    n('cert') && (n('cert') > 1 ? `${n('cert')} certificates` : 'certificate'),
+    n('cert') && 'certificate',
     n('bait') && (n('bait') > 1 ? `${n('bait')} bait visit reports` : 'a bait visit report')].filter(Boolean);
   const line = words.length > 1 ? words.slice(0, -1).join(', ') + ' and ' + words[words.length - 1] : words.join('');
   return line.charAt(0).toUpperCase() + line.slice(1);

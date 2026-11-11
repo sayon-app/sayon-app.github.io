@@ -1164,6 +1164,7 @@ async function fetchTeam() {
 async function loadTeam() {
   const list = document.getElementById('teamList');
   const placesEl = document.getElementById('teamPlacesText');
+  document.getElementById('teamPlacesTrack').hidden = true;
   if (!authBusiness || !isBusinessOwner()) {
     placesEl.textContent = 'Your business owner looks after the team.';
     list.innerHTML = '';
@@ -1193,6 +1194,14 @@ function renderTeam(sub) {
   else if (sub.plan === 'trial') placesEl.textContent = `${taken} of ${cap} places used. The free trial lets you try SAYON with up to ${cap} people; Team takes up to 9.`;
   else placesEl.textContent = `${taken} of ${cap} inspector places used on your ${plan} plan.`;
   const full = cap !== null && taken >= cap;
+  // The places as a meter, like Billing's AI fills: full shows amber.
+  const track = document.getElementById('teamPlacesTrack');
+  const meter = cap && sub.plan !== 'starter';
+  track.hidden = !meter;
+  if (meter) {
+    track.classList.toggle('full', full);
+    document.getElementById('teamPlacesFill').style.width = Math.min(100, Math.round(taken / cap * 100)) + '%';
+  }
   document.getElementById('teamInviteBtn').disabled = full;
   document.getElementById('teamInviteEmail').disabled = full;
   document.getElementById('teamMorePlaces').hidden = !full;
@@ -1200,7 +1209,9 @@ function renderTeam(sub) {
   const rows = members.map(m => {
     const you = m.user_id === authUser.id;
     const who = escapeHtml(m.name && m.name !== m.email ? m.name : m.email || 'Inspector');
+    const face = (m.name && m.name !== m.email ? m.name : (m.email || '?').split('@')[0]).trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
     return `<div class="team-row">
+      <span class="team-face${m.role === 'owner' ? ' owner' : ''}" aria-hidden="true">${escapeHtml(face)}</span>
       <div class="team-row-text"><div class="team-row-name">${who}${you ? ' (you)' : ''}</div>
       <div class="team-row-sub">${escapeHtml(m.email || '')}${m.role === 'owner' ? ' · Owner' : ''}</div></div>
       ${you || m.role === 'owner' ? '' : `<button class="link-btn team-row-btn" data-id="${escapeHtml(m.user_id)}" onclick="removeTeamMember(this.dataset.id)">Remove</button>`}
@@ -1208,6 +1219,7 @@ function renderTeam(sub) {
   });
   invites.forEach(i => {
     rows.push(`<div class="team-row team-row-pending">
+      <span class="team-face pending" aria-hidden="true"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
       <div class="team-row-text"><div class="team-row-name">${escapeHtml(i.email)}</div>
       <div class="team-row-sub">Invited, not signed up yet</div></div>
       <button class="link-btn team-row-btn" data-id="${escapeHtml(i.id)}" onclick="shareTeamInvite(this.dataset.id)">Send link</button>
@@ -1672,6 +1684,11 @@ function renderProfileMenu() {
   if (nameEl) nameEl.textContent = name;
   const emailEl = document.getElementById('profileEmail');
   if (emailEl) emailEl.textContent = authUser.email;
+  // Your sign-in's own card: the same face, name and email.
+  const meInitials = document.getElementById('meInitials');
+  if (meInitials) meInitials.textContent = initials;
+  const meWho = document.getElementById('meWhoName');
+  if (meWho) meWho.textContent = name;
   const bizRow = document.getElementById('profileBusinessRow');
   if (bizRow) {
     // The name the PDFs print, which Business details edits
@@ -1709,6 +1726,7 @@ function openSignInPage() {
   if (!authUser) return;
   document.getElementById('meName').value = (authUser.user_metadata || {}).name || '';
   document.getElementById('meEmail').textContent = authUser.email || '';
+  renderProfileMenu();
   document.getElementById('mePassError').textContent = '';
   ['mePassNow', 'mePassNew'].forEach(id => {
     const el = document.getElementById(id);

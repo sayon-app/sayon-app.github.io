@@ -1141,7 +1141,19 @@
         </button>
         <div class="job-panel-body">
           <div class="settings-row-desc pb-intro">Every report, quote and certificate you send prints these details. Changes show on the next PDF you make.</div>
-          <div class="business-fields-slot" id="businessPageSlot">
+          <!-- How the top of each PDF reads, as the boxes are typed in
+               (renderBusinessPreview in js/app/state.js) -->
+          <div class="menu-card biz-preview" id="businessPreview" aria-hidden="true">
+            <div class="biz-preview-tag">On every PDF</div>
+            <div class="biz-preview-head">
+              <span class="biz-preview-logo" id="bizPreviewLogo"></span>
+              <span class="biz-preview-text">
+                <span class="biz-preview-name" id="bizPreviewName"></span>
+                <span class="biz-preview-line" id="bizPreviewLine"></span>
+              </span>
+            </div>
+          </div>
+          <div class="menu-card business-fields-slot" id="businessPageSlot">
             <div class="business-fields" id="businessFields" oninput="businessFormTouched()">
               <div class="auth-field" id="obNameField">
                 <label class="auth-label" for="ob-companyName">Business name</label>
@@ -1198,6 +1210,7 @@
           <div class="settings-row-desc pb-owner" id="pbOwnerNote" hidden>Your business owner sets these prices. They show on your quotes.</div>
           <div class="pb-list" id="pbList"></div>
           <div class="settings-group-title">How you charge</div>
+          <div class="menu-card">
           <div class="settings-row">
             <div class="settings-row-text">
               <div class="settings-row-title">Add GST</div>
@@ -1208,6 +1221,7 @@
           <div class="pb-terms">
             <label class="settings-row-title" for="pbTerms">Payment terms</label>
             <textarea class="job-input pb-terms-input" id="pbTerms" rows="2" onchange="onPriceBookTerms(this)"></textarea>
+          </div>
           </div>
         </div>
       </div>
@@ -1249,15 +1263,22 @@
           <svg class="icon panel-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
         </button>
         <div class="job-panel-body">
-          <div class="settings-row-desc team-places" id="teamPlacesText">Loading…</div>
-          <div class="team-list" id="teamList"></div>
-          <div class="settings-group-title">Add an inspector</div>
-          <div class="team-invite">
-            <input class="job-input" id="teamInviteEmail" type="email" inputmode="email" autocomplete="off" placeholder="Their email address" aria-label="Their email address" onkeydown="if (event.key === 'Enter') inviteTeamMember()">
-            <button class="job-action-btn settings-primary-btn" id="teamInviteBtn" onclick="inviteTeamMember()">Invite</button>
+          <div class="menu-card team-card">
+            <div class="team-places" id="teamPlaces">
+              <div class="settings-row-desc team-places-text" id="teamPlacesText">Loading…</div>
+              <div class="bill-meter-track team-places-track" id="teamPlacesTrack" hidden><i id="teamPlacesFill"></i></div>
+            </div>
+            <div class="team-list" id="teamList"></div>
           </div>
-          <div class="settings-row-desc team-help">Send them the sign-up link SAYON gives you. When they sign up with that email, they join your business: your business details, logo and prices on every PDF, with their own reports and the AI fills shared.</div>
           <button class="job-action-btn settings-primary-btn team-more" id="teamMorePlaces" onclick="openMenuPage('billingPanel')" hidden>More inspector places in Billing</button>
+          <div class="settings-group-title">Add an inspector</div>
+          <div class="menu-card team-invite-card">
+            <div class="team-invite">
+              <input class="job-input" id="teamInviteEmail" type="email" inputmode="email" autocomplete="off" placeholder="Their email address" aria-label="Their email address" onkeydown="if (event.key === 'Enter') inviteTeamMember()">
+              <button class="job-action-btn settings-primary-btn" id="teamInviteBtn" onclick="inviteTeamMember()">Invite</button>
+            </div>
+            <div class="settings-row-desc team-help">Send them the sign-up link SAYON gives you. When they sign up with that email, they join your business: your business details, logo and prices on every PDF, with their own reports and the AI fills shared.</div>
+          </div>
         </div>
       </div>
 
@@ -1425,6 +1446,7 @@
         </button>
         <div class="job-panel-body">
           <div class="settings-group-title">Display</div>
+          <div class="menu-card">
           <div class="settings-row">
             <div class="settings-row-text">
               <div class="settings-row-title">Text size</div>
@@ -1469,7 +1491,9 @@
               <option value="tritanopia">Tritanopia</option>
             </select>
           </div>
+          </div>
           <div class="settings-group-title">Voice</div>
+          <div class="menu-card">
           <div class="settings-row" id="audioCaptureRow" hidden>
             <div class="settings-row-text">
               <div class="settings-row-title">Second transcription (experimental)</div>
@@ -1484,7 +1508,9 @@
               <div class="learned-list" id="learnedList"></div>
             </div>
           </div>
+          </div>
           <div class="settings-group-title">Your data</div>
+          <div class="menu-card">
           <div class="settings-row">
             <div class="settings-row-text">
               <div class="settings-row-title">Download a copy</div>
@@ -1509,6 +1535,8 @@
             </div>
             <button type="button" class="toggle-switch" id="toggleTestMode" onclick="toggleTestMode()" aria-label="Test mode"></button>
           </div>
+          </div>
+          <div class="menu-card menu-card-danger">
           <div class="settings-row">
             <div class="settings-row-text">
               <div class="settings-row-title">Delete all jobs</div>
@@ -1522,6 +1550,7 @@
               <div class="settings-row-desc">Permanently deletes your account, every report and photo stored online, and everything on this phone.</div>
             </div>
             <button class="job-action-btn settings-danger-btn" onclick="deleteMyAccount()">Delete</button>
+          </div>
           </div>
         </div>
       </div>
@@ -1555,17 +1584,24 @@
           <span class="panel-title">Your sign-in</span>
         </button>
         <div class="job-panel-body">
+          <div class="menu-card signin-who">
+            <span class="menu-account-avatar" id="meInitials" aria-hidden="true">?</span>
+            <span class="signin-who-text">
+              <span class="signin-who-name" id="meWhoName"></span>
+              <span class="signin-email" id="meEmail"></span>
+            </span>
+          </div>
+          <div class="settings-row-desc signin-email-note">You sign in with this email. It can't be changed here yet: if you need it moved, <a href="mailto:sayon.application@gmail.com?subject=SAYON%20sign-in%20email">email SAYON</a>.</div>
           <div class="settings-group-title">Your name</div>
+          <div class="menu-card">
           <div class="signin-line">
             <input class="job-input" id="meName" type="text" autocomplete="name" aria-label="Your name" onkeydown="if (event.key === 'Enter') saveMyName()">
             <button type="button" class="job-action-btn settings-primary-btn" id="meNameSave" onclick="saveMyName()">Save</button>
           </div>
           <div class="settings-row-desc">SAYON shows this name in your menu, and starts a new job, treatment record or bait visit with it.</div>
-          <div class="settings-group-title">Email</div>
-          <div class="signin-email" id="meEmail"></div>
-          <div class="settings-row-desc">You sign in with this. It can't be changed here yet: if you need it moved, <a href="mailto:sayon.application@gmail.com?subject=SAYON%20sign-in%20email">email SAYON</a>.</div>
+          </div>
           <div class="settings-group-title">Change password</div>
-          <div class="signin-pass">
+          <div class="menu-card signin-pass">
             <label class="settings-row-title" for="mePassNow">Current password</label>
             <div class="auth-pass"><input class="job-input" id="mePassNow" type="password" autocomplete="current-password"><button type="button" class="auth-reveal" onclick="toggleAuthReveal(this)" aria-label="Show password" aria-pressed="false">Show</button></div>
             <label class="settings-row-title" for="mePassNew">New password</label>

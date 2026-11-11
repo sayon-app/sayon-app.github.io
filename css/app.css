@@ -1146,8 +1146,7 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .auth-inline-link { border: none; background: none; padding: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
 .drawer-help { text-decoration: none; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-top: 8px; }
 /* Send is for the report: off the menu's own pages (Settings, Billing). */
-.settings-row.current-plan { background: rgba(var(--accent-rgb), 0.08); border-radius: 10px; }
-.settings-row.current-plan .settings-primary-btn:disabled { opacity: 1; background: transparent; color: var(--accent2); border-color: transparent; box-shadow: none; }
+
 
 
 /* ── HORIZONTAL SECTION TABS (in report) ── */
@@ -5456,11 +5455,95 @@ body .agreement-banner.last-visit-banner .agreement-banner-btn { background: var
 .last-visit-cols small { display: block; font-size: calc(11px * var(--ts)); color: var(--text2); font-weight: 600; }
 .last-visit-row.changed .last-visit-cols > div:last-child { font-weight: 700; }
 
+/* ── BILLING: your subscription, the plans, the fine print ── */
+.billing-body { display: flex; flex-direction: column; gap: 14px; padding-top: 4px; }
+.bill-section-label { margin: 6px 2px -4px; font-size: calc(11.5px * var(--ts)); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text3); }
+
+/* Your subscription: a blue card, like the plan you hold. */
+.bill-current {
+  position: relative; overflow: hidden;
+  padding: 18px 18px 16px; border-radius: 18px; color: #fff;
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(var(--accent-glow-rgb), 0.55) 0%, rgba(var(--accent-glow-rgb), 0) 55%),
+    linear-gradient(135deg, #2F6BFF 0%, #1F4FE0 55%, #1E3A8A 100%);
+  box-shadow: 0 10px 28px rgba(var(--accent-deep-rgb), 0.28), 0 1px 0 rgba(255,255,255,0.25) inset;
+}
+.bill-current::after {
+  content: ''; position: absolute; right: -40px; bottom: -60px; width: 180px; height: 180px; border-radius: 50%;
+  border: 26px solid rgba(255,255,255,0.07); pointer-events: none;
+}
+.bill-current-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bill-eyebrow { font-size: calc(11.5px * var(--ts)); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.78); }
+.bill-pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+  font-size: calc(12px * var(--ts)); font-weight: 700; background: rgba(255,255,255,0.16); color: #fff; border: 1px solid rgba(255,255,255,0.28);
+}
+.bill-pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.bill-pill[data-tone="good"] { background: #fff; color: var(--green); border-color: #fff; }
+.bill-pill[data-tone="warn"] { background: #FFF4DB; color: var(--yellow-text); border-color: #FFF4DB; }
+.bill-pill[data-tone="bad"] { background: #FFE4E1; color: var(--risk); border-color: #FFE4E1; }
+.bill-current-plan { margin-top: 8px; font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: calc(28px * var(--ts)); font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; }
+.bill-current-price { margin-top: 4px; font-size: calc(14px * var(--ts)); font-weight: 600; color: rgba(255,255,255,0.9); }
+.bill-status-text { margin-top: 10px; font-size: calc(13px * var(--ts)); line-height: 1.5; color: rgba(255,255,255,0.92); }
+.bill-current[data-tone="bad"] .bill-status-text, .bill-current[data-tone="warn"] .bill-status-text {
+  padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.24); color: #fff; font-weight: 600;
+}
+.bill-meter { position: relative; z-index: 1; margin-top: 16px; padding: 12px 14px; border-radius: 14px; background: rgba(6,18,58,0.22); }
+.bill-meter-top, .bill-meter-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.bill-meter-top { font-size: calc(12.5px * var(--ts)); font-weight: 600; color: rgba(255,255,255,0.85); }
+.bill-meter-count { font-size: calc(13px * var(--ts)); color: rgba(255,255,255,0.85); white-space: nowrap; }
+.bill-meter-count b { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: calc(20px * var(--ts)); font-weight: 700; color: #fff; }
+.bill-meter-track { height: 10px; margin: 8px 0; border-radius: 999px; background: rgba(255,255,255,0.2); overflow: hidden; }
+.bill-meter-fill { height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, #fff 0%, #DCE6FF 100%); box-shadow: 0 0 10px rgba(255,255,255,0.6); transition: width 0.6s cubic-bezier(.2,.8,.2,1); }
+.bill-meter[data-level="low"] .bill-meter-fill { background: linear-gradient(90deg, #FFD36B, #F5A524); box-shadow: none; }
+.bill-meter[data-level="out"] .bill-meter-fill { background: linear-gradient(90deg, #FF8FB8, var(--pink)); box-shadow: none; }
+.bill-meter-foot { font-size: calc(12px * var(--ts)); color: rgba(255,255,255,0.8); flex-wrap: wrap; }
+@media (prefers-reduced-motion: reduce) { .bill-meter-fill { transition: none; } }
+.bill-manage { position: relative; z-index: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-top: 14px; }
+.bill-current .bill-manage .settings-primary-btn { background: #fff !important; color: var(--accent2) !important; border-color: #fff !important; box-shadow: 0 2px 8px rgba(6,18,58,0.18); }
+.bill-current .bill-manage .settings-primary-btn:hover { background: var(--accent-wash) !important; }
+.bill-manage-hint { font-size: calc(12px * var(--ts)); color: rgba(255,255,255,0.8); }
+
+/* The plans: one card each, side by side when there's room. */
+.bill-plans { display: grid; gap: 12px; }
+.plan-card {
+  position: relative; display: flex; flex-direction: column; gap: 14px;
+  padding: 16px; border-radius: 16px; background: var(--surface);
+  border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(13,17,23,0.04), 0 6px 18px rgba(30,58,138,0.06);
+}
+.plan-card-text { flex: 1; min-width: 0; }
+.plan-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.plan-name { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: calc(18px * var(--ts)); font-weight: 700; color: var(--text); }
+.plan-badge { display: none; padding: 3px 9px; border-radius: 999px; font-size: calc(11.5px * var(--ts)); font-weight: 700; background: var(--accent2); color: #fff; }
+.plan-price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 6px; margin-top: 6px; }
+.plan-amount { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: calc(32px * var(--ts)); font-weight: 700; line-height: 1; letter-spacing: -0.02em; color: var(--text); }
+.plan-per { font-size: calc(13px * var(--ts)); font-weight: 600; color: var(--text2); }
+.plan-feats { list-style: none; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--border); display: grid; gap: 7px; }
+.plan-feats li { display: flex; gap: 8px; align-items: flex-start; font-size: calc(13px * var(--ts)); line-height: 1.4; color: var(--text2); }
+.plan-feats li svg { flex: none; margin-top: 2px; padding: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--accent-wash); color: var(--accent2); }
+.plan-card .plan-btn { width: 100%; min-height: 46px; justify-content: center; font-weight: 700; }
+.plan-card.current-plan { border: 2px solid var(--accent); padding: 15px; background: linear-gradient(180deg, var(--accent-wash) 0%, var(--surface) 70%); box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.16); }
+.plan-card.current-plan .plan-badge { display: inline-block; }
+.plan-card.current-plan .plan-btn:disabled { opacity: 1; background: transparent !important; color: var(--accent2) !important; border-color: rgba(var(--accent-rgb),0.3) !important; border-style: dashed !important; box-shadow: none; }
+
 /* Billing: how many inspectors on Team and Business */
-.seat-pick { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: calc(12.5px * var(--ts)); color: var(--text2); }
+.seat-pick { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: var(--surface2); font-size: calc(13px * var(--ts)); color: var(--text2); }
 .seat-pick label { font-weight: 600; }
-.seat-pick .seat-input { width: 76px; min-height: 40px; padding: 8px 10px; text-align: center; }
-.seat-total { color: var(--text); font-weight: 600; }
+.seat-pick .seat-input { width: 76px; min-height: 40px; padding: 8px 10px; text-align: center; background: var(--surface); }
+.seat-total { margin-left: auto; color: var(--text); font-weight: 700; font-size: calc(14px * var(--ts)); }
+
+/* The fine print: short lines, and who takes the payment. */
+.bill-fine { display: flex; flex-direction: column; gap: 10px; }
+.bill-secure { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 12px; background: var(--green-wash); border: 1px solid var(--green-edge); font-size: calc(12.5px * var(--ts)); font-weight: 600; color: var(--green); line-height: 1.45; }
+.bill-secure svg { flex: none; }
+.bill-terms { list-style: none; margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); display: grid; gap: 8px; }
+.bill-terms:has(+ .bill-terms:not([hidden])) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; padding-bottom: 6px; }
+.bill-terms + .bill-terms { margin-top: -10px; border-top: none; border-top-left-radius: 0; border-top-right-radius: 0; padding-top: 6px; }
+.bill-terms li { position: relative; padding-left: 16px; font-size: calc(12.5px * var(--ts)); line-height: 1.5; color: var(--text2); }
+.bill-terms li::before { content: ''; position: absolute; left: 2px; top: 0.6em; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+.bill-soon { font-size: calc(12.5px * var(--ts)); color: var(--text3); padding: 0 2px; }
+.billing-body .billing-explainer { margin: 0; background: var(--surface); border: 1px solid var(--border); }
+.billing-body #billingOwnerOnly { border: none; padding: 0 2px; }
 
 /* Your team */
 .team-places { padding: 4px 0 8px; font-size: calc(12.5px * var(--ts)); color: var(--text2); }

@@ -97,6 +97,7 @@ function resetBillingDisplay() {
   const manageBtn = document.getElementById('manageBillingBtn');
   if (manageBtn) manageBtn.style.display = 'none';
   billingStatusCache = null;
+  renderBillingCard(null);
 }
 
 // A real job takes 8 to 20 fills (the pricing doc's measurement); plans are
@@ -127,6 +128,7 @@ async function loadBillingStatus() {
   const forUser = authUser.id;
   if (el) el.textContent = 'Loading…';
   if (manageBtn) manageBtn.style.display = 'none';
+  renderBillingCard(null);
   try {
     const res = await workerFetch('/stripe/subscription-status', { method: 'GET' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -138,6 +140,7 @@ async function loadBillingStatus() {
     if (el) el.textContent = billingStatusLine(sub, planLabel);
     const owner = !authBusiness || isBusinessOwner();
     if (manageBtn) manageBtn.style.display = sub.stripe_customer_id && owner ? '' : 'none';
+    renderBillingCard(sub);
     showPlanOptions(sub, owner);
     markCurrentPlan(sub);
     renderProfileMenu();
@@ -177,6 +180,87 @@ function billingStatusLine(sub, planLabel) {
   return `${planLabel} plan${sub.per_seat ? ` for ${sub.seats} inspector${sub.seats === 1 ? '' : 's'}` : ''}. ${billingUsageText(sub)}`;
 }
 
+// YOUR SUBSCRIPTION CARD: the plan's name, a pill for its state, what it
+// costs, and a meter of the AI fills used. Drawn from the same subscription
+// status as billingStatusLine. With no status (signed out, loading, or it
+// couldn't load) only the sentence shows.
+function billingPlanState(sub) {
+  const ended = sub.status === 'canceled' || sub.status === 'cancelled';
+  if (sub.status === 'trialing') {
+    const over = sub.trial_ends_at && new Date(sub.trial_ends_at) <= Date.now();
+    return over ? { pill: 'Trial ended', tone: 'bad', plain: false } : { pill: 'Free trial', tone: 'trial', plain: true };
+  }
+  if (sub.status === 'past_due') return { pill: 'Payment failed', tone: 'bad', plain: false };
+  if (ended) return { pill: 'Ended', tone: 'off', plain: false };
+  if (sub.cancel_at_period_end) return { pill: 'Ending', tone: 'warn', plain: false };
+  return { pill: 'Active', tone: 'good', plain: true };
+}
+
+function renderBillingCard(sub) {
+  const $ = id => document.getElementById(id);
+  const card = $('billingCurrent');
+  if (!card) return;
+  const name = $('billingPlanName'), price = $('billingPlanPrice'), pill = $('billingStatusPill');
+  const meter = $('billingMeter'), text = $('billingStatusText'), hint = $('billingManageHint');
+  card.dataset.tone = '';
+  if (!sub) {
+    name.textContent = 'Current plan';
+    price.hidden = true; pill.hidden = true; meter.hidden = true; hint.hidden = true;
+    $('billingManageRow').hidden = true;
+    text.classList.remove('sr-only');
+    return;
+  }
+  const state = billingPlanState(sub);
+  const trial = sub.status === 'trialing';
+  const when = iso => new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  card.dataset.tone = state.tone;
+  name.textContent = trial ? 'Free trial' : `${planDisplayLabel(sub.plan)} plan`;
+  pill.textContent = state.pill;
+  pill.dataset.tone = state.tone;
+  pill.hidden = false;
+
+  // "$237 a month · 3 inspectors · Renews 1 Dec 2026"
+  const bits = [];
+  if (trial) {
+    const daysLeft = sub.trial_ends_at ? Math.max(0, Math.ceil((new Date(sub.trial_ends_at) - Date.now()) / 86400000)) : null;
+    if (daysLeft) bits.push(`${daysLeft} day${daysLeft === 1 ? '' : 's'} left`, `ends ${when(sub.trial_ends_at)}`);
+    bits.push('no card needed');
+  } else if (sub.plan === 'starter' || SEAT_PLANS[sub.plan]) {
+    const seats = SEAT_PLANS[sub.plan] ? (sub.per_seat && sub.seats ? sub.seats : SEAT_PLANS[sub.plan].min) : undefined;
+    bits.push(planPriceText(sub.plan, seats));
+    bits.push(seats ? `${seats} inspectors` : 'one inspector');
+    if (sub.current_period_end && state.tone === 'good') bits.push(`renews ${when(sub.current_period_end)}`);
+    if (sub.current_period_end && state.tone === 'warn') bits.push(`ends ${when(sub.current_period_end)}`);
+  }
+  price.textContent = bits.map((b, i) => i ? b : b.charAt(0).toUpperCase() + b.slice(1)).join(' · ');
+  price.hidden = !bits.length;
+
+  // The meter: shown whenever there's a limit and the plan still runs.
+  const limit = sub.limit, used = sub.ai_calls_used_this_period ?? 0;
+  const showMeter = !!limit && state.tone !== 'off' && !(trial && state.tone === 'bad');
+  meter.hidden = !showMeter;
+  if (showMeter) {
+    const left = Math.max(0, limit - used), share = Math.min(1, used / limit);
+    const n = v => v.toLocaleString('en-AU');
+    $('billingMeterLabel').textContent = trial ? 'AI fills in your trial' : 'AI fills this month';
+    $('billingMeterCount').innerHTML = `<b>${n(used)}</b> of ${n(limit)}`;
+    const fill = $('billingMeterFill');
+    fill.style.width = (used > 0 ? Math.max(2, share * 100) : 0) + '%';
+    meter.dataset.level = share >= 1 ? 'out' : share >= 0.8 ? 'low' : 'ok';
+    const inspections = Math.floor(left / FILLS_PER_INSPECTION);
+    $('billingMeterLeft').textContent = left === 0 ? 'None left'
+      : inspections === 0 ? `${n(left)} left, less than one inspection`
+      : `${n(left)} left, about ${inspections} inspection${inspections === 1 ? '' : 's'}`;
+    const next = new Date(); next.setUTCMonth(next.getUTCMonth() + 1, 1);
+    $('billingMeterReset').textContent = trial ? '' : `Back to ${n(limit)} on ${next.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' })}`;
+  }
+  // When the card says it all, the sentence is for screen readers only. A
+  // plan that needs something done keeps it on screen.
+  text.classList.toggle('sr-only', state.plain && showMeter);
+  hint.hidden = !sub.stripe_customer_id || (authBusiness && !isBusinessOwner());
+  $('billingManageRow').hidden = $('manageBillingBtn').style.display === 'none';
+}
+
 // Team and Business are charged per inspector. They're offered only once
 // the Worker says it can charge that way (seat_plans), and only the owner
 // sees the plans to choose from.
@@ -190,6 +274,7 @@ function showPlanOptions(sub, owner) {
   document.querySelectorAll('#billingPanel [data-plan]').forEach(row => {
     row.hidden = !owner || (row.hasAttribute('data-seat-plan') && !seatPlans);
   });
+  document.getElementById('billingPlansLabel').hidden = !owner;
   document.getElementById('billingOwnerOnly').hidden = owner;
   // Prices, cancelling and paying are the owner's business, not a technician's.
   document.getElementById('billingTermsRow').hidden = !owner;
@@ -313,11 +398,12 @@ function markCurrentPlan(sub) {
 // offer Upgrade, and a second tap could start a second subscription.
 async function confirmBillingAfterCheckout() {
   const el = document.getElementById('billingStatusText');
+  renderBillingCard(null);
   if (el) el.textContent = 'Confirming your payment…';
   for (let i = 0; i < 10; i++) {
     const sub = await loadBillingStatus();
     if (sub && (sub.status !== 'trialing' || sub.subscribed)) { showToast('Subscription updated. Thank you', 'success'); return; }
-    if (el && i < 9) el.textContent = 'Confirming your payment…';
+    if (el && i < 9) { renderBillingCard(null); el.textContent = 'Confirming your payment…'; }
     await new Promise(r => setTimeout(r, 2000));
   }
   showToast('Payment received. Your plan shows here once Stripe confirms it, usually within a minute', 'info');

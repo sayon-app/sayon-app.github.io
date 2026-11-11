@@ -9,7 +9,6 @@
 const { chromium } = require('playwright'); const fs = require('fs'); const { execFileSync } = require('child_process');
 const OUT = process.argv[2] || '/tmp/findings-prompted'; fs.mkdirSync(OUT, { recursive: true });
 const uid = 'u-owner', SP = process.env.JSPDF_DIR || '/tmp/jspdf';
-const MODES = (process.env.MODES || 'light').split(',');
 const sess = { access_token: 'a.b.c', refresh_token: 'r', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: uid, email: 'office@example.com', user_metadata: { name: 'Alex Example', business_name: 'Example Pest Co' } } };
 const sc = require('../visual/scenarios.js').find(s => s.name === 'standard');
 let fails = 0;
@@ -47,16 +46,13 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
     rd: { termites: (reportData.findings || []).map(f => f.termiteActivity || ''), borer: reportData.borerActivity || '', decay: reportData.decayFound || '', delig: reportData.delignification || '', auto: reportData.noneFromAreas || [] },
   }));
   const shoot = async name => {
-    for (const mode of MODES) {
-      await p.evaluate(m => { document.body.classList.toggle('dark-screen', m === 'dark'); const t = document.getElementById('toast'); if (t) t.className = 'toast'; }, mode);
-      await p.waitForTimeout(250);
-      const card = p.locator('#section-findings');
-      const h = await card.evaluate(c => c.scrollHeight);
-      await p.setViewportSize({ width: 390, height: Math.min(6000, h + 400) }); await p.waitForTimeout(250);
-      await card.screenshot({ path: `${OUT}/${name}-${mode}.png` });
-      await p.setViewportSize({ width: 390, height: 844 });
-    }
-    await p.evaluate(() => document.body.classList.remove('dark-screen'));
+    await p.evaluate(() => { const t = document.getElementById('toast'); if (t) t.className = 'toast'; });
+    await p.waitForTimeout(250);
+    const card = p.locator('#section-findings');
+    const h = await card.evaluate(c => c.scrollHeight);
+    await p.setViewportSize({ width: 390, height: Math.min(6000, h + 400) }); await p.waitForTimeout(250);
+    await card.screenshot({ path: `${OUT}/${name}.png` });
+    await p.setViewportSize({ width: 390, height: 844 });
   };
 
   // 1. A fresh report: nothing out but the quick fill and "Found something?".

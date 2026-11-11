@@ -1,6 +1,6 @@
 // Site plan: the technician draws the site on the treatment record with a
 // fixed set of symbols (building, barrier, bait and monitoring stations,
-// notice, findings). The plan and its legend print on the certificates,
+// notice, findings). The plan and its legend print on the certificate,
 // fill the first bait visit's stations, and colour each station by what a
 // visit found, on the bait card and the visit report.
 // node e2e.js <outDir>  (serve the repo on :8765; see tests/visual/README.md)
@@ -198,15 +198,20 @@ let shotN = 0;
   const t = await p.evaluate(() => ({ plan: quoteState.treatment.plan && planLayerItems(quoteState.treatment.plan).length, site: quoteState.treatment.site }));
   check(t.plan === 25 && /Concrete slab/.test(t.site.floor), 'the plan and the site are kept with the treatment record');
 
-  // 4. The certificates carry the plan, the legend and where each station is.
+  // 4. The certificate carries the plan, the legend and where each station
+  // is. The baiting system left in place has its own row on the one
+  // certificate, with its care line: there's no second certificate.
   await p.evaluate(() => ensureJsPDFLoaded()); await p.waitForTimeout(400);
-  for (const install of [false, true]) {
-    const pdf = await makePdf(`() => buildTreatmentCertificatePDF(quoteState, { install: ${install} })`);
-    const name = install ? 'installation-certificate' : 'treatment-certificate';
+  {
+    const pdf = await makePdf(`() => buildTreatmentCertificatePDF(quoteState)`);
+    const name = 'treatment-certificate';
     const text = await pdfShots(pdf.b64, name);
     console.log(name, pdf.fname, pdf.pages, 'pages');
-    check(pdf.pages === 3, `${name}: the certificate keeps page 1, the site plan gets page 2 and the subfloor page 3`);
+    // The system's row and care line take the signature onto page 2 here.
+    check(pdf.pages === 4, `${name}: the certificate takes pages 1 and 2, the site plan gets page 3 and the subfloor page 4`);
     if (text) {
+      check(/SYSTEM INSTALLED/.test(text) && /Termite baiting system installed, 10 stations/.test(text) && /The bait stations need checking/.test(text) && /and the system installed/.test(text), `${name}: the baiting system has its own row and its care line, and the closing line covers it`);
+      check(!/Certificate of Installation|LOOKING AFTER THE SYSTEM/i.test(text) && (text.match(/Termite baiting system installed/g) || []).length === 2, `${name}: one certificate, the system named once in what was done (and once on the durable notice)`);
       check(/SITE PLAN/.test(text) && /LEGEND/.test(text) && /In-ground bait station \(8\)/.test(text) && /Above-ground bait station \(2\)/.test(text) && /Durable notice/.test(text), `${name}: the plan prints with its legend`);
       check(/WHERE EACH STATION IS/.test(text) && /Front left corner/.test(text) && /Approximate scale/.test(text) && /44 m/.test(text), `${name}: station locations under the plan`);
       check(/SUBFLOOR PLAN/.test(text) && /Pier or stump/.test(text) && /Ant cap missing or damaged/.test(text) && /Walls of the building above/.test(text), `${name}: the subfloor plan prints with its own legend`);
@@ -248,11 +253,10 @@ let shotN = 0;
   const old = await p.evaluate(() => { const q = JSON.parse(JSON.stringify(quoteState)); q.treatment.plan = null; q.treatment.sketch = treatmentSketchImage() || 'data:image/jpeg;base64,'; const { blob } = buildTreatmentCertificatePDF(q); return blob.size > 0; });
   check(old, 'a record without a drawn plan still makes its certificate');
 
-  // 7. Dark screen: the plan stays on white.
-  await p.evaluate(() => { document.body.classList.add('dark-screen'); openTreatmentRecord(); document.getElementById('trPlan').scrollIntoView({ block: 'start' }); });
-  await shot('record-plan-dark');
-  await p.evaluate(() => openTreatmentSitePlan()); await p.waitForTimeout(300); await shot('editor-dark');
-  // A plan already drawn opens where the ticked treatment goes.
+  // 7. The saved record opened again: a plan already drawn opens where the
+  // ticked treatment goes.
+  await p.evaluate(() => { openTreatmentRecord(); document.getElementById('trPlan').scrollIntoView({ block: 'start' }); });
+  await p.evaluate(() => openTreatmentSitePlan()); await p.waitForTimeout(300); await shot('editor-reopened');
   const tab = await p.evaluate(() => { const house = { items: [{ k: 'house' }] }, lined = { items: [{ k: 'house' }, { k: 'barrier' }] };
     return { now: sitePlanEditor.group, on: document.querySelector('#spGroups .sp-group.on').textContent, none: sitePlanStartGroup(null, ['bait']), barrier: sitePlanStartGroup(house, ['barrier', 'bait']),
       then: sitePlanStartGroup(lined, ['barrier', 'bait']), other: sitePlanStartGroup(house, ['borer']), sub: sitePlanStartGroup({ items: [{ k: 'house' }, { k: 'inground', layer: 'sub' }] }, ['bait']) }; });
@@ -262,7 +266,7 @@ let shotN = 0;
   check(recSig.kept && recSig.again && recSig.by === 'Alex Example', 'the saved record\'s signature is kept, with Sign again: ' + JSON.stringify(recSig));
   const wanted = await p.evaluate(() => ({ n: sitePlanEditor.stationsWanted, qty: document.querySelector('#trMethods [data-qty="bait"]').value }));
   check(wanted.n > 0 && String(wanted.n) === wanted.qty, `the record's station count goes to Stations all round (${wanted.n})`);
-  await p.evaluate(() => { closeSitePlan(); closeTreatmentRecord(); document.body.classList.remove('dark-screen'); });
+  await p.evaluate(() => { closeSitePlan(); closeTreatmentRecord(); });
 
   check(!errs.length, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await b.close();

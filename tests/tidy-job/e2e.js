@@ -1,5 +1,6 @@
-// The tidied job screens: the certificates card on This job (one line,
-// Email / PDF, "Mark as given" as a quiet link, both certificates in one PDF),
+// The tidied job screens: the certificate card on This job (one line,
+// Email / PDF, "Mark as given" as a quiet link, one certificate even when a
+// system went in),
 // Finalise as a finished job's next step, then the "Job finalised" card
 // (with what went in folded away), the voice panel docked on the dock and short
 // enough to read the report above it, and the quiet Say the quote row.
@@ -58,7 +59,7 @@ const emails = [];
   console.log('finalise, the next step:', JSON.stringify(n));
   check(n.title === 'Finalise the job' && !c, 'a finished job\'s next step is "Finalise the job", and it\'s on the page once');
   check(n.buttons.join('|') === 'Finalise and email it to me|Finalise and save the PDF' && n.main === 'Finalise and email it to me', 'Email comes first and is the main button, then Save: ' + n.buttons.join(' | '));
-  check(n.fold && !n.open && n.items === 5, 'the five parts are listed, folded away');
+  check(n.fold && !n.open && n.items === 4, 'the four parts are listed, folded away (one certificate, though the job left a system in place)');
   check(n.h < 340, `the card is short (${Math.round(n.h)}px)`);
   await p.locator('#jobOverlay .job-next').scrollIntoViewIfNeeded(); await shot('1-finalise-next');
   await tap(p.getByRole('button', { name: 'Finalise and email it to me' }), 'Finalise and email it to me'); await p.waitForTimeout(6000);
@@ -66,10 +67,10 @@ const emails = [];
   console.log('after email:', JSON.stringify(c));
   check(emails.length === 1, 'the job PDF was emailed');
   check(c && c.label === 'Job finalised' && c.made && /^Version 1, \d+ \w+ \d{4}\. Job PDF emailed to you \d+ \w+ \d{4}\.$/.test(c.line), 'once emailed the card reads "Job finalised", the version and where the PDF went: ' + (c && c.line));
-  check(c && c.buttons.join('|') === 'Email it to me|Save PDF|Amend' && !c.primary && c.fold && !c.open && c.items === 5 && c.h < 240, `the PDF again and Amend, none of them shouting (${c && Math.round(c.h)}px)`);
+  check(c && c.buttons.join('|') === 'Email it to me|Save PDF|Amend' && !c.primary && c.fold && !c.open && c.items === 4 && c.h < 240, `the PDF again and Amend, none of them shouting (${c && Math.round(c.h)}px)`);
   await p.locator('#jobOverlay .job-pdf').scrollIntoViewIfNeeded(); await shot('2-jobpdf-made');
 
-  // 2. The certificates card, on This job: its Next step card while the
+  // 2. The certificate card, on This job: its Next step card while the
   // certificate is still to give, then under the Treatment step.
   await p.evaluate(() => { delete quoteState.certificateSentAt; delete quoteState.certificateHandedAt; persistQuote(); storeQuoteOnReport(quoteState, false); renderQuoteProgress(); document.getElementById('jobPageBody').scrollTop = 0; }); await p.waitForTimeout(400);
   const cert = () => p.evaluate(() => {
@@ -85,12 +86,12 @@ const emails = [];
   let k = await cert();
   console.log('certificate card:', JSON.stringify(k));
   check(k.where === 'next' && k.nextTitle === 'Email the certificate' && !k.quote, 'a certificate still to give is This job\'s Next step, done from its card (not inside the quote)');
-  check(k.title === 'Treatment and installation certificates' && k.text === 'Goes to jordan@example.com', 'one line under the title: where they go');
+  check(k.title === 'Treatment certificate' && k.text === 'Goes to jordan@example.com', 'one line under the title: where it goes');
   check(k.buttons.join('|') === 'Email to Jordan|PDF' && k.rows === 1, 'two buttons on one row: Email to Jordan, PDF');
-  check(/^Handed them over in person\? Mark as given$/.test(k.handed), '"Mark as given" is a quiet link under them');
+  check(/^Handed it over in person\? Mark as given$/.test(k.handed), '"Mark as given" is a quiet link under them');
   check(k.h < 190, `the card is short (${Math.round(k.h)}px)`);
   await p.locator('#jobOverlay .job-next .qp-cert').scrollIntoViewIfNeeded(); await shot('3-cert');
-  // PDF: both certificates in one file.
+  // PDF: the one certificate, its system included.
   const pdf = await p.evaluate(async () => {
     let got = null; const real = window.deliverPdfBlob;
     window.deliverPdfBlob = async (blob, fname) => { got = { blob, fname }; };
@@ -101,10 +102,10 @@ const emails = [];
     const lib = await ensurePdfLibLoaded();
     const pages = async blob => (await lib.PDFDocument.load(await blob.arrayBuffer())).getPageCount();
     const q = quoteState;
-    return { fname: got.fname, pages: await pages(got.blob), treat: await pages((await buildTreatmentCertificatePDF(q)).blob), install: await pages((await buildTreatmentCertificatePDF(q, { install: true })).blob) };
+    return { fname: got.fname, pages: await pages(got.blob), treat: await pages((await buildTreatmentCertificatePDF(q)).blob), system: installedSystems(q.treatment).length };
   });
   console.log('certificate pdf:', JSON.stringify(pdf));
-  check(pdf && pdf.pages === pdf.treat + pdf.install && /^Certificates_TC-/.test(pdf.fname), 'PDF gives both certificates as one file: ' + JSON.stringify(pdf));
+  check(pdf && pdf.system > 0 && pdf.pages === pdf.treat && /^Treatment_Certificate_TC-/.test(pdf.fname), 'a job that left a system in place still gets one certificate: ' + JSON.stringify(pdf));
   await tap(p.locator('#jobOverlay .job-next .qp-cert-handed'), 'Mark as given'); await p.waitForTimeout(600);
   k = await cert();
   check(k.where === 'step' && /^Given to Jordan Sample in person \d/.test(k.text) && k.buttons.join('|') === 'Email a copy|PDF' && !k.handed, 'marked as given: the card moves under the Treatment step, its line says so and the link goes: ' + k.text);

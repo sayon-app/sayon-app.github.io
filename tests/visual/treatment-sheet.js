@@ -1,5 +1,5 @@
 // The treatment record sheet, for before and after shots: its folds closed,
-// then What was done open on the products, in light and dark.
+// then What was done open on the products.
 // node treatment-sheet.js <outDir> [w]  (serve the repo on :8765; see README.md)
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2] || '/tmp/treatment-sheet'; fs.mkdirSync(OUT, { recursive: true });
@@ -24,14 +24,12 @@ const sc = require('./scenarios.js').find(s => s.name === 'standard');
     quoteState.answer = { status: 'accepted', by: 'Sam Taylor', date: todayIsoDate(), method: 'signed', note: '', at: Date.now(), hash: quoteContentHash(quoteState) };
     persistQuote(); storeQuoteOnReport(quoteState, false); renderQuoteProgress();
   }, { sc });
-  for (const mode of ['light', 'dark']) {
-    await p.evaluate(m => { document.body.classList.toggle('dark-screen', m === 'dark'); closeTreatmentRecord(); openTreatmentRecord(); }, mode);
-    await p.waitForTimeout(400);
-    await p.evaluate(() => { document.getElementById('trTech').value = 'Alex Example'; document.getElementById('trLicence').value = '57586876'; renderTreatmentFolds(true); document.querySelectorAll('.sheet-fold').forEach(f => f.open = false); document.getElementById('trFold1').scrollIntoView({ block: 'center' }); });
-    await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/${mode}-1-folds.png` });
-    await p.evaluate(() => { const f = document.getElementById('trFold2'); f.open = true; document.getElementById('trPest').scrollIntoView({ block: 'start' }); });
-    await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/${mode}-2-products.png` });
-  }
+  await p.evaluate(() => { closeTreatmentRecord(); openTreatmentRecord(); });
+  await p.waitForTimeout(400);
+  await p.evaluate(() => { document.getElementById('trTech').value = 'Alex Example'; document.getElementById('trLicence').value = '57586876'; renderTreatmentFolds(true); document.querySelectorAll('.sheet-fold').forEach(f => f.open = false); document.getElementById('trFold1').scrollIntoView({ block: 'center' }); });
+  await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/1-folds.png` });
+  await p.evaluate(() => { const f = document.getElementById('trFold2'); f.open = true; document.getElementById('trPest').scrollIntoView({ block: 'start' }); });
+  await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/2-products.png` });
   console.log(errs.length ? 'errors: ' + errs.join(' | ') : 'no page errors');
   await b.close();
 })();

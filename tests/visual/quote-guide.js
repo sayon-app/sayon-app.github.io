@@ -1,5 +1,5 @@
 // The quote's parts, for before and after shots: its four folds closed,
-// then the client and the work open, in light and dark.
+// then the client and the work open.
 // node quote-guide.js <outDir> [w]  (serve the repo on :8765; see README.md)
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2] || '/tmp/quote-guide'; fs.mkdirSync(OUT, { recursive: true });
@@ -25,16 +25,14 @@ const sc = require('./scenarios.js').find(s => s.name === 'standard');
     persistQuote(); renderQuoteProgress();
   }, { sc });
   await p.waitForTimeout(500);
-  for (const mode of ['light', 'dark']) {
-    await p.evaluate(m => { document.body.classList.toggle('dark-screen', m === 'dark'); document.querySelectorAll('#quoteParts .quote-fold').forEach(f => f.open = false); document.getElementById('quoteParts').scrollIntoView({ block: 'start' }); }, mode);
-    await p.waitForTimeout(400); await p.screenshot({ path: `${OUT}/${mode}-1-folds.png` });
-    await p.evaluate(() => { document.getElementById('quoteDetailsFold').open = true; document.getElementById('quoteDetailsFold').scrollIntoView({ block: 'start' }); });
-    await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/${mode}-2-client.png` });
-    await p.evaluate(() => { document.getElementById('quoteDetailsFold').open = false; const f = document.getElementById('quoteWorkFold'); f.open = true; f.scrollIntoView({ block: 'start' }); });
-    await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/${mode}-3-work.png` });
-    await p.evaluate(() => { document.getElementById('quoteWorkFold').open = false; const f = document.getElementById('quoteTermsFold'); f.open = true; f.scrollIntoView({ block: 'start' }); });
-    await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/${mode}-4-terms.png` });
-  }
+  await p.evaluate(() => { document.querySelectorAll('#quoteParts .quote-fold').forEach(f => f.open = false); document.getElementById('quoteParts').scrollIntoView({ block: 'start' }); });
+  await p.waitForTimeout(400); await p.screenshot({ path: `${OUT}/1-folds.png` });
+  await p.evaluate(() => { document.getElementById('quoteDetailsFold').open = true; document.getElementById('quoteDetailsFold').scrollIntoView({ block: 'start' }); });
+  await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/2-client.png` });
+  await p.evaluate(() => { document.getElementById('quoteDetailsFold').open = false; const f = document.getElementById('quoteWorkFold'); f.open = true; f.scrollIntoView({ block: 'start' }); });
+  await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/3-work.png` });
+  await p.evaluate(() => { document.getElementById('quoteWorkFold').open = false; const f = document.getElementById('quoteTermsFold'); f.open = true; f.scrollIntoView({ block: 'start' }); });
+  await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/4-terms.png` });
   console.log(errs.length ? 'errors: ' + errs.join(' | ') : 'no page errors');
   await b.close();
 })();

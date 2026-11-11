@@ -1,6 +1,6 @@
 // The job page (This job), for before and after shots: a new job, one waiting
-// on the agreement, one mid-way (quote sent), one accepted, and the finished sample job,
-// in light and dark. Each is shot at the top and in full (a tall viewport).
+// on the agreement, one mid-way (quote sent), one accepted, and the finished sample job.
+// Each is shot at the top and in full (a tall viewport).
 // node job-page.js <outDir> [w]  (serve the repo on :8765; see README.md)
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2] || '/tmp/job-page'; fs.mkdirSync(OUT, { recursive: true });
@@ -40,14 +40,12 @@ const sc = require('./scenarios.js').find(s => s.name === 'standard');
   };
   for (const [name, fn] of Object.entries(stages)) {
     await p.evaluate(`(${fn.toString()})()`.replace(/\bsc\b/g, 'window.__sc'), null).catch(e => errs.push(name + ': ' + e.message));
-    for (const mode of ['light', 'dark']) {
-      await p.setViewportSize({ width: W, height: 844 });
-      await p.evaluate(m => { document.body.classList.toggle('dark-screen', m === 'dark'); closeJobPage(); openJobPage(); }, mode);
-      await p.waitForTimeout(400); await p.screenshot({ path: `${OUT}/${name}-${mode}.png` });
-      const h = await p.evaluate(() => { const b = document.getElementById('jobPageBody'); return b.scrollHeight + (b.getBoundingClientRect().top) + 120; });
-      await p.setViewportSize({ width: W, height: Math.min(4000, Math.ceil(h)) });
-      await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/${name}-${mode}-full.png` });
-    }
+    await p.setViewportSize({ width: W, height: 844 });
+    await p.evaluate(() => { closeJobPage(); openJobPage(); });
+    await p.waitForTimeout(400); await p.screenshot({ path: `${OUT}/${name}.png` });
+    const h = await p.evaluate(() => { const b = document.getElementById('jobPageBody'); return b.scrollHeight + (b.getBoundingClientRect().top) + 120; });
+    await p.setViewportSize({ width: W, height: Math.min(4000, Math.ceil(h)) });
+    await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/${name}-full.png` });
   }
   console.log(errs.length ? 'errors: ' + errs.join(' | ') : 'no page errors');
   await b.close();

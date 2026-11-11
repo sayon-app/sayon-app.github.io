@@ -1,7 +1,7 @@
 // The Jobs list, for before and after shots: a business with a realistic
 // mix of jobs (a report under way, one ready to quote, a quote waiting on
 // the client, one accepted, one treated, a declined one) on each tab, the
-// job sheet, and a brand-new business's empty list, in light and dark.
+// job sheet, and a brand-new business's empty list.
 // node jobs-list.js <outDir> [w]  (serve the repo on :8765; see README.md)
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2] || '/tmp/jobs-list'; fs.mkdirSync(OUT, { recursive: true });
@@ -28,11 +28,8 @@ const JOBS = [
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto('http://localhost:8765/'); await p.waitForTimeout(2500);
   const shoot = async (name) => {
-    for (const mode of (process.env.MODES || 'light').split(',')) {
-      await p.setViewportSize({ width: W, height: 844 });
-      await p.evaluate(m => document.body.classList.toggle('dark-screen', m === 'dark'), mode);
-      await p.waitForTimeout(350); await p.screenshot({ path: `${OUT}/${name}-${mode}.png` });
-    }
+    await p.setViewportSize({ width: W, height: 844 });
+    await p.waitForTimeout(350); await p.screenshot({ path: `${OUT}/${name}.png` });
   };
   // A brand-new business: nothing saved yet.
   await p.evaluate((sc) => { storeCompanyDetails(sc.company); openApp('inspect'); resetReportState(); openDashboard(); }, sc);

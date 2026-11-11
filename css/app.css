@@ -5964,3 +5964,91 @@ body.pocket-lock #voicePopover > .transcript-box { max-height: 4.6em; -webkit-ma
 body[data-voice="listening"] #voicePopover { bottom: calc(var(--tabbar-h) + 40px); }
 .pocket-shield { background: transparent; }
 .pocket-shield span { padding: 6px 12px; font-size: calc(12px * var(--ts)); opacity: 0.92; }
+
+/* ── MENU PAGES IN CARDS ────────────────────────────────────────────────
+   Business details, Your prices, Chemical register, Your team, Settings
+   and Your sign-in, in Billing's look: each group a white card on the
+   page, its label trailing a fading line. */
+.sidebar.on-page .menu-page-active .settings-group-title { display: flex; align-items: center; gap: 10px; padding: 18px 2px 8px; color: var(--text2); }
+.sidebar.on-page .menu-page-active .settings-group-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border2), rgba(200,213,227,0)); }
+.sidebar.on-page .menu-page-active .settings-group-title:first-child { padding-top: 6px; }
+.menu-card {
+  padding: 2px 14px; border-radius: 16px; background: var(--surface);
+  border: 1px solid var(--card-edge); box-shadow: 0 6px 18px rgba(0,40,80,0.07);
+}
+.menu-card + .menu-card { margin-top: 12px; }
+.menu-card .settings-row { padding: 13px 0; }
+.menu-card .settings-row:last-child { border-bottom: none; }
+/* A hidden row last (Test mode) leaves no line under the one above it. */
+.menu-card .settings-row:not(:has(~ .settings-row:not([hidden]))) { border-bottom: none; }
+/* The two deletes: their own card, edged in red. */
+.menu-card.menu-card-danger { border-color: rgba(192,57,43,0.28); box-shadow: none; }
+.sidebar.on-page .menu-page-active .pb-intro { margin: 0 2px 12px; font-size: calc(12.5px * var(--ts)); color: var(--text2); }
+.sidebar.on-page .menu-page-active .pb-status { margin-bottom: 4px; padding: 10px 12px; border-radius: 12px; }
+
+/* Business details: the top of the PDF, then the boxes. */
+.biz-preview { padding: 12px 14px 14px; margin-bottom: 12px; background: linear-gradient(180deg, var(--surface), var(--accent-wash)); }
+.biz-preview-tag { font-size: calc(10.5px * var(--ts)); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--accent2); margin-bottom: 8px; }
+.biz-preview-head { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; background: #fff; border: 1px solid var(--border); border-bottom: 2px solid var(--accent); }
+.biz-preview-logo {
+  flex: none; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  background: var(--accent); color: #fff; font: 800 calc(13px * var(--ts)) 'Inter', sans-serif;
+}
+.biz-preview-logo.has-logo { background: transparent; }
+.biz-preview-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.biz-preview-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.biz-preview-name { font: 700 calc(15px * var(--ts)) 'Inter', sans-serif; color: var(--text); overflow-wrap: anywhere; line-height: 1.25; }
+.biz-preview-line { font-size: calc(11.5px * var(--ts)); color: var(--text3); overflow-wrap: anywhere; line-height: 1.45; }
+.biz-preview-row { display: block; }
+.biz-preview-row > span { display: inline-block; max-width: 100%; }
+.biz-preview-name.blank, .biz-preview-line.blank { color: var(--text3); font-style: italic; font-weight: 500; }
+#businessPageSlot.menu-card { padding: 14px 14px 4px; }
+#businessPanel .business-save { margin-top: 14px; }
+
+/* Your prices: a card per group. */
+.pb-card .pb-row { padding: 12px 0; }
+.menu-card .pb-terms { padding: 12px 0 14px; border-top: 1px solid var(--border); }
+
+/* Chemical register: white product cards like the rest of the app. */
+.sidebar.on-page #chemicalsPanel .chem-card { background: var(--surface); border-color: var(--card-edge); border-radius: 16px; box-shadow: 0 4px 14px rgba(0,40,80,0.06); }
+.sidebar.on-page #chemicalsPanel .chem-card[open] { box-shadow: 0 8px 22px rgba(0,40,80,0.10); }
+.sidebar.on-page #chemicalsPanel .chem-card > summary { padding: 13px 14px; }
+.sidebar.on-page #chemicalsPanel .chem-card-body { padding: 0 14px 14px; }
+.sidebar.on-page #chemicalsPanel .chem-search .job-input { border-radius: 14px; background: var(--surface); }
+
+/* Your team: the places as a meter, then a face for each person. */
+.team-card { padding: 0 14px; }
+.team-places { padding: 14px 0 12px; }
+.team-places-text { font-size: calc(13px * var(--ts)); font-weight: 600; color: var(--text2); }
+.team-places-track { margin: 8px 0 2px; height: 8px; }
+.team-places-track.full { background: #FBEBC8; }
+.team-places-track.full i { background: linear-gradient(90deg, #F5C451, #E0A21B); }
+.team-card .team-list { border-top: 1px solid var(--border); }
+.team-card .team-list:empty { display: none; }
+.team-card .team-row { padding: 12px 0; }
+.team-card .team-row:last-child { border-bottom: none; }
+.team-face {
+  flex: none; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--accent-wash); color: var(--accent2); border: 1px solid var(--accent-edge);
+  font: 800 calc(12.5px * var(--ts)) 'Inter', sans-serif;
+}
+.team-face.owner { background: linear-gradient(145deg, var(--accent-hi), var(--accent2)); color: #fff; border-color: transparent; }
+.team-face.pending { background: var(--surface2); color: var(--text3); border-style: dashed; border-color: var(--border2); }
+.team-card + .team-more { width: 100%; margin-top: 12px; }
+.team-invite-card { padding: 14px 14px 10px; }
+.team-invite-card .team-invite { padding: 0; }
+.team-invite-card .team-help { padding: 10px 0 2px; }
+
+/* Your sign-in: who's signed in on top, then a card each. */
+.signin-who { display: flex; align-items: center; gap: 14px; padding: 16px 14px; }
+.signin-who-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.signin-who-name { font: 700 calc(16px * var(--ts)) 'Inter', sans-serif; color: var(--text); overflow-wrap: anywhere; }
+.signin-who .signin-email { margin: 0; font-size: calc(13px * var(--ts)); font-weight: 500; color: var(--text2); }
+.signin-email-note { margin: 8px 2px 0; }
+.menu-card .signin-line { margin: 0; padding-top: 14px; }
+.menu-card > .signin-line + .settings-row-desc { padding: 8px 0 14px; }
+.menu-card.signin-pass { padding: 6px 14px 14px; margin-top: 0; }
+.chem-card-icon {
+  flex: none; width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  background: var(--accent-wash); color: var(--accent2); border: 1px solid var(--accent-edge);
+}

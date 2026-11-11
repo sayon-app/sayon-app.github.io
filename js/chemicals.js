@@ -38,6 +38,17 @@ const CHEMICAL_FORMS = {
   other: 'Other',
 };
 
+// The tile on each product's card in the register, by its form: a drop,
+// foam bubbles, dust, a bait station, or a flask.
+const CHEMICAL_FORM_ICONS = {
+  liquid: '<path d="M12 2.7 6.3 9.4a7 7 0 1 0 11.4 0Z"/>',
+  foam: '<circle cx="8" cy="14" r="4"/><circle cx="16" cy="10" r="3.5"/><circle cx="15.5" cy="18" r="2.5"/>',
+  dust: '<circle cx="6" cy="8" r="1.2"/><circle cx="12" cy="5" r="1.2"/><circle cx="18" cy="9" r="1.2"/><circle cx="9" cy="14" r="1.2"/><circle cx="15" cy="15" r="1.2"/><circle cx="7" cy="19" r="1.2"/><circle cx="17" cy="20" r="1.2"/>',
+  bait: '<rect x="5" y="6" width="14" height="13" rx="2"/><path d="M5 10h14"/><path d="M12 3v3"/>',
+  other: '<path d="M9 3h6"/><path d="M10 3v6L5 19a1 1 0 0 0 1 2h12a1 1 0 0 0 1-2l-5-10V3"/>',
+};
+const chemicalFormIcon = form => `<span class="chem-card-icon" aria-hidden="true"><svg class="icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CHEMICAL_FORM_ICONS[form] || CHEMICAL_FORM_ICONS.other}</svg></span>`;
+
 // The usual uses for each kind of product. The business checks them against
 // the label: a label can have more, fewer, or other ones.
 const CHEMICAL_STARTER_USES = {
@@ -699,6 +710,7 @@ function chemicalCardHtml(p, canEdit) {
   const find = [p.name, p.active, p.maker, p.apvma].filter(Boolean).join(' ').toLowerCase();
   return `<details class="chem-card" data-id="${esc(p.id)}" data-find="${esc(find)}">
       <summary>
+        ${chemicalFormIcon(p.form)}
         <span class="chem-card-text">
           <span class="chem-card-name">${esc(p.name || 'New product')}</span>
           <span class="chem-card-sub">${chemicalNotRegistered(p) ? `<span class="chem-unreg">${esc(chemicalNotRegistered(p))}</span> · ` : ''}${esc([p.active, CHEMICAL_FORMS[p.form] || ''].filter(Boolean).join(' · '))}${missing ? ` · <span class="pb-start">${missing === 1 ? '1 rate' : missing + ' rates'} to add</span>` : ''}</span>

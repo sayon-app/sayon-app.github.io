@@ -126,7 +126,7 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   check(/last payment failed/.test(await line()), 'a failed payment is named');
   state.sub = { plan: 'starter', status: 'active', ai_calls_used_this_period: 12, limit: 800, stripe_customer_id: 'c', stripe_subscription_id: 's' };
   await line();
-  const rows = await p.evaluate(() => [...document.querySelectorAll('#billingPanel [data-plan]')].map(r => r.dataset.plan + ':' + r.querySelector('button').textContent + (r.classList.contains('current-plan') ? '*' : '')));
+  const rows = await p.evaluate(() => [...document.querySelectorAll('#billingPanel [data-plan]')].map(r => r.dataset.plan + ':' + r.querySelector('.plan-btn').textContent + (r.classList.contains('current-plan') ? '*' : '')));
   check(rows.join() === 'starter:Current plan*,pro:Switch,business:Switch' && await p.evaluate(() => [...document.querySelectorAll('#billingPanel [data-seat-plan]')].every(r => r.hidden)), 'Solo is current and Team and Business wait for the per-inspector Worker: ' + rows.join());
   await p.evaluate(() => { toggleDrawer(); openMenuPage('billingPanel'); }); await p.waitForTimeout(500);
   await p.screenshot({ path: `${OUT}/4-billing-current.png`, fullPage: false });

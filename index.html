@@ -1270,75 +1270,111 @@
           <svg class="icon panel-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
         </button>
         <div class="job-panel-body billing-body">
-          <!-- Your subscription: the plan, its status, what it costs and how
-               many AI fills are left. The meter is drawn from the same numbers
-               as the sentence in billingStatusText, which screen readers read. -->
-          <section class="bill-current" id="billingCurrent" aria-labelledby="billingPlanName">
-            <div class="bill-current-head">
-              <span class="bill-eyebrow">Your subscription</span>
-              <span class="bill-pill" id="billingStatusPill" hidden></span>
+          <!-- CURRENT PLAN: one card. The ink top says which plan, its state
+               and what it costs; under it, the AI fills used (and, on Team and
+               Business, the inspector places taken), then Manage. The fills
+               meter is drawn from the same numbers as the sentence in
+               billingStatusText, which screen readers read in its place. -->
+          <section class="bill-card" id="billingCurrent" aria-label="Current plan">
+            <div class="bill-plan">
+              <div class="bill-plan-top">
+                <span class="bill-eyebrow">Current plan</span>
+                <span class="bill-pill" id="billingStatusPill" hidden></span>
+              </div>
+              <div class="bill-plan-name" id="billingPlanName" hidden></div>
+              <div class="bill-plan-price" id="billingPlanPrice" hidden></div>
+              <div class="bill-status-text" id="billingStatusText">Sign in to see your plan.</div>
             </div>
-            <div class="bill-current-plan" id="billingPlanName">Current plan</div>
-            <div class="bill-current-price" id="billingPlanPrice" hidden></div>
-            <div class="bill-meter" id="billingMeter" aria-hidden="true" hidden>
-              <div class="bill-meter-top"><span id="billingMeterLabel">AI fills this month</span><span class="bill-meter-count" id="billingMeterCount"></span></div>
-              <div class="bill-meter-track"><div class="bill-meter-fill" id="billingMeterFill"></div></div>
-              <div class="bill-meter-foot"><span id="billingMeterLeft"></span><span id="billingMeterReset"></span></div>
+            <div class="bill-usage" id="billingUsage" hidden>
+              <div class="bill-meter" id="billingMeter" aria-hidden="true" hidden>
+                <div class="bill-meter-head">
+                  <span class="bill-meter-name" id="billingMeterLabel">AI fills this month</span>
+                  <span class="bill-flag" id="billingMeterFlag" hidden><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span id="billingMeterFlagText"></span></span>
+                </div>
+                <div class="bill-meter-figure" id="billingMeterCount"></div>
+                <div class="bill-meter-track"><i id="billingMeterFill"></i></div>
+                <div class="bill-meter-foot"><span id="billingMeterLeft"></span><span id="billingMeterReset"></span></div>
+              </div>
+              <div class="bill-meter" id="billingPlaces" hidden>
+                <div class="bill-meter-head"><span class="bill-meter-name">Inspector places</span></div>
+                <div class="bill-meter-figure" id="billingPlacesCount"></div>
+                <div class="bill-meter-track" aria-hidden="true"><i id="billingPlacesFill"></i></div>
+                <div class="bill-meter-foot"><span id="billingPlacesLeft"></span><button type="button" class="link-btn bill-meter-link" onclick="openMenuPage('teamPanel')">Your team</button></div>
+              </div>
             </div>
-            <div class="bill-status-text" id="billingStatusText">Sign in to see your plan.</div>
-            <div class="bill-manage" id="billingManageRow">
+            <div class="bill-manage" id="billingManageRow" hidden>
+              <div class="bill-manage-text">
+                <div class="bill-manage-title">Payment and invoices</div>
+                <div class="bill-manage-desc">Your card, invoices and cancelling, on Stripe's secure page.</div>
+              </div>
               <button class="job-action-btn settings-primary-btn" id="manageBillingBtn" onclick="openBillingPortal()" style="display:none">Manage</button>
-              <span class="bill-manage-hint" id="billingManageHint" hidden>Your card, invoices and cancelling, on Stripe</span>
             </div>
           </section>
-          <div class="bill-section-label" id="billingPlansLabel">Plans</div>
+
+          <div class="settings-group-title bill-label" id="billingPlansLabel">Plans</div>
           <div class="bill-plans">
             <div class="plan-card" data-plan="starter">
-              <div class="plan-card-text">
-                <div class="plan-card-top"><span class="plan-name">Solo</span><span class="plan-badge">Your plan</span></div>
+              <div class="plan-card-head">
+                <div class="plan-card-id">
+                  <div class="plan-name">Solo <span class="plan-badge" hidden>Current plan</span></div>
+                  <div class="plan-for">Suits a full-time solo inspector</div>
+                </div>
                 <div class="plan-price"><span class="plan-amount">$89</span><span class="plan-per">a month</span></div>
-                <ul class="plan-feats">
-                  <li><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>One inspector</span></li>
-                  <li><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>800 AI fills a month, about 40 inspections</span></li>
-                  <li><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Suits a full-time solo inspector</span></li>
-                </ul>
               </div>
+              <ul class="plan-feats">
+                <li><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>One inspector</span></li>
+                <li><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>About 40 inspections a month (800 AI fills)</span></li>
+              </ul>
               <button class="job-action-btn settings-primary-btn plan-btn" onclick="choosePlan('starter')">Upgrade</button>
             </div>
             <!-- Team and Business show once the Worker can charge per inspector
                  (its plan status says seat_plans). Plan keys stay pro and business. -->
             <div class="plan-card" data-plan="pro" data-seat-plan hidden>
-              <div class="plan-card-text">
-                <div class="plan-card-top"><span class="plan-name">Team</span><span class="plan-badge">Your plan</span></div>
-                <div class="plan-price"><span class="plan-amount">$79</span><span class="plan-per">per inspector a month</span></div>
-                <ul class="plan-feats">
-                  <li><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>2 to 9 inspectors</span></li>
-                  <li><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>800 AI fills per inspector a month, about 40 inspections each</span></li>
-                  <li><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>AI fills shared across the team</span></li>
-                </ul>
-                <div class="seat-pick">
-                  <label for="seatsPro">Inspectors</label>
-                  <input class="job-input seat-input" id="seatsPro" type="number" inputmode="numeric" min="2" max="9" value="2" oninput="onSeatInput('pro')" onchange="this.value = seatInputValue('pro'); onSeatInput('pro')">
-                  <span class="seat-total" id="seatTotalPro"></span>
+              <div class="plan-card-head">
+                <div class="plan-card-id">
+                  <div class="plan-name">Team <span class="plan-badge" hidden>Current plan</span></div>
+                  <div class="plan-for">2 to 9 inspectors</div>
                 </div>
+                <div class="plan-price"><span class="plan-amount">$79</span><span class="plan-per">per inspector a month</span></div>
               </div>
+              <ul class="plan-feats">
+                <li><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>About 40 inspections a month each (800 AI fills per inspector)</span></li>
+                <li><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>AI fills shared across the team</span></li>
+              </ul>
+              <div class="seat-pick">
+                <label for="seatsPro">Inspectors</label>
+                <div class="seat-step">
+                  <button type="button" class="seat-step-btn" data-step="-1" aria-label="One fewer inspector" onclick="stepSeats('pro', -1)"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+                  <input class="job-input seat-input" id="seatsPro" type="number" inputmode="numeric" min="2" max="9" value="2" oninput="onSeatInput('pro')" onchange="this.value = seatInputValue('pro'); onSeatInput('pro')">
+                  <button type="button" class="seat-step-btn" data-step="1" aria-label="One more inspector" onclick="stepSeats('pro', 1)"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button>
+                </div>
+                <div class="seat-sum"><span id="seatMathPro"></span><span class="seat-total" id="seatTotalPro"></span></div>
+              </div>
+              <div class="seat-hint" hidden>Change the number to add or take away inspector places.</div>
               <button class="job-action-btn settings-primary-btn plan-btn" onclick="choosePlan('pro')">Upgrade</button>
             </div>
             <div class="plan-card" data-plan="business" data-seat-plan hidden>
-              <div class="plan-card-text">
-                <div class="plan-card-top"><span class="plan-name">Business</span><span class="plan-badge">Your plan</span></div>
-                <div class="plan-price"><span class="plan-amount">$69</span><span class="plan-per">per inspector a month, billed yearly</span></div>
-                <ul class="plan-feats">
-                  <li><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>10 or more inspectors</span></li>
-                  <li><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>800 AI fills per inspector a month, about 40 inspections each</span></li>
-                  <li><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>AI fills shared across the business</span></li>
-                </ul>
-                <div class="seat-pick">
-                  <label for="seatsBusiness">Inspectors</label>
-                  <input class="job-input seat-input" id="seatsBusiness" type="number" inputmode="numeric" min="10" max="200" value="10" oninput="onSeatInput('business')" onchange="this.value = seatInputValue('business'); onSeatInput('business')">
-                  <span class="seat-total" id="seatTotalBusiness"></span>
+              <div class="plan-card-head">
+                <div class="plan-card-id">
+                  <div class="plan-name">Business <span class="plan-badge" hidden>Current plan</span></div>
+                  <div class="plan-for">10 or more inspectors, billed yearly</div>
                 </div>
+                <div class="plan-price"><span class="plan-amount">$69</span><span class="plan-per">per inspector a month</span></div>
               </div>
+              <ul class="plan-feats">
+                <li><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>About 40 inspections a month each (800 AI fills per inspector)</span></li>
+                <li><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>AI fills shared across the business</span></li>
+              </ul>
+              <div class="seat-pick">
+                <label for="seatsBusiness">Inspectors</label>
+                <div class="seat-step">
+                  <button type="button" class="seat-step-btn" data-step="-1" aria-label="One fewer inspector" onclick="stepSeats('business', -1)"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+                  <input class="job-input seat-input" id="seatsBusiness" type="number" inputmode="numeric" min="10" max="200" value="10" oninput="onSeatInput('business')" onchange="this.value = seatInputValue('business'); onSeatInput('business')">
+                  <button type="button" class="seat-step-btn" data-step="1" aria-label="One more inspector" onclick="stepSeats('business', 1)"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button>
+                </div>
+                <div class="seat-sum"><span id="seatMathBusiness"></span><span class="seat-total" id="seatTotalBusiness"></span></div>
+              </div>
+              <div class="seat-hint" hidden>Change the number to add or take away inspector places.</div>
               <button class="job-action-btn settings-primary-btn plan-btn" onclick="choosePlan('business')">Upgrade</button>
             </div>
           </div>
@@ -1354,17 +1390,15 @@
             <p>Listening while you talk is free and never counts. A typical inspection uses about 10 to 20 AI fills, and each paid plan gives every inspector 800 a month, about 40 inspections.</p>
             <p><strong>If you run out,</strong> nothing is lost. Your notes stay in the report and you can keep typing it by hand. AI fills come back on the 1st of each month, and upgrading gives you the bigger number straight away.</p>
           </details>
-          <div class="settings-row" id="billingOwnerOnly" hidden>
-            <div class="settings-row-text">
-              <div class="settings-row-desc">Your business owner looks after the plan. Ask them if you need more AI fills.</div>
-            </div>
-          </div>
+          <div class="bill-owner-note" id="billingOwnerOnly" hidden>Your business owner looks after the plan. Ask them if you need more AI fills.</div>
           <div class="bill-fine" id="billingTermsRow">
-            <div class="bill-secure"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Payments are made securely through Stripe. SAYON never sees your card number.</span></div>
-            <div class="bill-section-label">The fine print</div>
+            <ul class="bill-promises">
+              <li><span class="bill-promise-icon"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span><div><b>Paid through Stripe</b><span>SAYON never sees your card number.</span></div></li>
+              <li><span class="bill-promise-icon"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="m9.5 14.5 5 5"/><path d="m14.5 14.5-5 5"/></svg></span><div><b>Cancel any time</b><span>In Manage. Your plan runs to the end of the month you've paid for.</span></div></li>
+              <li><span class="bill-promise-icon"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20"/><path d="M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><div><b>Prices in Australian dollars</b><span>No GST.</span></div></li>
+            </ul>
+            <div class="settings-group-title bill-label">The fine print</div>
             <ul class="bill-terms" id="billingTermsText">
-              <li>Prices are in Australian dollars, no GST.</li>
-              <li>Cancel any time in Manage, and your plan runs to the end of the month you've paid for.</li>
               <li>The free trial is 14 days with 50 AI fills (about 3 to 5 inspections), and no card is needed.</li>
               <li>Paying opens in your browser. Come back to SAYON afterwards and your plan shows here.</li>
             </ul>

@@ -77,25 +77,28 @@ function formatAgreementSignedAt(ms) {
   return new Date(ms).toLocaleString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-// A date as YYYY-MM-DD on the phone's own calendar. toISOString() gives the
-// UTC date, which in Australia is the day before until 10 or 11 in the morning.
-function isoDate(d) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+// The unsigned sheet is on screen, so its own boxes (who signs, special
+// requests) count.
+function agreementEditOpen() {
+  return document.getElementById('agreementOverlay').classList.contains('open') && !reportData.agreement;
 }
-function todayIsoDate() { return isoDate(new Date()); }
 
-// The job details the agreement is filled from, read from the open sheet.
+// What the agreement is filled from. The inspection type, date and fee are
+// the job's own (Job details); the sheet adds any special requests and who
+// signs. With the sheet shut (a link sent from This job) it is Job details
+// alone.
 function agreementFormValues() {
   const standard = reportData.standard || 'AS 3660.2-2017';
-  const inspectionDate = document.getElementById('agreementDate').value || todayIsoDate();
-  const fee = agreementFeeText(document.getElementById('agreementFee').value);
-  const notes = document.getElementById('agreementNotes').value.trim();
+  const inspectionDate = reportData.jobInspectionDate || todayIsoDate();
+  const fee = agreementFeeText(jobFeeOf(reportData));
+  const open = agreementEditOpen();
+  const notes = open ? document.getElementById('agreementNotes').value.trim() : '';
   return {
     standard, inspectionDate, fee, notes,
     text: fillAgreementText(getAgreementTemplate(), {
       company: getCompanyDetails().name || 'The inspecting company',
       // The inspection is for the client; someone else may sign for them.
-      client: document.getElementById('jobClient').value.trim() || document.getElementById('agreementSignerName').value.trim(),
+      client: document.getElementById('jobClient').value.trim() || (open ? document.getElementById('agreementSignerName').value.trim() : ''),
       address: getFullAddress(),
       date: formatAgreementDate(inspectionDate),
       standard,
@@ -106,25 +109,56 @@ function agreementFormValues() {
   };
 }
 
+// Step 1 of the sheet: what Job details already say, on one line, and a
+// box only for what's missing. Change swaps the line for all three boxes.
+// Which boxes show is settled when the sheet opens (and by Change), so one
+// doesn't vanish while it's being typed in.
+let agreementJobAsk = { type: false, date: false, fee: false };
+function renderAgreementJob() {
+  const type = reportData.jobInspectionType || '';
+  const day = reportData.jobInspectionDate ? new Date(reportData.jobInspectionDate + 'T00:00:00') : null;
+  const fee = agreementFeeText(jobFeeOf(reportData));
+  // The line carries what isn't in a box below it, so nothing shows twice.
+  const ask = agreementJobAsk;
+  const parts = [!ask.type && type,
+    !ask.date && day && !isNaN(day) ? day.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }) : '',
+    !ask.fee && fee].filter(Boolean);
+  document.getElementById('agreementJobText').textContent = parts.join(' · ');
+  document.getElementById('agreementJobLine').hidden = !parts.length;
+  document.getElementById('agreementJobChange').hidden = ask.type && ask.date && ask.fee;
+  document.getElementById('agreementTypeField').hidden = !ask.type;
+  document.getElementById('agreementDateField').hidden = !ask.date;
+  document.getElementById('agreementFeeField').hidden = !ask.fee;
+  document.getElementById('agreementDateFeeRow').hidden = !ask.date && !ask.fee;
+}
+// A job with no day yet takes the agreement's (today), so the two match.
+function keepAgreementDate(values) {
+  const el = document.getElementById('jobInspectionDate');
+  if (reportData.jobInspectionDate || !el) return;
+  el.value = values.inspectionDate;
+  saveJobInfo();
+}
+function changeAgreementJob() {
+  if (isReportLocked()) { sayLocked(); return; }
+  agreementJobAsk = { type: true, date: true, fee: true };
+  renderAgreementJob();
+  document.getElementById('agreementInspectionType').focus({ preventScroll: true });
+}
+
+// The banner on the report's first step, until the agreement is signed:
+// red while there's nothing, amber once a link is out. A signed agreement
+// has no banner; it is on This job's Agreement step.
 function renderAgreementBanner() {
   const banner = document.getElementById('agreementBanner');
   if (!banner) return;
   const a = reportData.agreement;
-  banner.classList.toggle('signed', !!a);
+  banner.hidden = !!a;
   const sent = !a && reportData.agreementRequest;
   banner.classList.toggle('waiting', !!sent);
-  document.getElementById('agreementBannerText').textContent = a
-    ? `Agreement signed by ${a.signerName} · ${formatAgreementSignedAt(a.signedAt)}`
-    : sent ? `Link sent to ${sent.signerName}, waiting for them to sign` : 'Pre-inspection agreement not signed yet';
+  document.getElementById('agreementBannerText').textContent = sent
+    ? `Link sent to ${sent.signerName}, waiting for them to sign` : 'Pre-inspection agreement not signed yet';
   if (sent) checkAgreementLink(false);
-  document.getElementById('agreementBannerBtn').textContent = a ? 'View' : sent ? 'Open' : 'Get it signed';
-  const so = document.getElementById('signoffAgreementStatus');
-  if (so) {
-    so.textContent = a
-      ? `Signed by ${a.signerName} on ${formatAgreementSignedAt(a.signedAt)}${a.method === 'other' ? ` (${a.otherNote})` : ''}`
-      : 'Not signed yet. The client signs the agreement before the inspection starts.';
-    so.classList.toggle('signed', !!a);
-  }
+  document.getElementById('agreementBannerBtn').textContent = sent ? 'Open' : 'Get it signed';
 }
 
 function openAgreementSheet() {
@@ -140,20 +174,36 @@ function openAgreementSheet() {
     const img = document.getElementById('agreementViewSignature');
     img.style.display = a.signature ? '' : 'none';
     if (a.signature) img.src = a.signature;
+    // A finalised job's agreement stays as it was signed (Amend first).
+    document.getElementById('agreementRemoveBtn').hidden = isReportLocked();
   } else {
     document.getElementById('agreementAddr').textContent = getFullAddress() || 'No address yet';
     document.getElementById('agreementAddr').classList.toggle('empty', !getFullAddress());
     document.getElementById('agreementSignerName').value = document.getElementById('jobClient').value.trim() || ((typeof currentJobQuote === 'function' && currentJobQuote()) || {}).client || '';
+    // The type, date and fee are the job's own: shown as one line, with a
+    // box for any that Job details don't have yet.
     document.getElementById('agreementInspectionType').value = reportData.jobInspectionType || '';
-    // Job Details may already have the inspection date and fee.
-    document.getElementById('agreementDate').value = reportData.jobInspectionDate || todayIsoDate();
+    document.getElementById('agreementDate').value = reportData.jobInspectionDate || '';
     document.getElementById('agreementFee').value = jobFeeOf(reportData);
+    agreementJobAsk = { type: !reportData.jobInspectionType, date: !reportData.jobInspectionDate, fee: !jobFeeOf(reportData) };
     document.getElementById('agreementNotes').value = '';
     document.getElementById('agreementAgree').checked = false;
     document.getElementById('agreementOtherNote').value = '';
     document.getElementById('agreementOtherWrap').style.display = 'none';
     if (agreementSignaturePad) agreementSignaturePad.clear();
+    // What was typed and signed before the app closed comes back (UNSAVED
+    // SHEETS in js/quote.js). Signing or closing the sheet drops the copy.
+    const sheetKey = 'agreement|' + (currentReportId || 'draft');
+    const copy = unsavedSheetCopy(sheetKey);
+    if (copy && copy.data) restoreAgreementForm(copy.data);
     refreshAgreementPreview();
+    const overlay = document.getElementById('agreementOverlay');
+    if (!overlay.dataset.keeps) {
+      overlay.dataset.keeps = '1';
+      ['input', 'change'].forEach(ev => overlay.addEventListener(ev, unsavedSheetChanged));
+    }
+    watchUnsavedSheet(sheetKey, readAgreementForm);
+    if (copy && copy.data) showToast('Picked up where you left off', 'info');
   }
   renderAgreementRemote();
   checkAgreementLink(false);
@@ -234,16 +284,50 @@ function onAgreementFeeInput() {
   refreshAgreementPreview();
 }
 
+// What's on the unsigned sheet, kept on the phone while it's open.
+function readAgreementForm() {
+  const val = id => document.getElementById(id).value;
+  return {
+    signerName: val('agreementSignerName'), notes: val('agreementNotes'),
+    otherNote: val('agreementOtherNote'), agreed: document.getElementById('agreementAgree').checked,
+    signature: agreementSignaturePad && !agreementSignaturePad.empty ? agreementSignaturePad.canvas.toDataURL('image/png') : '',
+  };
+}
+function restoreAgreementForm(d) {
+  if (d.signerName) document.getElementById('agreementSignerName').value = d.signerName;
+  if (d.notes) document.getElementById('agreementNotes').value = d.notes;
+  if (d.otherNote) {
+    document.getElementById('agreementOtherNote').value = d.otherNote;
+    document.getElementById('agreementOtherWrap').style.display = '';
+  }
+  document.getElementById('agreementAgree').checked = !!d.agreed;
+  if (d.signature && agreementSignaturePad) agreementSignaturePad.show(d.signature);
+}
+
 function closeAgreementSheet() {
+  forgetSheetFrom('agreementOverlay');
+  if (typeof dropUnsavedSheet === 'function') dropUnsavedSheet();
   cancelSheetVoice('agreement');
   document.getElementById('agreementOverlay').classList.remove('open');
 }
 
 function refreshAgreementPreview() {
   if (!reportData.agreement) renderAgreementDoc(document.getElementById('agreementText'), agreementFormValues().text);
+  renderAgreementJob();
   const hint = document.getElementById('agreementFeeHint');
-  if (hint) hint.hidden = !!document.getElementById('agreementFee').value.trim();
+  if (hint) hint.hidden = !!jobFeeOf(reportData);
   updateAgreementSignButton();
+}
+
+// The agreement sheet's date box is the job's inspection date: changing it
+// here changes Job details, so the job and the signed agreement can't
+// carry two different days. Cleared, it goes back to the job's day.
+function onAgreementDateChange() {
+  const el = document.getElementById('agreementDate');
+  const jobEl = document.getElementById('jobInspectionDate');
+  if (!el.value || isReportLocked()) el.value = reportData.jobInspectionDate || '';
+  else if (jobEl && jobEl.value !== el.value) { jobEl.value = el.value; saveJobInfo(); }
+  refreshAgreementPreview();
 }
 
 // The agreement sheet's inspection type is the job's inspection type: it is
@@ -257,7 +341,7 @@ function onAgreementTypeChange() {
 }
 
 function agreementTypeChosen() {
-  return !!document.getElementById('agreementInspectionType').value;
+  return !!reportData.jobInspectionType;
 }
 
 function updateAgreementSignButton() {
@@ -315,6 +399,7 @@ function signAgreement(method) {
     if (!agreement.otherNote) { showToast('Say how it was signed, e.g. "Signed on paper"', 'error'); return; }
   }
   reportData.agreement = agreement;
+  keepAgreementDate(values);
   if (reportData.agreementRequest) {
     const id = reportData.agreementRequest.id;
     if (authSession) fetch(`${SUPABASE_URL}/rest/v1/sign_requests?id=eq.${encodeURIComponent(id)}&status=eq.pending`, {
@@ -349,11 +434,20 @@ function agreementLinkUrl(id) {
 }
 
 async function sendAgreementLink() {
-  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  if (isReportLocked()) { sayLocked(); return; }
   if (isSampleJob(currentReportId)) { showToast('The sample job doesn\'t make signing links. Try it on a real job', 'info'); return; }
-  const signerName = document.getElementById('agreementSignerName').value.trim();
-  if (!agreementTypeChosen()) { showToast('Choose the inspection type first: it sets the standard the agreement names', 'error'); return; }
-  if (!signerName) { showToast('Enter the name of the person signing', 'error'); return; }
+  // From the sheet, whoever is named there signs. From This job's Next
+  // step card the sheet is shut: the client signs, and anything missing
+  // is asked for on the sheet.
+  const onSheet = agreementEditOpen();
+  const signerName = (onSheet ? document.getElementById('agreementSignerName') : document.getElementById('jobClient')).value.trim();
+  const need = !agreementTypeChosen() ? 'Choose the inspection type first: it sets the standard the agreement names'
+    : !signerName ? 'Enter the name of the person signing' : '';
+  if (need) {
+    if (!onSheet) jobGo('agreement');
+    showToast(need, 'error');
+    return;
+  }
   if (!authSession) { showToast('Sign in to send a link', 'error'); return; }
   if (!navigator.onLine) { showToast('Sending a link needs signal. Try again when you have it', 'error'); return; }
   const values = agreementFormValues();
@@ -361,8 +455,8 @@ async function sendAgreementLink() {
   const doc = { company: company.name || '', phone: company.phone || '', email: company.email || '',
     inspector: (document.getElementById('jobInspector') || {}).value?.trim() || '', client: signerName, address: getFullAddress(),
     inspectionDate: values.inspectionDate, standard: values.standard, text: values.text };
-  const btn = document.getElementById('agreementLinkBtn');
-  if (btn) btn.disabled = true;
+  const btns = [...document.querySelectorAll('#agreementLinkBtn, #jobOverlay .job-way-link')];
+  btns.forEach(b => { b.disabled = true; });
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/sign_requests?select=id`, {
       method: 'POST',
@@ -372,20 +466,24 @@ async function sendAgreementLink() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const [row] = await res.json();
     reportData.agreementRequest = { id: row.id, signerName, sentAt: Date.now(), values };
+    keepAgreementDate(values);
     if (!document.getElementById('jobClient').value.trim()) {
       document.getElementById('jobClient').value = signerName;
       updateJob();
     }
-    saveDraft();
+    // Onto the saved job straight away, so Jobs shows it waiting on the client.
+    saveOpenReportNow();
     renderAgreementBanner();
     renderAgreementRemote();
-    track('agreement_link_sent');
-    sendAgreementLinkOn();
+    track('agreement_link_sent', { from: onSheet ? 'sheet' : 'job' });
+    await sendAgreementLinkOn();
   } catch (e) {
     reportError(e, 'agreement_link');
     showToast('Could not make the link. Check your signal and try again', 'error');
   } finally {
-    if (btn) btn.disabled = false;
+    btns.forEach(b => { b.disabled = false; });
+    // This job's Next step card now says it's waiting on the client.
+    if (document.getElementById('jobOverlay').classList.contains('open')) renderJobPage();
   }
 }
 
@@ -434,7 +532,7 @@ async function shareAgreementLink() {
     await navigator.clipboard.writeText(`${text} ${url}`);
     showToast('Link copied. Paste it into a text or email to the client', 'success');
   } catch (e) {
-    prompt('Copy this link and send it to the client:', url);
+    showLinkToCopy(url);
   }
 }
 
@@ -452,17 +550,8 @@ async function checkAgreementLink(byTap) {
     // The report may have moved on while the request was out.
     if (reportData.agreementRequest !== r) return;
     if (row && row.status === 'signed') {
-      const v = r.values;
-      reportData.agreement = { method: 'remote', signerName: row.signer_name, signature: row.signature,
-        signedAt: new Date(row.signed_at).getTime(), inspectionDate: v.inspectionDate, fee: v.fee,
-        notes: v.notes, standard: v.standard, text: v.text };
-      delete reportData.agreementRequest;
-      saveDraft();
-      updateProgress();
-      renderAgreementBanner();
-      if (document.getElementById('agreementOverlay').classList.contains('open')) openAgreementSheet();
+      takeOpenAgreement(row);
       showToast(`${row.signer_name} signed the agreement`, 'success');
-      track('agreement_signed', { method: 'remote' });
     } else if (byTap) {
       showToast(row && row.status === 'cancelled' ? 'That link was cancelled' : 'Not signed yet', 'info');
     }
@@ -471,9 +560,57 @@ async function checkAgreementLink(byTap) {
   }
 }
 
+// The signed agreement, from the link's request and the row the client signed.
+function agreementFromLink(r, row) {
+  const v = r.values || {};
+  return { method: 'remote', signerName: row.signer_name, signature: row.signature,
+    signedAt: new Date(row.signed_at).getTime(), inspectionDate: v.inspectionDate, fee: v.fee,
+    notes: v.notes, standard: v.standard, text: v.text };
+}
+
+// The open job's link came back signed: every place that shows the
+// agreement takes it.
+function takeOpenAgreement(row) {
+  reportData.agreement = agreementFromLink(reportData.agreementRequest, row);
+  delete reportData.agreementRequest;
+  saveDraft();
+  updateProgress();
+  renderAgreementBanner();
+  if (document.getElementById('agreementOverlay').classList.contains('open')) openAgreementSheet();
+  if (document.getElementById('jobOverlay').classList.contains('open')) renderJobPage();
+  track('agreement_signed', { method: 'remote' });
+}
+
+// From the Jobs list's check of every link that's out (checkLinksOut in
+// js/app/dashboard.js): the open job's agreement, or one on a saved job.
+// Returns what to say, or '' when it isn't signed yet.
+function takeSignedAgreement(reportId, row) {
+  if (!row || row.status !== 'signed') return '';
+  if (reportId === currentReportId) {
+    const r = reportData.agreementRequest;
+    if (!r || r.id !== row.id || reportData.agreement) return '';
+    takeOpenAgreement(row);
+    saveOpenReportNow();
+  } else {
+    const reports = getSavedReports();
+    const entry = reports.find(x => x.id === reportId);
+    const d = entry && entry.reportData;
+    if (!d || !d.agreementRequest || d.agreementRequest.id !== row.id || d.agreement) return '';
+    d.agreement = agreementFromLink(d.agreementRequest, row);
+    delete d.agreementRequest;
+    // A new save of the report, so another device takes the agreement in.
+    entry.cloudSavedAt = cloudBaseOf(entry);
+    entry.savedAt = Date.now();
+    if (!setSavedReports(reports)) return '';
+    supabaseSave(entry, true);
+    track('agreement_signed', { method: 'remote' });
+  }
+  return `${row.signer_name || 'The client'} signed the agreement`;
+}
+
 async function cancelAgreementLink() {
   const r = reportData.agreementRequest;
-  if (!r || !confirm('Cancel this link? The client won\'t be able to sign with it.')) return;
+  if (!r || !(await askFirst({ title: 'Cancel this link?', text: 'The client won\'t be able to sign with it. You can send a new one, or have them sign on this phone.', yes: 'Cancel the link', no: 'Keep it' }))) return;
   if (authSession) {
     fetch(`${SUPABASE_URL}/rest/v1/sign_requests?id=eq.${encodeURIComponent(r.id)}&status=eq.pending`, {
       method: 'PATCH', headers: getAuthHeaders(), body: JSON.stringify({ status: 'cancelled' }),
@@ -496,9 +633,9 @@ function renderAgreementRemote() {
   }
 }
 
-function removeAgreement() {
-  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
-  if (!confirm('Remove the signed agreement from this report? The client will need to sign again.')) return;
+async function removeAgreement() {
+  if (isReportLocked()) { sayLocked(); return; }
+  if (!(await askFirst({ title: 'Remove the signed agreement?', text: 'The client will need to sign it again.', yes: 'Remove the agreement', danger: true }))) return;
   delete reportData.agreement;
   saveDraft();
   updateProgress();
@@ -526,7 +663,9 @@ function buildAgreementPdf(a) {
   const header = () => drawPdfRunningHeader(doc, company, 'Pre-Inspection Agreement', getFullAddress(), '');
   let y = drawPdfDocCover(doc, company, { compact: true, kicker: 'Timber pest inspection', title: 'Pre-Inspection Agreement',
     date: formatAgreementDate(todayIsoDate()), left: [
-      ['CLIENT', a.signerName],
+      // The client is the job's client. Whoever signed for them (an agent,
+      // a partner) is named in the signature block.
+      ['CLIENT', document.getElementById('jobClient').value.trim() || a.signerName],
       ['PROPERTY ADDRESS', getFullAddress() || 'Not specified'],
     ], right: [
       ['INSPECTION DATE', a.inspectionDate ? formatAgreementDate(a.inspectionDate) : ''],
@@ -537,8 +676,7 @@ function buildAgreementPdf(a) {
   y += 2;
   y = drawAgreementBody(doc, a, y, { M, CW, onNewPage: header });
   drawPdfDocFooters(doc, `Pre-Inspection Agreement${company.name ? `  ·  ${company.name}` : ''}`);
-  const fname = `Agreement_${fileNamePart(getFullAddress()) || 'Property'}.pdf`;
-  return { blob: doc.output('blob'), fname };
+  return { blob: doc.output('blob'), fname: pdfFileName('Agreement', getFullAddress()) };
 }
 
 // Prints the agreed wording and who signed it, from y down. Used for the

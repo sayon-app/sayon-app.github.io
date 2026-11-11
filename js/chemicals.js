@@ -11,15 +11,19 @@
 // prices, js/price-book.js): the register is only what the label says.
 //
 // SAYON starts the register with common Australian termiticides and baits
-// and their usual uses, with no rates: a rate has to come from the label in
-// the business's hands, and is typed once (here, or on a treatment record
-// with "Keep this rate"). Stored per business under korva_chemicals_<id>
+// and their uses, with each label's own rates where SAYON has read the
+// label (CHEMICAL_STARTER_DETAILS). The business checks them against the
+// label in its hands and can change any of them; each product's card says
+// which it is showing (chemicalRatesNote). A rate SAYON doesn't have is
+// typed once (here, or on a treatment record with "Keep this rate").
+// Stored per business under korva_chemicals_<id>
 // and synced to the team in businesses.settings.chemicals
 // (js/business-sync.js). Only the owner changes it; a technician reads it.
 //
 // register = { products: [{ id, name, maker, active, apvma, form, labelUrl,
 //   sdsUrl, sdsExpires (YYYY-MM-DD), declUrl (manufacturer's declaration),
-//   uses: [{ id, pest, method, surface, rate, volume, life }] }], updatedAt }
+//   uses: [{ id, pest, method, surface, rate, volume, life }],
+//   ratesChangedAt (when the business last changed a use) }], updatedAt }
 //
 // The page works like a supplier's chemical register: search by name, tap a
 // product, and its documents (SDS with its expiry date, label,
@@ -238,6 +242,9 @@ const CHEMICAL_STARTER_DETAILS = {
     ],
   },
 };
+
+// The day SAYON's starting rates were last read off the labels themselves.
+const CHEMICAL_RATES_CHECKED = '2026-11-05';
 
 const chemId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
@@ -535,13 +542,33 @@ function chemicalDocsHtml(p) {
   return `<div class="chem-docs">${chemicalApvmaHtml(p)}${chemicalDocRow(p, 'sds')}${chemicalDocRow(p, 'label')}${safeUrl(p.declUrl) ? chemicalDocRow(p, 'decl') : ''}</div>`;
 }
 
+// Where a product's rates came from, since they print on the certificate:
+// SAYON's reading of the label (and the day it was read), or the business.
+// '' for a product with no rate yet.
+function chemicalRatesNote(p) {
+  const uses = p.uses || [];
+  if (!uses.some(u => chemicalUseRate(u) || u.life)) return '';
+  const sig = list => JSON.stringify(list.map(u => [u.pest, u.method, u.surface, u.rate, u.volume, u.life].map(v => String(v || '').trim())));
+  const starter = chemicalStarterProducts().find(s => s.name.toLowerCase() === String(p.name || '').trim().toLowerCase());
+  const fromLabel = !!starter && starter.uses.some(u => u.rate);
+  if (fromLabel && sig(starter.uses) === sig(uses)) {
+    return `Rates from the label, checked ${apvmaDayText(new Date(CHEMICAL_RATES_CHECKED + 'T00:00:00').getTime())}. Check they match yours.`;
+  }
+  const when = p.ratesChangedAt ? new Date(p.ratesChangedAt) : null;
+  const day = when ? ', ' + when.toLocaleDateString('en-AU', when.getFullYear() === new Date().getFullYear() ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  const who = canEditBusiness() ? 'you' : 'your business';
+  return `${fromLabel ? 'Changed' : 'Rates typed'} by ${who}${day}`;
+}
+
 // The label's rates, to read: the edit form holds the same in boxes.
 function chemicalRatesHtml(p) {
   const esc = escapeHtml;
   const uses = p.uses || [];
   if (!uses.length) return '<div class="chem-rates"></div>';
+  const note = chemicalRatesNote(p);
   return `<div class="chem-rates">
       <div class="chem-doc-title">Label rates</div>
+      ${note ? `<div class="chem-rates-note">${esc(note)}</div>` : ''}
       ${uses.map(u => `<div class="chem-rate">
         <div class="chem-rate-use">${esc([u.pest, chemicalUseLabel(u)].filter(Boolean).join(' · '))}</div>
         <div class="chem-rate-val${chemicalUseRate(u) ? '' : ' none'}">${esc(chemicalUseRate(u) || 'No rate yet')}${u.life ? ` · ${esc(u.life)}` : ''}</div>
@@ -730,7 +757,7 @@ function onChemicalEdit(el) {
     el.value = v;
   } else if (el.dataset.u) {
     const u = (p.uses || []).find(x => x.id === el.closest('.chem-use').dataset.use);
-    if (u) u[el.dataset.u] = el.value.trim();
+    if (u) { u[el.dataset.u] = el.value.trim(); p.ratesChangedAt = Date.now(); }
   }
   storeChemicalRegister(reg);
   // The heading, documents and rates follow the edit; the form stays put.
@@ -783,6 +810,7 @@ function addChemicalUse(id) {
   if (!p) return;
   const last = (p.uses || [])[p.uses.length - 1];
   (p.uses = p.uses || []).push({ id: chemId(), pest: last ? last.pest : 'Subterranean termites', method: last ? last.method : '', surface: '', rate: '', volume: '', life: last ? last.life : '' });
+  p.ratesChangedAt = Date.now();
   storeChemicalRegister(reg);
   const card = rerenderChemicalCard(id);
   const uses = card ? card.querySelectorAll('.chem-use [data-u="surface"]') : [];
@@ -795,6 +823,7 @@ function removeChemicalUse(id, useId) {
   const p = reg.products.find(x => x.id === id);
   if (!p) return;
   p.uses = (p.uses || []).filter(u => u.id !== useId);
+  p.ratesChangedAt = Date.now();
   storeChemicalRegister(reg);
   rerenderChemicalCard(id);
 }
@@ -823,6 +852,7 @@ function keepChemicalRate(productName, useId, rate, life) {
   if (!u) return false;
   u.rate = rate;
   if (life && !u.life) u.life = life;
+  p.ratesChangedAt = Date.now();
   storeChemicalRegister(reg);
   return true;
 }

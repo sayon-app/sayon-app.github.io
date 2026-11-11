@@ -1,4 +1,4 @@
-// SAYON app: App updates, address move, splash, platform navigation, keyboard access.
+// SAYON app: App updates, address move, splash, platform navigation, keyboard access, back, where you were.
 // One of the js/app/ files, which share one global scope: they load as plain
 // scripts in the order index.html lists them, so a top-level name declared in
 // any of them can be used from the others once the page has loaded.
@@ -21,7 +21,7 @@ function appIsBusy() {
 // visit, the client's answer, the site plan, the agreement, an email being
 // checked, a photo being marked up). What's on it isn't saved until its
 // button is tapped, so an update waits until it's closed.
-const FORM_SHEETS = ['treatmentOverlay', 'baitOverlay', 'quoteAnswerOverlay', 'sitePlanOverlay', 'agreementOverlay', 'sendReviewOverlay'];
+const FORM_SHEETS = ['treatmentOverlay', 'baitOverlay', 'quoteAnswerOverlay', 'sitePlanOverlay', 'agreementOverlay', 'sendReviewOverlay', 'problemOverlay'];
 function formSheetOpen() {
   const markup = document.getElementById('photoMarkup');
   return FORM_SHEETS.some(id => { const el = document.getElementById(id); return !!el && el.classList.contains('open'); })
@@ -84,7 +84,7 @@ async function backUpForMove() {
   if (isBusinessOwner()) await pushBusinessSettings();
   const detailsLeft = isBusinessOwner() && localSettingsAhead(authBusiness.settings || {});
   if (missing || detailsLeft) {
-    const what = missing ? `${missing} report${missing === 1 ? '' : 's'}` : 'Your company details';
+    const what = missing ? `${missing} report${missing === 1 ? '' : 's'}` : 'Your business details';
     status.textContent = `${what} couldn't be backed up yet. Check you have internet, then try again.`;
     retryBtn.hidden = false;
     return;
@@ -112,33 +112,14 @@ window.addEventListener('load', () => {
     });
   }
 
+  // The logo shows for as long as the sign-in check takes, then the app
+  // opens. No fixed wait: there is nothing else to load.
   const statusEl = document.getElementById('splashStatus');
-  const messages = [
-    'Initialising vocabulary…',
-    'Loading the termite species reference…',
-    'Preparing report template…',
-  ];
-  let msgIndex = 0;
-  if (statusEl) {
-    const cycle = setInterval(() => {
-      msgIndex++;
-      if (msgIndex < messages.length) {
-        statusEl.style.opacity = '0';
-        setTimeout(() => {
-          statusEl.textContent = messages[msgIndex];
-          statusEl.style.opacity = '1';
-        }, 150);
-      } else {
-        clearInterval(cycle);
-      }
-    }, 700);
-  }
-
-  setTimeout(async () => {
+  (async () => {
     const splash = document.getElementById('splash');
     const hideSplash = () => new Promise(done => {
       splash.style.opacity = '0';
-      setTimeout(() => { splash.style.display = 'none'; done(); }, 600);
+      setTimeout(() => { splash.style.display = 'none'; done(); }, 250);
     });
 
     // If we arrived here via a "reset your password" email link, Supabase
@@ -156,8 +137,9 @@ window.addEventListener('load', () => {
     }
 
     // The splash stays up while the sign-in and the business load, so the
-    // screen is never blank on a weak signal (see START_NETWORK_WAIT_MS).
-    const slow = setTimeout(() => { if (statusEl) statusEl.textContent = 'Signing in…'; }, 1000);
+    // screen is never blank on a weak signal (see START_NETWORK_WAIT_MS),
+    // and says what it's waiting on once that takes a second.
+    const slow = setTimeout(() => { if (statusEl) statusEl.textContent = 'Signing in…'; splash.classList.add('waiting'); }, 1000);
     const hasSession = await restoreAuthSession();
     clearTimeout(slow);
     await hideSplash();
@@ -168,17 +150,14 @@ window.addEventListener('load', () => {
       showAuth(new URLSearchParams(window.location.search).get('signup') ? 'authSignUp' : 'authSignIn');
       applyInviteToSignUp();
     }
-  }, 2200);
+  })();
 });
 
 // ── PLATFORM NAVIGATION ─────────────────────────────────────────────────
 function openApp(appName) {
-  if (appName === 'quote') { openQuote('menu'); return; }
   if (appName !== 'inspect') return;
 
-  const menu = document.getElementById('mainMenu');
   const app = document.getElementById('app');
-  menu.style.display = 'none';
   app.style.display = 'flex';
   track('screen_viewed', { screen: 'report' });
 
@@ -190,7 +169,7 @@ function openApp(appName) {
     buildChoiceCards();
     buildSelectCards();
     enhanceFieldsWithNotes();
-    renderSavedList();
+    refreshJobsList();
     const restored = loadDraft();
     restoreSignaturePads(); restoreLicenceField();
     renderFindingsUI();
@@ -214,6 +193,7 @@ function openApp(appName) {
       const insp = document.getElementById('jobInspector');
       if (insp && !insp.value) insp.value = me.name;
       if (me.licence && !reportData.inspectorLicence) { reportData.inspectorLicence = me.licence; restoreLicenceField(); }
+      if (me.signature && !reportData.inspectorSignature) { reportData.inspectorSignature = me.signature; restoreSignaturePads(); }
       if (!reportData.jobInspectionDate) reportData.jobInspectionDate = todayIsoDate();
     }
     enableKeyboardActivation();
@@ -225,6 +205,10 @@ function openApp(appName) {
     // pull any cloud reports not on this device, then sort out photo storage
     supabaseSyncOnOpen().then(pushUnsyncedReports).finally(tidyPhotoStorage);
     processPendingNotes();
+    fillWeatherOnTheDay();
+    // Back and swipe back step through the app, and it reopens where it was (BACK, WHERE YOU WERE).
+    installBackNavigation();
+    restoreNavPlace();
   }
 }
 
@@ -248,4 +232,274 @@ function enableKeyboardActivation() {
       }
     });
   });
+}
+
+// ── BACK ──────────────────────────────────────────────────────────────────
+// One step back, however it's asked for: the phone's back button or swipe
+// (browser history), Esc on a keyboard, or a swipe in from the left edge in
+// the home-screen app (iOS gives a home-screen app no back swipe of its
+// own). Back closes what's on top (a photo, a sheet, the voice panel, a menu
+// page), then climbs the job: a document (the report or the quote) goes back
+// to This job, and This job to Jobs. Jobs is the top, so a back from there
+// is the browser's own and leaves SAYON.
+
+// Where the inspector is, under any sheet.
+function navPlace() {
+  const open = id => { const el = document.getElementById(id); return !!(el && el.classList.contains('open')); };
+  if (open('sidebarPanel')) return 'menu';
+  if (open('dashboardOverlay')) return 'jobs';
+  if (open('jobOverlay')) return 'job';
+  if (open('quoteScreen')) return 'quote';
+  if (document.getElementById('app').style.display === 'flex') return 'report';
+  return '';
+}
+
+function navGo(place) {
+  const tab = { jobs: 'dashboard', job: 'job', quote: 'quote', report: 'report' }[place];
+  if (tab) tabGo(tab);
+}
+
+// Back has somewhere to go only once the app is up (not on the splash,
+// sign-in or onboarding).
+function navReady() {
+  return document.getElementById('app').style.display === 'flex' || document.getElementById('quoteScreen').classList.contains('open');
+}
+
+// The sheet on top: the highest, then the latest in the page.
+function topOpenSheet() {
+  const open = [...document.querySelectorAll('.page-sheet-overlay.open')];
+  const z = el => parseInt(getComputedStyle(el).zIndex, 10) || 0;
+  return open.reduce((a, b) => !a || z(b) > z(a) || (z(b) === z(a) && (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)) ? b : a, null);
+}
+
+// How back closes each sheet. The treatment record, a bait visit and the
+// agreement keep what's been filled in, so opening them again carries on.
+const NAV_SHEET_BACK = {
+  agreementOverlay: () => cancelSheet('agreementOverlay', true),
+  treatmentOverlay: () => cancelSheet('treatmentOverlay', true),
+  baitOverlay: () => cancelSheet('baitOverlay', true),
+  sitePlanOverlay: () => leaveSitePlan(),
+  sendReviewOverlay: () => { if (!(sendReview && sendReview.busy)) closeSendReview(); },
+  didItSendOverlay: () => answerDidItSend(false),
+  askOverlay: () => answerAsk(null),
+  quoteAnswerOverlay: () => closeQuoteAnswer(),
+  compassOverlay: () => closeCompass(),
+  problemOverlay: () => closeProblemReport(),
+  extractSummaryOverlay: () => closeExtractSummary(),
+  lastVisitOverlay: () => closeLastVisitChanges(),
+  photoSourceOverlay: () => closePhotoSource(),
+  moveOverlay: () => closeMoveNotice(),
+};
+
+// One step back. False when there's nowhere further back (Jobs).
+function navBack() {
+  const isOpen = id => { const el = document.getElementById(id); return !!(el && el.classList.contains('open')); };
+  const shown = id => { const el = document.getElementById(id); return !!(el && !el.hidden); };
+  if (isRecording) { showToast('Tap Stop to finish recording first', 'info'); return true; }
+  if (activeEditEl) { commitActive(); return true; }
+  if (shown('photoMarkup')) { if (markupState.pendingLabel) closeMarkupLabel(); else closePhotoMarkup(); return true; }
+  if (shown('photoViewer')) { closePhotoViewer(); return true; }
+  const sheet = topOpenSheet();
+  if (sheet) {
+    const close = NAV_SHEET_BACK[sheet.id];
+    if (close) close(); else sheet.classList.remove('open');
+    return true;
+  }
+  if (isOpen('voicePopover')) { toggleVoicePopover(); return true; }
+  if (isOpen('dashboardDetail')) { closeDashboardDetail(); return true; }
+  if (isOpen('sidebarPanel')) { drawerBackTap(); return true; }
+  const place = navPlace();
+  if (place === 'report' || place === 'quote') { tabGo('job'); return true; }
+  if (place === 'job') { tabGo('dashboard'); return true; }
+  return false;
+}
+
+// Browser history: one entry of SAYON's own sits on top of the page's, so
+// the phone's back lands here instead of leaving. Each back steps back and
+// puts the entry back; on Jobs it isn't put back, so the next back leaves.
+// Any tap puts it back too.
+function navArm() {
+  if (!navReady() || (history.state && history.state.sayonBack)) return;
+  try { history.pushState({ sayonBack: 1 }, ''); } catch (e) { /* history unavailable */ }
+}
+
+let backNavInstalled = false;
+function installBackNavigation() {
+  if (backNavInstalled) return;
+  backNavInstalled = true;
+  try { if (!history.state) history.replaceState({ sayonBase: 1 }, ''); } catch (e) {}
+  navArm();
+  window.addEventListener('popstate', e => {
+    if (e.state && e.state.sayonBack) return; // forward onto SAYON's own entry
+    if (!navReady()) return;
+    if (navBack()) navArm();
+  });
+  document.addEventListener('click', navArm, true);
+  // Esc: after a field's own Esc (which backs out of the edit) has had its
+  // turn. In a box being typed in, the first Esc only leaves the box (and
+  // closes its suggestions); the next one goes back.
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || !navReady()) return;
+    const t = e.target;
+    if (t && t.matches && t.matches('input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]), textarea, select, [contenteditable="true"]')) {
+      t.blur(); e.preventDefault(); return;
+    }
+    if (navBack()) e.preventDefault();
+  });
+  installEdgeSwipeBack();
+  // Where the inspector was, for when the phone closes the app.
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') rememberNavPlace(); });
+  window.addEventListener('pagehide', rememberNavPlace);
+}
+
+// The home-screen app: a swipe in from the left edge goes back, with an
+// arrow that follows the finger. Not in a browser tab, which has its own.
+// Never from a drawing surface (signatures, the site plan, photo markup).
+function installEdgeSwipeBack() {
+  const standalone = navigator.standalone === true || !!(window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  if (!standalone) return;
+  const EDGE = 20, GO = 80;
+  const hint = document.createElement('div');
+  hint.className = 'edge-back';
+  hint.hidden = true;
+  hint.setAttribute('aria-hidden', 'true');
+  hint.innerHTML = '<svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>';
+  document.body.appendChild(hint);
+  let s = null;
+  const reset = () => { s = null; hint.hidden = true; hint.classList.remove('ready'); };
+  document.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    s = e.touches.length === 1 && t.clientX <= EDGE && !isRecording && navReady()
+      && !e.target.closest('canvas, input[type="range"], .photo-viewer, .photo-markup')
+      ? { x: t.clientX, y: t.clientY, top: t.clientY, go: false } : null;
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!s) return;
+    const t = e.touches[0], dx = t.clientX - s.x, dy = Math.abs(t.clientY - s.y);
+    if (dy > 40 && dy > dx) { reset(); return; }
+    if (dx < 12) return;
+    s.go = dx >= GO;
+    hint.hidden = false;
+    hint.style.top = Math.round(s.top) + 'px';
+    hint.style.setProperty('--pull', Math.min(1, dx / GO).toFixed(2));
+    hint.classList.toggle('ready', s.go);
+  }, { passive: true });
+  document.addEventListener('touchend', () => { const go = s && s.go; reset(); if (go) navBack(); }, { passive: true });
+  document.addEventListener('touchcancel', reset, { passive: true });
+}
+
+// ── WHERE YOU WERE ───────────────────────────────────────────────────────
+// The phone closes an app it isn't showing, and reopening started on the
+// report's first step. Now it opens where it was: the Jobs list, the job's
+// page, the quote, or the report on the step that was showing.
+const NAV_PLACE_KEY = 'korva_last_place';
+function rememberNavPlace() {
+  if (!navReady()) return;
+  const place = navPlace();
+  const step = document.getElementById('reportBody').dataset.step || '';
+  try {
+    localStorage.setItem(NAV_PLACE_KEY, JSON.stringify({ place: place === 'menu' ? 'jobs' : place, step, id: currentReportId || null, at: Date.now() }));
+  } catch (e) { /* storage full: it opens on the report as before */ }
+}
+
+function restoreNavPlace() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(NAV_PLACE_KEY) || 'null'); } catch (e) {}
+  if (!s) return;
+  try {
+    if (s.place === 'jobs') { tabGo('dashboard'); return; }
+    // The rest belong to a job: only the one that's open again.
+    if ((s.id || null) !== (currentReportId || null)) return;
+    if (s.place === 'job') tabGo('job');
+    else if (s.place === 'quote' && currentReportId) jobGo('quote');
+    else if (s.place === 'report' && s.step && document.getElementById('tab-' + s.step)) goStep(s.step);
+  } catch (e) { /* a place that can't open: the report, as before */ }
+}
+
+// ── ASK FIRST ────────────────────────────────────────────────────────────
+// SAYON's own sheet for a question, in place of the browser's grey box:
+// what will happen, a button that names it, and a quiet way out.
+//   askFirst({ title, text, facts, yes, no, danger, input })
+// facts: [[label, value], …] set out above the text (a plan and its price).
+// yes: the button's words, which say what it does. no: the quiet one,
+// "Not now" unless given, or null for none (a sheet that only shows
+// something). danger: the button is red (it deletes something).
+// input: { value, placeholder, label, match, readonly } puts a box on the
+// sheet, in place of the browser's prompt(). The named button then gives
+// what's in the box (a string, trimmed); with match it stays off until
+// the box says that word (DELETE).
+// Resolves true for the named button (or the box's words), false for the
+// quiet one, and null when the sheet is closed by back, Esc or a tap
+// outside it.
+let askResolve = null, askInputMatch = '', askHasInput = false;
+function askFirst({ title, text = '', facts = null, yes, no = 'Not now', danger = false, input = null }) {
+  if (askResolve) answerAsk(null);
+  document.getElementById('askTitle').textContent = title;
+  const textEl = document.getElementById('askText');
+  textEl.textContent = text;
+  textEl.hidden = !text;
+  const factsEl = document.getElementById('askFacts');
+  factsEl.hidden = !(facts && facts.length);
+  factsEl.innerHTML = (facts || []).map(([k, v]) => `<div><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd></div>`).join('');
+  const box = document.getElementById('askInput');
+  box.hidden = !input;
+  askHasInput = !!input;
+  askInputMatch = (input && input.match) || '';
+  if (input) {
+    box.value = input.value || '';
+    box.placeholder = input.placeholder || '';
+    box.readOnly = !!input.readonly;
+    box.setAttribute('aria-label', input.label || title);
+    box.setAttribute('autocapitalize', askInputMatch ? 'characters' : 'sentences');
+  }
+  const yesBtn = document.getElementById('askYes');
+  yesBtn.textContent = yes;
+  yesBtn.classList.toggle('danger', !!danger);
+  syncAskYes();
+  const noBtn = document.getElementById('askNo');
+  noBtn.hidden = no === null;
+  noBtn.textContent = no || '';
+  document.getElementById('askOverlay').classList.add('open');
+  if (input) setTimeout(() => { box.focus(); if (input.readonly) box.select(); }, 60);
+  return new Promise(resolve => { askResolve = resolve; });
+}
+// Where neither the share sheet nor the clipboard works: the link in a box
+// to press and hold, in place of the browser's prompt().
+function showLinkToCopy(url) {
+  return askFirst({ title: 'Copy the link', text: 'Press and hold the link to copy it, then send it to the client.', input: { value: url, readonly: true, label: 'The link' }, yes: 'Done', no: null });
+}
+// A box that wants a word keeps the button off until it has it.
+function syncAskYes() {
+  const typed = document.getElementById('askInput').value.trim().toUpperCase();
+  document.getElementById('askYes').disabled = !!askInputMatch && typed !== askInputMatch;
+}
+function answerAsk(answer) {
+  if (answer === true && document.getElementById('askYes').disabled) return;
+  if (answer === true && askHasInput) answer = document.getElementById('askInput').value.trim();
+  document.getElementById('askOverlay').classList.remove('open');
+  document.getElementById('askInput').blur();
+  const resolve = askResolve;
+  askResolve = null;
+  if (resolve) resolve(answer);
+}
+
+// ── SHEETS OPENED FROM A PAGE ─────────────────────────────────────────────
+// The agreement, the treatment record and a bait visit open from This job
+// or the Jobs list over the report or the quote. Closing one without
+// finishing it (its ✕, back or Esc) goes back to where it was opened from.
+// Signing or saving carries on from the document, as before.
+let navSheetFrom = null; // { sheet, place }
+function rememberSheetFrom(sheet, place) { navSheetFrom = place ? { sheet, place } : null; }
+function forgetSheetFrom(sheet) { if (navSheetFrom && navSheetFrom.sheet === sheet) navSheetFrom = null; }
+
+function cancelSheet(sheet, keep) {
+  const from = navSheetFrom && navSheetFrom.sheet === sheet ? navSheetFrom.place : null;
+  // Back or Esc can be a slip, so what's filled in is kept (UNSAVED SHEETS in js/quote.js).
+  if (keep && typeof unsavedSheet !== 'undefined' && unsavedSheet && unsavedSheet.changed) {
+    keepUnsavedSheet();
+    unsavedSheet = null;
+    showToast('Not saved yet. Open it again to carry on', 'info');
+  }
+  ({ agreementOverlay: closeAgreementSheet, treatmentOverlay: closeTreatmentRecord, baitOverlay: closeBaitVisit })[sheet]();
+  if (from && from !== navPlace()) navGo(from);
 }

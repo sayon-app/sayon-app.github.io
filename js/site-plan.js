@@ -2,8 +2,14 @@
 // A drawn plan of the site with a fixed set of symbols and a legend, so
 // anyone reading the certificate (the client, an agent, a solicitor, the
 // next technician) can see where the building, the treatment and each
-// station are. It's kept with the treatment record as data, not a picture:
-// q.treatment.plan = { v: 1, north: 0..7 (steps of 45°), items: [
+// station are. It's kept as data, not a picture. The plan starts at the
+// report, drawn at the inspection if the inspector wants one
+// (reportData.sitePlan: the building, what couldn't be reached, what was
+// found; it prints in the report's Areas Inspected), and the treatment
+// record starts from a copy of it and adds the treatment and the stations
+// (q.treatment.plan, which the certificate and bait visits print). Each
+// document keeps the plan it went out with. Either one is
+// { v: 1, north: 0..7 (steps of 45°), items: [
 //   { id, k: symbol key, x, y } for a point,
 //   { ..., n } for a station (one number sequence across all station types),
 //   { ..., w, h } for a building or an area (x, y its top-left corner),
@@ -193,7 +199,9 @@ function sitePlanStations(plan) {
 
 // "12 in-ground bait stations, 2 above-ground bait stations and a
 // chemical barrier": what the plan shows, for the record and the PDF.
-function sitePlanSummary(plan) {
+// report: the report's plan, where a no access area is one that couldn't
+// be inspected (on the treatment's, it wasn't treated either).
+function sitePlanSummary(plan, { report = false } = {}) {
   const items = planLayerItems(plan);
   const count = k => items.filter(it => it.k === k).length;
   const bits = [];
@@ -207,8 +215,13 @@ function sitePlanSummary(plan) {
   else if (count('fillpoint')) bits.push(`${count('fillpoint')} reticulation filling point${count('fillpoint') === 1 ? '' : 's'}`);
   if (count('physical')) bits.push(`a physical barrier${physical ? ` (about ${formatPlanMetres(physical)})` : ''}`);
   if (count('treated')) bits.push(`${count('treated')} direct treatment spot${count('treated') === 1 ? '' : 's'}`);
-  if (count('untreated') + count('noaccess')) bits.push('areas not treated');
+  if (report && count('noaccess')) bits.push(`${count('noaccess')} area${count('noaccess') === 1 ? '' : 's'} that could not be inspected`);
+  else if (count('untreated') + count('noaccess')) bits.push('areas not treated');
   if (count('activity')) bits.push(`${count('activity')} place${count('activity') === 1 ? '' : 's'} where termite activity or damage was found`);
+  const some = (k, one, many) => { const n = count(k); if (n) bits.push(`${n} ${n === 1 ? one : many}`); };
+  some('moisture', 'damp or leaking spot', 'damp or leaking spots');
+  some('timber', 'place with timber on the soil', 'places with timber on the soil');
+  some('bridge', 'place where the slab edge or barrier is bridged', 'places where the slab edge or barrier is bridged');
   return bits.length ? joinWithAnd(bits) : '';
 }
 
@@ -708,6 +721,59 @@ function drawSitePlanStationListPdf(doc, plan, { x, y, w, cols = 3 } = {}) {
   return 4.5 + perCol * 3.8;
 }
 
+// ── THE PLAN AS A CARD ── On the report's Areas step and the treatment
+// record: the drawing (tap to edit), its legend and what it shows, the
+// subfloor under it, then the buttons. open: the name of the function that
+// opens the editor (given 'sub' for the subfloor). empty: the title and
+// line of the button while nothing is drawn. note: a line over the buttons.
+function sitePlanCardHTML(plan, open, { report = false, empty = [], note = '' } = {}) {
+  if (!sitePlanHasContent(plan)) {
+    return `<button type="button" class="treat-plan-empty" onclick="${open}()">
+        <span class="treat-plan-empty-title">${empty[0]}</span>
+        <span class="treat-plan-empty-text">${empty[1]}</span>
+      </button>`;
+  }
+  const sum = sitePlanSummary(plan, { report });
+  const sub = sitePlanHasSubfloor(plan);
+  const subSum = sub ? sitePlanSubSummary(plan) : '';
+  return `<button type="button" class="treat-plan-view" onclick="${open}()" aria-label="Edit the site plan">${sitePlanSVG(plan)}</button>
+    ${sitePlanLegendHTML(plan)}
+    ${sum ? `<p class="quote-hint">The plan shows ${escapeHtml(sum)}.</p>` : ''}
+    ${sub ? `<div class="treat-plan-sub">
+      <p class="treat-plan-caption">Subfloor</p>
+      <button type="button" class="treat-plan-view" onclick="${open}('sub')" aria-label="Edit the subfloor plan">${sitePlanSVG(plan, { layer: 'sub' })}</button>
+      ${sitePlanLegendHTML(plan, { layer: 'sub' })}
+      ${subSum ? `<p class="quote-hint">The subfloor plan shows ${escapeHtml(subSum)}.</p>` : ''}
+    </div>` : ''}
+    ${note ? `<p class="quote-hint treat-plan-note">${escapeHtml(note)}</p>` : ''}
+    <button type="button" class="quote-link-btn" onclick="${open}()">Edit the site plan</button>
+    ${sub ? '' : `<button type="button" class="quote-link-btn" onclick="${open}('sub')">Add the subfloor</button>`}`;
+}
+
+// ── THE SITE PLAN IN THE REPORT ── Drawn at the inspection if the inspector
+// wants one, from the Areas step (#reportPlan, under the areas), and kept in
+// reportData.sitePlan. It prints in the report's Areas Inspected, and a new
+// treatment record starts from a copy of it. A finalised report's guard
+// stops a tap on it, as on every other part of the report.
+function renderReportPlan() {
+  const el = document.getElementById('reportPlan');
+  if (!el) return;
+  el.innerHTML = sitePlanCardHTML(reportData.sitePlan, 'openReportSitePlan', { report: true,
+    empty: ['Draw a site plan', 'If you want one: the house, what you couldn\'t get to and where you found things. It prints in the report, and the treatment record starts from it.'] });
+}
+
+function openReportSitePlan(layer) {
+  if (isReportLocked()) { sayLocked(); return; }
+  openSitePlan(reportData.sitePlan, plan => {
+    if (sitePlanHasContent(plan)) reportData.sitePlan = plan;
+    else delete reportData.sitePlan;
+    renderReportPlan();
+    updateProgress();
+    flushDraftSave();
+  }, { mode: 'report' });
+  if (layer === 'sub') setSitePlanLayer('sub');
+}
+
 // ── THE EDITOR ──
 // A full-screen sheet with the plan, a tray of symbols by group, and a bar
 // for the selected item (its label, real size, angle, delete). A selected
@@ -716,9 +782,11 @@ function drawSitePlanStationListPdf(doc, plan, { x, y, w, cols = 3 } = {}) {
 // turn handle to set it at any angle (a house built on the diagonal). Tap a
 // corner or a tab to pick it: then give the wall's real length, add a corner
 // in it, step a corner in for an L shape, or remove a corner. Two fingers
-// pinch to zoom. Opened from the treatment record; Save hands the plan back
-// through sitePlanEditor.onSave.
-const sitePlanEditor = { plan: null, layer: 'site', tool: null, group: 'build', sel: null, part: null, drawing: null, drag: null, undo: [], onSave: null, stationsWanted: 0, note: '',
+// pinch to zoom. Opened from the report's Areas step and from the treatment
+// record; Save hands the plan back through sitePlanEditor.onSave.
+// mode: 'report' leaves out what belongs to the treatment (its tabs, the
+// treated soil under the floor) and puts the no access area under Findings.
+const sitePlanEditor = { mode: 'treatment', plan: null, layer: 'site', tool: null, group: 'build', sel: null, part: null, drawing: null, drag: null, undo: [], onSave: null, stationsWanted: 0, note: '',
   zoom: 1, cx: PLAN_W / 2, cy: PLAN_H / 2, upx: 3, ptrs: new Map(), pinch: null, down: null, partBase: null, grab: false, space: false };
 const PLAN_MAX_ZOOM = 4;
 
@@ -729,15 +797,48 @@ function newSitePlan() {
 
 function planId() { return 'p' + Math.random().toString(36).slice(2, 9); }
 
+// The tab the editor opens on. A new plan starts with the building, which
+// is fitted to the house first. One already drawn opens where the treatment
+// ticked on the record goes next: Stations for a baiting system, Treatment
+// for a barrier, reticulation or a direct treatment. The first of those not
+// on the plan yet, else the first one ticked. methods: the record's ticked
+// treatments, in the record's order.
+const SITE_PLAN_METHOD_MARKS = {
+  barrier: ['treat', ['barrier']], retic: ['treat', ['retic']], physical: ['treat', ['physical']],
+  direct: ['treat', ['treated']], nest: ['treat', ['treated']], bait: ['stations', ['inground', 'above']],
+};
+function sitePlanStartGroup(plan, methods) {
+  if (!sitePlanHasContent(plan)) return 'build';
+  const marks = (methods || []).map(m => SITE_PLAN_METHOD_MARKS[m]).filter(Boolean);
+  const drawn = planLayerItems(plan).map(it => it.k);
+  const next = marks.find(([, keys]) => !keys.some(k => drawn.includes(k))) || marks[0];
+  return next ? next[0] : 'build';
+}
+
+// The tabs of a view, and the symbols under a tab, for the plan being
+// drawn: the report's plan is what was seen at the inspection.
+const SITE_PLAN_TREATMENT_ONLY = { groups: ['treat', 'stations'], keys: ['subtreated'] };
+function sitePlanGroups(layer) {
+  return SITE_PLAN_TRAYS[layer].filter(g => sitePlanEditor.mode !== 'report' || !SITE_PLAN_TREATMENT_ONLY.groups.includes(g));
+}
+function sitePlanTrayKeys(layer, group) {
+  const report = sitePlanEditor.mode === 'report';
+  const keys = layer === 'sub' ? SITE_PLAN_SUB_TRAY[group] || [] : Object.keys(SITE_PLAN_SYMBOLS).filter(k => SITE_PLAN_SYMBOLS[k].group === group);
+  return keys.filter(k => !(report && SITE_PLAN_TREATMENT_ONLY.keys.includes(k))).concat(report && layer === 'site' && group === 'find' ? ['noaccess'] : []);
+}
+
 // opts.stations: how many bait stations the treatment record has, which
-// Stations all round places.
+// Stations all round places. opts.methods: the treatments ticked on the
+// record, which decide the tab it opens on. opts.mode: 'report' for the
+// report's plan.
 function openSitePlan(plan, onSave, opts = {}) {
   const E = sitePlanEditor;
+  E.mode = opts.mode === 'report' ? 'report' : 'treatment';
   E.stationsWanted = opts.stations > 0 ? Math.round(opts.stations) : 0;
   E.plan = sitePlanHasContent(plan) ? JSON.parse(JSON.stringify(plan)) : newSitePlan();
   if (E.plan.north == null) E.plan.north = 0;
   E.tool = null; E.sel = null; E.part = null; E.drawing = null; E.drag = null; E.undo = []; E.onSave = onSave; E.note = '';
-  E.layer = 'site'; E.group = 'build'; E.zoom = 1; E.cx = PLAN_W / 2; E.cy = PLAN_H / 2;
+  E.layer = 'site'; E.group = sitePlanStartGroup(plan, opts.methods); E.zoom = 1; E.cx = PLAN_W / 2; E.cy = PLAN_H / 2;
   E.ptrs.clear(); E.pinch = null; E.down = null; E.grab = false; E.space = false;
   track('screen_viewed', { screen: 'site_plan' });
   document.getElementById('sitePlanOverlay').classList.add('open');
@@ -779,6 +880,11 @@ function renderSitePlanGrab() {
 
 function closeSitePlan() {
   document.getElementById('sitePlanOverlay').classList.remove('open');
+}
+// The X, Cancel and back: a plan that was changed asks before it goes.
+async function leaveSitePlan() {
+  if (sitePlanEditor.undo.length && !(await askFirst({ title: 'Close the plan without saving?', text: 'What you drew since you opened it is lost. Save site plan keeps it.', yes: 'Close without saving', no: 'Keep drawing', danger: true }))) return;
+  closeSitePlan();
 }
 
 function saveSitePlan() {
@@ -823,7 +929,7 @@ function setSitePlanLayer(layer) {
   finishSitePlanLine();
   if (E.layer === layer) return;
   E.layer = layer; E.tool = null; E.sel = null; E.part = null; E.note = '';
-  E.group = SITE_PLAN_TRAYS[layer][0];
+  E.group = sitePlanGroups(layer)[0];
   if (layer === 'sub' && !sitePlanHasSubfloor(E.plan)) {
     pushSitePlanUndo();
     planLayerItems(E.plan, 'site').forEach(it => {
@@ -849,10 +955,12 @@ function setSitePlanTool(k) {
 function renderSitePlanTray() {
   const E = sitePlanEditor;
   document.querySelectorAll('#spViews .sp-view').forEach(b => { const on = b.dataset.layer === E.layer; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
-  document.getElementById('spGroups').innerHTML = SITE_PLAN_TRAYS[E.layer].map(g => [g, SITE_PLAN_GROUPS[g]]).map(([g, name]) =>
+  const groups = sitePlanGroups(E.layer);
+  document.getElementById('spGroups').dataset.n = groups.length;
+  document.getElementById('spGroups').innerHTML = groups.map(g => [g, SITE_PLAN_GROUPS[g]]).map(([g, name]) =>
     `<button type="button" role="tab" aria-selected="${E.group === g}" class="sp-group${E.group === g ? ' on' : ''}" onclick="setSitePlanGroup('${g}')">${name}</button>`).join('');
   const swatch = k => { const P = svgPainter(); drawPlanSwatch(P, k, 0, 0); return `<svg viewBox="-42 -30 84 60" aria-hidden="true">${k === 'text' ? '<text x="0" y="2" font-size="30" font-weight="800" text-anchor="middle" dominant-baseline="central" fill="#0C121C">Aa</text>' : P.out.join('')}</svg>`; };
-  const keys = E.layer === 'sub' ? SITE_PLAN_SUB_TRAY[E.group] || [] : Object.keys(SITE_PLAN_SYMBOLS).filter(k => SITE_PLAN_SYMBOLS[k].group === E.group);
+  const keys = sitePlanTrayKeys(E.layer, E.group);
   const round = E.layer === 'site' && sitePlanRoundHouse() ? (SITE_PLAN_ROUND[E.group] || []) : [];
   document.getElementById('spTools').innerHTML = round.map(k =>
     `<button type="button" class="sp-tool sp-round" onclick="addSitePlanRound('${k}')">${sitePlanRoundSwatch(k)}<span>${sitePlanRoundLabel(k)}</span></button>`).join('') +
@@ -1067,10 +1175,10 @@ function renderSitePlanEditor() {
   document.getElementById('spNorth').textContent = `North: ${['up', 'up-right', 'right', 'down-right', 'down', 'down-left', 'left', 'up-left'][E.plan.north || 0]}`;
   const per = E.plan.mpu ? sitePlanPerimeter(E.plan) : 0;
   document.getElementById('spScaleNote').textContent = E.plan.mpu
-    ? (per ? `House walls about ${formatPlanMetres(per)} all round. ` : '') + 'Lengths show on the treatment lines and walls, and fill the record\'s metres.'
+    ? (per ? `House walls about ${formatPlanMetres(per)} all round. ` : '') + (E.mode === 'report' ? 'Lengths show on the walls and lines.' : 'Lengths show on the treatment lines and walls, and fill the record\'s metres.')
     : 'No measuring needed. If you know a width, tap the house and type it to show lengths.';
   document.getElementById('spLegend').innerHTML = sitePlanLegendHTML(E.plan, { layer: E.layer });
-  const sum = E.layer === 'sub' ? sitePlanSubSummary(E.plan) : sitePlanSummary(E.plan);
+  const sum = E.layer === 'sub' ? sitePlanSubSummary(E.plan) : sitePlanSummary(E.plan, { report: E.mode === 'report' });
   document.getElementById('spSummary').textContent = sum ? `The ${E.layer === 'sub' ? 'subfloor plan' : 'plan'} shows ${sum}.` : '';
 }
 

@@ -20,6 +20,7 @@ function openDashboard() {
     const fallback = ['waiting', 'done'].find(g => dashboardJobs.some(j => j.group === g));
     if (fallback) setDashboardTab(fallback);
   }
+  checkLinksOut();
 }
 
 // Opens the open job's details, on its page.
@@ -28,8 +29,19 @@ function openJobDetails() {
   jobGo('details');
 }
 
+// A job changed somewhere else (a save, a sync, a delete, a client's
+// answer): the list and the headline are read again. The tab and what's
+// typed in the search box stay as they are.
 function refreshDashboardIfOpen() {
-  if (document.getElementById('dashboardOverlay').classList.contains('open')) renderDashboard();
+  if (!document.getElementById('dashboardOverlay').classList.contains('open')) return;
+  if (!document.getElementById('dashboardJobs')) { renderDashboard(); return; }
+  readDashboardJobs();
+  renderDashboardJobs();
+}
+// The same, with the dock's count of jobs that need the inspector.
+function refreshJobsList() {
+  refreshDashboardIfOpen();
+  syncDockJobs();
 }
 
 function closeDashboard() {
@@ -53,12 +65,28 @@ function parkJobPanel() {
   if (panel && home && panel.parentNode !== home) home.appendChild(panel);
 }
 
-// The day a job belongs to: its inspection date, else when it was saved.
+// When a job is: its inspection date, at the time it's booked for, else
+// when it was saved.
 function dashboardJobTime(r) {
   const d = r.reportData || {};
   const iso = d.jobInspectionDate || (d.agreement && d.agreement.inspectionDate);
   const t = iso ? new Date(iso + 'T00:00:00').getTime() : NaN;
-  return isNaN(t) ? r.savedAt : t;
+  if (isNaN(t)) return r.savedAt;
+  const at = /^(\d{1,2}):(\d{2})/.exec(String(d.jobInspectionTime || ''));
+  return t + (at ? (+at[1] * 60 + +at[2]) * 60000 : 0);
+}
+// How many days from today a time is: 0 today, 1 tomorrow, -1 yesterday.
+function dashDaysAway(ts) {
+  const day = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  return Math.round((day(ts) - day(Date.now())) / 864e5);
+}
+// The jobs that are the inspector's move, split the way the headline and
+// the dock count them: today's (with anything still open from an earlier
+// day) and those booked for a later day.
+function jobsNeedingYou(jobs) {
+  const todo = jobs.filter(j => j.group === 'todo');
+  const later = todo.filter(j => dashDaysAway(j.time) > 0).length;
+  return { today: todo.length - later, later };
 }
 
 const dashDate = (ts) => new Date(ts).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
@@ -74,7 +102,10 @@ function dashboardJob(r, quotes) {
   const a = hasQuote ? quoteAnswerState(q) : null;
   // Ready: every required field filled, or a PDF made. Done: completed or sent.
   const reportSent = !!(d.issue || d.sent);
-  const reportDone = reportSent || !!d.pdfAt || (r.completion || 0) >= 100;
+  const reportDone = reportSent || !!d.doneAt || !!d.pdfAt || (r.completion || 0) >= 100;
+  // The client's copy is behind: the report changed after it went
+  // (r.reportStale, set as it's saved), in an amendment or without one.
+  const reportStale = reportSent && !(d.issue && !d.amending) && !!r.reportStale;
   // The quote's link carries the report too, so a quote sent that way gave
   // the client the report.
   const reportWentWithQuote = !!(hasQuote && q.sentAt && q.linkRequest && q.linkRequest.files && q.linkRequest.files.report);
@@ -87,7 +118,7 @@ function dashboardJob(r, quotes) {
   let onlyReportUnsent = false;
   if (!reportDone) {
     group = 'todo'; status = 'Finish the report';
-    hint = 'Fill in the rest of the report, then make the PDF from its Finish tab.';
+    hint = 'Fill in the rest of the report, then tick Report done on its last step.';
     next = { label: 'Open report', to: 'report' };
   } else if (!hasQuote && needsQuote) {
     group = 'todo'; status = 'Write the quote';
@@ -99,10 +130,14 @@ function dashboardJob(r, quotes) {
     onlyReportUnsent = !reportSent;
     hint = reportSent ? 'The report has gone to ' + who + (clientNotGoingAhead ? ' and they aren\'t going ahead with treatment.' : ' and no treatment was recommended.') : 'The report is ready. Send it to ' + who + '.';
     if (!reportSent) next = { label: 'Open report', to: 'report' };
+  } else if (!a && q.sentAt && q.sentHash && q.sentHash !== quoteContentHash(q)) {
+    group = 'todo'; status = 'Send the quote again';
+    hint = 'The quote changed after it went to ' + who + '. Send the new version.';
+    next = { label: 'Open quote', to: 'quote' };
   } else if (!a) {
     group = q.sentAt ? 'waiting' : 'todo';
     status = q.sentAt ? `Quote sent ${dashDate(q.sentAt)}` : 'Send the quote';
-    hint = q.sentAt ? 'Waiting on ' + who + '. When they answer, record it on the quote.' : 'The quote is priced. Send it to ' + who + '.';
+    hint = q.sentAt ? 'Waiting on ' + who + '. Record their answer when it comes.' : 'The quote is priced. Send it to ' + who + '.';
     next = { label: q.sentAt ? 'Record their answer' : 'Send the quote', to: q.sentAt ? 'answer' : 'quote' };
   } else if (a.stale) {
     group = 'todo'; status = 'Quote changed, get a new answer';
@@ -111,6 +146,13 @@ function dashboardJob(r, quotes) {
   } else if (a.status !== 'accepted') {
     group = 'done'; status = 'Quote declined';
     hint = who.charAt(0).toUpperCase() + who.slice(1) + ' declined the quote, so there\'s nothing more to do.';
+  } else if (!q.treatment && signedQuoteOwed(q)) {
+    // They signed to accept and have nothing to keep yet (THE CLIENT'S
+    // SIGNED COPY in js/quote.js).
+    const first = who.split(/\s+/)[0];
+    group = 'todo'; status = 'Email the signed quote';
+    hint = who.charAt(0).toUpperCase() + who.slice(1) + ` accepted the quote${a.method === 'link' ? ' from the link' : ''}. Email ${r.client ? first : 'them'} the signed copy to keep. The treatment record comes after the work is done.`;
+    next = { label: `Email ${r.client ? first : 'the client'} the signed quote`, to: 'signedQuote' };
   } else if (!q.treatment) {
     group = 'todo'; status = 'Record the treatment';
     hint = who.charAt(0).toUpperCase() + who.slice(1) + ' accepted the quote. Once the work is done, record what was used and where.';
@@ -125,11 +167,14 @@ function dashboardJob(r, quotes) {
   }
 
   // Everything else is finished (a declined quote, say) but the report
-  // itself never went: that's still the inspector's to do.
-  if (group === 'done' && reportDone && !reportSent && !reportWentWithQuote) {
+  // itself never went, or changed after it did: that's still the
+  // inspector's to do.
+  if (group === 'done' && reportDone && (reportStale || !reportSent && !reportWentWithQuote)) {
     onlyReportUnsent = true;
-    group = 'todo'; status = 'Send the report';
-    hint = 'The report is ready but hasn\'t gone to ' + who + '. Send it from the report\'s Finish tab.';
+    group = 'todo'; status = reportStale ? 'Send the report again' : 'Send the report';
+    hint = reportStale && d.amending ? 'The amended report hasn\'t gone to ' + who + '. Send it, then finalise the new version.'
+      : reportStale ? 'The report changed after it went to ' + who + '. Send it again so they have it as it is now.'
+      : 'The report is ready but hasn\'t gone to ' + who + '. Send it from the report\'s last step.';
     next = { label: 'Open report', to: 'report' };
   }
 
@@ -161,7 +206,7 @@ function dashboardJob(r, quotes) {
   const sentOn = d.issue ? d.issue.completedAt : d.sent ? d.sent.at : null;
   const steps = [
     { label: 'Report', to: 'report', state: reportDone ? 'done' : 'todo',
-      text: d.issue ? `Completed${sentOn ? ' ' + dashDate(sentOn) : ''}` : d.sent ? `Sent ${dashDate(d.sent.at)}`
+      text: d.sent ? `Sent ${dashDate(d.sent.at)}` : d.issue ? `Completed${sentOn ? ' ' + dashDate(sentOn) : ''}`
         : d.pdfAt ? `PDF made ${dashDate(d.pdfAt)}, not sent yet`
         : reportDone ? 'Ready to send' : 'In progress' },
     { label: 'Quote', to: 'quote', state: hasQuote && (q.sentAt || answered) ? 'done' : !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
@@ -184,6 +229,9 @@ function dashboardJob(r, quotes) {
   // hasn't got it (unless it went on the quote's link), so the step says so
   // instead of "Completed".
   if (!reportSent && reportDone && !reportWentWithQuote) Object.assign(steps[0], { state: 'now', ready: true, text: d.pdfAt ? 'PDF made, not sent yet' : 'Ready to send' });
+  // Sent, then changed: the step says so, and it's the next one once
+  // nothing else on the job is.
+  else if (reportStale) { const line = d.amending ? 'Amended, not sent yet' : 'Changed since it was sent'; Object.assign(steps[0], { full: line }, onlyReportUnsent ? { state: 'now', ready: true, text: line } : {}); }
   // Recorded but the certificate hasn't gone: the treatment isn't finished.
   if (q && q.treatment && !certificateGiven(q) && steps[3].state === 'done') Object.assign(steps[3], { state: 'now', text: 'Certificate not emailed yet' });
   // Bait station visits, as a fifth stage once a baiting system is in.
@@ -196,7 +244,7 @@ function dashboardJob(r, quotes) {
   // Everything the job needs is done (bait checks may still be coming):
   // the job page offers to finalise it into one PDF.
   const finished = group === 'done' || baitWaiting || onlyReportUnsent;
-  return { r, q, group, status, hint, next, steps, total, time: dashboardJobTime(r), finished, onlyReportUnsent, clientNotGoingAhead };
+  return { r, q, group, status, hint, next, steps, total, time: dashboardJobTime(r), finished, onlyReportUnsent, reportStale, clientNotGoingAhead };
 }
 
 function setDashboardTab(tab) {
@@ -209,8 +257,7 @@ function setDashboardTab(tab) {
 // When a job is, as an inspector says it: Today, Yesterday, Tomorrow, the
 // weekday within the week, else the date.
 function dashWhen(ts) {
-  const day = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
-  const n = Math.round((day(ts) - day(Date.now())) / 864e5);
+  const n = dashDaysAway(ts);
   if (n === 0) return 'Today';
   if (n === -1) return 'Yesterday';
   if (n === 1) return 'Tomorrow';
@@ -218,19 +265,54 @@ function dashWhen(ts) {
   return dashDate(ts);
 }
 
-// A job's next step on the Jobs list and its sheet. Before the report's
-// under way, the agreement comes first, as on the job page.
+// Before the report's under way, the agreement comes first. There are two
+// ways to get it signed, and the card offers both (ways): a link the client
+// signs from, which leads on a job booked for a later day with an email to
+// send it to (the client isn't there, so it goes out when the job is
+// booked), and signing on this phone, which leads on the day. Once a link
+// has gone, the job is waiting on the client and says so, with the day it
+// went (sent: true).
+function agreementNext(d, client) {
+  const sent = !d.agreement && d.agreementRequest;
+  const who = String((sent && sent.signerName) || client || '').trim().split(/\s+/)[0] || 'the client';
+  if (sent) return { status: `Agreement sent ${dashDate(sent.emailedAt || sent.sentAt)}, waiting on ${who}`, sent: true,
+    hint: 'It shows as signed here once they sign. They can still sign on this phone instead.',
+    next: { label: 'Open the agreement', to: 'agreement' } };
+  const email = String(d.jobClientEmail || '').trim();
+  const day = d.jobInspectionDate && d.jobInspectionDate > todayIsoDate() ? new Date(d.jobInspectionDate + 'T00:00:00') : null;
+  const later = day && !isNaN(day);
+  const link = { way: 'link', label: directEmail && email ? `Email it to ${who} to sign` : `Send ${who} a link to sign` };
+  const phone = { way: 'phone', label: 'Sign on this phone' };
+  const ways = later && email ? [link, phone] : [phone, link];
+  return { status: 'Get the agreement signed', ways,
+    hint: ways[0] === link
+      ? `The inspection is on ${day.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}, so ${who} can sign from ${directEmail ? `an email before then. It goes to ${email}.` : 'a link before then.'}`
+      : 'The client signs it before the inspection starts.',
+    next: { label: ways[0].label, to: 'agreement', way: ways[0].way } };
+}
+
+// A job's next step on the Jobs list, as on the job page: the agreement
+// first, until it's signed.
 function dashNext(j) {
   const d = j.r.reportData || {};
   return j.group === 'todo' && !d.agreement && j.status === 'Finish the report'
-    ? { status: 'Get the agreement signed', hint: 'The client signs it before the inspection starts.', next: { label: 'Open the agreement', to: 'agreement' } }
+    ? agreementNext(d, j.r.client)
     : { status: j.status, hint: j.hint, next: j.next };
+}
+
+// The day in the card's corner. A booking still to come carries its time
+// ("Tomorrow 9am"), once the job has one.
+function dashCardWhen(j) {
+  const day = dashWhen(j.time);
+  const at = /^(\d{1,2}):(\d{2})/.exec(String((j.r.reportData || {}).jobInspectionTime || ''));
+  if (!at || j.group !== 'todo' || dashDaysAway(j.time) < 0) return day;
+  return `${day} ${(+at[1] % 12) || 12}${at[2] === '00' ? '' : ':' + at[2]}${+at[1] < 12 ? 'am' : 'pm'}`;
 }
 
 // One job on the Jobs list: the street big and the suburb under it, the
 // client, how far along it is, and the next step as its own button, so a
 // job in To do is one tap from its next document. The card opens the
-// job's sheet.
+// job's page (This job).
 function dashCardHTML(j) {
   const id = j.r.id;
   const steps = jobPageSteps(j);
@@ -240,29 +322,35 @@ function dashCardHTML(j) {
   const suburb = cut > 0 ? addr.slice(cut + 2) : '';
   const next = dashNext(j);
   const declined = j.group === 'done' && /declined|not going ahead/i.test(j.status);
-  const tile = j.group === 'todo' ? ['now', next.next ? next.next.to : 'report']
+  const tile = j.group === 'todo' ? [next.sent ? 'wait' : 'now', next.next ? next.next.to : 'report']
     : j.group === 'waiting' ? ['wait', 'clock'] : declined ? ['', 'answer'] : ['done', 'tick'];
-  const sub = [j.r.client, j.group !== 'todo' ? j.status : ''].filter(Boolean);
+  // The client, then where the job is up to, which stays in one piece when
+  // the line is too long for the card.
+  const sub = [j.r.client ? `<span>${escapeHtml(j.r.client)}</span>` : '', j.group !== 'todo' ? `<span class="dash-card-status">${escapeHtml(j.status)}</span>` : ''].join('');
   const act = next.next && j.group === 'todo' ? next.status : next.next ? next.next.label : '';
+  // Two cards for one address after a sync clash: the one from this phone
+  // says so. A job the account doesn't hold yet says that too.
   const tags = (id === currentReportId ? '<span class="dash-card-tag">This job</span>' : '')
-    + (isSampleJob(j.r) ? '<span class="dash-card-tag sample">Sample</span>' : '');
+    + (isSampleJob(j.r) ? '<span class="dash-card-tag sample">Sample</span>' : '')
+    + (j.r.conflictCopy ? '<span class="dash-card-tag warn">Copy from this phone</span>' : '')
+    + (leftOffAccount(j.r) ? '<span class="dash-card-tag warn">Not in your account yet</span>' : '');
   const arrow = '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
   return `
     <div class="dash-card ${j.group}${declined ? ' declined' : ''}">
-      <button type="button" class="dash-card-main" onclick="openDashboardDetail('${id}')">
+      <button type="button" class="dash-card-main" onclick="openDashboardJob('${id}', 'job')">
         <span class="job-tile ${tile[0]}" aria-hidden="true">${jobIcon(tile[1], 20)}</span>
         <span class="dash-card-text">
           <span class="dash-card-street">${escapeHtml(street)}</span>
           ${suburb ? `<span class="dash-card-suburb">${escapeHtml(suburb)}</span>` : ''}
-          ${sub.length || tags ? `<span class="dash-card-sub">${tags}${sub.length ? `<span>${sub.map(escapeHtml).join(' · ')}</span>` : ''}</span>` : ''}
+          ${sub || tags ? `<span class="dash-card-sub">${tags}${sub}</span>` : ''}
         </span>
         <span class="dash-card-end">
-          <span class="dash-card-when">${dashWhen(j.time)}</span>
+          <span class="dash-card-when">${dashCardWhen(j)}</span>
           ${j.total ? `<span class="dash-card-total">${formatAUD(j.total).replace(/\.00$/, '')}</span>` : ''}
         </span>
-        <span class="dash-card-progress" aria-hidden="true">${steps.map(st => `<i class="${st.state}"></i>`).join('')}</span>
+        <span class="dash-card-progress" aria-hidden="true">${jobStepsCounted(steps).map(st => `<i class="${st.state}"></i>`).join('')}</span>
       </button>
-      ${act ? `<button type="button" class="dash-card-act" onclick="openDashboardJob('${id}', '${next.next.to}')"><span>${escapeHtml(act)}</span>${arrow}</button>` : ''}
+      ${act ? `<button type="button" class="dash-card-act${next.sent ? ' wait' : ''}" onclick="openDashboardJob('${id}', '${next.next.way === 'link' ? 'agreementLink' : next.next.to}')"><span>${escapeHtml(act)}</span>${arrow}</button>` : ''}
     </div>`;
 }
 
@@ -277,25 +365,42 @@ function startNewJob() {
   if (addr) addr.focus({ preventScroll: true });
 }
 
+// Every saved job, read as the list shows it, and the headline over them:
+// how many need the inspector today, then what's booked for later and any
+// re-inspections that are overdue, which opens the Due tab.
+function readDashboardJobs() {
+  const quotes = getSavedQuotes();
+  dashboardJobs = getSavedReports().map(r => dashboardJob(r, quotes)).sort((a, b) => b.time - a.time);
+  const body = document.getElementById('dashboardBody');
+  // Nothing saved at all: no tabs or search, just the way in.
+  if (body) body.classList.toggle('no-jobs', !dashboardJobs.length);
+  const title = document.getElementById('dashboardLead');
+  if (!title) return;
+  const need = jobsNeedingYou(dashboardJobs);
+  // The sample alone isn't work done: a new business still has no jobs.
+  title.innerHTML = !dashboardJobs.some(j => !isSampleJob(j.r)) ? 'No jobs yet.'
+    : need.today ? `<b>${need.today} job${need.today === 1 ? '' : 's'}</b> need${need.today === 1 ? 's' : ''} you today.`
+    : need.later ? 'Nothing needs you today.'
+    : 'You\'re all caught up.';
+  const overdue = typeof reinspectionsDue === 'function' ? reinspectionsDue().filter(it => it.overdue).length : 0;
+  const more = document.getElementById('dashboardMore');
+  more.innerHTML = [
+    need.later ? `<span>${need.later} booked for later</span>` : '',
+    overdue ? `<button type="button" onclick="setDashboardTab('due')">${overdue} re-inspection${overdue === 1 ? '' : 's'} overdue</button>` : '',
+  ].filter(Boolean).join('<i aria-hidden="true">·</i>');
+  more.hidden = !more.innerHTML;
+}
+
 function renderDashboard() {
   const body = document.getElementById('dashboardBody');
   if (!body) return;
   parkJobPanel();
-  const quotes = getSavedQuotes();
-  dashboardJobs = getSavedReports().map(r => dashboardJob(r, quotes)).sort((a, b) => b.time - a.time);
-  const need = dashboardJobs.filter(j => j.group === 'todo').length;
   const today = new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
-  // The sample alone isn't work done: a new business still has no jobs.
-  const lead = !dashboardJobs.some(j => !isSampleJob(j.r)) ? 'No jobs yet.'
-    : need ? `<b>${need} job${need === 1 ? '' : 's'}</b> need${need === 1 ? 's' : ''} you today.`
-    : 'You\'re all caught up.';
-
-  // Nothing saved at all: no tabs or search, just the way in.
-  body.classList.toggle('no-jobs', !dashboardJobs.length);
   body.innerHTML = `
     <div class="dash-hero">
       <span class="dash-hero-date">${today}</span>
-      <p class="dash-hero-title">${lead}</p>
+      <p class="dash-hero-title" id="dashboardLead"></p>
+      <p class="dash-hero-more" id="dashboardMore" hidden></p>
     </div>
     <div class="dash-tabs" id="dashboardTabs" role="tablist">
       ${DASHBOARD_TABS.map(([key, label]) => `<button type="button" role="tab" class="dash-tab" data-tab="${key}" onclick="setDashboardTab('${key}')">${label} <span></span></button>`).join('')}
@@ -307,6 +412,7 @@ function renderDashboard() {
     </label>
     <div id="dashboardJobs"></div>
   `;
+  readDashboardJobs();
   renderDashboardJobs();
 }
 
@@ -317,14 +423,28 @@ function renderDashboardJobs(fade) {
   const wrap = document.getElementById('dashboardJobs');
   if (!wrap) return;
   parkJobPanel();
-  const counts = { current: '', todo: 0, waiting: 0, done: 0, all: dashboardJobs.length };
+  const counts = { todo: 0, waiting: 0, done: 0 };
   dashboardJobs.forEach(j => counts[j.group]++);
   counts.due = typeof reinspectionsDue === 'function' ? reinspectionsDue().length : 0;
   const searchEl = document.getElementById('dashboardSearch');
   const query = searchEl ? searchEl.value.trim().toLowerCase() : '';
   const shown = dashboardJobs.filter(j => query
     ? [j.r.address, j.r.client, j.r.jobSuburb, j.r.jobPostcode].filter(Boolean).join(' ').toLowerCase().includes(query)
-    : dashboardTab === 'all' || j.group === dashboardTab);
+    : j.group === dashboardTab);
+  // To do runs the way the week does: anything still open from an earlier
+  // day, then today, then what's booked for later, each in the order it
+  // comes. The other lists (and a search) are newest first.
+  const byDay = dashboardTab === 'todo' && !query;
+  if (byDay) shown.sort((a, b) => a.time - b.time);
+  const part = j => { const n = dashDaysAway(j.time); return n < 0 ? 'Still open from earlier' : n ? 'Coming up' : 'Today'; };
+  const parted = byDay && new Set(shown.map(part)).size > 1;
+  const cards = shown.map((j, i) => (parted && (!i || part(shown[i - 1]) !== part(j)) ? `<h3 class="dash-part">${part(j)}</h3>` : '') + dashCardHTML(j)).join('');
+  // Finished jobs taken off a full phone are still in the account: the
+  // line sits where they'd be looked for, under Done and under a search.
+  const parked = getArchivedReportIds().length;
+  const parkedNote = parked && (query || dashboardTab === 'done' || !dashboardJobs.length)
+    ? `<p class="dash-parked">${parked} older job${parked === 1 ? ' is' : 's are'} kept in your account only. <button type="button" class="link-btn" onclick="restoreArchivedReports()">Bring ${parked === 1 ? 'it' : 'them'} back</button></p>`
+    : '';
 
   const tabs = document.getElementById('dashboardTabs');
   if (tabs) {
@@ -348,9 +468,9 @@ function renderDashboardJobs(fade) {
     : !dashboardJobs.length ? 'Your jobs will show up here once you save a report.'
     : { todo: 'Nothing to do right now.', waiting: 'Nothing is waiting on a client.', done: 'No finished jobs yet.' }[dashboardTab];
   if (dashboardTab === 'due' && !query && typeof renderReinspectionList === 'function') { wrap.innerHTML = renderReinspectionList(fade); return; }
-  wrap.innerHTML = shown.length ? `
+  wrap.innerHTML = (shown.length ? `
     <div class="dash-cards${fade ? ' fade-in' : ''}">
-      ${shown.map(dashCardHTML).join('')}
+      ${cards}
     </div>` : !query && !dashboardJobs.length ? `
     <div class="dash-start${fade ? ' fade-in' : ''}">
       <span class="job-tile now" aria-hidden="true">${jobIcon('details', 22)}</span>
@@ -362,249 +482,69 @@ function renderDashboardJobs(fade) {
       <p class="dash-sample-title">Or see a finished job first</p>
       <p class="dash-sample-text">A made-up job from start to finish, with your business on every page: the agreement, report, quote, the client's signed answer and the treatment certificate.</p>
       <button type="button" class="dash-sample-btn" onclick="openSampleJob('jobs')">See a sample job</button>
-    </div>` : ''}` : `<p class="dash-none${fade ? ' fade-in' : ''}">${empty}</p>`;
+    </div>` : ''}` : `<p class="dash-none${fade ? ' fade-in' : ''}">${empty}</p>`) + parkedNote;
 }
 
-// One job's timeline and its next step, in a sheet over the list.
-function openDashboardDetail(id) {
-  const j = dashboardJobs.find(x => x.r.id === id);
-  const sheet = document.getElementById('dashboardDetailSheet');
-  if (!j || !sheet) return;
-  const group = (DASHBOARD_TABS.find(([k]) => k === j.group) || [, ''])[1];
-  const steps = jobPageSteps(j);
-  const next = dashNext(j);
-  const done = steps.filter(s => s.state === 'done' || s.state === 'skip').length;
-  const facts = [
-    ['Client', j.r.client || 'Not entered'],
-    ['Quote', j.total ? formatAUD(j.total).replace(/\.00$/, '') : 'None yet'],
-    ['Date', dashDate(j.time)],
-  ];
-  sheet.innerHTML = `
-    <div class="dash-detail-grab" aria-hidden="true"></div>
-    <div class="dash-detail-head">
-      <div class="dash-detail-head-text">
-        <span class="dash-detail-chip ${j.group}">${group}</span>
-        <h3 class="dash-detail-addr">${escapeHtml(j.r.address || 'No address')}</h3>
-      </div>
-      <button type="button" class="dash-detail-close" onclick="closeDashboardDetail()" aria-label="Close">
-        <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <dl class="dash-detail-facts">
-      ${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${escapeHtml(v)}</dd></div>`).join('')}
-    </dl>
-    <section class="dash-next ${j.group}">
-      <div class="dash-next-label">${next.next ? 'Next step' : 'Where it\'s at'}</div>
-      <div class="dash-next-title">${escapeHtml(next.status)}</div>
-      ${next.hint ? `<p class="dash-next-hint">${escapeHtml(next.hint)}</p>` : ''}
-      ${next.next ? `<button type="button" class="dash-detail-primary" onclick="openDashboardJob('${j.r.id}', '${next.next.to}')">${next.next.label}</button>` : ''}
-    </section>
-    <div class="dash-detail-section">
-      <span>Job steps</span><span>${done} of ${steps.length} done</span>
-    </div>
-    ${jobStepsHTML(j, steps, st => st.to === 'agreement' ? `openDashboardJob('${j.r.id}', 'agreement')` : `openDashboardPeek('${j.r.id}', '${st.to}')`)}
-    <div class="dash-detail-foot">
-      <button type="button" class="dash-detail-delete" onclick="closeDashboardDetail(); deleteReport('${j.r.id}')">
-        <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete this job
-      </button>
-    </div>
-  `;
-  sheet.scrollTop = 0;
-  document.getElementById('dashboardDetail').classList.add('open');
-}
-
-// A step opens as a small preview over the dashboard: what that section
-// holds, read-only, with a button to open it full screen. On a wide screen
-// the sheet sits at the side, so the job list stays in view.
-const DASH_PEEK_TITLES = { report: 'Report', quote: 'Quote', answer: 'Client\'s answer', treatment: 'Treatment', bait: 'Bait station visits' };
-const DASH_PEEK_OPEN = { report: 'Open the report', quote: 'Open the quote', answer: 'Open the quote', treatment: 'Open the treatment record', bait: 'Open the visits' };
-
-function openDashboardPeek(id, to) {
-  const j = dashboardJobs.find(x => x.r.id === id);
-  const sheet = document.getElementById('dashboardDetailSheet');
-  if (!j || !sheet) return;
-  const step = j.steps.find(s => s.to === to);
-  const expand = '<svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/></svg>';
-  sheet.innerHTML = `
-    <div class="dash-detail-grab" aria-hidden="true"></div>
-    <div class="dash-peek-bar">
-      <button type="button" class="dash-peek-back" onclick="openDashboardDetail('${id}')">
-        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Job
-      </button>
-      <button type="button" class="dash-peek-full" onclick="openDashboardJob('${id}', '${to}')" aria-label="Full screen">${expand}Full screen</button>
-    </div>
-    <div class="dash-peek-kicker">${escapeHtml(j.r.address || 'No address')}</div>
-    <h3 class="dash-peek-title">${DASH_PEEK_TITLES[to]}</h3>
-    ${step ? `<div class="dash-peek-status ${step.state}">${escapeHtml(step.text)}</div>` : ''}
-    <div class="dash-peek-body">${dashboardPeekBody(j, to)}</div>
-    <div class="dash-detail-actions">
-      <button type="button" class="dash-detail-primary" onclick="openDashboardJob('${id}', '${to}')">${DASH_PEEK_OPEN[to]}</button>
-    </div>`;
-  sheet.scrollTop = 0;
-  document.getElementById('dashboardDetail').classList.add('open');
-}
-
-function dashPeekRows(rows) {
-  const shown = rows.filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== '');
-  return shown.length ? `<dl class="dash-peek-rows">${shown.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}</dl>` : '';
-}
-
-function dashboardPeekBody(j, to) {
-  const d = j.r.reportData || {};
-  const q = j.q;
-  const none = (t) => `<p class="dash-peek-none">${escapeHtml(t)}</p>`;
-  if (to === 'report') {
-    const findings = (Array.isArray(d.findings) ? d.findings : []).filter(f => f && f.termiteActivity);
-    const borers = (Array.isArray(d.borerFindings) ? d.borerFindings : []).filter(f => f && f.borerActivity);
-    const ag = d.agreement;
-    const list = [
-      ...findings.map((f, i) => [`Termites ${i + 1}`, [f.termiteActivity, f.activityLocation].filter(Boolean).join(' · ')]),
-      ...borers.map((f, i) => [`Borers ${i + 1}`, [f.borerActivity, f.location].filter(Boolean).join(' · ')]),
-    ];
-    if (d.decayFound === 'YES') list.push(['Wood decay', d.decayWhere || 'Found']);
-    return dashPeekRows([
-      ['Inspection', d.inspectionType],
-      ['Filled in', `${j.r.completion || 0}%`],
-      ['Agreement', ag ? `Signed by ${ag.signerName || 'the client'}` : 'Not signed yet'],
-      ['Treatment', d.treatmentRecommended === 'YES' ? (d.treatmentType || 'Recommended') : d.treatmentRecommended === 'NO' ? 'Not recommended' : ''],
-    ]) + (list.length ? `<div class="dash-peek-sub">Findings</div>${dashPeekRows(list)}`
-      : `<div class="dash-peek-sub">Findings</div>${none('No termite or borer findings recorded.')}`);
-  }
-  if (!quoteHasItems(q)) return none(to === 'quote' ? 'No quote written yet.' : 'There\'s no quote for this job yet.');
-  if (to === 'quote') {
-    const t = quoteTotals(q);
-    return `${q.number ? `<div class="dash-peek-num">Quote ${escapeHtml(q.number)}</div>` : ''}
-      <ul class="dash-peek-lines">${q.items.map(it => `<li><span>${escapeHtml(it.desc || 'Line')}</span><strong>${formatAUD(lineTotal(it))}</strong></li>`).join('')}</ul>
-      <ul class="dash-peek-lines dash-peek-totals">${q.gst !== false ? `<li><span>GST</span><strong>${formatAUD(t.gst)}</strong></li>` : ''}<li class="grand"><span>Total</span><strong>${formatAUD(t.total)}</strong></li></ul>`;
-  }
-  if (to === 'answer') {
-    const a = quoteAnswerState(q);
-    if (!a) return none(q.sentAt ? 'Waiting on the client.' : 'The quote hasn\'t been sent yet.');
-    return dashPeekRows([
-      ['Answer', a.status === 'accepted' ? 'Accepted' : 'Declined'],
-      ['By', a.by], ['Date', formatAnswerDate(a.date)],
-      ['How', a.status === 'accepted' ? (QUOTE_ANSWER_METHODS[a.method] || '') : ''],
-      ['Note', a.note],
-    ]) + (isSignatureImage(a.signature) ? `<img class="dash-peek-sig" src="${a.signature}" alt="Client signature">` : '')
-      + (a.stale ? '<p class="dash-peek-warn">The quote changed after they answered.</p>' : '');
-  }
-  if (to === 'bait') {
-    const b = typeof baitProgram === 'function' ? baitProgram(q) : null;
-    if (!b) return none('No baiting system on this job.');
-    const rows = b.visits.slice().reverse().slice(0, 6).map((v, i) => [`${formatAnswerDate(v.date)}`, `${baitVisitShort(v)}${v.sentAt ? '' : ' · report not sent'}`]);
-    return dashPeekRows([
-      ['Stations', String(parseInt(q.treatment.methods.bait, 10) || (b.last ? (b.last.stations || []).length : '') || '')],
-      ['Next visit', b.finished ? 'None, baiting finished' : b.due ? `${formatAnswerDate(b.due)}${b.overdue ? ' (overdue)' : ''}` : ''],
-      ...rows,
-    ]) || none('No visits recorded yet.');
-  }
-  const t = q.treatment;
-  if (!t) return none('No treatment recorded yet.');
-  return dashPeekRows([
-    ['Date', formatAnswerDate(t.date)],
-    ['Technician', t.technician],
-    ['Pest', t.pest],
-    ['Work', Object.keys(t.methods || {}).map(k => (TREATMENT_METHODS[k] || {}).label || k).join(', ')],
-    ['Products', (t.products || []).map(p => p.name).filter(Boolean).join(', ')],
-    ['Areas', t.areas],
-    ['Certificate', q.certificateSentAt ? `Sent ${dashDate(q.certificateSentAt)}` : q.certificateHandedAt ? `Given in person ${dashDate(q.certificateHandedAt)}` : 'Not sent yet'],
-  ]);
-}
-
+// The sheet over the list: the Due tab's properties (js/reinspection.js).
+// A job's card opens the job's own page instead (openDashboardJob).
 function closeDashboardDetail() {
   const el = document.getElementById('dashboardDetail');
   if (el) el.classList.remove('open');
 }
 
-// Opens a job from the dashboard: its report, its quote, or straight into
-// recording the treatment.
-// Every step opens in any order: report, quote, the client's answer (the
-// quote, scrolled to it) or the treatment record.
+// Opens a job from the Jobs list: its page ('job'), or straight to one of
+// its documents (the card's next-step button). The job becomes This job. A
+// sheet opened this way and closed unfinished comes back to the list.
 function openDashboardJob(id, to) {
   closeDashboard();
-  loadReport(id);
-  jobGo(to);
+  loadReport(id, true);
+  jobGo(to, 'jobs');
 }
 
-const SAVED_EMPTY_HTML = `<div class="empty-state">
-    <p>No saved reports yet. A report saves itself here once it has an address.</p>
-    <button class="job-action-btn" onclick="toggleDrawer()">Back to the report</button>
-  </div>`;
-
-function renderSavedList() {
-  const list = document.getElementById('savedList');
-  const allReports = getSavedReports();
-  const summary = document.getElementById('savedPanelSummary');
-
-  const archived = getArchivedReportIds().length;
-  const archivedNote = archived
-    ? `<div class="saved-archived">${archived} older job${archived === 1 ? ' is' : 's are'} kept in your account only. <button class="link-btn" onclick="restoreArchivedReports()">Bring ${archived === 1 ? 'it' : 'them'} back</button></div>`
-    : '';
-  if (allReports.length === 0) {
-    list.innerHTML = SAVED_EMPTY_HTML + archivedNote;
-    if (summary) summary.textContent = 'None saved';
-    return;
-  }
-
-  if (summary) summary.textContent = `${allReports.length} saved`;
-
-  const searchEl = document.getElementById('savedSearchInput');
-  const query = searchEl ? searchEl.value.trim().toLowerCase() : '';
-
-  let reports = allReports;
-  if (query) {
-    reports = allReports.filter(r => {
-      const haystack = [r.address, r.client, r.jobSuburb, r.jobPostcode, r.inspector]
-        .filter(Boolean).join(' ').toLowerCase();
-      return haystack.includes(query);
+// ── LINKS OUT ─────────────────────────────────────────────────────────────
+// Every link a client hasn't answered yet (an agreement to sign, a quote
+// to accept or decline) is read back in one request when Jobs opens, so
+// nobody has to open each job to find out. One that came back moves its
+// job on the list and says so.
+const LINKS_CHECK_MS = 60000;
+let linksCheckedAt = 0;
+function linksOut() {
+  const quotes = getSavedQuotes();
+  const out = [];
+  getSavedReports().forEach(r => {
+    const d = r.reportData || {};
+    const street = String(r.address || '').split(', ')[0];
+    if (d.agreementRequest && d.agreementRequest.id && !d.agreement) out.push({ id: d.agreementRequest.id, kind: 'agreement', reportId: r.id, street });
+    const q = quotes[r.id];
+    if (q && q.linkRequest && q.linkRequest.id && !q.answer) out.push({ id: q.linkRequest.id, kind: 'quote', reportId: r.id, street });
+  });
+  return out;
+}
+async function checkLinksOut() {
+  if (!authSession || !navigator.onLine || Date.now() - linksCheckedAt < LINKS_CHECK_MS) return;
+  const out = linksOut();
+  if (!out.length) return;
+  linksCheckedAt = Date.now();
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/sign_requests?id=in.(${out.map(l => encodeURIComponent(l.id)).join(',')})&select=id,status,signer_name,signature,signed_at,note`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    const back = [];
+    out.forEach(l => {
+      const row = rows.find(x => x.id === l.id);
+      if (!row) return;
+      const said = l.kind === 'quote' ? takeQuoteLinkAnswer(l.reportId, row) : takeSignedAgreement(l.reportId, row);
+      if (said) back.push({ id: l.reportId, said: `${said} for ${l.street || 'a job'}` });
     });
-  }
-
-  // Sort newest first
-  reports.sort((a, b) => b.savedAt - a.savedAt);
-
-  if (reports.length === 0) {
-    list.innerHTML = `<div class="saved-empty">No matches for "${escapeHtml(searchEl.value.trim())}"</div>`;
-    return;
-  }
-
-  list.innerHTML = reports.map(r => {
-    const date = new Date(r.savedAt);
-    const dateStr = date.toLocaleDateString('en-AU', { day:'numeric', month:'short' });
-    const risk = r.reportData.riskLevel || 'none';
-    const addr = (r.address || 'Untitled property') + (r.conflictCopy ? ' (copy from this phone)' : '') + (isSampleJob(r) ? ' (sample)' : '');
-    const pending = (r.reportData.pendingNotes || []).length;
-    const status = savedReportStatus(r);
-    const statusTag = `<span class="saved-item-status ${status.tone}">${status.label}</span>`;
-    const answer = quoteAnswerSummary(getSavedQuotes()[r.id] || r.quote);
-    const answerTag = answer ? `<span class="saved-item-quote ${answer.tone}">${answer.short}</span>` : '';
-    return `
-      <div class="saved-item" onclick="loadReport('${r.id}')">
-        <div class="saved-item-info">
-          <div class="saved-item-address">${escapeHtml(addr)}</div>
-          <div class="saved-item-meta">
-            <span>${dateStr}</span>
-            <span class="saved-item-risk ${risk}">${risk === 'none' ? 'N/A' : risk}</span>
-            ${statusTag}
-            ${answerTag}
-            ${pending ? `<span class="saved-item-pending">${pending} note${pending !== 1 ? 's' : ''} to fill in</span>` : ''}
-            ${notInAccount(r) ? '<span class="saved-item-unsynced">Not in your account yet</span>' : ''}
-          </div>
-        </div>
-        <button class="saved-item-delete" onclick="deleteReport('${r.id}', event)" title="Delete">✕</button>
-      </div>
-    `;
-  }).join('') + archivedNote;
+    if (!back.length) return;
+    refreshJobsList();
+    if (back.length === 1) showToast(back[0].said, 'success', { label: 'Open', run: () => openDashboardJob(back[0].id, 'job') });
+    else showToast(`${back.length} came back: ${back.map(b => b.said).join('. ')}`, 'success');
+  } catch (e) { /* no signal, or the account is down: the next open asks again */ }
 }
 
-// Safe inside text and inside quoted attributes (value="…", src="…").
-function escapeHtml(str) {
-  return String(str == null ? '' : str)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-// ── STATUS / TOAST ────────────────────────────────────────────────────────
+// ── AI STATUS ──────────────────────────────────────────────────────────────
+// (The pop-up message, showToast, is in common.js.)
 function setAI(state, text) {
   document.getElementById('aiStatus').textContent = text;
   document.getElementById('aiDot').className = 'ai-dot' + (state === 'thinking' ? ' thinking' : '');
@@ -621,83 +561,27 @@ function setAI(state, text) {
   if (keep) keep.hidden = !(busy && /Filling in/.test(text));
 }
 
-// action: optional { label, run } adds a button to the toast (e.g. Undo).
-function showToast(msg, type = 'default', action) {
-  const t = document.getElementById('toast');
-  clearTimeout(t._timeout);
-
-  const svgIcon = (path) => `<svg class="icon toast-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
-
-  const icons = {
-    success: svgIcon('<path d="M20 6 9 17l-5-5"/>'),
-    error: svgIcon('<path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'),
-    info: svgIcon('<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>'),
-    default: svgIcon('<circle cx="12" cy="12" r="9"/><circle class="logo-dot" cx="12" cy="4" r="2" fill="currentColor"/>'),
-  };
-
-  t.innerHTML = `${icons[type] || icons.default}<span>${escapeHtml(String(msg))}</span>`;
-  // Where inspectors get stuck. Toasts are the app's own wording; details
-  // in brackets (an error's own text) and any email or long number are
-  // blanked before it's sent.
-  if (type === 'error') track('error_shown', { message: scrubTelemetryText(String(msg).replace(/\([^)]*\)/g, '(…)')) });
-  t.className = 'toast show toast-' + type + (action ? ' toast-has-action' : '');
-  if (action) {
-    const btn = document.createElement('button');
-    btn.className = 'toast-action';
-    btn.textContent = action.label;
-    btn.onclick = () => { dismissToast(); action.run(); };
-    t.appendChild(btn);
-  }
-
-  t._shownAt = Date.now();
-  // Errors, and toasts with a button to press, stay up longer.
-  t._timeout = setTimeout(() => t.classList.remove('show'), (type === 'error' || action) ? 6000 : 2800);
-}
-
-function dismissToast() {
-  const t = document.getElementById('toast');
-  if (!t) return;
-  clearTimeout(t._timeout);
-  t.classList.remove('show');
-}
-
-// A toast belongs to the screen it was shown on: when the screen changes
-// (the menu, a menu page, the quote screen, the dashboard or a sheet opens
-// or closes), an older toast goes, so it never sits over the next screen's
-// buttons. A toast shown by the same tap that changed the screen stays.
-function installToastScreenWatch() {
-  // The toast sits inside the report app's markup, so it was hidden with
-  // the app (on the quote screen, for one). It belongs to the page.
-  const toast = document.getElementById('toast');
-  if (toast && toast.parentElement !== document.body) document.body.appendChild(toast);
-  const ids = ['app', 'mainMenu', 'quoteScreen', 'sidebarPanel', 'dashboardOverlay'];
-  const targets = ids.map(id => document.getElementById(id))
-    .concat([...document.querySelectorAll('.page-sheet-overlay, .menu-page, .saved-panel')])
-    .filter(Boolean);
-  const obs = new MutationObserver(() => {
-    const t = document.getElementById('toast');
-    if (t && t.classList.contains('show') && Date.now() - (t._shownAt || 0) > 400) dismissToast();
-  });
-  targets.forEach(el => obs.observe(el, { attributes: true, attributeFilter: ['class', 'style'] }));
-}
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installToastScreenWatch);
-else installToastScreenWatch();
-
-// ── COMPLETED JOBS ────────────────────────────────────────────────────────
-// Nothing locks until the whole job is done: the report is signed and sent,
-// the quote is sent (or marked not needed), and the inspector taps "Complete
-// job". Then the report and its quote lock together, so what's saved always
-// matches what the client received. Changing anything afterwards means
-// "Amend" with a reason; sending again and completing again makes it
-// version 2, and the PDF lists every version with its reason.
+// ── FINALISED JOBS ────────────────────────────────────────────────────────
+// A job has one ending: Finalise, on This job, once its steps are done
+// (jobCanFinalise). It locks the report and its quote together, so what's
+// saved always matches what the client received, and makes the job PDF
+// (makeJobPdf in js/job-pack.js). Changing anything afterwards means Amend,
+// from This job, with a reason; sending again and finalising again makes
+// it version 2, and the report PDF lists every version with its reason.
 //   reportData.reportNumber  stable reference printed on every PDF
 //   reportData.sent          { at, fingerprint, version } - last send
 //   reportData.issue         { version, completedAt, completedBy, fingerprint, fieldHashes }
 //   reportData.issueHistory  [{ version, completedAt, completedBy, reason, changed[], fingerprint }]
 //   reportData.amending      { reason, startedAt } - unlocked for an amendment
-//   reportData.noQuoteNeeded true when the job needs no quote
+//   reportData.noQuoteNeeded true when the client isn't going ahead with a quote
 // The quote's own sent state lives on the quote (see SENT AND LOCKED in js/quote.js).
-const ISSUE_META_KEYS = ['reportNumber', 'sent', 'issue', 'issueHistory', 'amending', 'pendingNotes', 'noQuoteNeeded', 'noteText', 'heardNotes', 'weatherFilled', 'naFromHouse', 'jobPdfAt', 'jobPdfSentAt', 'copyTo', 'copySent'];
+// Kept on the job but not part of the report as the client reads it, so a
+// change to one isn't a change to the report.
+const ISSUE_META_KEYS_FIRST = ['reportNumber', 'sent', 'issue', 'issueHistory', 'amending', 'pendingNotes', 'noQuoteNeeded', 'noteText', 'heardNotes', 'weatherFilled', 'naFromHouse', 'jobPdfAt', 'jobPdfSentAt', 'copyTo', 'copySent', 'doneAt'];
+// Added on 10 Nov 2026, when a report started saying it had changed since
+// it was sent. A fingerprint from before then was taken with these in.
+const ISSUE_META_KEYS_LATER = ['pdfAt', 'agreementRequest', 'quoteSpoken', 'lastVisit', 'lastVisitDismissed', 'jobFee', 'aiFilled', 'treatmentAutoSet', 'noneFromAreas'];
+const ISSUE_META_KEYS = [...ISSUE_META_KEYS_FIRST, ...ISSUE_META_KEYS_LATER];
 const ISSUE_SECTION_NAMES = { job:'Job details', quote:'Quote', property:'Property', obstructions:'Areas inspected', restrictions:'Areas unable to be inspected',
   findings:'Findings', conducive:'Conducive', recommendations:'Recommendations', photos:'Photos', signoff:'Sign-off' };
 
@@ -741,14 +625,29 @@ function stableJson(v) {
 }
 
 // The report's content, keyed by field, plus the job details from the menu.
-function reportContentParts() {
+// asBefore: as fingerprints were taken before ISSUE_META_KEYS_LATER.
+function reportContentParts(asBefore) {
   const parts = {};
-  Object.keys(reportData).forEach(k => { if (!ISSUE_META_KEYS.includes(k)) parts[k] = reportData[k]; });
+  const meta = asBefore ? ISSUE_META_KEYS_FIRST : ISSUE_META_KEYS;
+  Object.keys(reportData).forEach(k => { if (!meta.includes(k)) parts[k] = reportData[k]; });
   parts.job = ['jobAddress','jobSuburb','jobState','jobPostcode','jobClient','jobInspector']
     .map(id => (document.getElementById(id) || {}).value || '');
   return parts;
 }
-function reportFingerprint() { return sha256Hex(stableJson(reportContentParts())); }
+// The last one worked out is kept: it's asked for on every save and every
+// redraw of the Finish step once a report has gone, and the hashing is the
+// slow part.
+let fingerprintKept = { json: '', hash: '' };
+function reportFingerprint() {
+  const json = stableJson(reportContentParts());
+  if (json !== fingerprintKept.json) fingerprintKept = { json, hash: sha256Hex(json) };
+  return fingerprintKept.hash;
+}
+// Whether the report still reads as it did when a fingerprint was taken
+// (when it was sent, or finalised).
+function reportMatches(fingerprint) {
+  return !fingerprint || fingerprint === reportFingerprint() || fingerprint === sha256Hex(stableJson(reportContentParts(true)));
+}
 function formatFingerprint(fp) { return (fp || '').slice(0, 16).toUpperCase().match(/.{4}/g).join('-'); }
 function reportFieldHashes() {
   const parts = reportContentParts(), out = {};
@@ -761,8 +660,9 @@ function changedSections(before, after) {
   const keys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
   const names = new Set();
   keys.forEach(k => {
-    if ((before || {})[k] === (after || {})[k]) return;
-    let sec = (k === 'job' || k === 'quote') ? k : Object.keys(SECTIONS).find(s => SECTIONS[s].fields.includes(k));
+    if (ISSUE_META_KEYS.includes(k) || (before || {})[k] === (after || {})[k]) return;
+    // The site plan is drawn under the areas, and prints there.
+    let sec = (k === 'job' || k === 'quote') ? k : k === 'sitePlan' ? 'obstructions' : Object.keys(SECTIONS).find(s => SECTIONS[s].fields.includes(k));
     if (!sec) {
       const el = document.getElementById('f-' + k);
       const section = el && el.closest('.report-section');
@@ -828,6 +728,9 @@ function reportSummary() {
   const structural = termiteReferral || borerReferral;
   const unanswered = findingsMissingReferral();
   const conducive = conduciveConditions(reportData);
+  // "None found" is an answer: it's only said once the step's required
+  // questions are answered. Until then it's not recorded, like any blank.
+  const conduciveAnswered = REQUIRED_FIELDS.conducive.every(isFieldFilled);
   const places = list => joinPlaces(list.map(f => f.activityLocation));
   const NR = 'NOT RECORDED';
   // A borer-only recommendation ("Borer treatment of the floorboards") is
@@ -882,7 +785,7 @@ function reportSummary() {
       ['Builder or engineer referral?', structural ? 'YES' : unanswered.length ? 'NOT ANSWERED' : fs.length ? 'NO' : NR,
         structural ? 'bad' : unanswered.length ? 'warn' : fs.length ? 'good' : 'none', REPORT_PARTS.findings,
         !structural && unanswered.length ? `Finding${unanswered.length === 1 ? '' : 's'} ${unanswered.join(', ')}: not answered` : ''],
-      ['Conditions conducive to timber pests?', conducive.length ? `${conducive.length} FOUND` : 'NONE RECORDED', conducive.length ? 'warn' : 'none', REPORT_PARTS.conducive,
+      ['Conditions conducive to timber pests?', conducive.length ? `${conducive.length} FOUND` : conduciveAnswered ? 'NONE FOUND' : NR, conducive.length ? 'warn' : conduciveAnswered ? 'good' : 'none', REPORT_PARTS.conducive,
         conducive.join('; ').replace(/^./, ch => ch.toUpperCase())],
       ['Termite treatment recommended?', { YES: 'YES', NO: 'NO' }[termiteTreatment] || NR,
         { YES: 'bad', NO: 'good' }[termiteTreatment] || 'none', REPORT_PARTS.recommendations, reportData.treatmentType || ''],
@@ -930,51 +833,120 @@ function reportSummary() {
   return { groups, limited, next, basis };
 }
 
-// Gaps in the report itself, shown before sending and before completing.
+// ── WHAT THE REPORT IS STILL MISSING ──
+// One list. Finish, the check before sending, the percentage in the corner
+// and the job's Finalise step all read it, so they can't disagree. It runs
+// in the order a job is done: the job's details, the agreement, then the
+// report's steps. A line is either required answers left blank
+// (REQUIRED_FIELDS, one line a step, so a skipped step isn't eight lines)
+// or something worth a second look (two answers that disagree, a note
+// still waiting). Each has the buttons that fix it there and then, or
+// "Show me", which goes to it in the report.
 function reportPrepItems() { return reportPrepGaps().map(g => g.text); }
 
-// The same list, each with the buttons that fix it from the check sheet
-// (fix: HTML, or '' when it has to be fixed in the report).
-// from: which sheet the fix buttons come back to ('send' or 'extract').
-// key: what kind of gap, so a sheet can leave some out.
+// What the list calls a required answer where the screen's own label
+// needs its heading to make sense.
+const REQUIRED_NAMES = { weatherConditions: 'weather conditions', findings: 'termite activity' };
+// How many required answers a report has: the address, the agreement, the
+// inspector's signature and every REQUIRED_FIELDS answer bar the hindered
+// access one, which is answered by the same taps as the area statuses.
+const reportRequiredCount = () => 1 + Object.values(REQUIRED_FIELDS).flat().filter(k => k !== 'hinderedAreas').length;
+
+// from: the screen the buttons come back to ('send', 'extract' or 'finish').
+// Each line: key (what kind of gap, so a sheet can leave some out), text,
+// fix (the buttons' HTML), targets (the places in the report "Show me" and
+// its Next walk through, in order), n (how many things it stands for),
+// required (they are required answers) and blank (an answer not given, as
+// against one worth a second look).
 function reportPrepGaps(from = 'send') {
   const gaps = [];
-  const push = (key, text, fix) => gaps.push({ key, text, fix: fix || '' });
+  const push = (key, text, fix, more) => gaps.push(Object.assign({ key, text, fix: fix || '', n: 1 }, more));
   const fixBtn = (kind, label) => `<button class="link-btn" onclick="fixReportGap('${kind}', '${from}')">${label}</button>`;
-  if (!document.getElementById('jobAddress').value.trim()) push('address', 'The job has no property address');
+  const show = (target, label) => fixBtn('go:' + target, label || 'Show me');
+  // A step's required answers that are blank, as one line naming them in
+  // the order they sit on the screen.
+  const blanks = (step, title, keys) => {
+    const open = keys.filter(k => !isFieldFilled(k)).map(k => {
+      const el = document.getElementById(k === 'findings' ? 'section-findings' : 'f-' + k);
+      const label = el && el.closest('.field') && el.closest('.field').querySelector('.field-label');
+      return { k, el, name: REQUIRED_NAMES[k] || (label ? lowerFirst(label.childNodes[0].textContent.trim()) : k) };
+    }).filter(b => b.el).sort((a, b) => a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
+    if (!open.length) return;
+    const names = open.map(b => b.name);
+    const text = names.length > 3 ? `${title}: ${names.length} answers are blank, starting with ${names[0]}`
+      : `${title}: ${joinWithAnd(names)} ${names.length === 1 ? 'isn\'t' : 'aren\'t'} answered`;
+    push('blank:' + step, text, show(open[0].el.id), { targets: open.map(b => b.el.id), n: open.length, required: true, blank: true });
+  };
+
+  if (!document.getElementById('jobAddress').value.trim()) push('address', 'The job has no property address', fixBtn('address', 'Add it'), { required: true, blank: true });
+  // The agreement comes before the report is touched, so it leads the list.
+  if (!reportData.agreement && reportData.agreementRequest) push('agreement', `The agreement link is waiting on ${reportData.agreementRequest.signerName || 'the client'} to sign`, fixBtn('agreement', 'Check it'), { required: true, blank: true });
+  else if (!reportData.agreement) push('agreement', 'No pre-inspection agreement is recorded', fixBtn('agreement', 'Get it signed'), { required: true, blank: true });
+
+  blanks('property', 'Property', REQUIRED_FIELDS.property);
+
   const unmarked = Object.keys(OBS_ZONES).filter(z => !areaStatusOf(z));
   // A few areas each get their own answer: "no outbuildings" and "the
   // sleeper wall was looked at" need different taps, and one button for
   // both got one of them wrong. Many at once keep the quick buttons.
   if (unmarked.length && unmarked.length <= 3) {
-    unmarked.forEach(z => push('status', `${zoneName(z)}: no inspection status${areaEvidence(z).length ? ' (a finding mentions it)' : ''}`,
-      fixBtn('inspected:' + z, 'Inspected') + fixBtn('na:' + z, 'Not applicable')));
+    unmarked.forEach((z, i) => push('status', `${zoneName(z)}: no inspection status${areaEvidence(z).length ? ' (a finding mentions it)' : ''}`,
+      fixBtn('inspected:' + z, 'Inspected') + fixBtn('na:' + z, 'Not applicable'), { required: i === 0, blank: true }));
   } else if (unmarked.length) push('status', `${unmarked.length} areas have no inspection status (${joinWithAnd(unmarked.map(z => zoneName(z).toLowerCase()))})`,
-    fixBtn('inspected', 'Mark the rest as inspected') + fixBtn('na', 'Mark the rest not applicable'));
+    fixBtn('inspected', 'Mark the rest as inspected') + fixBtn('na', 'Mark the rest not applicable'), { required: true, blank: true });
   const noResult = areasMissingResult();
   if (noResult.length) push('result', `${noResult.length} area${noResult.length === 1 ? ' has' : 's have'} no result for what was found there (${joinWithAnd(noResult.map(z => zoneName(z).toLowerCase()))})`,
-    fixBtn('clear', 'Mark the rest as nothing found'));
+    fixBtn('clear', 'Mark the rest as nothing found'), { blank: true });
   // "Nothing found" over an area a finding names: the report would contradict itself.
   Object.keys(OBS_ZONES).filter(z => areaResultOf(z) === 'CLEAR' && areaEvidence(z).length).forEach(z =>
     push('contradiction', `${zoneName(z)}: marked "nothing found", but ${areaEvidence(z)[0].replace(/ \(.*$/, '')} is there`, fixBtn('found:' + z, 'Mark evidence found')));
   areasEvidenceUnlinked().forEach(z => push('evidence', `${zoneName(z)}: marked "evidence found", but no finding mentions it`, fixBtn('finding:' + z, 'Say what it was')));
-  findingsMissingReferral().forEach(n => push('referral', `Finding ${n}: "refer to a builder or engineer?" isn't answered`));
-  const pending = (reportData.pendingNotes || []).length;
-  if (pending) push('pending', `${pending} voice note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
+
+  blanks('findings', 'Findings', REQUIRED_FIELDS.findings);
+  findingsMissingReferral().forEach(n => {
+    const f = reportData.findings[n - 1];
+    push('referral', `Finding ${n}: "refer to a builder or engineer?" isn't answered`, f && f.id ? show(`finding-card-${f.id}:referral`) : '', { blank: true, targets: f && f.id ? [`finding-card-${f.id}:referral`] : [] });
+  });
+
+  blanks('conducive', 'Conducive', REQUIRED_FIELDS.conducive);
+  // The three answers a client reads first: each is named when blank.
+  blanks('recommendations', 'Advice', REQUIRED_FIELDS.recommendations);
   // AS 3660.2 recommends a timber pest inspection at least every 12 months,
   // so a longer interval is worth a second look before it goes out.
   const intervalMonths = longestInspectionIntervalMonths(reportData.inspectionFrequency);
   if (intervalMonths > 12) push('interval', `The next inspection is set ${intervalMonths % 12 ? intervalMonths + ' months' : (intervalMonths / 12) + ' years'} away. AS 3660.2 recommends one at least every 12 months`,
     fixBtn('interval12', 'Make it 12 months'));
-  if (!reportData.inspectorSignature) push('signature', 'The inspector hasn\'t signed');
-  if (!reportData.agreement && reportData.agreementRequest) push('agreement', `The agreement link is waiting on ${reportData.agreementRequest.signerName || 'the client'} to sign`, from === 'extract' ? fixBtn('agreement', 'Check it') : '');
-  else if (!reportData.agreement) push('agreement', 'No pre-inspection agreement is recorded', from === 'extract' ? fixBtn('agreement', 'Get it signed') : '');
+
+  if (!isFieldFilled('inspectorLicence')) push('licence', 'Your pest licence number isn\'t on the report', show('inspectorLicence', 'Add it'), { required: true, blank: true, targets: ['inspectorLicence'] });
+  if (!reportData.inspectorSignature) push('signature', 'The inspector hasn\'t signed', show('sigCanvasInspector', 'Sign it'), { required: true, blank: true, targets: ['sigCanvasInspector'] });
+
+  const pending = (reportData.pendingNotes || []).length;
+  if (pending) push('pending', `${pending} saved note${pending === 1 ? ' is' : 's are'} still waiting to be filled in`);
   // Photos the account never received are only on this phone: the PDF
-  // has them today, but a lost phone or another device's copy won't.
+  // has them today, but a lost phone or another device's copy won't. They
+  // go up on their own with signal, so they don't hold the percentage back.
   const onlyHere = photosOnlyOnThisPhone().length;
   if (onlyHere && authSession) push('photos', `${onlyHere} photo${onlyHere === 1 ? ' is' : 's are'} only on this phone, not in your account yet`,
-    fixBtn('photos', navigator.onLine ? 'Back up now' : 'Back up when online'));
+    fixBtn('photos', navigator.onLine ? 'Back up now' : 'Back up when online'), { n: 0 });
+  // A completed job is locked, so nothing here offers to change it.
+  if (isReportLocked()) gaps.forEach(g => { if (g.key !== 'photos') g.fix = ''; });
   return gaps;
+}
+
+// How far along the report is, off that list: 100% is nothing left on it.
+// Required answers make up the whole; a second look still open adds to it.
+function reportProgress() {
+  const gaps = reportPrepGaps('finish');
+  const open = gaps.reduce((sum, g) => sum + g.n, 0);
+  const blank = gaps.reduce((sum, g) => sum + (g.blank ? g.n : 0), 0);
+  const total = reportRequiredCount() + gaps.reduce((sum, g) => sum + (g.required ? 0 : g.n), 0);
+  return { gaps, open, blank, checks: open - blank, total, pct: Math.max(0, Math.round((total - open) / total * 100)) };
+}
+
+// The list as the amber box Finish and the check sheet both show.
+function reportGapsHtml(gaps) {
+  return `<div class="send-review-label">Worth checking first</div><ul class="send-review-list">${gaps.map(g =>
+    `<li><span class="send-review-gap-text">${escapeHtml(g.text)}</span>${g.fix ? `<span class="send-review-fixes">${g.fix}</span>` : ''}</li>`).join('')}</ul>`;
 }
 
 // The longest interval the re-inspection wording names, in months:
@@ -998,7 +970,7 @@ function photosOnlyOnThisPhone() {
 // "Back up now" on the check sheet: the photos go up, and the sheet is
 // drawn again with the gap gone or a reason it isn't.
 async function backUpPhotosFromGap(from) {
-  const reopen = () => from === 'send' ? openSendReview() : showExtractSummary(extractSummaryBefore);
+  const reopen = () => from === 'send' ? openSendReview() : from === 'extract' ? showExtractSummary(extractSummaryBefore) : updateProgress();
   if (!navigator.onLine) { showToast('You\'re offline. The photos back up on their own once you\'re online', 'warn'); return; }
   const before = photosOnlyOnThisPhone().length;
   showToast(`Backing up ${before} photo${before === 1 ? '' : 's'}…`, 'info');
@@ -1015,31 +987,15 @@ async function backUpPhotosFromGap(from) {
 // The same gaps, shown on the after-extract sheet while the inspector is
 // still on site: what the standard asks for that the notes didn't cover,
 // and a minute fixes it in the driveway. Signing and waiting notes are
-// left out: they aren't on-site work. The referral is on the Left blank
-// list already.
+// left out: they aren't on-site work, and nor is the licence number. The
+// referral is on the Left blank list already, and the steps not reached
+// yet aren't gaps mid-inspection.
 function driveawayGaps() {
-  const gaps = reportPrepGaps('extract').filter(g => !['pending', 'signature', 'referral'].includes(g.key));
+  const gaps = reportPrepGaps('extract').filter(g => !['pending', 'signature', 'licence', 'referral'].includes(g.key) && !g.key.startsWith('blank:'));
   const go = (target, label) => `<button class="link-btn" onclick="closeExtractSummary(); goToReportField('${target}')">${label}</button>`;
   if (isBlankValue(reportData.moistureReadings)) gaps.push({ key: 'moisture', text: 'Moisture readings: not recorded', fix: go('f-moistureReadings', 'Record') });
   if (isBlankValue(reportData.durableNoticePresent)) gaps.push({ key: 'notice', text: 'Durable notice in the meter box: not recorded', fix: go('f-durableNoticePresent', 'Record') });
   return gaps;
-}
-
-// Anything that should be sorted out before the job is completed and locked.
-function reportAttentionItems() {
-  const items = reportPrepItems();
-  const amending = reportData.amending;
-  if (!reportData.sent) items.push('The report hasn\'t been sent to the client');
-  else if (amending && reportData.sent.at < amending.startedAt) items.push('The amended report hasn\'t been sent to the client');
-  else if (reportData.sent.fingerprint !== reportFingerprint()) items.push('The report changed after it was sent. Send it again');
-  const quote = currentJobQuote();
-  if (quoteHasItems(quote)) {
-    if (!quote.sentAt) items.push('The quote hasn\'t been sent to the client');
-    else if (quote.sentHash !== quoteContentHash(quote)) items.push('The quote changed after it was sent. Send it again');
-  } else if (!reportData.noQuoteNeeded) {
-    items.push('No quote yet. Make one, or tap "No quote needed"');
-  }
-  return items;
 }
 
 function setNoQuoteNeeded(on) {
@@ -1068,13 +1024,25 @@ function recordReportSent(fingerprint, version) {
   renderIssueState();
 }
 
-function markReportComplete() {
-  if (isReportLocked()) return;
-  const items = reportAttentionItems();
-  if (items.length) { renderIssueState(); showToast(items[0], 'error'); return; }
+// The one note for anything a locked job stops, with the way to Amend.
+function sayLocked() {
+  showToast('This job is finalised and locked. Amend it from This job', 'info', { label: 'This job', run: () => tabGo('job') });
+}
+
+// A job can be finalised once its steps are done (j: currentJobSummary()),
+// which takes the client having the report as it stands: one that hasn't
+// gone, or changed after it went, is still the next step.
+function jobCanFinalise(j) {
+  return !!j && j.finished && !j.onlyReportUnsent;
+}
+
+// Locks the report and quote as the next version. Returns a function that
+// takes the lock back off, for a job PDF that then couldn't be made or sent.
+function lockJob() {
+  const before = { issue: reportData.issue, issueHistory: reportData.issueHistory, amending: reportData.amending };
   const fingerprint = reportFingerprint(), fieldHashes = reportFieldHashes();
   const quote = currentJobQuote();
-  if (quoteHasItems(quote)) fieldHashes.quote = quote.sentHash.slice(0, 12);
+  if (quoteHasItems(quote)) fieldHashes.quote = quoteContentHash(quote).slice(0, 12);
   const prev = reportData.issue, amending = reportData.amending;
   const version = reportVersion();
   const entry = { version, completedAt: Date.now(), completedBy: inspectorDisplayName(), fingerprint };
@@ -1085,29 +1053,35 @@ function markReportComplete() {
   reportData.issueHistory = [...(reportData.issueHistory || []), entry];
   reportData.issue = { version, completedAt: entry.completedAt, completedBy: entry.completedBy, fingerprint, fieldHashes };
   delete reportData.amending;
-  saveCurrentReport(true);
   renderIssueState();
-  showToast(version > 1 ? `Version ${version} complete. Report and quote locked` : 'Job complete. Report and quote locked', 'success');
-  track('report_completed', { version });
+  return () => {
+    ['issue', 'issueHistory', 'amending'].forEach(k => { if (before[k] === undefined) delete reportData[k]; else reportData[k] = before[k]; });
+    saveCurrentReport(true);
+    renderIssueState();
+  };
 }
 
+// Amend, from the finalised job's card on This job: why, then unlock.
 function openAmendForm() {
+  if (navPlace() !== 'job') tabGo('job');
   const form = document.getElementById('issueAmendForm');
   if (!form) return;
-  form.style.display = '';
-  document.getElementById('issueAmendReason').focus();
+  form.hidden = false;
+  form.scrollIntoView({ block: 'center' });
+  document.getElementById('issueAmendReason').focus({ preventScroll: true });
 }
 function closeAmendForm() {
   const form = document.getElementById('issueAmendForm');
-  if (form) form.style.display = 'none';
+  if (form) form.hidden = true;
 }
 function startAmendment() {
   const reason = document.getElementById('issueAmendReason').value.trim();
-  if (!reason) { showToast('Say why the report is being changed', 'error'); return; }
+  if (!reason) { showToast('Say why the job is being changed', 'error'); return; }
   reportData.amending = { reason, startedAt: Date.now() };
   track('report_unlocked');
   saveCurrentReport(true);
   renderIssueState();
+  renderJobPage();
   showToast(`Unlocked. Changes become version ${reportVersion()}`, 'info');
 }
 // Back out of an amendment, only while nothing has been changed.
@@ -1115,13 +1089,14 @@ function cancelAmendment() {
   if (!reportData.amending || !reportData.issue) return;
   const quote = currentJobQuote();
   const quoteChanged = quoteHasItems(quote) && (reportData.issue.fieldHashes || {}).quote !== quoteContentHash(quote).slice(0, 12);
-  if (reportFingerprint() !== reportData.issue.fingerprint || quoteChanged) {
-    showToast('Changes have been made. Send them and complete the job to finish the amendment', 'error');
+  if (!reportMatches(reportData.issue.fingerprint) || quoteChanged) {
+    showToast('Changes have been made. Send them and finalise the job to finish the amendment', 'error');
     return;
   }
   delete reportData.amending;
   saveCurrentReport(true);
   renderIssueState();
+  renderJobPage();
 }
 
 function formatIssueDate(ts) {
@@ -1137,46 +1112,23 @@ function formatClockTime(t) {
   return `${h % 12 === 0 ? 12 : h % 12}:${String(m || 0).padStart(2, '0')} ${h >= 12 ? 'pm' : 'am'}`;
 }
 
+// The lock on the screen: the report and its job details go quiet, and one
+// line at the top of the report says why. Finalising and Amend are on This
+// job; nothing else of the job's progress is told here.
 function renderIssueState() {
   const banner = document.getElementById('issueBanner');
   if (!banner) return;
   const locked = isReportLocked();
   document.body.classList.toggle('report-locked', locked);
   if (locked) commitActive();
-  const issue = reportData.issue, amending = reportData.amending, sent = reportData.sent;
-  let html = '';
-  if (locked) {
-    html = `<div class="issue-banner-row"><span class="issue-banner-text"><strong>Job complete · version ${issue.version}</strong>
-      · ${formatIssueDate(issue.completedAt)}. The report and quote are locked so they match what the client received.</span>
-      <button class="agreement-banner-btn" onclick="openAmendForm()">Amend</button></div>
-      <div class="issue-amend-form" id="issueAmendForm" style="display:none">
-        <textarea id="issueAmendReason" rows="2" placeholder="Why is it changing? e.g. Client asked for the garage to be added"></textarea>
-        <div class="issue-amend-actions">
-          <button class="link-btn" onclick="closeAmendForm()">Cancel</button>
-          <button class="agreement-banner-btn issue-primary" onclick="startAmendment()">Unlock for version ${issue.version + 1}</button>
-        </div>
-      </div>`;
-    html += renderSentLines(reportData, currentJobQuote());
-    const answer = quoteAnswerSummary(currentJobQuote());
-    if (answer) html += `<div class="issue-quote-answer ${answer.tone}"><span>${escapeHtml(answer.text)}</span>
-      <button class="link-btn" onclick="openQuoteFromReport()">${answer.tone === 'good' ? 'View quote' : 'Record answer'}</button></div>`;
-  } else if (sent || amending) {
-    const items = reportAttentionItems();
-    const head = amending
-      ? `<strong>Amending to version ${reportVersion()}</strong> · ${escapeHtml(amending.reason)}.`
-      : '';
-    const next = items.length ? 'Before the job can be completed:' : 'Everything\'s done. Complete the job to lock it.';
-    const noQuote = !quoteHasItems(currentJobQuote());
-    html = `${renderSentLines(reportData, currentJobQuote())}<div class="issue-banner-row"><span class="issue-banner-text">${head} ${next}</span>
-      ${items.length ? '' : '<button class="agreement-banner-btn issue-primary" onclick="markReportComplete()">Complete job</button>'}</div>
-      ${items.length ? `<ul class="issue-attention">${items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : ''}
-      <div class="issue-links">
-        ${noQuote ? `<button class="link-btn" onclick="setNoQuoteNeeded(${!reportData.noQuoteNeeded})">${reportData.noQuoteNeeded ? 'A quote is needed' : 'No quote needed'}</button>` : ''}
-        ${amending ? '<button class="link-btn" onclick="cancelAmendment()">Cancel amendment</button>' : ''}
-      </div>`;
-  } else if (sentDocs(reportData, currentJobQuote()).some(d => d.at)) {
-    html = renderSentLines(reportData, currentJobQuote());
-  }
+  renderLastVisitBanner();
+  const issue = reportData.issue, amending = reportData.amending;
+  const html = locked
+    ? `<div class="issue-banner-row"><span class="issue-banner-text"><strong>Job finalised ${formatIssueDate(issue.completedAt)}</strong> · version ${issue.version}. Locked, so it matches what the client received.</span>
+      <button class="agreement-banner-btn" onclick="openAmendForm()">Amend</button></div>`
+    : amending && issue
+    ? `<div class="issue-banner-row"><span class="issue-banner-text"><strong>Amending to version ${reportVersion()}</strong> · ${escapeHtml(amending.reason)}</span></div>`
+    : '';
   banner.innerHTML = html;
   banner.style.display = html ? '' : 'none';
   banner.classList.toggle('locked', locked);
@@ -1185,13 +1137,12 @@ function renderIssueState() {
 
 // While locked, taps and typing in the report, the job details and the mic
 // are stopped with a note pointing at Amend. Scrolling and the section tabs
-// still work, and a signed agreement can still be viewed.
+// still work.
 let lockToastAt = 0;
 function installReportLockGuard() {
   const stop = e => {
     if (!isReportLocked()) return;
     if (e.target.closest('.issue-banner')) return;
-    if (reportData.agreement && e.target.closest('.agreement-banner-btn')) return;
     // Touches only matter on the signature pad; elsewhere they're scrolling.
     if (e.type === 'touchstart' && e.target.tagName !== 'CANVAS') return;
     e.preventDefault();
@@ -1199,7 +1150,7 @@ function installReportLockGuard() {
     if (e.type === 'focusin' && e.target.blur) e.target.blur();
     if (e.type === 'click' && Date.now() - lockToastAt > 2500) {
       lockToastAt = Date.now();
-      showToast('This job is complete and locked. Tap Amend to change it', 'info');
+      sayLocked();
     }
   };
   ['reportBody', 'jobPanelBody', 'micDock'].forEach(id => {

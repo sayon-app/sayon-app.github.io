@@ -27,7 +27,7 @@ function enhanceFieldsWithNotes() {
       <div class="field-notes-bar">
         <button class="field-notes-mic" type="button" onclick="openNotesVoice('${key}')">
           <svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-          Dictate
+          Say it
         </button>
         <span class="field-notes-charcount" id="notes-count-${key}"></span>
       </div>
@@ -103,7 +103,7 @@ function openNotesVoice(key) {
   const labelEl = fieldEl ? fieldEl.querySelector('.field-label') : null;
   const labelText = labelEl ? labelEl.textContent.replace('edit', '').trim() : 'this field';
 
-  if (title) title.textContent = `Dictating: ${labelText}`;
+  if (title) title.textContent = `Your note on ${labelText}`;
   document.getElementById('extractBtn').style.display = 'none';
   document.getElementById('useTranscriptBtn').style.display = 'block';
 
@@ -163,7 +163,7 @@ function useTranscriptForNotes() {
 function resetVoicePopoverToDefault() {
   activeNotesTargetKey = null;
   const title = document.getElementById('voicePopoverTitleText');
-  if (title) title.textContent = 'Voice capture';
+  if (title) title.textContent = 'Your note';
   document.getElementById('extractBtn').style.display = 'flex';
   document.getElementById('useTranscriptBtn').style.display = 'none';
   const box = document.getElementById('transcriptBox');
@@ -446,7 +446,7 @@ async function suggestTranscriptCleanup() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-5',
+        model: AI_MODEL,
         // Thinking counts toward max_tokens (see requestExtraction()), and
         // the answer repeats the whole transcript, so leave room for both.
         max_tokens: 8000,
@@ -534,6 +534,14 @@ function toggleAudioCaptureSetting() {
   // turns this back on, so a failure from a much earlier session (or a
   // since-fixed bug) doesn't permanently lock the toggle into a no-op.
   if (audioCaptureEnabled) audioCaptureFailedThisSession = false;
+}
+
+// The switch is still being tried, so it shows only on a business set up
+// for trying things (the one Test mode shows on), and on a phone that
+// already has it on, so it can be turned off there.
+function showAudioCaptureRow() {
+  const row = document.getElementById('audioCaptureRow');
+  if (row) row.hidden = !(audioCaptureEnabled || !!(authBusiness && authBusiness.settings && authBusiness.settings.testMode));
 }
 
 function restoreAudioCaptureSetting() {
@@ -1066,12 +1074,8 @@ function startRecording() {
     };
 
     recognition.onerror = (e) => {
-      // FIX: this used to silently discard the error entirely, so when
-      // recognition failed or produced garbage there was no way to tell
-      // whether it was a network drop, a mic/permission problem, no speech
-      // detected, or something else — every failure looked identical from
-      // the outside. Surface the actual reason (console + toast) so a bad
-      // field test can actually be diagnosed instead of guessed at.
+      // The reason is logged so a bad field test can be told apart: a
+      // dropped network, the mic's permission, or no speech heard.
       const reason = (e && e.error) ? e.error : 'unknown';
       console.warn('Speech recognition error:', reason);
       // A quiet stretch (moving between rooms, phone in a pocket) is not a

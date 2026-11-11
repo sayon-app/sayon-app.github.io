@@ -955,20 +955,27 @@ function markNothingFound(section) {
   } });
 }
 
-// Each button shows only while its section has a blank it can fill, and
-// says "else" or "other" once something has been recorded there.
+// What the button says: "else" or "other" once something has been
+// recorded there.
+function nothingFoundTitle(section) {
+  const somethingFound = section === 'findings'
+    ? (reportData.findings || []).some(f => f && ['ACTIVE', 'INACTIVE'].includes(f.termiteActivity)) || borersFound() || reportData.decayFound === 'YES' || reportData.delignification === 'YES' || Object.keys(OBS_ZONES).some(z => areaResultOf(z) === 'FOUND')
+    : reportData.waterLeaks === 'YES' || Object.entries(CONDUCIVE_CLEAN).some(([k, clean]) => !isBlankValue(reportData[k]) && ![clean, 'N/A'].includes(reportData[k]) && !(k === 'weepHoles' && reportData[k] === 'NONE'));
+  return section === 'findings'
+    ? (somethingFound ? 'Nothing else found' : 'No timber pests found')
+    : (somethingFound ? 'No other conducive conditions' : 'No conducive conditions');
+}
+
+// Each button shows only while its section has a blank it can fill. The
+// Findings one is in the "Not answered yet" box while that box is asking
+// (renderFindingsMore), and at the top only when it isn't.
 function syncNothingFoundButtons() {
   ['findings', 'conducive'].forEach(section => {
     const btn = document.getElementById('nothingFound-' + section);
     if (!btn) return;
-    btn.hidden = !nothingFoundBlanks(section).length;
-    const somethingFound = section === 'findings'
-      ? (reportData.findings || []).some(f => f && ['ACTIVE', 'INACTIVE'].includes(f.termiteActivity)) || borersFound() || reportData.decayFound === 'YES' || reportData.delignification === 'YES' || Object.keys(OBS_ZONES).some(z => areaResultOf(z) === 'FOUND')
-      : reportData.waterLeaks === 'YES' || Object.entries(CONDUCIVE_CLEAN).some(([k, clean]) => !isBlankValue(reportData[k]) && ![clean, 'N/A'].includes(reportData[k]) && !(k === 'weepHoles' && reportData[k] === 'NONE'));
+    btn.hidden = !nothingFoundBlanks(section).length || (section === 'findings' && findingsOutOfSight().blank.length > 0);
     const title = btn.querySelector('strong');
-    if (title) title.textContent = section === 'findings'
-      ? (somethingFound ? 'Nothing else found' : 'No timber pests found')
-      : (somethingFound ? 'No other conducive conditions' : 'No conducive conditions');
+    if (title) title.textContent = nothingFoundTitle(section);
   });
 }
 
@@ -1043,28 +1050,34 @@ const FINDINGS_TICK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="non
 const FINDINGS_DASH = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>';
 const joinWithOr = list => list.length < 2 ? (list[0] || '') : list.slice(0, -1).join(', ') + ' or ' + list[list.length - 1];
 
-function renderFindingsMore() {
-  const box = document.getElementById('findingsMore');
-  if (!box) return;
+// The timber pest groups out of sight, and each pest in them as answered
+// none or not answered yet.
+function findingsOutOfSight() {
   const hidden = FINDINGS_GROUPS.filter(g => !findingsGroupShown(g.id));
-  box.hidden = !hidden.length;
-  if (!hidden.length) { box.innerHTML = ''; return; }
   const out = id => hidden.some(g => g.id === id);
   const said = (k, none) => none.includes(reportData[k]);
-  // Each timber pest out of sight, and whether it's answered none.
   const pests = [];
   if (out('termites')) { const fs = reportData.findings || []; pests.push(['termites', fs.length > 0 && fs.every(f => f && f.termiteActivity === 'NONE')]); }
   if (out('borers')) pests.push(['borers', said('borerActivity', ['NONE'])]);
   if (out('decay')) pests.push(['rot', said('decayFound', ['NO', 'N/A'])], ['delignification', said('delignification', ['NO', 'N/A'])]);
-  const none = pests.filter(p => p[1]).map(p => p[0]), blank = pests.filter(p => !p[1]).map(p => p[0]);
+  return { hidden, none: pests.filter(p => p[1]).map(p => p[0]), blank: pests.filter(p => !p[1]).map(p => p[0]) };
+}
+
+function renderFindingsMore() {
+  const box = document.getElementById('findingsMore');
+  if (!box) return;
+  const { hidden, none, blank } = findingsOutOfSight();
+  box.hidden = !hidden.length;
+  if (!hidden.length) { box.innerHTML = ''; return; }
   const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
   let state = '';
   if (blank.length) {
-    const btn = document.getElementById('nothingFound-findings');
-    const quick = btn && !btn.hidden ? `Tap “${btn.querySelector('strong').textContent}” at the top if there was nothing.` : '';
+    // The one-tap answer is here, in the box that's asking.
+    const quick = nothingFoundBlanks('findings').length ? `<button type="button" class="nothing-found-btn findings-more-none" onclick="markNothingFound('findings')">${FINDINGS_TICK}
+      <span><strong>${nothingFoundTitle('findings')}</strong><small>Fills the blank answers. Change any that differ.</small></span></button>` : '';
     state = `<div class="findings-more-state is-blank"><span class="findings-more-icon">${FINDINGS_DASH}</span>
       <span class="findings-more-text"><strong>Not answered yet: ${joinWithAnd(blank)}</strong>
-      ${none.length || quick ? `<small>${none.length ? `No ${joinWithOr(none)} found. ` : ''}${quick}</small>` : ''}</span></div>`;
+      ${none.length ? `<small>No ${joinWithOr(none)} found.</small>` : ''}</span>${quick}</div>`;
   } else if (none.length) {
     const fromAreas = (reportData.noneFromAreas || []).length > 0;
     state = `<div class="findings-more-state is-none"><span class="findings-more-icon">${FINDINGS_TICK}</span>
@@ -1576,7 +1589,7 @@ function compassPointFor(h) {
 }
 
 async function openCompass() {
-  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  if (isReportLocked()) { sayLocked(); return; }
   commitActive();
   compassTarget = null;
   compassHeading = null;

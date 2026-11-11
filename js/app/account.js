@@ -228,7 +228,7 @@ function onSeatInput(plan) {
   }
 }
 
-function choosePlan(plan) {
+async function choosePlan(plan) {
   const sub = billingStatusCache;
   if (SEAT_PLANS[plan] && sub && sub.plan === plan && sub.per_seat && ['active', 'past_due'].includes(sub.status)) {
     updateSeats(seatInputValue(plan));
@@ -236,7 +236,17 @@ function choosePlan(plan) {
   }
   const seats = SEAT_PLANS[plan] ? seatInputValue(plan) : undefined;
   const paying = sub && sub.plan && sub.plan !== 'trial' && sub.subscribed && ['active', 'past_due'].includes(sub.status);
-  if (paying && !confirm(`Switch to ${planDisplayLabel(plan)}${seats ? ` for ${seats} inspectors` : ''} at ${planPriceText(plan, seats)}? It's charged now, less the unused part of your current plan, and only happens if the payment goes through.`)) return;
+  // Someone already paying is charged by this tap, so it's asked first.
+  if (paying && !(await askFirst({
+    title: `Switch to ${planDisplayLabel(plan)}?`,
+    facts: [
+      ['Plan', `${planDisplayLabel(plan)}${seats ? `, ${seats} inspectors` : ''}`],
+      ['Price', planPriceText(plan, seats)],
+      ['Charged', 'Now, less the unused part of your current plan'],
+    ],
+    text: 'The switch only happens if the payment goes through.',
+    yes: `Pay ${planPriceText(plan, seats)}`,
+  }))) return;
   openCheckout(plan, seats);
 }
 
@@ -253,10 +263,17 @@ async function updateSeats(seats) {
   const sub = billingStatusCache;
   if (!sub || seatChangeInFlight) return;
   const more = seats > sub.seats;
-  const ask = more
-    ? `Pay for ${seats} inspectors instead of ${sub.seats} (${planPriceText(sub.plan, seats)})? The extra places are charged now for the rest of what you've paid for.`
-    : `Pay for ${seats} inspectors instead of ${sub.seats} (${planPriceText(sub.plan, seats)})? The unused part comes off your next bill.`;
-  if (!confirm(ask)) return;
+  if (!(await askFirst({
+    title: `Pay for ${seats} inspectors instead of ${sub.seats}?`,
+    facts: [
+      ['Plan', `${planDisplayLabel(sub.plan)}, ${seats} inspectors`],
+      ['Price', planPriceText(sub.plan, seats)],
+      ['Charged', more ? 'The extra places now, for the rest of what you\'ve paid for' : 'The unused part comes off your next bill'],
+    ],
+    text: more ? 'The change only happens if the payment goes through.' : '',
+    yes: `Pay ${planPriceText(sub.plan, seats)}`,
+  }))) return;
+  if (seatChangeInFlight) return;
   seatChangeInFlight = true;
   try {
     const res = await workerFetch('/stripe/update-seats', {
@@ -547,7 +564,7 @@ function stopAuthAutoRefresh() {
 // ── SIGN UP ──────────────────────────────────────────────────────────────
 // The Terms and Privacy versions a new account agrees to at sign-up. Raise
 // these with the "Version N" lines at the top of terms.html and privacy.html.
-const LEGAL_VERSIONS = { terms: 3, privacy: 7 };
+const LEGAL_VERSIONS = { terms: 3, privacy: 9 };
 
 async function signUp() {
   const name     = document.getElementById('suName').value.trim();
@@ -728,7 +745,7 @@ async function signOut() {
         failed ? `${failed} saved report${failed === 1 ? '' : 's'} couldn't be backed up (no signal?)` : '',
         unsaved ? 'The open report hasn\'t been saved' : '',
       ].filter(Boolean).join('. ');
-      if (!confirm(`${lost}.\n\nSigning out removes reports from this phone. Sign out anyway and lose them?`)) {
+      if (!(await askFirst({ title: 'Sign out and lose them?', text: `${lost}. Signing out removes reports from this phone.`, yes: 'Sign out and lose them', no: 'Stay signed in', danger: true }))) {
         showToast('Still signed in. Your reports are safe on this phone', 'info');
         return;
       }
@@ -759,9 +776,8 @@ async function endSessionOnDevice() {
     resetReportState();
     ['jobAddress','jobSuburb','jobState','jobPostcode','jobClient','jobInspector'].forEach(id => { document.getElementById(id).value = ''; });
     updateJob();
-    renderSavedList();
+    refreshJobsList();
   }
-  document.getElementById('mainMenu').style.display  = 'none';
   document.getElementById('app').style.display       = 'none';
   document.getElementById('authScreen').style.display = 'flex';
   showAuth('authSignIn');
@@ -853,12 +869,15 @@ async function deleteFolder(bucket, prefix, listFolder) {
 async function deleteMyAccount() {
   if (!authSession || !authUser) { showToast('Sign in to delete your account', 'error'); return; }
   if (!navigator.onLine) { showToast('You need signal to delete your account', 'error'); return; }
-  const typed = prompt(
-    'This permanently deletes your SAYON account, every saved report and photo, ' +
-    (authBusiness && authBusiness.owner_id === authUser.id ? 'your business details, ' : '') +
-    'and everything on this phone. It cannot be undone.\n\nExport your data first if you want a copy.\n\nType DELETE to confirm.');
-  if (typed === null) return;
-  if (typed.trim().toUpperCase() !== 'DELETE') { showToast('Not deleted. Type DELETE to confirm', 'info'); return; }
+  const typed = await askFirst({
+    title: 'Delete your account?',
+    text: 'This permanently deletes your SAYON account, every saved report and photo, ' +
+      (authBusiness && authBusiness.owner_id === authUser.id ? 'your business details, ' : '') +
+      'and everything on this phone. It cannot be undone.\n\nTo keep a copy, tap Not now and use Download a copy first.\n\nType DELETE to confirm.',
+    input: { match: 'DELETE', placeholder: 'DELETE', label: 'Type DELETE to confirm' },
+    yes: 'Delete my account', danger: true });
+  if (typeof typed !== 'string') return;
+  if (typed.toUpperCase() !== 'DELETE') { showToast('Not deleted. Type DELETE to confirm', 'info'); return; }
   showToast('Deleting your account…', 'info');
   try {
     const blocked = await deleteAccountRpc(true);
@@ -1102,7 +1121,7 @@ async function sendInviteLink(email, token) {
 async function removeTeamMember(userId) {
   const m = teamCache.members.find(x => x.user_id === userId);
   if (!m || userId === authUser.id) return;
-  if (!confirm(`Take ${m.name || m.email} off your team? They can't use SAYON with your business after this. Their reports stay in their account.`)) return;
+  if (!(await askFirst({ title: `Take ${m.name || m.email} off your team?`, text: 'They can\'t use SAYON with your business after this. Their reports stay in their account.', yes: 'Take them off', danger: true }))) return;
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/team_members?business_id=eq.${authBusiness.id}&user_id=eq.${encodeURIComponent(userId)}`, { method: 'DELETE', headers: getAuthHeaders() });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -1115,7 +1134,7 @@ async function removeTeamMember(userId) {
 
 async function cancelTeamInvite(id) {
   const i = teamCache.invites.find(x => x.id === id);
-  if (!i || !confirm(`Cancel the invite for ${i.email}?`)) return;
+  if (!i || !(await askFirst({ title: `Cancel the invite for ${i.email}?`, text: 'Their sign-up link stops working. You can invite them again any time.', yes: 'Cancel the invite', no: 'Keep it' }))) return;
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/invites?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: getAuthHeaders() });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -1198,7 +1217,7 @@ function showInviteSignUp(joining) {
   if (joining) document.getElementById('suBusiness').value = '';
   document.getElementById('suTitle').textContent = joining ? `Join ${inviteSignUp.business} on SAYON` : 'Create your account';
   document.getElementById('suSubtitle').textContent = joining
-    ? `${inviteSignUp.business} has added you. Sign up with this email and you'll join their account, with their company details on your reports.`
+    ? `${inviteSignUp.business} has added you. Sign up with this email and you'll join their account, with their business details on your reports.`
     : `This email wasn't invited, so this sets up a business of your own. To join ${inviteSignUp.business}, use ${inviteSignUp.email}.`;
 }
 
@@ -1210,20 +1229,10 @@ function onSignUpEmailInput() {
 }
 
 // ── BUSINESS LOAD ────────────────────────────────────────────────────────
-// FIX: loadBusiness() used to be a plain check-then-create with no lock -
-// "is authBusiness already set? no -> look for an existing business row ->
-// none found -> create one." Two overlapping calls (confirmed live: sign-in
-// retried minutes apart after the team_members 500 below made it LOOK like
-// something had failed, each a fresh call since authBusiness resets on
-// reload) could both pass the "none found" check before either one's POST
-// landed, and both would create a business row for the same owner - exactly
-// what happened to two of the real test accounts (two "Korva Pest Control"
-// rows, two "JC Pest Control" rows, same owner_id each time, confirmed via
-// the businesses table and edge_logs). There's also no unique constraint on
-// businesses.owner_id at the database level, so nothing stopped it there
-// either. This in-flight lock makes every call for the same page session
-// share one real attempt instead of racing - a second caller just awaits
-// the first one's result instead of starting its own.
+// One attempt at a time: two calls that overlap (a sign-in retried) would
+// both find no business row and both create one, and nothing in the
+// database stops two rows for one owner. A second caller waits for the
+// first one's result.
 let _loadBusinessInFlight = null;
 async function loadBusiness() {
   if (!authUser) return;
@@ -1425,7 +1434,7 @@ function enterApp() {
     // hadn't landed yet. Per-account keys mean nothing ever gets deleted on
     // a switch - the previous account's reports stay exactly where they
     // were, under their own key, completely untouched.
-    renderSavedList();
+    refreshJobsList();
   }
   lastActiveAccountUserId = authUser ? authUser.id : lastActiveAccountUserId;
 
@@ -1472,6 +1481,10 @@ function enterApp() {
   // New users see onboarding; returning users go straight into the app.
   if (shouldShowOnboarding()) showOnboarding();
   else openApp('inspect');
+  // CRASH GUARD (js/crash-guard.js): reports written with no signal go now,
+  // and if the app closed while in use last time, offer to tell us.
+  sendQueuedProblemReports();
+  maybeOfferCrashReport();
 }
 
 function renderProfileMenu() {
@@ -1489,23 +1502,111 @@ function renderProfileMenu() {
   if (emailEl) emailEl.textContent = authUser.email;
   const bizRow = document.getElementById('profileBusinessRow');
   if (bizRow) {
-    // The name the PDFs print, which "Your business" edits
+    // The name the PDFs print, which Business details edits
     const bizName = getCompanyDetails().name || authBusiness?.name || '';
     document.getElementById('profileBusinessName').textContent = bizName;
     bizRow.style.display = authBusiness && bizName ? 'flex' : 'none';
   }
-  const bizBtn = document.getElementById('profileYourBusiness');
-  if (bizBtn) bizBtn.hidden = !canEditBusiness();
+  // The Your business list. Business details is the owner's to change.
+  const row = id => document.getElementById(id);
+  const summary = (id, text) => { const el = row(id) && row(id).querySelector('.job-panel-summary'); if (el) el.textContent = text; };
+  if (row('businessPanel')) {
+    row('businessPanel').classList.toggle('menu-row-hidden', !canEditBusiness());
+    summary('businessPanel', getCompanyDetails().name || authBusiness?.name || '');
+  }
   // Your team needs a business of your own and a Worker that knows about
   // inspector places (supabase/team-seats.sql is applied before it).
-  const teamBtn = document.getElementById('profileYourTeam');
-  if (teamBtn) teamBtn.hidden = !(authBusiness && isBusinessOwner() && billingStatusCache && billingStatusCache.seat_plans);
+  if (row('teamPanel')) row('teamPanel').classList.toggle('menu-row-hidden', !(authBusiness && isBusinessOwner() && billingStatusCache && billingStatusCache.seat_plans));
+  summary('billingPanel', billingStatusCache && billingStatusCache.plan ? planDisplayLabel(billingStatusCache.plan) : '');
+  renderPriceBookSummary();
+  renderChemicalSummary();
 }
-function openBillingFromProfile() {
-  openMenuPage('billingPanel');
+
+// Sign out sits last in the menu. Signing back in means typing the email
+// and password again, so it's asked first.
+async function signOutFromProfile() {
+  if (await askFirst({ title: 'Sign out of SAYON?', text: 'Your reports are backed up to your account first. You\'ll need your email and password to sign back in.', yes: 'Sign out' })) signOut();
 }
-function signOutFromProfile() {
-  if (confirm('Sign out of SAYON?')) signOut();
+
+// ── YOUR SIGN-IN ─────────────────────────────────────────────────────────
+// Opened from the card at the top of the menu: the name SAYON knows you
+// by, the email you sign in with, and a change of password. Changing the
+// email needs a confirmation email and a way back in from its link, which
+// isn't built: the page says so and gives the address to ask.
+function openSignInPage() {
+  if (!authUser) return;
+  document.getElementById('meName').value = (authUser.user_metadata || {}).name || '';
+  document.getElementById('meEmail').textContent = authUser.email || '';
+  document.getElementById('mePassError').textContent = '';
+  ['mePassNow', 'mePassNew'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = '';
+    if (el.type !== 'password') toggleAuthReveal(el.parentElement.querySelector('.auth-reveal'));
+  });
+  openMenuPage('signinPanel');
+}
+
+// Changes the signed-in user's own name or password. Throws with the
+// reason; a thrown error with no status means SAYON couldn't be reached.
+async function updateMyUser(body) {
+  await maybeRefreshAuthSession();
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.msg || data.error_description || (data.error && data.error.message) || 'That didn\'t go through. Try again.'), { status: res.status });
+  return data;
+}
+
+async function saveMyName() {
+  const input = document.getElementById('meName');
+  const btn = document.getElementById('meNameSave');
+  const name = input.value.trim();
+  if (!name) { showToast('Type your name', 'error'); input.focus(); return; }
+  btn.disabled = true;
+  try {
+    const user = await updateMyUser({ data: { name } });
+    // The account's copy of the user, or this one with the new name on it.
+    authUser = user && user.id ? user : { ...authUser, user_metadata: { ...(authUser.user_metadata || {}), name } };
+    if (authSession) { authSession.user = authUser; saveSession(authSession); }
+    renderProfileMenu();
+    showToast('Name saved', 'success');
+  } catch (e) {
+    showToast(e.status ? e.message : 'Couldn\'t reach SAYON. Check your signal and try again', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function changeMyPassword() {
+  const nowEl = document.getElementById('mePassNow'), nextEl = document.getElementById('mePassNew');
+  const errEl = document.getElementById('mePassError');
+  const btn = document.getElementById('mePassSave');
+  const now = nowEl.value, next = nextEl.value;
+  errEl.textContent = '';
+  if (!now) { errEl.textContent = 'Type the password you have now.'; nowEl.focus(); return; }
+  if (!next || next.length < 8) { errEl.textContent = 'The new password must be at least 8 characters.'; nextEl.focus(); return; }
+  if (next === now) { errEl.textContent = 'That\'s the password you have now.'; nextEl.focus(); return; }
+  btn.disabled = true; btn.textContent = 'Changing…';
+  try {
+    // The current password is checked by signing in with it, which also
+    // gives the fresh sign-in a password change asks for.
+    const check = await supabaseAuth('token?grant_type=password', { email: authUser.email, password: now });
+    if (check.error) {
+      errEl.textContent = check.error.code === 'invalid_credentials' || check.error.message === 'Invalid login credentials'
+        ? 'That isn\'t the password you have now. If you\'ve forgotten it, sign out and tap Forgot password.'
+        : (check.error.message || 'Couldn\'t check your password. Try again.');
+      return;
+    }
+    authSession = check;
+    authUser = check.user;
+    saveSession(check);
+    await updateMyUser({ password: next });
+    nowEl.value = ''; nextEl.value = '';
+    showToast('Password changed', 'success');
+  } catch (e) {
+    errEl.textContent = e.status ? e.message : 'Couldn\'t reach SAYON. Check your signal and try again.';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Change password';
+  }
 }
 
 // ── AUTH UI HELPERS ──────────────────────────────────────────────────────
@@ -1517,6 +1618,9 @@ function showAuth(panel) {
   // Fix: ensure displayed card uses flex column
   const active = document.getElementById(panel);
   if (active) active.style.flexDirection = 'column';
+  // Create account has a tick box for the Terms and Privacy Policy, so the
+  // "By continuing you agree" line is for the cards without one.
+  document.getElementById('authAgreeLine').hidden = panel === 'authSignUp' || panel === 'authConfirm';
   track('screen_viewed', { screen: 'auth_' + panel });
 }
 

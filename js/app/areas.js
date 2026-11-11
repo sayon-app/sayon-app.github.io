@@ -350,6 +350,8 @@ function toggleObsItem(zoneId, item) {
 function renderAreaChecklist() {
   const wrap = document.getElementById('areaChecklist');
   if (!wrap) return;
+  // A spot still being typed is kept before its box is redrawn.
+  wrap.querySelectorAll('.access-spot-editor').forEach(w => storeAccessSpot(w.dataset.kind, w.dataset.key, w.querySelector('input').value));
   migrateLegacyObstructions();
   const zones = Object.keys(OBS_ZONES);
   const markAll = document.getElementById('markAllAreasBtn');
@@ -376,11 +378,12 @@ function renderAreaChecklist() {
         return `<button type="button" class="obs-item-btn${selected.includes(item) ? ' selected' : ''}" aria-pressed="${selected.includes(item)}"
           onclick="toggleObsItem('${zoneId}','${safe}')">${item}</button>`;
       };
+      // Where exactly, and its photos, sit under the kind of reason that was
+      // ticked: the area is finished on its own card.
       const group = (kind, title, items) => items.length
-        ? `<div class="obs-reasons obs-reasons-${kind}"><div class="obs-items-label">${ACCESS_GROUP_ICONS[kind]}<span>${title}</span></div><div class="obs-items">${items.map(btn).join('')}</div></div>` : '';
+        ? `<div class="obs-reasons obs-reasons-${kind}"><div class="obs-items-label">${ACCESS_GROUP_ICONS[kind]}<span>${title}</span></div><div class="obs-items">${items.map(btn).join('')}</div>${accessZones(kind).includes(zoneId) ? areaSpotHTML(kind, zoneId) : ''}</div>` : '';
       reasons = group('hindered', 'Obstructions: in the way today', zone.items.filter(i => !RESTRICTED_REASONS.has(i)))
         + group('restricted', 'Restricted: permanent or locked', zone.items.filter(i => RESTRICTED_REASONS.has(i)));
-      if (selected.length) reasons += `<div class="area-where">Add where exactly, and photos, under <button type="button" class="link-btn" onclick="showSection('restrictions')">Areas unable to be inspected</button> below</div>`;
     }
     let result = '';
     if (areaWasEntered(zoneId)) {
@@ -404,6 +407,9 @@ function renderAreaChecklist() {
       <summary class="obs-zone-panel-header area-summary">${tile}${areaSummary(zoneId, zoneName(zoneId))}</summary>
       <div class="area-body"><div class="area-status">${statusBtns}</div>${result}${reasons}</div></details></div>`;
   }).join('');
+  hydrateSpotPhotos(wrap);
+  // The site plan sits under the areas (js/site-plan.js).
+  if (typeof renderReportPlan === 'function') renderReportPlan();
 }
 const AREA_DOT_TICK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
 const AREA_DOT_DASH = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"><path d="M5 12h14"/></svg>';
@@ -697,12 +703,14 @@ function openAreaRow(zoneId) {
 }
 
 // ── ACCESS SPOTS ─────────────────────────────────────────────────────────
-// Where exactly, per area, typed on the area's row in Section 5:
+// Where exactly, per area, typed on the area's own card in Section 4, under
+// the kind of reason that was ticked:
 // reportData.accessSpots = { hindered: { zoneId: text }, restricted: {…} }.
 // Voice notes still fill the free text (hinderedAreas, noAccessAreas), so a
 // sentence there that opens with an area ("Roof void: outer edges") is
-// shown on that area's row; anything else shows as "Other spots" (key
-// '_other'). A typed spot, even a blank one, wins over the voice text.
+// shown on that area's card; anything else shows in Section 5 as "Other
+// spots" (key '_other'). A typed spot, even a blank one, wins over the
+// voice text. Section 5 only reads back what the report will print.
 const ACCESS_SPOT_TEXT = { hindered: 'hinderedAreas', restricted: 'noAccessAreas' };
 const ZONE_SPOT_ALIASES = {
   interior: ['the interior', 'interior', 'inside'],
@@ -751,22 +759,38 @@ function accessZones(kind) {
   });
 }
 
-function setAccessSpot(kind, key, value) {
+function storeAccessSpot(kind, key, value) {
   if (!reportData.accessSpots) reportData.accessSpots = {};
   if (!reportData.accessSpots[kind]) reportData.accessSpots[kind] = {};
   reportData.accessSpots[kind][key] = value.trim();
+}
+
+function setAccessSpot(kind, key, value) {
+  storeAccessSpot(kind, key, value);
   closeAccessSpotEditor();
   updateProgress(); flushDraftSave();
 }
 
+// The box goes back to being the spot's line. On an area's card only the
+// box is swapped, not the card: a tap on the card may be under way.
 function closeAccessSpotEditor() {
   const el = document.activeElement;
   if (el && el.classList.contains('access-spot-input')) el.blur();
+  document.querySelectorAll('#areaChecklist .access-spot-editor').forEach(w => { w.outerHTML = accessSpotLineHTML(w.dataset.kind, w.dataset.key); });
   renderAccessSummary();
 }
 
-// Swaps a row's spot line for a text box that saves the same way as the
-// other report fields.
+// The spot's line: what's written, or "Add exact spot". A tap swaps it for
+// a text box that saves the same way as the other report fields.
+function accessSpotLineHTML(kind, key) {
+  const spot = accessSpot(kind, key, accessZones(kind));
+  return `<button type="button" class="access-spot${spot ? '' : ' empty'}" data-kind="${kind}" data-key="${key}" onclick="editAccessSpot('${kind}','${key}')">${ACCESS_PIN}<span>${spot ? escapeHtml(spot) : 'Add exact spot'}</span></button>`;
+}
+// The spot and its photos, on the area's card.
+function areaSpotHTML(kind, zoneId) {
+  return `<div class="area-spot">${accessSpotLineHTML(kind, zoneId)}${spotPhotosHTML(spotPhotoSection(kind, zoneId))}</div>`;
+}
+
 function editAccessSpot(kind, key) {
   const btn = document.querySelector(`.access-spot[data-kind="${kind}"][data-key="${key}"]`);
   if (!btn) return;
@@ -778,6 +802,8 @@ function editAccessSpot(kind, key) {
   wireInlineTextEdit(input, v => setAccessSpot(kind, key, v), closeAccessSpotEditor);
   const wrap = document.createElement('div');
   wrap.className = 'access-spot-editor';
+  wrap.dataset.kind = kind;
+  wrap.dataset.key = key;
   wrap.append(input);
   btn.replaceWith(wrap);
   input.focus();
@@ -816,18 +842,20 @@ function renderAccessSummary() {
     const tile = `<span class="area-tile" aria-hidden="true">${AREA_ICONS[z] || ''}<span class="area-tile-badge">${st === 'not' ? AREA_DOT_CROSS : AREA_DOT_TICK}</span></span>`;
     return `<div class="access-item access-item-${st}">
       <button type="button" class="access-item-head" onclick="openAreaRow('${z}')" aria-label="${zoneName(z)}, ${status}. Change in Areas">${tile}
-        <span class="access-item-main"><span class="access-item-name">${zoneName(z)}</span><span class="access-item-state">${status}</span>${why}</span>${ACCESS_CHEV}</button>
-      ${spotLine(kind, z)}${spotPhotos(kind, z)}</div>`;
+        <span class="access-item-main"><span class="access-item-name">${zoneName(z)}</span><span class="access-item-state">${status}</span>${why}${where(kind, z)}</span>${ACCESS_CHEV}</button></div>`;
   }).filter(Boolean);
-  const spotLine = (kind, key) => {
-    const spot = accessSpot(kind, key, accessZones(kind));
-    return `<button type="button" class="access-spot${spot ? '' : ' empty'}" data-kind="${kind}" data-key="${key}" onclick="editAccessSpot('${kind}','${key}')">${ACCESS_PIN}<span>${spot ? escapeHtml(spot) : 'Add exact spot'}</span></button>`;
+  // The exact spot and how many photos it has, as entered on the area's
+  // card: read here, changed there.
+  const where = (kind, z) => {
+    const spot = accessSpot(kind, z, accessZones(kind));
+    const n = ((reportData.photosBySection || {})[spotPhotoSection(kind, z)] || []).length;
+    const parts = [spot ? escapeHtml(spot.charAt(0).toUpperCase() + spot.slice(1)) : '', n ? `${n} photo${n === 1 ? '' : 's'}` : ''].filter(Boolean);
+    return parts.length ? `<span class="access-item-where">${ACCESS_PIN}<span>${parts.join(' · ')}</span></span>` : '';
   };
-  // Photos of the spot, each with its own details box.
-  const spotPhotos = (kind, key) => spotPhotosHTML(spotPhotoSection(kind, key));
-  // Voice text that names no listed area, under its own row.
+  // Voice text that names no listed area has no card in Areas, so its row
+  // here is the one place it's changed and takes its photos.
   const other = kind => accessSpot(kind, '_other', accessZones(kind)) ? `<div class="access-item access-item-other">
-      <span class="access-item-name">Other spots</span>${spotLine(kind, '_other')}${spotPhotos(kind, '_other')}</div>` : '';
+      <span class="access-item-name">Other spots</span>${accessSpotLineHTML(kind, '_other')}${spotPhotosHTML(spotPhotoSection(kind, '_other'))}</div>` : '';
   // One card per kind of limit: a header with the count, then the areas.
   const group = (kind, title, sub, list, none) => {
     const extra = other(kind);
@@ -846,7 +874,7 @@ function renderAccessSummary() {
     rows(true), allMarked);
   [hBox, rBox].forEach(hydrateSpotPhotos);
   const intro = document.getElementById('accessIntro');
-  if (intro) intro.innerHTML = allMarked || limited.length ? 'Filled in from your ticks in Areas. Tap an area to change it there, or add where exactly.'
+  if (intro) intro.innerHTML = allMarked || limited.length ? 'What the report will print, from your ticks in Areas. Tap an area to change it there.'
     : `Mark every area above and these fill themselves in. <button type="button" class="link-btn" onclick="document.getElementById('section-obstructions').scrollIntoView({ behavior: 'smooth', block: 'start' })">Back to the areas</button>`;
   const hint = document.getElementById('accessHighRiskHint');
   if (hint) {
@@ -985,9 +1013,10 @@ function accessLimits() {
 }
 
 // ── ACCESS SPOT PHOTOS ───────────────────────────────────────────────────
-// Each area row in Section 5 takes its own photos, stored with the other
-// section photos under photosBySection['spot-<kind>-<zone>'] so backup and
-// sync pick them up. They print with the access rows.
+// Each area's card takes its own photos under the kind of reason ticked,
+// stored with the other section photos under
+// photosBySection['spot-<kind>-<zone>'] so backup and sync pick them up.
+// They print with the access rows.
 function spotPhotoSection(kind, key) { return `spot-${kind}-${key}`; }
 // Each termite finding takes its own photos the same way, under
 // photosBySection['finding-<finding id>']; they print inside its card.
@@ -1009,21 +1038,27 @@ function spotPhotosHTML(section) {
       ${photoSuggestionHTML(p)}
     </div>`).join('');
   return `<div class="spot-photos" data-section="${section}">${cards}
-    <button type="button" class="spot-photo-add" onclick="addSpotPhoto('${section}')">${PHOTO_ADD_ICON}Add photo</button></div>`;
+    <div class="photo-add-row"><button type="button" class="spot-photo-add" onclick="addSpotPhoto('${section}')">${PHOTO_ADD_ICON}Add photo</button>
+      <button type="button" class="link-btn photo-choose" onclick="addSpotPhoto('${section}', true)">Choose one instead</button></div></div>`;
 }
 function hydrateSpotPhotos(container) {
   container.querySelectorAll('.spot-photos').forEach(el =>
     hydratePhotoImages(el, (reportData.photosBySection || {})[el.dataset.section] || []));
 }
-// Redraws whichever part of the report the strip belongs to.
+// Redraws whichever part of the report the strip belongs to: an area's
+// card and its line in Section 5, the finding, or the conducive condition.
 function refreshSpotPhotos(section) {
-  if (section.startsWith('finding-')) renderFindingsUI(); else renderAccessSummary();
+  if (section.startsWith('finding-')) { renderFindingsUI(); return; }
+  if (section.startsWith('cond-')) { renderConditionPhotos(); return; }
+  renderAreaChecklist();
+  renderAccessSummary();
 }
 
-function addSpotPhoto(section) {
+// Add photo is the camera; choosing: "Choose one instead" (js/app/photos.js).
+function addSpotPhoto(section, choosing) {
   const input = document.getElementById('spotPhotoInput');
   input.dataset.section = section;
-  choosePhotoSource(input);
+  if (choosing) choosePhotoSource(input, true); else takePhoto(input);
 }
 
 async function handleSpotPhotoFiles(input) {

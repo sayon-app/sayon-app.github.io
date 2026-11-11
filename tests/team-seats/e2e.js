@@ -5,6 +5,8 @@
 // sign-up link with a secret; that link names the business on the sign-up
 // card and joins it with nothing to set up. A wrong email, a dead link or
 // no free place never joins anyone. A technician sees no plans to buy.
+// The current plan card on top says the plan, its state, the price (to the
+// owner only), the AI fills used and the inspector places taken.
 // node e2e.js <outDir> (server on :8765)
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2] || '/tmp/team-seats'; fs.mkdirSync(OUT, { recursive: true });
@@ -79,8 +81,15 @@ async function setup(b, { user, sub, members, invites }) {
 }
 
 const trial = (extra) => Object.assign({ plan: 'trial', status: 'trialing', ai_calls_used_this_period: 3, limit: 50, trial_ends_at: new Date(Date.now() + 5 * 864e5).toISOString(), subscribed: false, seats: 1, per_seat: false }, extra);
+// What the current plan card shows. A part that's hidden reads null.
+const planCard = p => p.evaluate(() => {
+  const shown = id => { const el = document.getElementById(id); return el && !el.closest('[hidden]') && el.style.display !== 'none' ? el.textContent.replace(/\s+/g, ' ').trim() : null; };
+  return { name: shown('billingPlanName'), pill: shown('billingStatusPill'), price: shown('billingPlanPrice'), fills: shown('billingMeterCount'), left: shown('billingMeterLeft'),
+    places: shown('billingPlacesCount') && shown('billingPlacesCount') + ', ' + shown('billingPlacesLeft'), manage: shown('manageBillingBtn'), label: shown('billingPlansLabel'),
+    spoken: document.getElementById('billingStatusText').classList.contains('sr-only') };
+});
 const openBilling = async p => { await p.evaluate(() => openMenuPage('billingPanel')); await p.waitForTimeout(600); };
-const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPanel [data-plan]')].map(r => r.dataset.plan + (r.hidden ? ':hidden' : ':' + r.querySelector('button').textContent + (r.querySelector('button').disabled ? '(off)' : ''))).join(' '));
+const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPanel [data-plan]')].map(r => r.dataset.plan + (r.hidden ? ':hidden' : ':' + r.querySelector('.plan-btn').textContent + (r.querySelector('.plan-btn').disabled ? '(off)' : ''))).join(' '));
 
 (async () => {
   const b = await chromium.launch();
@@ -101,6 +110,9 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     const { ctx, p, st, errs } = await setup(b, { user: OWNER, sub: trial({ seat_plans: true }) });
     await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(3200); await p.hookToasts(); await openBilling(p);
     check(/starter:Upgrade pro:Upgrade business:Upgrade/.test(await rowState(p)), 'Team and Business are offered: ' + await rowState(p));
+    const trialCard = await planCard(p);
+    check(trialCard.name === 'Free trial' && trialCard.pill === 'Free trial' && /^5 days left · ends /.test(trialCard.price) && trialCard.fills === '3 of 50 used' && trialCard.left === '47 left' && trialCard.spoken, 'the plan card on a trial: the days left and the fills used, with the sentence kept for screen readers: ' + JSON.stringify(trialCard));
+    check(trialCard.label === 'Choose a plan' && trialCard.places === null && trialCard.manage === null, 'a trial is asked to choose a plan, with no places to count and no Manage');
     const totals = await p.evaluate(() => [document.getElementById('seatTotalPro').textContent, document.getElementById('seatTotalBusiness').textContent]);
     check(totals[0] === '$158 a month' && totals[1] === '$8,280 a year', 'prices for the starting numbers: ' + totals.join(', '));
     await p.fill('#seatsPro', '4'); await p.waitForTimeout(100);
@@ -158,24 +170,35 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(3200); await p.hookToasts(); await openBilling(p);
     check(/Team plan for 4 inspectors\. 100 of 3200 AI fills/.test(await p.textContent('#billingStatusText')), 'status names Team and the inspectors: ' + await p.textContent('#billingStatusText'));
     check(/starter:Switch pro:Current plan\(off\) business:Switch/.test(await rowState(p)) && await p.inputValue('#seatsPro') === '4', 'Team is current at 4: ' + await rowState(p));
+    const card = await planCard(p);
+    check(card.name === 'Team plan' && card.pill === 'Active' && card.price === '$316 a month · 4 inspectors' && card.fills === '100 of 3,200 used' && card.left === '3,100 left, about 155 inspections', 'the plan card names the plan, its price and the fills used: ' + JSON.stringify(card));
+    check(card.places === '2 of 4 taken, 2 free' && card.manage === 'Manage', 'the places taken are counted against the places paid for, and Manage is there');
+    check(card.label === 'Change plan' && await p.evaluate(() => { const row = document.querySelector('#billingPanel [data-plan="pro"]'); return row.querySelector('.plan-btn').hidden && !row.querySelector('.plan-badge').hidden && !row.querySelector('.seat-hint').hidden; }), 'the current plan wears a badge, and has no button until its number changes');
+    // The plus and minus beside the number.
+    await p.click('#billingPanel [data-plan="pro"] .seat-step-btn[data-step="1"]'); await p.waitForTimeout(100);
+    check(await p.inputValue('#seatsPro') === '5' && await p.textContent('#seatMathPro') === '5 × $79 =' && await p.textContent('#seatTotalPro') === '$395 a month' && /pro:Change to 5/.test(await rowState(p)), 'plus makes it 5, shows the sum and offers Change to 5');
+    await p.click('#billingPanel [data-plan="pro"] .seat-step-btn[data-step="-1"]'); await p.waitForTimeout(100);
+    check(await p.inputValue('#seatsPro') === '4' && /pro:Current plan\(off\)/.test(await rowState(p)), 'minus puts it back, and the button goes');
+    await p.fill('#seatsPro', '2'); await p.waitForTimeout(100);
+    check(await p.evaluate(() => document.querySelector('#billingPanel [data-plan="pro"] .seat-step-btn[data-step="-1"]').disabled), 'minus stops at the fewest a Team can have');
     await p.fill('#seatsPro', '6'); await p.waitForTimeout(100);
     check(/pro:Change to 6/.test(await rowState(p)), 'a new number offers Change to 6');
     // Paying is asked on SAYON's own sheet: the plan, the price, when it's
     // charged, and a button that says what it does.
     const sheet = () => p.evaluate(() => ({ open: document.getElementById('askOverlay').classList.contains('open'), title: document.getElementById('askTitle').textContent, facts: [...document.querySelectorAll('#askFacts > div')].map(d => d.innerText.replace(/\s+/g, ' ').trim()), yes: document.getElementById('askYes').textContent, no: document.getElementById('askNo').textContent }));
-    await p.click('#billingPanel [data-plan="pro"] button'); await p.waitForTimeout(300);
+    await p.click('#billingPanel [data-plan="pro"] .plan-btn'); await p.waitForTimeout(300);
     const ask = await sheet();
     check(ask.open && ask.title === 'Pay for 6 inspectors instead of 4?' && ask.yes === 'Pay $474 a month' && ask.no === 'Not now', 'changing the number asks on SAYON\'s sheet, and the button says what it does: ' + JSON.stringify(ask));
     check(/Plan Team, 6 inspectors/.test(ask.facts[0]) && /Price \$474 a month/.test(ask.facts[1]) && /Charged The extra places now/.test(ask.facts[2]), 'the sheet sets out the plan, the price and when it\'s charged: ' + ask.facts.join(' | '));
     await p.screenshot({ path: `${OUT}/3a-pay-sheet.png` });
     await p.click('#askNo'); await p.waitForTimeout(300);
     check(!(await sheet()).open && !st.calls.some(c => c.path.startsWith('/stripe/update-seats')), '"Not now" closes it and nothing is charged');
-    await p.click('#billingPanel [data-plan="starter"] button'); await p.waitForTimeout(300);
+    await p.click('#billingPanel [data-plan="starter"] .plan-btn'); await p.waitForTimeout(300);
     const sw = await sheet();
     check(sw.open && sw.title === 'Switch to Solo?' && sw.yes === 'Pay $89 a month' && /Charged Now, less the unused part/.test(sw.facts[2]), 'switching plan is asked the same way: ' + JSON.stringify(sw));
     await p.keyboard.press('Escape'); await p.waitForTimeout(300);
     check(!(await sheet()).open && !st.calls.some(c => c.path.startsWith('/stripe/create-checkout')), 'Esc closes it and nothing is charged');
-    await p.click('#billingPanel [data-plan="pro"] button'); await p.waitForTimeout(300);
+    await p.click('#billingPanel [data-plan="pro"] .plan-btn'); await p.waitForTimeout(300);
     await p.click('#askYes'); await p.waitForTimeout(900);
     const up = st.calls.find(c => c.path.startsWith('/stripe/update-seats'));
     check(up && up.body.seats === 6 && !st.calls.some(c => c.path.startsWith('/stripe/create-checkout')), 'Change sends 6 to update-seats, not checkout');
@@ -203,6 +226,8 @@ const rowState = p => p.evaluate(() => [...document.querySelectorAll('#billingPa
     const t = await p.evaluate(() => ({ rows: [...document.querySelectorAll('#billingPanel [data-plan]')].every(r => r.hidden), note: !document.getElementById('billingOwnerOnly').hidden, manage: document.getElementById('manageBillingBtn').style.display, team: document.getElementById('teamPanel').classList.contains('menu-row-hidden'), details: document.getElementById('businessPanel').classList.contains('menu-row-hidden') }));
     check(t.rows && t.note && t.manage === 'none' && t.team && t.details, 'technician: no plan rows, no Manage, no Your team or Business details, and a note: ' + JSON.stringify(t));
     check(await p.evaluate(() => document.getElementById('billingTermsRow').hidden), 'technician: no prices, cancelling or paying wording');
+    const techCard = await planCard(p);
+    check(techCard.name === 'Team plan' && techCard.price === '4 inspectors' && techCard.fills === '100 of 3,200 used' && techCard.places === null && techCard.manage === null, 'technician: the plan and the fills used, with no price, places or Manage: ' + JSON.stringify(techCard));
     check(!errs.length, 'no page errors ' + errs.join('; '));
     await ctx.close();
   }

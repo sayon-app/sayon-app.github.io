@@ -97,6 +97,7 @@ function resetBillingDisplay() {
   const manageBtn = document.getElementById('manageBillingBtn');
   if (manageBtn) manageBtn.style.display = 'none';
   billingStatusCache = null;
+  renderBillingCard(null);
 }
 
 // A real job takes 8 to 20 fills (the pricing doc's measurement); plans are
@@ -112,12 +113,16 @@ function billingUsageText(sub, trial) {
   const period = trial ? '' : ' this month';
   if (!limit) return `${used} AI fills used${period}.`;
   const left = Math.max(0, limit - used);
-  const now = new Date();
-  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-  const when = next.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
   const inspections = Math.floor(left / FILLS_PER_INSPECTION);
   const leftText = left === 0 ? 'none left' : `about ${inspections} inspection${inspections === 1 ? '' : 's'} left`;
-  return `${used} of ${limit} AI fills used${period}, ${leftText}.` + (trial ? '' : ` They come back on ${when}.`);
+  return `${used} of ${limit} AI fills used${period}, ${leftText}.` + (trial ? '' : ` They come back on ${fillsBackOn()}.`);
+}
+
+// "1 Dec": the day the month's AI fills come back.
+function fillsBackOn() {
+  const now = new Date();
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return next.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
 }
 
 async function loadBillingStatus() {
@@ -127,6 +132,7 @@ async function loadBillingStatus() {
   const forUser = authUser.id;
   if (el) el.textContent = 'Loading…';
   if (manageBtn) manageBtn.style.display = 'none';
+  renderBillingCard(null);
   try {
     const res = await workerFetch('/stripe/subscription-status', { method: 'GET' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -138,6 +144,7 @@ async function loadBillingStatus() {
     if (el) el.textContent = billingStatusLine(sub, planLabel);
     const owner = !authBusiness || isBusinessOwner();
     if (manageBtn) manageBtn.style.display = sub.stripe_customer_id && owner ? '' : 'none';
+    renderBillingCard(sub);
     showPlanOptions(sub, owner);
     markCurrentPlan(sub);
     renderProfileMenu();
@@ -177,12 +184,147 @@ function billingStatusLine(sub, planLabel) {
   return `${planLabel} plan${sub.per_seat ? ` for ${sub.seats} inspector${sub.seats === 1 ? '' : 's'}` : ''}. ${billingUsageText(sub)}`;
 }
 
+// THE CURRENT PLAN CARD: the plan's name, a pill for its state, what it
+// costs, then a meter of the AI fills used. Drawn from the same subscription
+// status as billingStatusLine. With no status (signed out, loading, or it
+// couldn't load) only the sentence shows.
+function billingPlanState(sub) {
+  const ended = sub.status === 'canceled' || sub.status === 'cancelled';
+  if (sub.status === 'trialing') {
+    const over = sub.trial_ends_at && new Date(sub.trial_ends_at) <= Date.now();
+    return over ? { pill: 'Trial ended', tone: 'bad', plain: false } : { pill: 'Free trial', tone: 'trial', plain: true };
+  }
+  if (sub.status === 'past_due') return { pill: 'Payment failed', tone: 'bad', plain: false };
+  if (ended) return { pill: 'Ended', tone: 'off', plain: false };
+  if (sub.cancel_at_period_end) return { pill: 'Ending', tone: 'warn', plain: false };
+  return { pill: 'Active', tone: 'good', plain: true };
+}
+
+function renderBillingCard(sub) {
+  const $ = id => document.getElementById(id);
+  const card = $('billingCurrent');
+  if (!card) return;
+  const name = $('billingPlanName'), price = $('billingPlanPrice'), pill = $('billingStatusPill');
+  const meter = $('billingMeter'), text = $('billingStatusText'), manageBtn = $('manageBillingBtn');
+  if (!sub) {
+    card.dataset.tone = '';
+    name.hidden = price.hidden = pill.hidden = meter.hidden = true;
+    $('billingPlaces').hidden = $('billingUsage').hidden = $('billingManageRow').hidden = true;
+    text.classList.remove('sr-only');
+    return;
+  }
+  const state = billingPlanState(sub);
+  const trial = sub.status === 'trialing';
+  const owner = !authBusiness || isBusinessOwner();
+  const day = iso => new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  card.dataset.tone = state.tone;
+  name.textContent = trial ? 'Free trial' : `${planDisplayLabel(sub.plan)} plan`;
+  name.hidden = false;
+  pill.textContent = state.pill;
+  pill.dataset.tone = state.tone;
+  pill.hidden = false;
+
+  // "$237 a month · 3 inspectors". The price is the owner's to see, and a
+  // plan that has ended has none.
+  const bits = [];
+  if (trial) {
+    const daysLeft = sub.trial_ends_at ? Math.max(0, Math.ceil((new Date(sub.trial_ends_at) - Date.now()) / 86400000)) : 0;
+    if (daysLeft) bits.push(`<b>${daysLeft} day${daysLeft === 1 ? '' : 's'} left</b>`, `ends ${day(sub.trial_ends_at)}`);
+  } else if (state.tone !== 'off') {
+    const seats = SEAT_PLANS[sub.plan] && sub.per_seat ? Number(sub.seats) || 0 : 0;
+    if (owner && (sub.plan === 'starter' || seats)) bits.push(planPriceText(sub.plan, seats).replace(/^\S+/, '<b>$&</b>'));
+    if (sub.plan === 'starter') bits.push('one inspector');
+    else if (seats) bits.push(`${seats} inspector${seats === 1 ? '' : 's'}`);
+    if (sub.current_period_end && state.tone === 'good') bits.push(`renews ${day(sub.current_period_end)}`);
+  }
+  price.innerHTML = bits.join(' · ').replace(/^[a-z]/, c => c.toUpperCase());
+  price.hidden = !bits.length;
+
+  // The meter, whenever there's a limit and the plan still runs. The fill
+  // says how much is used; amber from four fifths, red when none are left.
+  const limit = Number(sub.limit) || 0, used = Number(sub.ai_calls_used_this_period) || 0;
+  const showMeter = !!limit && state.tone !== 'off' && !(trial && state.tone === 'bad');
+  const fresh = meter.hidden;
+  meter.hidden = !showMeter;
+  if (showMeter) {
+    $('billingUsage').hidden = false;
+    const left = Math.max(0, limit - used), share = Math.min(1, used / limit);
+    const n = v => v.toLocaleString('en-AU');
+    const level = left === 0 ? 'out' : share >= 0.8 ? 'low' : 'ok';
+    const inspections = Math.floor(left / FILLS_PER_INSPECTION);
+    meter.dataset.level = level;
+    $('billingMeterLabel').textContent = trial ? 'AI fills in your trial' : 'AI fills this month';
+    $('billingMeterFlag').hidden = level === 'ok';
+    $('billingMeterFlagText').textContent = level === 'out' ? 'None left' : 'Running low';
+    $('billingMeterCount').innerHTML = `<b>${n(used)}</b> of ${n(limit)} used`;
+    // Newly shown, the bar fills from empty.
+    const fill = $('billingMeterFill');
+    if (fresh) { fill.style.width = fill.style.minWidth = '0'; void fill.offsetWidth; }
+    fill.style.width = share * 100 + '%';
+    fill.style.minWidth = used > 0 ? '10px' : '0';
+    // A trial's 50 are a taste, not a month's work, so they aren't turned
+    // into inspections.
+    $('billingMeterLeft').textContent = left === 0 ? 'You can still type your reports by hand'
+      : trial ? `${n(left)} left`
+      : inspections === 0 ? `${n(left)} left, less than one inspection`
+      : `${n(left)} left, about ${inspections} inspection${inspections === 1 ? '' : 's'}`;
+    $('billingMeterReset').textContent = trial ? '' : `All ${n(limit)} back on ${fillsBackOn()}`;
+  }
+  // When the card says it all, the sentence is for screen readers only. A
+  // plan that needs something done keeps it on screen, less the count the
+  // meter already shows.
+  text.classList.toggle('sr-only', state.plain && showMeter);
+  const line = text.textContent, usage = billingUsageText(sub, trial);
+  if (showMeter && !state.plain && line.endsWith(' ' + usage)) {
+    const spoken = document.createElement('span');
+    spoken.className = 'sr-only';
+    spoken.textContent = usage;
+    text.replaceChildren(line.slice(0, -usage.length), spoken);
+  }
+
+  // Manage: the next thing to do when a payment has failed.
+  $('billingManageRow').hidden = manageBtn.style.display === 'none';
+  manageBtn.classList.toggle('primary', sub.status === 'past_due');
+
+  loadBillingPlaces(sub);
+  $('billingUsage').hidden = meter.hidden && $('billingPlaces').hidden;
+}
+
+// INSPECTOR PLACES on Team and Business: how many of the places paid for are
+// taken, by the people on the team and the invites still out. The owner's to
+// see, and only on the Billing page, which is where it's fetched.
+async function loadBillingPlaces(sub) {
+  const row = document.getElementById('billingPlaces');
+  const show = SEAT_PLANS[sub.plan] && sub.per_seat && ['active', 'past_due'].includes(sub.status) && authBusiness && isBusinessOwner();
+  if (!show) { row.hidden = true; return; }
+  const forBusiness = authBusiness.id;
+  // What Your team last loaded shows straight away, then it's fetched fresh.
+  renderBillingPlaces(sub);
+  if (!document.getElementById('billingPanel').classList.contains('menu-page-active')) return;
+  try { await fetchTeam(); } catch (e) { console.warn('loadBillingPlaces failed:', e.message); return; }
+  if (authBusiness && authBusiness.id === forBusiness && billingStatusCache === sub) renderBillingPlaces(sub);
+}
+
+function renderBillingPlaces(sub) {
+  const $ = id => document.getElementById(id);
+  const cap = teamPlaceCap(sub);
+  const taken = teamCache.businessId === authBusiness.id ? teamCache.members.length + teamCache.invites.length : 0;
+  $('billingPlaces').hidden = !taken || !cap;
+  if (taken && cap) {
+    const free = cap - taken;
+    $('billingPlacesCount').innerHTML = `<b>${taken}</b> of ${cap} taken`;
+    $('billingPlacesFill').style.width = Math.min(1, taken / cap) * 100 + '%';
+    $('billingPlacesLeft').textContent = free > 0 ? `${free} free` : 'All taken';
+  }
+  $('billingUsage').hidden = $('billingMeter').hidden && $('billingPlaces').hidden;
+}
+
 // Team and Business are charged per inspector. They're offered only once
 // the Worker says it can charge that way (seat_plans), and only the owner
 // sees the plans to choose from.
 const SEAT_PLANS = {
-  pro: { input: 'seatsPro', total: 'seatTotalPro', min: 2, max: 9, perMonth: 79, yearly: false },
-  business: { input: 'seatsBusiness', total: 'seatTotalBusiness', min: 10, max: 200, perMonth: 69, yearly: true },
+  pro: { input: 'seatsPro', total: 'seatTotalPro', math: 'seatMathPro', min: 2, max: 9, perMonth: 79, yearly: false },
+  business: { input: 'seatsBusiness', total: 'seatTotalBusiness', math: 'seatMathBusiness', min: 10, max: 200, perMonth: 69, yearly: true },
 };
 
 function showPlanOptions(sub, owner) {
@@ -190,6 +332,7 @@ function showPlanOptions(sub, owner) {
   document.querySelectorAll('#billingPanel [data-plan]').forEach(row => {
     row.hidden = !owner || (row.hasAttribute('data-seat-plan') && !seatPlans);
   });
+  document.getElementById('billingPlansLabel').hidden = !owner;
   document.getElementById('billingOwnerOnly').hidden = owner;
   // Prices, cancelling and paying are the owner's business, not a technician's.
   document.getElementById('billingTermsRow').hidden = !owner;
@@ -210,21 +353,32 @@ function seatInputValue(plan) {
   return Number.isFinite(n) ? Math.min(cfg.max, Math.max(cfg.min, n)) : cfg.min;
 }
 
+// The minus and plus beside the number.
+function stepSeats(plan, by) {
+  const cfg = SEAT_PLANS[plan];
+  document.getElementById(cfg.input).value = Math.min(cfg.max, Math.max(cfg.min, seatInputValue(plan) + by));
+  onSeatInput(plan);
+}
+
 function onSeatInput(plan) {
   const cfg = SEAT_PLANS[plan];
   const n = seatInputValue(plan);
   const total = document.getElementById(cfg.total);
   if (total) total.textContent = planPriceText(plan, n);
+  // How the total is reached: "3 × $79 =", and "× 12 months" billed yearly.
+  document.getElementById(cfg.math).textContent = `${n} × $${cfg.perMonth}${cfg.yearly ? ' × 12 months' : ''} =`;
+  const row = document.querySelector(`#billingPanel [data-plan="${plan}"]`);
+  row.querySelectorAll('.seat-step-btn').forEach(b => { b.disabled = b.dataset.step < 0 ? n <= cfg.min : n >= cfg.max; });
   const sub = billingStatusCache;
-  // On the current plan the button saves a new number of places.
+  // On the current plan the button saves a new number of places, and is
+  // there only once the number has changed.
   if (sub && sub.plan === plan && sub.per_seat && ['active', 'past_due'].includes(sub.status)) {
-    const row = document.querySelector(`#billingPanel [data-plan="${plan}"]`);
-    const btn = row && row.querySelector('button');
-    if (btn) {
-      const changed = n !== sub.seats;
-      btn.textContent = changed ? `Change to ${n}` : 'Current plan';
-      btn.disabled = !changed;
-    }
+    const btn = row.querySelector('.plan-btn');
+    const changed = n !== sub.seats;
+    btn.textContent = changed ? `Change to ${n}` : 'Current plan';
+    btn.disabled = btn.hidden = !changed;
+    // Filled, unless Manage already is (a failed payment comes first).
+    btn.classList.toggle('primary', changed && sub.status !== 'past_due');
   }
 }
 
@@ -297,14 +451,21 @@ async function updateSeats(seats) {
 // read Switch rather than Upgrade for someone already paying.
 function markCurrentPlan(sub) {
   const paying = sub && sub.plan && sub.plan !== 'trial' && ['active', 'past_due'].includes(sub.status);
+  document.getElementById('billingPlansLabel').textContent = paying ? 'Change plan' : 'Choose a plan';
   document.querySelectorAll('#billingPanel [data-plan]').forEach(row => {
-    const btn = row.querySelector('button');
-    const current = paying && row.dataset.plan === sub.plan;
+    const btn = row.querySelector('.plan-btn');
+    const current = !!paying && row.dataset.plan === sub.plan;
+    const ownSeats = current && !!SEAT_PLANS[sub.plan] && !!sub.per_seat;
     row.classList.toggle('current-plan', current);
-    if (btn) btn.textContent = current ? 'Current plan' : paying ? 'Switch' : 'Upgrade';
-    if (btn) btn.disabled = !!current;
-    // A per-inspector plan's own row can still change its number of places.
-    if (current && SEAT_PLANS[sub.plan] && sub.per_seat) onSeatInput(sub.plan);
+    row.querySelector('.plan-badge').hidden = !current;
+    const hint = row.querySelector('.seat-hint');
+    if (hint) hint.hidden = !ownSeats;
+    // The card's badge says it's the current plan, so its button goes.
+    btn.textContent = current ? 'Current plan' : paying ? 'Switch' : 'Upgrade';
+    btn.disabled = btn.hidden = current;
+    btn.classList.remove('primary');
+    // A per-inspector plan's own card can still change its number of places.
+    if (ownSeats) onSeatInput(sub.plan);
   });
 }
 
@@ -313,11 +474,12 @@ function markCurrentPlan(sub) {
 // offer Upgrade, and a second tap could start a second subscription.
 async function confirmBillingAfterCheckout() {
   const el = document.getElementById('billingStatusText');
+  renderBillingCard(null);
   if (el) el.textContent = 'Confirming your payment…';
   for (let i = 0; i < 10; i++) {
     const sub = await loadBillingStatus();
     if (sub && (sub.status !== 'trialing' || sub.subscribed)) { showToast('Subscription updated. Thank you', 'success'); return; }
-    if (el && i < 9) el.textContent = 'Confirming your payment…';
+    if (el && i < 9) { renderBillingCard(null); el.textContent = 'Confirming your payment…'; }
     await new Promise(r => setTimeout(r, 2000));
   }
   showToast('Payment received. Your plan shows here once Stripe confirms it, usually within a minute', 'info');
@@ -986,6 +1148,19 @@ function teamPlaceCap(sub) {
 
 let teamCache = { members: [], invites: [] };
 
+// The people on the team and the invites still out. Your team lists them and
+// Billing counts them against the places paid for.
+async function fetchTeam() {
+  const businessId = authBusiness.id;
+  const [mRes, iRes] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/team_members?business_id=eq.${businessId}&select=user_id,role,name,email&order=joined_at.asc`, { headers: getAuthHeaders() }),
+    fetch(`${SUPABASE_URL}/rest/v1/invites?business_id=eq.${businessId}&status=eq.pending&select=id,email&order=created_at.asc`, { headers: getAuthHeaders() }),
+  ]);
+  if (!mRes.ok || !iRes.ok) throw new Error('HTTP ' + (mRes.ok ? iRes.status : mRes.status));
+  teamCache = { members: await mRes.json(), invites: await iRes.json(), businessId };
+  return teamCache;
+}
+
 async function loadTeam() {
   const list = document.getElementById('teamList');
   const placesEl = document.getElementById('teamPlacesText');
@@ -996,13 +1171,10 @@ async function loadTeam() {
   }
   placesEl.textContent = 'Loading…';
   try {
-    const [mRes, iRes, sub] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/team_members?business_id=eq.${authBusiness.id}&select=user_id,role,name,email&order=joined_at.asc`, { headers: getAuthHeaders() }),
-      fetch(`${SUPABASE_URL}/rest/v1/invites?business_id=eq.${authBusiness.id}&status=eq.pending&select=id,email&order=created_at.asc`, { headers: getAuthHeaders() }),
+    const [, sub] = await Promise.all([
+      fetchTeam(),
       billingStatusCache ? Promise.resolve(billingStatusCache) : loadBillingStatus(),
     ]);
-    if (!mRes.ok || !iRes.ok) throw new Error('HTTP ' + (mRes.ok ? iRes.status : mRes.status));
-    teamCache = { members: await mRes.json(), invites: await iRes.json() };
     renderTeam(sub);
   } catch (e) {
     console.warn('loadTeam failed:', e.message);

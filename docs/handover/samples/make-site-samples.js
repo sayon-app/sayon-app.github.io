@@ -80,7 +80,7 @@ const sess = { access_token:'a.b.c', refresh_token:'r', expires_at: Math.floor(D
     q.answer = { status: 'accepted', method: 'onsite', by: 'Sam Taylor', date: new Date().toISOString().slice(0,10), signature: sig, at: Date.now() };
     q.treatment = { date: new Date().toISOString().slice(0,10), technician: 'Alex Example', licence: 'NSW 000000', supervisor: '', supervisorLicence: '', start: '08:30', finish: '12:00', pest: 'Subterranean termites', weather: 'Fine and dry', equipment: 'Low-pressure sprayer, trenching tools',
       methods: { direct: '', bait: '8' }, products: [{ name: 'Termidor Foam', active: 'fipronil', rate: 'As per label', amount: '2 cans', batch: 'B-0000' }],
-      areas: 'Backyard gum tree; perimeter of the house', notTreated: 'Back section of the subfloor (stored items)', sketch: '', notice: 'new', noticeWhere: 'Meter box', cautions: 'Keep garden beds below the slab edge and away from the bait stations', nextInspection: 'In 3 months', warranty: '', notes: '', signature: sig, at: Date.now() };
+      areas: 'Backyard gum tree; perimeter of the house', notTreated: 'Back section of the subfloor (stored items)', sketch: '', notice: 'new', noticeWhere: 'Meter box', cautions: 'Keep garden beds below the slab edge and away from the bait stations', nextInspection: addMonthsIso(todayIsoDate(), 3), warranty: '', notes: '', signature: sig, at: Date.now() };
     await ensureJsPDFLoaded(); const { blob } = await buildTreatmentCertificatePDF(q); return toB64(blob); })()`), OUT + '/sample-certificate.pdf');
   console.log('errors', errs.length ? errs : 'none');
   await b.close();

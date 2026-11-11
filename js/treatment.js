@@ -70,14 +70,15 @@ function treatmentCertNumber(q, prefix = 'TC') {
 }
 
 // A chemical barrier, baiting system, reticulation system or physical
-// barrier is a termite management system left in place, so the client also
-// gets a certificate of installation.
+// barrier is a termite management system left in place, so the certificate
+// gives it a row of its own, System installed, with where it went, and care
+// lines on how to look after it.
 const INSTALLED_SYSTEMS = ['barrier', 'bait', 'retic', 'physical'];
 function installedSystems(t) {
   return INSTALLED_SYSTEMS.filter(k => t && t.methods && k in t.methods);
 }
 
-// Where the installed system went, for the certificate of installation: the
+// Where the installed system went, for the certificate's System installed: the
 // treated areas without the spots that were only treated directly (the
 // active workings the report found), which aren't part of the system.
 function installedSystemAreas(t, rd) {
@@ -252,7 +253,6 @@ function treatmentRecordLine(q) {
 function treatmentCertificateCard(q) {
   const t = q.treatment;
   if (!t) return '';
-  const many = installedSystems(t).length > 0;
   const who = (q.client || '').trim();
   const first = who.split(/\s+/)[0];
   const to = quoteClientEmail(q);
@@ -264,15 +264,15 @@ function treatmentCertificateCard(q) {
   // What the certificate would go without, said before it's emailed.
   const missing = treatmentRecordGaps(t).filter(Boolean).map(g => g.missing);
   return `<div class="qp-cert ${given ? 'sent' : ''}">
-      <div class="qp-cert-title">${many ? 'Treatment and installation certificates' : 'Treatment certificate'}</div>
+      <div class="qp-cert-title">Treatment certificate</div>
       <p class="qp-cert-text">${escapeHtml(status)}</p>
-      ${missing.length ? `<div class="qp-cert-gaps"><span>The certificate${many ? 's don\'t' : ' doesn\'t'} say ${escapeHtml(joinWithAnd(missing))} yet.</span>${isReportLocked() ? '' : `<button type="button" class="quote-link-btn" onclick="openTreatmentRecord()">Add ${missing.length === 1 ? 'it' : 'them'}</button>`}</div>` : ''}
+      ${missing.length ? `<div class="qp-cert-gaps"><span>The certificate doesn't say ${escapeHtml(joinWithAnd(missing))} yet.</span>${isReportLocked() ? '' : `<button type="button" class="quote-link-btn" onclick="openTreatmentRecord()">Add ${missing.length === 1 ? 'it' : 'them'}</button>`}</div>` : ''}
       ${treatmentReportFor(q).propertyState === 'QLD' ? '<div class="quote-answer-note">In Queensland, email alone isn\'t enough: also hand the client a printed copy, or leave one in their letterbox.</div>' : ''}
       <div class="qp-cert-actions">
         <button type="button" class="${given ? 'quote-link-btn' : 'quote-btn primary'} qp-cert-email" onclick="emailTreatmentCertificate()">${q.certificateSentAt ? 'Email again' : q.certificateHandedAt ? 'Email a copy' : `Email${first ? ' to ' + escapeHtml(first) : ''}`}</button>
         <button type="button" class="quote-link-btn" onclick="downloadTreatmentCertificate()">PDF</button>
       </div>
-      ${given ? '' : `<button type="button" class="qp-cert-handed" onclick="markCertificateHanded()">Handed ${many ? 'them' : 'it'} over in person? <span>Mark as given</span></button>`}
+      ${given ? '' : `<button type="button" class="qp-cert-handed" onclick="markCertificateHanded()">Handed it over in person? <span>Mark as given</span></button>`}
     </div>`;
 }
 
@@ -899,25 +899,16 @@ function saveTreatmentRecord() {
 }
 
 // ── CERTIFICATE PDF ──
-// The card's PDF button: the treatment certificate, with the installation
-// certificate joined behind it when a system went in.
+// The card's PDF button.
 function downloadTreatmentCertificate() {
   const q = quoteState;
   if (!q || !q.treatment) return;
-  const both = installedSystems(q.treatment).length > 0;
-  const name = both ? 'Treatment and installation certificates' : 'Treatment certificate';
   ensureJsPDFLoaded()
-    .then(async () => {
-      const cert = await buildTreatmentCertificatePDF(q);
-      if (!both) return cert;
-      const lib = await ensurePdfLibLoaded();
-      const joined = await joinPdfs(lib, [cert.blob, (await buildTreatmentCertificatePDF(q, { install: true })).blob]);
-      return { blob: new Blob([await joined.save()], { type: 'application/pdf' }), fname: cert.fname.replace(/^Treatment_Certificate_/, 'Certificates_') };
-    })
-    .then(({ blob, fname }) => { track('certificate_pdf_made', { install: both }); return deliverPdfBlob(blob, fname, {
-      title: name,
-      text: `${name} — ${q.address || 'Property'}`,
-      readyToast: `Certificate${both ? 's' : ''} ready. Choose where to save or send ${both ? 'them' : 'it'}`,
+    .then(() => buildTreatmentCertificatePDF(q))
+    .then(({ blob, fname }) => { track('certificate_pdf_made'); return deliverPdfBlob(blob, fname, {
+      title: 'Treatment certificate',
+      text: `Treatment certificate — ${q.address || 'Property'}`,
+      readyToast: 'Certificate ready. Choose where to save or send it',
     }); })
     .catch(e => {
       console.error('Certificate PDF failed:', e);
@@ -937,26 +928,25 @@ function emailTreatmentCertificate() {
       .catch(e => showToast((e && e.message) || 'Could not load the PDF tools', 'error'));
     return;
   }
-  const install = installedSystems(q.treatment).length > 0;
   sendPdfsToClient({
-    files: [buildTreatmentCertificatePDF(q), ...(install ? [buildTreatmentCertificatePDF(q, { install: true })] : [])],
+    files: [buildTreatmentCertificatePDF(q)],
     to: quoteClientEmail(q),
-    subject: `Termite treatment ${install ? 'and installation certificates' : 'certificate'} — ${q.address || 'your property'}`,
-    body: clientMessage({ client: q.client, address: q.address, docs: install ? 'termite treatment certificate and certificate of installation' : 'termite treatment certificate', signOff: q.treatment.technician }),
+    subject: `Termite treatment certificate — ${q.address || 'your property'}`,
+    body: clientMessage({ client: q.client, address: q.address, docs: 'termite treatment certificate', signOff: q.treatment.technician }),
   }).then(sent => { if (sent) { markCertificateSent(q); track('certificate_sent'); } });
 }
 
-// The treatment certificate, or with install set, the certificate of
-// installation for the barrier or baiting system left in place. Both come
-// from the same treatment record.
-function buildTreatmentCertificatePDF(q, { install = false } = {}) {
+// The treatment certificate. A system left in place (a barrier, bait
+// stations, reticulation) gets its own row, System installed, and its own
+// care lines, on the same certificate.
+function buildTreatmentCertificatePDF(q) {
   const C = PDF_COLORS;
   const t = q.treatment;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = 210, M = 15, CW = W - M * 2, BOTTOM = 281;
   const company = getCompanyDetails();
-  const number = treatmentCertNumber(q, install ? 'IC' : 'TC');
-  const docName = install ? 'Certificate of Installation' : 'Treatment Certificate';
+  const number = treatmentCertNumber(q);
+  const docName = 'Treatment Certificate';
   const systems = installedSystems(t);
   let y = 0;
 
@@ -1007,13 +997,13 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     y += h + 1;
   };
 
-  y = drawPdfDocCover(doc, company, { compact: true, kicker: install ? 'Termite management system' : 'Termite management', title: docName, date: formatLongDate(t.date), left: [
+  y = drawPdfDocCover(doc, company, { compact: true, kicker: 'Termite management', title: docName, date: formatLongDate(t.date), left: [
     ['CLIENT', q.client || 'Not specified'],
     ['PROPERTY ADDRESS', q.address || 'Not specified'],
     ['CONTACT', [q.clientPhone, q.clientEmail].map(v => (v || '').trim()).filter(Boolean).join('  ·  ')],
   ], right: [
     ['CERTIFICATE NO.', number],
-    [install ? 'INSTALLATION DATE' : 'TREATMENT DATE', formatLongDate(t.date) + (t.start ? `, ${formatClockTime(t.start)}${t.finish ? ` to ${formatClockTime(t.finish)}` : ''}` : '')],
+    ['TREATMENT DATE', formatLongDate(t.date) + (t.start ? `, ${formatClockTime(t.start)}${t.finish ? ` to ${formatClockTime(t.finish)}` : ''}` : '')],
     ['TECHNICIAN', t.technician],
     ['LICENCE NO.', t.licence],
     ['SUPERVISOR', t.supervisor],
@@ -1021,18 +1011,20 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   ] });
 
   // ── WHAT WAS DONE ──
-  section(install ? 'SYSTEM INSTALLED' : 'TREATMENT CARRIED OUT');
+  section('TREATMENT CARRIED OUT');
   // Pest, equipment and weather in a row of small labelled cells.
   // A species qualifier ("not identified, further investigation required")
   // belongs on the inspection report, not on a certificate for work done.
   const pest = (t.pest || '').replace(/\s*\([^)]*(not identified|further investigation)[^)]*\)/gi, '').trim();
   cellRow([['Target pest', pest], ['Equipment', t.equipment], ['Weather', t.weather]]);
+  // What each method says, with its quantity.
+  const methodText = (key, qty) => { const m = TREATMENT_METHODS[key]; return m ? m.label + (m.qty && qty ? `, ${qty} ${m.qty}` : '') : ''; };
+  // One line for each method. A system left in place has its own row
+  // below instead, so nothing is said twice.
   Object.entries(t.methods || {}).forEach(([key, qty]) => {
-    const m = TREATMENT_METHODS[key];
-    if (!m || (install && !systems.includes(key))) return;
+    if (systems.includes(key) || !TREATMENT_METHODS[key]) return;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-    const text = m.label + (m.qty && qty ? `, ${qty} ${m.qty}` : '');
-    const lines = doc.splitTextToSize(text, CW - 6);
+    const lines = doc.splitTextToSize(methodText(key, qty), CW - 6);
     ensure(lines.length * 4.4 + 2);
     doc.setFillColor(...C.accent); doc.circle(M + 1.6, y - 1.1, 0.8, 'F');
     doc.setTextColor(...C.ink); doc.text(lines, M + 5, y);
@@ -1042,8 +1034,15 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   // Where, in the same row style.
   // A drawn plan prints on the last page; the row says so.
   const planNote = !sitePlanHasContent(t.plan) ? '' : sitePlanHasSubfloor(t.plan) ? 'Site and subfloor plans on the last pages, with legends' : 'Drawn on the last page, with a legend';
-  if (install) { y += 1.5; cellRow([['Where it was installed', installedSystemAreas(t, treatmentReportFor(q))], ['Areas not covered', t.notTreated], ['Installed to', 'AS 3660.2 and the manufacturer\'s directions'], ['Site plan', planNote]]); }
-  else if (t.areas || t.notTreated || planNote) { y += 1.5; cellRow([['Areas treated', t.areas], ['Areas not treated', t.notTreated], ['Site plan', planNote]]); }
+  if (t.areas || t.notTreated || planNote) { y += 1.5; cellRow([['Areas treated', t.areas], ['Areas not treated', t.notTreated], ['Site plan', planNote]]); }
+
+  // System installed: what stays at the property, and where, when that
+  // isn't every area treated (just above). One row; the closing line says
+  // what it was installed to.
+  if (systems.length) {
+    const where = installedSystemAreas(t, treatmentReportFor(q));
+    y += 1.5; cellRow([['System installed', Object.entries(t.methods).filter(([k]) => systems.includes(k)).map(([k, qty]) => methodText(k, qty)).join('; ')], ['Where it was installed', where !== (t.areas || '') ? where : '']]);
+  }
 
   // ── THE SITE ──
   const site = t.site || {};
@@ -1053,13 +1052,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   }
 
   // ── PRODUCTS ──
-  // The installation certificate lists what went into the system: a
-  // baiting-only system leaves out the foam or dust used on the workings,
-  // and a chemical system leaves out the baits.
-  const isBait = p => BAIT_PRODUCT_RE.test(`${p.name || ''} ${p.active || ''}`);
-  const baitOnly = systems.length && systems.every(k => k === 'bait');
-  const products = (t.products || []).filter(p => p.name || p.active)
-    .filter(p => !install || !systems.length || (baitOnly ? isBait(p) : !isBait(p) || systems.includes('bait')));
+  const products = (t.products || []).filter(p => p.name || p.active);
   if (products.length) {
     section('PRODUCTS APPLIED');
     // The product cell carries the active constituent on its second line.
@@ -1115,12 +1108,11 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   // (AS 3660.1, NCC 2022 Housing Provisions 3.4.3) in a grid, with a hand-drawn plan beside it
   // when there's no drawn one.
   const sketch = !drawn && t.sketch;
-  section(sketch ? 'DURABLE NOTICE AND SITE PLAN' : 'DURABLE NOTICE');
   const planW = sketch ? 64 : 0, planH = planW * 0.75;
   const boxW = sketch ? CW - planW - 5 : CW, ncols = sketch ? 2 : 3;
   const cellW = (boxW - 8 - (ncols - 1) * 5) / ncols;
   // The notice names the system left in place; a spot treatment isn't one.
-  const methodNames = Object.keys(t.methods || {}).filter(k => !(install || systems.length) || systems.includes(k) || k === 'topup').map(k => TREATMENT_METHODS[k] && TREATMENT_METHODS[k].label).filter(Boolean);
+  const methodNames = Object.keys(t.methods || {}).filter(k => !systems.length || systems.includes(k) || k === 'topup').map(k => TREATMENT_METHODS[k] && TREATMENT_METHODS[k].label).filter(Boolean);
   // Chemical life only when a chemical was applied, not on a baiting-only
   // job, and only for the chemicals (not the baits).
   // When a system went in, the notice is about that system: a chemical life
@@ -1149,7 +1141,9 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     rowHs.push(4 + Math.max(...noticeLines.slice(i, i + ncols).map(l => l.length)) * 3.6 + 1.5);
   }
   const boxH = Math.max(4 + rowHs.reduce((a, h) => a + h, 0), planH);
-  ensure(boxH + 2);
+  // The heading goes over with the box, never left at the foot of a page.
+  ensure(9 + boxH + 2);
+  section(sketch ? 'DURABLE NOTICE AND SITE PLAN' : 'DURABLE NOTICE');
   const top = y - 3.5;
   doc.setFillColor(...C.rowAlt); doc.rect(M, top, boxW, boxH, 'F');
   doc.setFillColor(...C.accent); doc.rect(M, top, 0.8, boxH, 'F');
@@ -1171,16 +1165,16 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
 
   // ── NEXT STEPS ──
   const steps = [];
-  if (install) {
-    // What keeps the installed system working.
-    if (systems.includes('barrier')) steps.push('The barrier only works while the treated soil stays unbroken. Do not dig, pave, build or garden against the house without asking us first.');
-    if (systems.includes('bait')) steps.push('The bait stations need checking as often as the manufacturer directs. Do not move, cover or remove them.');
-    if (systems.includes('retic')) steps.push('The reticulation system needs recharging when the label\'s life runs out. Keep its filling points clear and don\'t cut or dig through the pipes.');
-    if (systems.includes('physical')) steps.push('The physical barrier only works while it stays whole and visible. Do not cover, cut or build over it.');
-  } else if (t.cautions) steps.push(`Safety and re-entry: ${String(t.cautions).trim().replace(/[.;,\s]*$/, '.')}`);
+  if (t.cautions) steps.push(`Safety and re-entry: ${String(t.cautions).trim().replace(/[.;,\s]*$/, '.')}`);
+  // What keeps a system left in place working.
+  if (systems.includes('barrier')) steps.push('The barrier only works while the treated soil stays unbroken. Do not dig, pave, build or garden against the house without asking us first.');
+  if (systems.includes('bait')) steps.push('The bait stations need checking as often as the manufacturer directs. Do not move, cover or remove them.');
+  if (systems.includes('retic')) steps.push('The reticulation system needs recharging when the label\'s life runs out. Keep its filling points clear and don\'t cut or dig through the pipes.');
+  if (systems.includes('physical')) steps.push('The physical barrier only works while it stays whole and visible. Do not cover, cut or build over it.');
   if (t.nextInspection) steps.push(`Book your next timber pest inspection by ${formatLongDate(t.nextInspection)}. AS 3660.2 recommends one at least every 12 months.`);
-  // Three short points, so the signature stays on page 1.
-  steps.push((!install && ['barrier', 'retic'].some(k => (t.methods || {})[k] !== undefined) ? 'Do not dig or build against the treated soil without asking us. ' : '') +
+  // Short points, so the signature can stay on page 1. Treated soil is
+  // said once: the barrier's own line already covers it.
+  steps.push((systems.includes('retic') && !systems.includes('barrier') ? 'Do not dig or build against the treated soil without asking us. ' : '') +
     'Keep weep holes clear and leaks fixed, and call us if you see termites or mud leads.');
   // The list stays together, so it never starts at the foot of a page.
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
@@ -1188,8 +1182,8 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   const stepsH = 12 + stepLines.reduce((a, l) => a + l.length * 3.9 + 0.8, 0);
   // The closing words under the signature, measured now so the sign-off
   // can keep them with it.
-  const closing = install
-    ? 'The system above was installed by this technician in line with the manufacturer\'s directions, the product label and AS 3660.2. It does not repair existing damage, and no system can guarantee termites will never return. Regular inspections are the best protection.'
+  const closing = systems.length
+    ? 'The treatment above was carried out, and the system installed, by this technician in line with the manufacturer\'s directions, the product label and AS 3660.2. Neither repairs existing damage, and no treatment or system can guarantee termites will never return. Regular inspections are the best protection.'
     : 'The treatment above was carried out by this technician in line with the product label directions and AS 3660.2. It does not repair existing damage, and no treatment can guarantee termites will never return. Regular inspections are the best protection.';
   doc.setFontSize(7);
   const signOffH = (t.supervisor ? 36 : 31) + doc.splitTextToSize(closing, CW).length * 3.2;
@@ -1200,7 +1194,7 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   // it, so page 2 never holds a signature on its own.
   if (y + stepsH + notesH + signOffH > BOTTOM && 26 + stepsH + notesH + signOffH <= BOTTOM) ensure(BOTTOM);
   ensure(stepsH);
-  section(install ? 'LOOKING AFTER THE SYSTEM' : 'KEEPING THE PROPERTY PROTECTED');
+  section('KEEPING THE PROPERTY PROTECTED');
   stepLines.forEach((lines, i) => {
     ensure(lines.length * 3.9 + 2);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...C.accentDark);
@@ -1255,6 +1249,6 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
     drawSitePlanLegendPdf(doc, t.plan, { x: M, y, w: CW, layer: 'sub' });
   }
 
-  drawPdfDocFooters(doc, `${install ? 'Installation certificate' : 'Certificate'} ${number}${company.name ? `  ·  ${company.name}` : ''}`, q.reportKey);
-  return { blob: doc.output('blob'), fname: pdfFileName(install ? 'Installation Certificate' : 'Treatment Certificate', q.address, { ref: number }) };
+  drawPdfDocFooters(doc, `Certificate ${number}${company.name ? `  ·  ${company.name}` : ''}`, q.reportKey);
+  return { blob: doc.output('blob'), fname: pdfFileName('Treatment Certificate', q.address, { ref: number }) };
 }

@@ -7,7 +7,7 @@
 // (reportData.sitePlan: the building, what couldn't be reached, what was
 // found; it prints in the report's Areas Inspected), and the treatment
 // record starts from a copy of it and adds the treatment and the stations
-// (q.treatment.plan, which the certificates and bait visits print). Each
+// (q.treatment.plan, which the certificate and bait visits print). Each
 // document keeps the plan it went out with. Either one is
 // { v: 1, north: 0..7 (steps of 45°), items: [
 //   { id, k: symbol key, x, y } for a point,

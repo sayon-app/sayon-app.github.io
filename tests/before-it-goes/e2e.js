@@ -166,7 +166,7 @@ const emails = [];
   });
   await p.waitForTimeout(500);
   const cert = await p.evaluate(() => { const el = document.querySelector('#jobOverlay .job-fold[data-step="treatment"] .qp-cert-gaps'); return el ? el.innerText.replace(/\s+/g, ' ') : ''; });
-  check(/The certificates? (doesn't|don't) say the product used and the next inspection date yet\. Add them/.test(cert), 'the certificate card says what the certificate would go without: ' + cert);
+  check(/The certificate doesn't say the product used and the next inspection date yet\. Add them/.test(cert), 'the certificate card says what the certificate would go without: ' + cert);
   await p.evaluate(() => document.querySelector('#jobOverlay .job-fold[data-step="treatment"] .qp-cert').scrollIntoView({ block: 'center' })); await p.screenshot({ path: `${OUT}/5-certificate-gaps.png` });
   await p.evaluate(() => { quoteState.treatment.products = [{ name: 'Termidor HE' }]; quoteState.treatment.nextInspection = '2027-11-10'; persistQuote(); renderQuoteProgress(); }); await p.waitForTimeout(300);
   check(await p.evaluate(() => !document.querySelector('.qp-cert-gaps')), 'and nothing once the record is whole');

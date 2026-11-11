@@ -135,14 +135,16 @@ Closing line 9010: "This report must be read in its entirety…"
 - TERMS & NOTES (1072). Default `QUOTE_DEFAULT_NOTES` 40–42: "…licensed pest technician in accordance with AS 3660.2-2017 and the product label directions. Treatment does not repair existing timber damage."
 - ACCEPTANCE (1088–1092): "I accept this quote of {total} (inc GST) and authorise the work described above." The in-app version is at quote.js:654–655.
 
-**Treatment certificate — `buildTreatmentCertificatePDF`, js/treatment.js:426–671**
+**Treatment certificate — `buildTreatmentCertificatePDF`, js/treatment.js:942–1254**
 
-- Cover "TERMITE MANAGEMENT / TREATMENT CERTIFICATE" (470–481).
-- TREATMENT CARRIED OUT (484), PRODUCTS APPLIED (536).
-- DURABLE NOTICE (AND SITE PLAN) (580). Notice cells 587–594: System, Date installed, Chemical life (label), "Future inspections… at least every 12 months", Installed by, Notice. Notice options at 47–51.
-- KEEPING THE PROPERTY PROTECTED (633). Steps 624–628, including "AS 3660.2 recommends one at least every 12 months" and "Do not disturb the treated soil…". Default cautions 136–137. Optional warranty text at 643.
-- Closing line 665: "…carried out… in line with the product label directions and AS 3660.2. It does not repair existing damage, and no treatment can guarantee termites will never return…"
-- On Queensland jobs the inspector sees a reminder to also leave a printed copy (161).
+One certificate for every job. Since 2026-11-11 there is no separate certificate of installation: a system left in place has its own row on this one.
+- Cover "TERMITE MANAGEMENT / TREATMENT CERTIFICATE" (1000).
+- TREATMENT CARRIED OUT (1014): the methods that aren't a system left in place, then Areas treated, then a System installed row when a barrier, bait stations, reticulation or a physical barrier went in (1042): those methods with their quantities, and "Where it was installed" (left out when it's every area treated).
+- PRODUCTS APPLIED (1057).
+- DURABLE NOTICE (AND SITE PLAN) (1146). Notice cells from 1129: System, Date installed, Life expectancy, "Future inspections… at least every 12 months", Installed by, Notice. Notice options at 62.
+- KEEPING THE PROPERTY PROTECTED (1197): the safety and re-entry line, a care line for each system left in place ("The barrier only works while the treated soil stays unbroken…", "The bait stations need checking…"), the next inspection with "AS 3660.2 recommends one at least every 12 months", and weep holes and leaks.
+- Closing line (1185): "The treatment above was carried out by this technician in line with the product label directions and AS 3660.2…", or with a system "The treatment above was carried out, and the system installed, by this technician in line with the manufacturer's directions, the product label and AS 3660.2. Neither repairs existing damage…"
+- On Queensland jobs the inspector sees a reminder to also leave a printed copy (270).
 
 ## 5. Earlier reviews (do not redo)
 

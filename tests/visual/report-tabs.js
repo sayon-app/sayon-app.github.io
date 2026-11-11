@@ -4,7 +4,7 @@
 // sections as one image. Prints any section that runs past its card.
 // CHECKS=1 then taps through the parts the 2026-11-07 refresh restyled
 // (finding cards, Add another finding, a finding's bin, the area prompt on
-// Findings, moisture readings, Clear on the signature) and checks each tap
+// Findings, moisture readings, Sign again on the signature) and checks each tap
 // lands in the report; a FAIL line means a check failed.
 // node report-tabs.js <outDir> [w] [scenario] [steps]  (serve the repo on :8765)
 // MODES=light,dark adds dark shots; TS=xl shoots at Extra large text.
@@ -97,16 +97,16 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
     check(await rows() === r0 + 1, 'Add a reading adds a row');
     await p.locator('#moistureTableRows .moisture-row').last().locator('.photo-remove-btn').click(); await p.waitForTimeout(200);
     check(await rows() === r0, 'a reading\'s bin removes it');
-    // Sign-off: draw, then Clear.
+    // Sign-off: draw, then Sign again.
     await p.evaluate(() => goStep('finish')); await p.waitForTimeout(400);
     const pad = p.locator('#sigCanvasInspector'); await pad.scrollIntoViewIfNeeded();
     const bx = await pad.boundingBox();
     await p.mouse.move(bx.x + 30, bx.y + 40); await p.mouse.down(); await p.mouse.move(bx.x + 150, bx.y + 80, { steps: 8 }); await p.mouse.move(bx.x + 240, bx.y + 50, { steps: 8 }); await p.mouse.up();
     await p.waitForTimeout(300);
     const signed = await p.evaluate(() => document.getElementById('sigStatusInspector').textContent);
-    await p.locator('#section-signoff .signature-clear-btn', { hasText: 'Clear' }).click(); await p.waitForTimeout(300);
+    await p.locator('#section-signoff .signature-clear-btn', { hasText: 'Sign again' }).click(); await p.waitForTimeout(300);
     const cleared = await p.evaluate(() => document.getElementById('sigStatusInspector').textContent);
-    check(!/not/i.test(signed) && /not/i.test(cleared), `Clear clears the signature (${signed} → ${cleared})`);
+    check(!/not/i.test(signed) && /not/i.test(cleared), `Sign again empties the signature (${signed} → ${cleared})`);
   }
   console.log(errs.length ? 'errors: ' + errs.join(' | ') : 'no page errors');
   if (errs.length) fails++;

@@ -1,5 +1,6 @@
 // The client link, end to end, against canned Supabase and Worker routes:
-//   1. the quote screen's Send makes the link, uploads the PDFs and emails
+//   1. the quote screen's Send opens the check sheet, which makes the link,
+//      uploads the PDFs and, on its button, emails
 //      the quote with the link in the message;
 //   2. the report's Check-before-sending sheet reuses that link;
 //   3. the client opens sign.html, reads the quote and accepts with a
@@ -68,7 +69,11 @@ async function backend(ctx) {
   await p.waitForTimeout(2000);
 
   // 1. Send from the quote screen.
-  await p.evaluate(() => { quoteState.clientEmail = 'sam@example.com'; persistQuote(); emailQuoteToClient(); });
+  await p.evaluate(() => { quoteState.clientEmail = 'sam@example.com'; persistQuote(); openQuoteSendReview(); });
+  // Send opens the check before sending; its button is what sends.
+  await p.waitForFunction(() => sendReview && sendReview.kind === 'quote', null, { timeout: 60000 });
+  check(await p.evaluate(() => !quoteState.sentAt) && emails.length === 0, 'quote Send opens the check first: nothing has gone yet');
+  await p.evaluate(() => { confirmSendReview(); });
   await p.waitForFunction(() => quoteState && quoteState.sentAt, null, { timeout: 60000 });
   await p.waitForTimeout(600);
   const q1 = await p.evaluate(() => ({ link: quoteState.linkRequest, sentAt: quoteState.sentAt, hash: quoteContentHash(quoteState), client: quoteState.client }));
@@ -80,12 +85,13 @@ async function backend(ctx) {
   check(emails.length === 1 && emails[0].text.includes(`sign.html?id=${q1.link.id}`), 'email carries the link');
   check(emails[0] && emails[0].attachments.length === 1, 'email carries the quote PDF');
   check(q1.link.hash === q1.hash, 'link is for this version of the quote');
-  await p.evaluate(() => { document.querySelector('#quoteScreen .quote-scroll').scrollTo(0, 1e6); });
   await p.waitForTimeout(400);
+  const after1 = await p.evaluate(() => ({ place: navPlace(), next: (document.querySelector('#jobOverlay .job-next') || {}).innerText || '', quote: ([...document.querySelectorAll('#jobOverlay .job-step')].find(b => /quote/.test(b.getAttribute('onclick') || '')) || {}).innerText || '' }));
+  check(after1.place === 'job' && /sent/i.test(after1.quote), 'once it has gone, the app is on This job, which says the quote is sent: ' + JSON.stringify(after1).replace(/\\n/g, ' | ').slice(0, 300));
   await p.screenshot({ path: `${OUT}/1-quote-link-sent.png`, fullPage: false });
 
   // 2. The report's check sheet reuses the link.
-  await p.evaluate(() => { closeQuote(); openSendReview(); });
+  await p.evaluate(() => { closeJobPage(); openSendReview(); });
   await p.waitForFunction(() => sendReview && sendReview.link, null, { timeout: 60000 });
   await p.waitForTimeout(400);
   const sheet = await p.evaluate(() => ({ link: sendReview.link, body: document.getElementById('sendReviewBody').value, files: document.getElementById('sendReviewFiles').innerText }));
@@ -135,15 +141,19 @@ async function backend(ctx) {
   check(/Quote declined/.test(await c.evaluate(() => document.body.innerText)) && /Going with another company/.test(await c.evaluate(() => document.body.innerText)), 'reopening a declined link shows the note');
 
   // 4. The app reads the answer back.
-  await p.evaluate(() => { openQuoteFromReport(); });
-  await p.waitForTimeout(1500);
-  await p.evaluate(() => checkQuoteLink(quoteState, true));
+  // On This job, where a quote out on a link waits: its Next step card has Check now.
+  await p.evaluate(() => { quoteLinkChecked[currentJobQuote().linkRequest.id] = Date.now(); tabGo('job'); });
+  await p.waitForTimeout(800);
+  const waiting = await p.evaluate(() => ({ place: navPlace(), next: document.querySelector('#jobOverlay .job-next').innerText.replace(/\s+/g, ' '), filled: !!document.querySelector('#jobOverlay .job-next .quote-btn.primary') }));
+  check(waiting.place === 'job' && /Check now/.test(waiting.next) && /Share the link/.test(waiting.next) && /Accepted/.test(waiting.next) && /Declined/.test(waiting.next) && !waiting.filled, 'This job waits on the link, with Check now, Share the link and the two answers: ' + waiting.next.slice(0, 160));
+  await p.locator('#jobOverlay .job-next .quote-text-btn', { hasText: 'Check now' }).click();
   await p.waitForFunction(() => quoteState && quoteState.answer, null, { timeout: 10000 });
-  const ans = await p.evaluate(() => ({ a: quoteState.answer, link: quoteState.linkRequest, stale: quoteAnswerState(quoteState).stale, step: document.getElementById('qgStep3').innerText }));
+  await p.waitForTimeout(400);
+  const ans = await p.evaluate(() => { const f = document.querySelector('#jobOverlay .job-fold[data-step="answer"]'); f.open = true; return { a: quoteState.answer, link: quoteState.linkRequest, stale: quoteAnswerState(quoteState).stale, step: f.innerText }; });
   check(ans.a.status === 'accepted' && ans.a.method === 'link' && ans.a.by === q1.client && /^data:image\/png/.test(ans.a.signature), 'quote holds the accepted answer with the signature');
   check(!ans.link && !ans.stale, 'link request is cleared and the answer is current');
   check(/Accepted/.test(ans.step) && /from the link/.test(ans.step), 'answer step shows it');
-  await p.evaluate(() => { document.querySelector('#quoteScreen .quote-scroll').scrollTo(0, 1e6); });
+  await p.evaluate(() => document.querySelector('#jobOverlay .job-fold[data-step="answer"]').scrollIntoView({ block: 'center' }));
   await p.waitForTimeout(400);
   await p.screenshot({ path: `${OUT}/7-quote-accepted-in-app.png`, fullPage: false });
   const pdf = await p.evaluate(async () => { const { blob } = buildQuotePDF(quoteState); const buf = new Uint8Array(await blob.arrayBuffer()); let s = ''; for (let i = 0; i < buf.length; i += 32768) s += String.fromCharCode.apply(null, buf.subarray(i, i + 32768)); return btoa(s); });
@@ -152,7 +162,7 @@ async function backend(ctx) {
   // A changed quote needs a new link: the old one is cancelled.
   await p.evaluate(() => { quoteState.items[0].price = String(parseFloat(quoteState.items[0].price) + 10); delete quoteState.answer; quoteState.linkRequest = { id: Object.keys({})[0] }; });
   const oldId = q1.link.id; rows[oldId].status = 'pending';
-  await p.evaluate((id) => { quoteState.linkRequest = { id, sentAt: 1, hash: 'old' }; persistQuote(); emailQuoteToClient(); }, oldId);
+  await p.evaluate((id) => { quoteState.linkRequest = { id, sentAt: 1, hash: 'old' }; persistQuote(); openQuoteSendReview(); }, oldId);
   await p.waitForFunction((id) => quoteState.linkRequest && quoteState.linkRequest.id !== id, oldId, { timeout: 60000 });
   await p.waitForTimeout(500);
   check(rows[oldId].status === 'cancelled', 'a changed quote cancels the old link');

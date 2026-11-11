@@ -37,7 +37,9 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
     more: document.getElementById('findingsMore').hidden ? '' : document.getElementById('findingsMore').innerText.replace(/\s+/g, ' ').trim(),
     adds: [...document.querySelectorAll('#findingsMore .findings-more-btn')].map(x => x.textContent.trim()),
     prompts: document.getElementById('findingsFromAreas').hidden ? [] : [...document.querySelectorAll('#findingsFromAreas .area-finding-prompt')].map(e => e.textContent.replace(/\s+/g, ' ').trim()),
-    quick: document.getElementById('nothingFound-findings').hidden ? '' : document.querySelector('#nothingFound-findings strong').textContent,
+    // The quick fill, wherever it is: in the "Not answered yet" box, or at the top once that box isn't asking.
+    quick: [...document.querySelectorAll('#nothingFound-findings, #findingsMore .findings-more-none')].filter(x => x.getBoundingClientRect().height > 0).map(x => x.querySelector('strong').textContent).join(' + '),
+    quickAt: [...document.querySelectorAll('#nothingFound-findings, #findingsMore .findings-more-none')].filter(x => x.getBoundingClientRect().height > 0).map(x => x.id ? 'top' : 'box').join(' + '),
     badges: [...document.querySelectorAll('#findingsList .finding-card-header')].map(h => (h.querySelector('.finding-tile-num') || {}).textContent || ''),
     badgeBgs: [...document.querySelectorAll('#findingsList .finding-tile-num')].map(n => getComputedStyle(n).backgroundColor),
     pill: (() => { const c = document.querySelector('#fg-termites .fgroup-count'); return c && !c.hidden ? c.textContent : ''; })(),
@@ -61,11 +63,11 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   let s = await state();
   check(s.shown.length === 0, 'a fresh report shows no Findings groups: ' + JSON.stringify(s.shown));
   check(/Not answered yet: termites, borers, rot and delignification/.test(s.more) && s.adds.join(',') === 'Termites,Borers,Timber decay' && s.prev, 'the box says what is not answered and offers all three; Previous treatment still shows: ' + s.more + ' | ' + s.adds);
-  check(s.quick === 'No timber pests found', 'the quick fill still reads "No timber pests found": ' + s.quick);
+  check(s.quick === 'No timber pests found' && s.quickAt === 'box' && !/at the top/.test(s.more), 'the quick fill reads "No timber pests found" and is in the box that asks, not above it: ' + JSON.stringify([s.quick, s.quickAt]));
   await shoot('1-fresh');
 
   // 2. "No timber pests found": all answered none, still out of sight.
-  await p.locator('#nothingFound-findings').click(); await p.waitForTimeout(500);
+  await p.locator('#findingsMore .findings-more-none').click(); await p.waitForTimeout(500);
   s = await state();
   check(s.shown.length === 0 && /No termites, borers, rot or delignification found/.test(s.more) && s.rd.borer === 'NONE' && s.rd.decay === 'NO' && s.rd.delig === 'NO' && s.rd.termites.join() === 'NONE', 'the quick fill answers all none and they stay out of sight: ' + JSON.stringify(s));
   check(s.sts === 'Complete', 'Findings reads Complete: ' + s.sts);
@@ -117,7 +119,7 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   fs.writeFileSync(`${OUT}/report-areas-clear.pdf`, Buffer.from(pdf, 'base64'));
   const text = execFileSync('pdftotext', ['-layout', `${OUT}/report-areas-clear.pdf`, '-']).toString().replace(/\s+/g, ' ');
   const findingsText = text.slice(text.lastIndexOf('FINDINGS'), text.lastIndexOf('PREVIOUS TERMITE TREATMENT') + 200);
-  check(/Termite Activity\s+Not recorded/i.test(findingsText) === false && /NO ACTIVITY FOUND/.test(findingsText), 'the PDF prints the termite finding as no activity found');
+  check(/Termite Activity\s+NONE/i.test(findingsText) && !/TERMITE FINDING 1|NO ACTIVITY FOUND|NEST FOUND\?\s+NOT RECORDED/i.test(findingsText), 'the PDF prints no termites as one row, with no numbered card and no nest question');
   check(/Borers of Seasoned Timber\s+NONE/i.test(findingsText) && /Wood Decay Fungi \(Rot\)\s+NO\b/i.test(findingsText) && /Chemical Delignification\s+NO\b/i.test(findingsText), 'the PDF prints borers NONE, rot NO and delignification NO');
 
   // 5. An area changed to evidence found takes those answers back and asks what it was.
@@ -135,7 +137,7 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   s = await state();
   const borer2 = await p.evaluate(() => ({ cards: getBorerFindings().map(b => ({ act: b.borerActivity || '', loc: b.location || '' })), shown: shownBorerFindings().length }));
   check(borer2.cards[0].act === 'ACTIVE' && borer2.shown === 1 && !s.prompts.length, 'picking Active fills in the subfloor card and the prompt goes: ' + JSON.stringify([borer2, s.prompts]));
-  check(s.quick === 'Nothing else found' && /Not answered yet: termites, rot and delignification/.test(s.more), 'the quick fill reads "Nothing else found" and the rest wait: ' + JSON.stringify([s.quick, s.more]));
+  check(s.quick === 'Nothing else found' && s.quickAt === 'box' && /Not answered yet: termites, rot and delignification/.test(s.more), 'the quick fill reads "Nothing else found" and the rest wait: ' + JSON.stringify([s.quick, s.quickAt, s.more]));
   await shoot('6-borers-written-up');
   // Rot in the roof void.
   await markAreas({ ...allClear, subfloor: 'FOUND', roofvoid: 'FOUND' }); await p.waitForTimeout(400);

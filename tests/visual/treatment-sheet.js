@@ -22,7 +22,7 @@ const sc = require('./scenarios.js').find(s => s.name === 'standard');
     await populateFields(sc.fields); saveCurrentReport(true); openQuoteFromReport();
     quoteState.items = [newQuoteItem('bait_install', { qty: '12' }), newQuoteItem('bait_monitor')];
     quoteState.answer = { status: 'accepted', by: 'Sam Taylor', date: todayIsoDate(), method: 'signed', note: '', at: Date.now(), hash: quoteContentHash(quoteState) };
-    persistQuote(); storeQuoteOnReport(quoteState, false); renderQuoteAnswer();
+    persistQuote(); storeQuoteOnReport(quoteState, false); renderQuoteProgress();
   }, { sc });
   for (const mode of ['light', 'dark']) {
     await p.evaluate(m => { document.body.classList.toggle('dark-screen', m === 'dark'); closeTreatmentRecord(); openTreatmentRecord(); }, mode);

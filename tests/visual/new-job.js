@@ -80,11 +80,12 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   await p.evaluate(() => document.getElementById('jobDetailsHead').scrollIntoView({ block: 'start' }));
   await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/5-details-light.png` });
 
-  // A new job with no address: Open the agreement asks for one first.
-  await p.locator('#jobOverlay .topbar-new').click(); await p.waitForTimeout(600);
+  // A new job with no address: Sign on this phone asks for one first.
+  await p.evaluate(() => tabGo('dashboard')); await p.waitForTimeout(500);
+  await p.locator('#dashboardOverlay .topbar-new').click(); await p.waitForTimeout(600);
   await p.locator('#jobPageBody .job-next-new .dash-detail-primary').click(); await p.waitForTimeout(500);
   const asked = await p.evaluate(() => ({ focus: document.activeElement && document.activeElement.id, toast: document.getElementById('toast').textContent.trim(), agreement: document.getElementById('agreementOverlay').classList.contains('open') }));
-  check(asked.focus === 'jobAddress' && /address/.test(asked.toast) && !asked.agreement, 'Open the agreement with no address asks for it: ' + JSON.stringify(asked));
+  check(asked.focus === 'jobAddress' && /address/.test(asked.toast) && !asked.agreement, 'Sign on this phone with no address asks for it: ' + JSON.stringify(asked));
 
   // The postcode fills the state, but not over one picked by hand.
   await p.locator('#jobAddress').fill('3 Elm Court'); await p.keyboard.press('Escape');
@@ -96,7 +97,7 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   check(act === 'ACT' && kept === 'NSW', `postcode 2600 fills ACT (${act}); a state picked by hand stays (${kept})`);
 
   // Save it for later: a job booked ahead goes onto the Jobs list.
-  await p.locator('#jobPageBody .job-next-new .dash-detail-links button').click(); await p.waitForTimeout(700);
+  await p.locator('#jobPageBody .job-next-new .job-next-later button').click(); await p.waitForTimeout(700);
   const later = await p.evaluate(() => ({ jobs: document.getElementById('dashboardOverlay').classList.contains('open'), listed: [...document.querySelectorAll('#dashboardBody .dash-card')].some(c => /Elm Court/.test(c.textContent)) }));
   check(later.jobs && later.listed, 'Save it for later puts the job on the Jobs list: ' + JSON.stringify(later));
 

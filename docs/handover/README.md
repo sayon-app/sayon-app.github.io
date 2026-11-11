@@ -17,7 +17,7 @@ For an AI model taking over this repo with no context. Last checked 2026-10-05: 
   3. Quote
   4. The client's answer (signed on the phone, or recorded as by email, by phone or on paper), printed on the quote PDF
   5. Treatment record and a one-page certificate
-- **Deliberately cut:** invoices, dashboard follow-ups, office job assigning and schedule, treatment booking, the label calculator, and the Company details menu page (business details are entered at sign-up and edited under account menu › Your business). Don't rebuild them: field-service and accounting apps do them better. **Team came back** in a small form for the per-inspector Team and Business plans: account menu › Your team, where the owner invites by email (supabase/team-seats.sql, tests/team-seats).
+- **Deliberately cut:** invoices, dashboard follow-ups, office job assigning and schedule, treatment booking, and the label calculator. Don't rebuild them: field-service and accounting apps do them better. **Team came back** in a small form for the per-inspector Team and Business plans: Menu › Your team, where the owner invites by email (supabase/team-seats.sql, tests/team-seats).
 - **Later, not now:** one generic job-in, report-out format so SAYON works alongside field-service apps, with no per-vendor links. Don't start it.
 
 ## 2. Working with baz
@@ -47,13 +47,14 @@ For an AI model taking over this repo with no context. Last checked 2026-10-05: 
 
 ### Merging is not deploying (the most important rule)
 - Work goes into `main` by PR, which changes nothing live. GitHub Pages publishes the `live` branch.
-- Rulesets: `live` requires a PR and blocks force pushes and deletion; `main` blocks force pushes and deletion. There is no CI (no `.github/workflows`): the checks are your Playwright run and `node --check`.
+- Rulesets: `live` requires a PR and blocks force pushes and deletion; `main` blocks force pushes and deletion. One check runs on each PR into `main` (`.github/workflows/tests.yml`): `node --check` on every script, then `node tests/run-all.js`. A red check is a failing test; the run's Artifacts hold its screenshots and PDFs. Go-live PRs into `live` don't run it. Still run the tests yourself before pushing.
 - `gh pr …` uses GraphQL, which Claude Code sessions block. Use `gh api repos/{owner}/{repo}/pulls…` from the clone, or `list_project_prs`.
 - Go-live, only after baz says "deploy <thing>":
   1. In your thread, post a deploy request: what changes in plain English, plus the merged main PR's "Files changed" link. Wait for "deploy X".
   2. Your session can push to only one branch, and go-live PRs come from it too. Check no PR from it is open, and park unpushed work on another local branch. Then `git fetch origin && git checkout -B <your-branch> origin/live`.
   3. `git cherry-pick -x <sha>…` with the PR's own commits, never the merge commit. List them with `gh api repos/{owner}/{repo}/pulls/<N>/commits -q '.[].sha'` or `git log --no-merges --oneline <merge>^1..<merge>^2`. Example: #72 merged as `e15f1f0`; its commit `3ce4c6c` went live via #73 as `38d4ff0`.
   4. Check: `git diff --name-only origin/live...HEAD` lists only the files you meant to change, and `git grep -nF "[ABN]" HEAD -- terms.html privacy.html` prints nothing.
+     - The website's samples go with the PDFs. If that list has a file that draws a client's PDF (`js/app/pdf.js`, `js/quote.js`, `js/treatment.js`, `js/site-plan.js`), it should have `samples/` in it too: the sign-in screen and the website link to `samples/sample-report.pdf`, `sample-quote.pdf` and `sample-certificate.pdf`, and they are only true while they are made by the code that's live. Remake them on `main` in the PR that changes the PDF (`node docs/handover/samples/make-site-samples.js <jspdfDir> samples`, usage at the top of the script), read the three through, and cherry-pick that commit with the rest.
   5. If a cherry-pick conflicts or a check fails: for `CACHE_VERSION` take the higher of live+1 and the commit's number; if `CLAUDE.md`, `docs/` or `tests/` came along (a grep hit in `docs/` means they did), `git rm -r` them and `git commit --amend`. Keeping docs and tests in separate commits from app changes avoids this.
   6. `git push --force-with-lease origin <your-branch>`, open the PR into `live`, and give baz "GitHub → merge PR #N". Never merge, approve or turn on auto-merge for it yourself.
   7. After he merges, confirm the "pages build and deployment" run on `live` succeeded for the merge commit (section 5). github.io may be unreachable from the sandbox; a failed fetch doesn't mean the deploy failed.

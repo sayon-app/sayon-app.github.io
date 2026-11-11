@@ -1,5 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700;800&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
+/* Hidden means hidden. A part switched off with the hidden mark stays off
+   whatever layout its own rule gives it, so no part needs a rule of its own
+   to obey it. */
+[hidden] { display: none !important; }
+
 :root {
   --bg:        #D6E4EF;
   /* Daylight keeps the intro's look: white cards with a soft blue edge.
@@ -114,8 +119,6 @@ body.dark-screen .risk-medium { background: rgba(255,176,0,0.14);  color: #FFC53
 body.dark-screen .risk-low    { background: rgba(var(--green-rgb),0.14); color: var(--green); border-color: rgba(var(--green-rgb),0.5); }
 body.dark-screen header { background: var(--surface); border-bottom-color: var(--border); box-shadow: none; }
 body.dark-screen .section-tabs { background: var(--surface2); border-bottom-color: var(--border); }
-body.dark-screen .report-header { border-bottom-color: var(--border); }
-body.dark-screen .report-title h2 { color: var(--text); }
 body.dark-screen .report-body { background: var(--bg); }
 body.dark-screen .report-section { border: 3px solid var(--frame); border-radius: 6px; box-shadow: none; }
 body.dark-screen .section-header { background: #000000; border-bottom: 2px solid var(--frame); }
@@ -196,7 +199,6 @@ body.large-touch .mic-fab { width: 68px; height: 68px; }
 body.large-touch .toggle-switch { width: 56px; height: 32px; }
 body.large-touch .toggle-switch::after { width: 28px; height: 28px; }
 body.large-touch .toggle-switch.on::after { transform: translateX(24px); }
-body.large-touch .saved-item-delete { width: 44px; height: 44px; }
 
 /* ── SPLASH SCREEN ── */
 #splash {
@@ -208,7 +210,7 @@ body.large-touch .saved-item-delete { width: 44px; height: 44px; }
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  transition: opacity 0.6s ease;
+  transition: opacity 0.25s ease;
 }
 
 .splash-logo {
@@ -277,8 +279,8 @@ body.large-touch .saved-item-delete { width: 44px; height: 44px; }
 }
 /* The name blends into the dark: bright at the top, melting into blue and
    then the background at the foot of the letters, with a faint reflection
-   below. It drifts in out of a blur, then a light sheen crosses it once.
-   Both fit inside the 2.2s the splash stays up. */
+   below. It drifts in out of a blur, then a light sheen crosses it once,
+   if the sign-in check takes that long (the splash goes when it's done). */
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
   .splash-name {
     color: transparent;
@@ -340,6 +342,9 @@ body.large-touch .saved-item-delete { width: 44px; height: 44px; }
   border-radius: 99px;
 }
 
+/* Only once the sign-in check has taken a second (#splash.waiting, on a
+   weak signal): "Signing in…" under a bar that keeps moving, since how
+   long the signal will take isn't known. */
 .splash-loading {
   margin-top: 36px;
   display: flex;
@@ -347,7 +352,9 @@ body.large-touch .saved-item-delete { width: 44px; height: 44px; }
   align-items: center;
   gap: 10px;
   width: 200px;
+  visibility: hidden;
 }
+#splash.waiting .splash-loading { visibility: visible; }
 
 .splash-progress-track {
   width: 100%;
@@ -359,14 +366,15 @@ body.large-touch .saved-item-delete { width: 44px; height: 44px; }
 
 .splash-progress-fill {
   height: 100%;
-  width: 0%;
+  width: 40%;
   background: linear-gradient(90deg, var(--accent-deep), var(--accent-hi) 70%, var(--pink));
   border-radius: 99px;
-  animation: splashProgress 1.6s cubic-bezier(0.4, 0, 0.2, 1) 0.7s forwards;
+  animation: splashWait 1.3s ease-in-out infinite;
 }
 
-@keyframes splashProgress {
-  to { width: 100%; }
+@keyframes splashWait {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(250%); }
 }
 
 .splash-status {
@@ -408,30 +416,16 @@ body.large-touch .saved-item-delete { width: 44px; height: 44px; }
 .ob-step.active { background: var(--accent-hi); width: 44px; }
 .ob-step.done   { background: rgba(var(--accent-hi-rgb),0.55); }
 .ob-panel { animation: menuFadeIn 0.35s cubic-bezier(0.22,1,0.36,1); }
-/* "Your business" opens the sign-up form over the app (openBusinessForm) */
-#onboardScreen.ob-edit { position: fixed; inset: 0; z-index: 900; }
-#onboardScreen.ob-edit .ob-steps { display: none; }
-#onboardScreen.ob-edit .ob-setup-only, #onboardScreen:not(.ob-edit) .ob-edit-only { display: none; }
-.ob-cancel { text-align: center; width: 100%; margin-top: 4px; }
-.ob-cancel[hidden] { display: none; }
-.ob-demo-box {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px;
-  min-height: 72px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.ob-demo-text {
-  font-size: calc(13px * var(--ts));
-  color: var(--text3);
-  text-align: center;
-  line-height: 1.6;
-  transition: color 0.3s;
-}
-.ob-demo-text.active { color: var(--text); }
+/* The business's boxes (#businessFields) sit on the set-up card and on
+   Menu › Business details, where nothing "can wait". */
+.business-fields { display: flex; flex-direction: column; gap: 16px; width: 100%; }
+#businessPanel .ob-setup-only { display: none; }
+#businessPanel .business-fields { gap: 14px; margin: 12px 0 16px; }
+#businessPanel .auth-label { color: var(--text3); }
+#businessPanel .auth-label-optional { color: var(--text3); }
+#businessPanel .auth-input { background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; color: var(--text); min-height: 48px; }
+#businessPanel .business-save { width: 100%; min-height: 48px; justify-content: center; font-size: calc(14px * var(--ts)); }
+.ob-tip { font-size: calc(12px * var(--ts)); color: var(--text3); line-height: 1.6; margin: 4px 0 0; }
 .ob-checklist { display: flex; flex-direction: column; gap: 10px; }
 .ob-check-item {
   display: flex;
@@ -441,6 +435,7 @@ body.large-touch .saved-item-delete { width: 44px; height: 44px; }
   color: var(--text2);
   line-height: 1.5;
 }
+.ob-check-item strong { color: var(--text); }
 .ob-check-num {
   flex-shrink: 0;
   width: 22px; height: 22px;
@@ -512,204 +507,13 @@ body.large-touch .saved-item-delete { width: 44px; height: 44px; }
 .auth-footer { font-size: calc(12px * var(--ts)); color:rgba(232,240,246,0.6); text-align:center; line-height:1.6; margin:0; }
 .auth-footer a { color:rgba(232,240,246,0.85); text-decoration:underline; text-underline-offset:2px; }
 /* Legal links: a 44px tall tap area without moving the text around them. */
-.auth-footer a, .menu-footer a, .drawer-legal a { display:inline-block; padding:14px 2px; margin:-14px 0; }
+.auth-footer a, .drawer-legal a { display:inline-block; padding:14px 2px; margin:-14px 0; }
 
-/* ── MAIN MENU (platform hub) ── */
-#mainMenu {
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  padding: 40px 20px;
-  background: var(--bg);
-  animation: menuFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
+/* The fade-up the sign-in, set-up and quote screens open with. */
 @keyframes menuFadeIn {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-
-.menu-shell {
-  width: 100%;
-  max-width: 440px;
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-}
-
-.menu-header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  text-align: center;
-}
-
-.menu-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.menu-logo-icon {
-  color: var(--accent2);
-  display: flex;
-  align-items: center;
-  filter: drop-shadow(0 0 12px rgba(var(--accent-rgb),0.5));
-}
-
-.menu-logo-text {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: calc(30px * var(--ts));
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  color: var(--text);
-}
-
-.menu-tagline {
-  font-size: calc(12px * var(--ts));
-  color: var(--text3);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-
-.menu-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.menu-tile {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 18px 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  text-align: left;
-  font-family: 'Inter', sans-serif;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
-  overflow: hidden;
-}
-
-.menu-tile::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(var(--accent-rgb),0.06) 0%, transparent 60%);
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.menu-tile.live {
-  border-color: rgba(var(--accent-rgb), 0.25);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 4px 24px rgba(0,0,0,0.25);
-}
-
-.menu-tile.live::before { opacity: 1; }
-
-.menu-tile.live:hover,
-.menu-tile.live:active {
-  border-color: rgba(var(--accent-rgb), 0.6);
-  transform: translateY(-2px);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 8px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(var(--accent-rgb),0.15);
-}
-
-.menu-tile.soon {
-  opacity: 0.38;
-  cursor: default;
-}
-
-.menu-tile-icon {
-  flex-shrink: 0;
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(var(--accent-rgb), 0.12);
-  color: var(--accent2);
-  border: 1px solid rgba(var(--accent-rgb), 0.2);
-}
-
-.menu-tile.live .menu-tile-icon {
-  box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.2);
-}
-
-.menu-tile.soon .menu-tile-icon {
-  background: var(--surface2);
-  color: var(--text3);
-  border-color: var(--border);
-  box-shadow: none;
-}
-
-.menu-tile-name {
-  font-size: calc(15px * var(--ts));
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: -0.1px;
-}
-
-.menu-tile-desc {
-  font-size: calc(12px * var(--ts));
-  color: var(--text2);
-  margin-top: 2px;
-  line-height: 1.4;
-}
-
-.menu-tile-icon, .menu-tile-name, .menu-tile-desc { pointer-events: none; }
-
-.menu-tile-text {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-}
-
-.menu-tile-arrow {
-  flex-shrink: 0;
-  color: var(--accent2);
-  opacity: 0.5;
-  transition: opacity 0.2s, transform 0.2s;
-}
-
-.menu-tile.live:hover .menu-tile-arrow {
-  opacity: 1;
-  transform: translateX(3px);
-}
-
-.menu-tile-badge {
-  flex-shrink: 0;
-  font-size: calc(9px * var(--ts));
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: var(--text3);
-  background: var(--surface3);
-  border: 1px solid var(--border);
-  padding: 3px 8px;
-  border-radius: 99px;
-}
-
-.menu-footer {
-  text-align: center;
-  font-size: calc(12px * var(--ts));
-  color: var(--text3);
-  letter-spacing: 0.2px;
-  line-height: 2;
-}
-.menu-footer a {
-  color: var(--text3);
-  text-decoration: underline;
-  text-decoration-color: rgba(255,255,255,0.15);
-}
-.menu-footer a:hover { color: var(--accent2); }
 
 /* ── MAIN APP ── */
 #app {
@@ -746,38 +550,6 @@ header {
   gap: 10px;
   flex: 1;
   min-width: 0;
-}
-
-.app-logo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.app-logo-icon {
-  width: 26px;
-  height: 26px;
-  background: linear-gradient(145deg, var(--accent2), var(--accent));
-  border-radius: 7px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(13px * var(--ts));
-  box-shadow: 0 0 10px rgba(var(--accent-rgb),0.35);
-}
-
-.app-logo-name {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: calc(16px * var(--ts));
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  color: var(--text);
-}
-
-.header-divider {
-  width: 1px;
-  height: 16px;
-  background: rgba(255,255,255,0.08);
 }
 
 .header-job {
@@ -1013,7 +785,6 @@ header {
   border: 1px solid var(--border); background: var(--surface); color: var(--text);
   display: flex; align-items: center; justify-content: center; cursor: pointer;
 }
-.drawer-back[hidden] { display: none; }
 
 
 /* Menu groups: This job, Jobs, Business, App. On the menu list each panel
@@ -1149,7 +920,6 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 #jobPanelBody .job-input, #reportBody .job-input { border: 1.5px solid var(--frame); border-radius: 10px; font-size: calc(15px * var(--ts)); min-height: 52px; }
 
 .job-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15); background: var(--surface); }
-.saved-search-input { margin-bottom: 10px; }
 
 .drawer-legal {
   padding: 14px 8px 4px;
@@ -1223,14 +993,6 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .logo-upload-btn:hover { border-color: var(--accent); color: var(--accent2); }
 .logo-remove-btn:hover { border-color: var(--risk); color: var(--risk); }
 
-.job-actions {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-  padding: 12px 14px 0;
-  border-top: 1px solid var(--border);
-}
-
 .job-action-btn {
   min-height: 44px;
   padding: 8px 14px;
@@ -1248,18 +1010,6 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   justify-content: center;
   gap: 6px;
 }
-
-.job-action-btn.save {
-  border-color: rgba(var(--accent-rgb), 0.35);
-  background: rgba(var(--accent-rgb), 0.08);
-  color: var(--accent2);
-}
-.job-action-btn.save:hover { background: rgba(var(--accent-rgb), 0.16); }
-
-.job-action-btn.new {
-  white-space: nowrap;
-}
-.job-action-btn.new:hover { border-color: var(--accent); color: var(--accent2); }
 
 .sync-status {
   display: flex;
@@ -1284,7 +1034,7 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 .sync-status.error .sync-status-dot { background: var(--risk); }
 .sync-status.error { color: var(--risk); }
 
-/* Saved Reports */
+/* A panel in the menu */
 .saved-panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1292,20 +1042,7 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   overflow: hidden;
 }
 
-.saved-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 320px;
-  overflow-y: auto;
-}
 
-.saved-empty {
-  font-size: calc(12px * var(--ts));
-  color: var(--text3);
-  padding: 8px 2px;
-  line-height: 1.5;
-}
 
 /* Settings panel. One page in the menu, in groups: Display, Voice, Your data. */
 .settings-group-title {
@@ -1318,8 +1055,6 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 }
 .settings-group-title:first-child { padding-top: 4px; }
 .settings-row-desc .settings-inline-link { display: flex; margin-top: 2px; font-size: calc(12px * var(--ts)); }
-.settings-row[hidden] { display: none; }
-.settings-row-desc .settings-inline-link[hidden] { display: none; }
 .learned-list { margin-top: 8px; }
 .learned-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--border); }
 .learned-text { flex: 1; min-width: 0; font-size: calc(12.5px * var(--ts)); color: var(--text); line-height: 1.4; overflow-wrap: anywhere; }
@@ -1354,14 +1089,15 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 
 .billing-explainer {
   padding: 12px 14px;
-  margin: 4px 0 6px;
+  margin: 12px 0 6px;
   border-radius: 10px;
   background: var(--surface2, rgba(0,0,0,0.03));
   font-size: calc(12px * var(--ts));
   line-height: 1.5;
   color: var(--text2, var(--text));
 }
-.billing-explainer-title { font-size: calc(13px * var(--ts)); font-weight: 650; color: var(--text); margin-bottom: 4px; }
+.billing-explainer > summary { font-size: calc(13px * var(--ts)); font-weight: 650; color: var(--accent2); cursor: pointer; min-height: 24px; }
+.billing-explainer[open] > summary { margin-bottom: 8px; }
 .billing-explainer p { margin: 0 0 6px; }
 .billing-explainer p:last-child { margin-bottom: 0; }
 .billing-explainer ul { margin: 0 0 6px; padding-left: 18px; }
@@ -1465,81 +1201,18 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 
 .text-size-btn:hover { color: var(--text); }
 
-.saved-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 9px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
 
-.saved-item:hover { border-color: var(--accent); background: rgba(var(--accent-rgb),0.04); }
 
-.saved-item-info { flex: 1; min-width: 0; }
 
-.saved-item-address {
-  font-size: calc(12px * var(--ts));
-  font-weight: 700;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
-.saved-item-meta {
-  font-size: calc(10px * var(--ts));
-  color: var(--text2);
-  margin-top: 1px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
 
-.saved-item-risk {
-  font-size: calc(9px * var(--ts));
-  font-weight: 800;
-  padding: 1px 6px;
-  border-radius: 99px;
-  text-transform: uppercase;
-}
-.saved-item-risk.HIGH   { background: rgba(192,57,43,0.15); color: var(--risk); }
-.saved-item-risk.MEDIUM { background: rgba(255,182,72,0.15); color: var(--yellow-text); }
-.saved-item-risk.LOW    { background: rgba(var(--green-rgb),0.15); color: var(--green); }
-.saved-item-risk.none   { background: var(--surface2); color: var(--text3); }
 
-.saved-item-pending {
-  color: var(--yellow-text);
-  font-weight: 700;
-}
 .auth-inline-link { border: none; background: none; padding: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
 .drawer-help { text-decoration: none; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-top: 8px; }
 /* Send is for the report: off the menu's own pages (Settings, Billing). */
 .settings-row.current-plan { background: rgba(var(--accent-rgb), 0.08); border-radius: 10px; }
 .settings-row.current-plan .settings-primary-btn:disabled { opacity: 1; background: transparent; color: var(--accent2); border-color: transparent; box-shadow: none; }
-.saved-item-unsynced { color: var(--yellow-text); font-weight: 700; }
-.saved-archived { padding: 12px 14px; font-size: calc(13px * var(--ts)); line-height: 1.5; color: var(--text2); }
-.saved-archived .link-btn { display: inline; min-height: 0; padding: 0; font-size: inherit; font-weight: 700; }
 
-.saved-item-delete {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: var(--text3);
-  font-size: calc(14px * var(--ts));
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.15s;
-}
-.saved-item-delete:hover { background: rgba(192,57,43,0.12); color: var(--risk); }
 
 /* ── HORIZONTAL SECTION TABS (in report) ── */
 .section-tabs {
@@ -1663,7 +1336,6 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   display: flex; justify-content: center; align-items: flex-start;
   padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
 }
-.pocket-shield[hidden] { display: none; }
 .pocket-shield span {
   background: var(--surface); color: var(--text2); border: 1px solid var(--border);
   border-radius: 999px; padding: 8px 14px; font-size: calc(13px * var(--ts)); font-weight: 600;
@@ -1697,7 +1369,6 @@ body.pocket-lock .voice-btn { user-select: none; -webkit-user-select: none; -web
   background: var(--accent);
   color: #fff;
 }
-.test-mode-badge[hidden] { display: none; }
 
 .voice-popover-close {
   width: 44px;
@@ -1918,7 +1589,6 @@ body.pocket-lock .voice-btn { user-select: none; -webkit-user-select: none; -web
   line-height: 1.5;
   color: var(--text2);
 }
-.transcript-done[hidden] { display: none; }
 .transcript-done-label { font-size: calc(11px * var(--ts)); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
 
 .low-confidence-warning {
@@ -2130,21 +1800,6 @@ body.pocket-lock .voice-btn { user-select: none; -webkit-user-select: none; -web
   width: 100%;
 }
 
-.report-header {
-  padding: 12px 16px 10px;
-  border-bottom: 1px solid #D0DCE8;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-shrink: 0;
-  background: transparent;
-}
-.report-title { min-width: 0; }
-
-.report-title h2 { font-family: 'Space Grotesk', sans-serif; font-size: calc(18px * var(--ts)); font-weight: 700; letter-spacing: -0.4px; color: #0A1929; }
-.report-title p  { font-size: calc(12px * var(--ts)); color: var(--text2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
 /* Progress */
 .progress-wrap { height: 2px; background: rgba(255,255,255,0.04); flex-shrink: 0; }
 .progress-fill { height: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.5s cubic-bezier(0.22,1,0.36,1); width: 0%; }
@@ -2155,7 +1810,10 @@ body.pocket-lock .voice-btn { user-select: none; -webkit-user-select: none; -web
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 16px 16px;
+  /* On a computer the report takes the same column as Jobs and This job
+     (680 wide), instead of stretching a label to one edge and its answer
+     to the other. */
+  padding: 16px max(16px, calc(50% - 340px));
   padding-bottom: calc(var(--mic-clearance) + 16px);
   display: block;
   background: var(--bg);
@@ -2523,7 +2181,8 @@ body.dark-screen .warn-note.note-good { background: rgba(var(--green-rgb),0.12);
 .warn-note .icon { margin-top: 1px; }
 .warn-note.note-info { background: var(--surface2); border-color: var(--border); color: var(--text2); }
 
-/* Job completion (COMPLETED JOBS in js/app/) */
+/* A finalised job (FINALISED JOBS in js/app/): the one line at the top of
+   a locked report, and the Amend form on the job's card. */
 .issue-banner {
   margin: 0 0 12px;
   padding: 10px 12px;
@@ -2539,11 +2198,9 @@ body.dark-screen .warn-note.note-good { background: rgba(var(--green-rgb),0.12);
 }
 .issue-banner-row { display: flex; align-items: center; gap: 8px; }
 .issue-banner-text { flex: 1; min-width: 0; line-height: 1.45; }
-.issue-banner .issue-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.issue-attention { margin: 8px 0 2px 18px; padding: 0; color: var(--yellow-text); font-weight: 600; line-height: 1.6; }
-.issue-links { display: flex; gap: 14px; flex-wrap: wrap; }
-.issue-links:empty { display: none; }
-.issue-amend-form { margin-top: 10px; }
+.issue-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.issue-amend-form { margin: 12px 0 0 58px; }
+.issue-amend-form label { display: block; margin: 0 0 6px; font-size: calc(13px * var(--ts)); font-weight: 650; color: var(--text); }
 .issue-amend-form textarea {
   width: 100%;
   box-sizing: border-box;
@@ -2560,24 +2217,6 @@ body.dark-screen .warn-note.note-good { background: rgba(var(--green-rgb),0.12);
 body.report-locked #reportBody .report-section,
 body.report-locked #jobPanelBody { opacity: 0.78; }
 body.report-locked #micDock { opacity: 0.4; }
-.saved-item-quote { padding: 1px 6px; border-radius: 5px; font-weight: 700; }
-.saved-item-quote.good { background: rgba(var(--green-rgb),0.12); color: var(--green); }
-.saved-item-quote.bad { background: rgba(192,57,43,0.1); color: var(--risk); }
-.saved-item-quote.wait, .saved-item-quote.warn { background: rgba(212,146,10,0.12); color: var(--yellow-text); }
-.issue-quote-answer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-size: calc(12.5px * var(--ts)); color: var(--text2); }
-.issue-quote-answer.good span { color: var(--green); font-weight: 600; }
-.issue-quote-answer.wait span, .issue-quote-answer.warn span { color: var(--yellow-text); font-weight: 600; }
-.saved-item-status {
-  padding: 1px 6px;
-  border-radius: 5px;
-  font-weight: 700;
-  background: var(--border);
-  color: var(--text2);
-}
-.saved-item-status.ready { background: rgba(var(--accent-rgb),0.12); color: var(--accent2); }
-.saved-item-status.sent { background: rgba(212,146,10,0.12); color: var(--yellow-text); }
-.saved-item-status.complete { background: rgba(var(--green-rgb),0.12); color: var(--green); }
-.saved-item-status.amending { background: rgba(212,146,10,0.12); color: var(--yellow-text); }
 
 /* Pre-inspection agreement */
 .agreement-banner {
@@ -2735,11 +2374,21 @@ body.report-locked #micDock { opacity: 0.4; }
   font-weight: 700; letter-spacing: -0.02em; color: var(--text);
 }
 .agr-step .job-field, .agr-step .job-row { margin: 0; }
+/* Step 1: what Job details already say, on one line with Change. A box
+   shows only for what's missing, so the date and fee share a row or one
+   of them takes it all. */
+.agr-job-line {
+  display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 6px 6px 14px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+}
+.agr-job-text { flex: 1; min-width: 0; font-size: calc(14.5px * var(--ts)); font-weight: 600; line-height: 1.4; color: var(--text); text-wrap: pretty; }
+.agr-job-line .link-btn { flex: none; min-height: 44px; }
+#agreementDateFeeRow { display: flex; gap: 8px; }
+#agreementDateFeeRow > .job-field { flex: 1 1 0; min-width: 0; }
 .agr-hint {
   margin: -4px 0 0; padding: 9px 12px; border-radius: 10px; font-size: calc(12.5px * var(--ts)); line-height: 1.5;
   background: rgba(255,182,72,0.12); color: var(--yellow-text);
 }
-.agr-hint[hidden] { display: none; }
 .agr-sign-need { margin: -2px 0 0; padding: 0; background: none; color: var(--text3); text-align: center; }
 
 /* The wording, set as a page: a numbered gutter, clause titles, room to read. */
@@ -2829,8 +2478,9 @@ body.report-locked #micDock { opacity: 0.4; }
 .agr-signed-meta { margin-top: 4px; font-size: calc(13.5px * var(--ts)); color: var(--text2); font-variant-numeric: tabular-nums; }
 .agr-signed .agreement-view-signature { max-width: 260px; margin-top: 16px; border-radius: 12px; padding: 6px; box-sizing: border-box; }
 .agr-section-label { color: var(--text3); margin-bottom: 12px; }
-#agreementView .agr-doc + .extract-btn { margin-top: 22px; }
-#agreementView .link-btn { align-self: center; margin-top: 6px; }
+/* A signed agreement's two actions, straight under the signature. */
+.agr-signed-acts { display: flex; flex-direction: column; margin: -8px 0 26px; }
+.agr-signed-acts .link-btn { align-self: center; min-height: 44px; margin-top: 4px; }
 /* Long form sheets (the treatment record): numbered sections with a short
    head, a hairline between them, the same look as the agreement's steps. */
 .sheet-secs { gap: 0; padding: 22px 20px calc(32px + env(safe-area-inset-bottom, 0px)); }
@@ -2971,8 +2621,6 @@ body.dark-screen .fold-tick { color: #000; }
 .problem-details-wrap > summary { font-size: calc(12.5px * var(--ts)); }
 .problem-details-note { margin: 6px 0; font-size: calc(12px * var(--ts)); color: var(--text3); line-height: 1.45; }
 .problem-details { margin: 0; max-height: 200px; overflow: auto; padding: 8px 10px; border-radius: 8px; background: var(--surface2, rgba(127,127,127,0.08)); font-size: calc(11px * var(--ts)); line-height: 1.45; white-space: pre-wrap; word-break: break-word; color: var(--text2); }
-.signoff-agreement { font-size: calc(12px * var(--ts)); color: var(--text3); line-height: 1.5; }
-.signoff-agreement.signed { color: var(--green); font-weight: 600; }
 .link-btn {
   border: none;
   background: none;
@@ -3037,15 +2685,17 @@ body.dark-screen .fold-tick { color: #000; }
 }
 
 .signature-status {
-  font-size: calc(10.5px * var(--ts));
-  font-weight: 700;
+  font-size: calc(13px * var(--ts));
+  font-weight: 600;
   color: var(--text3);
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
 }
 .signature-status.signed { color: var(--green); }
+/* A signature already on the report isn't drawn on: a thumb scrolling past
+   would mark it. Sign again empties the pad. */
+.signature-pad-wrap.kept { border-style: solid; }
+.signature-pad-wrap.kept .signature-canvas { pointer-events: none; cursor: default; }
 
-/* Clear and Open agreement: plain buttons like the job page's. */
+/* Sign again and the sheets' Clear buttons: plain buttons like the job page's. */
 .signature-clear-btn {
   display: inline-flex;
   align-items: center;
@@ -3095,6 +2745,12 @@ body.dark-screen .signature-clear-btn { background: var(--surface2); border-colo
 }
 .add-photo-btn:hover { opacity: 0.88; }
 .add-photo-btn:disabled { background: var(--surface2); color: var(--text3); cursor: not-allowed; }
+/* On Finish, Report done or Send is the step's one filled button. */
+.add-photo-btn.quiet:not(:disabled) { background: var(--surface); color: var(--accent2); border: 1px solid var(--border2); }
+/* A done report's banner offers the next step, so Next steps aside. */
+#mainPanel.done-waiting .next-section-btn, body:not(.dark-screen) #mainPanel.done-waiting .next-section-btn {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border2); box-shadow: none;
+}
 
 .photo-grid {
   display: grid;
@@ -3532,7 +3188,6 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
   background: rgba(var(--accent-rgb), 0.08); border: 1.5px solid rgba(var(--accent-rgb), 0.45); border-radius: 12px;
   color: var(--accent2); font-family: 'Inter', sans-serif; text-align: left; cursor: pointer;
 }
-.nothing-found-btn[hidden] { display: none; }
 .nothing-found-btn svg { flex: none; }
 .nothing-found-btn strong { display: block; font-size: calc(15px * var(--ts)); font-weight: 700; }
 .nothing-found-btn small { display: block; margin-top: 2px; font-size: calc(12.5px * var(--ts)); color: var(--text2); }
@@ -3592,6 +3247,11 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
   color: var(--text);
 }
 .dash-hero-title b { font-weight: 700; color: var(--accent2); }
+/* Under the headline: what's booked for later, and re-inspections that are
+   overdue, which opens the Due tab. */
+.dash-hero-more { margin: 8px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: calc(14px * var(--ts)); line-height: 1.4; color: var(--text2); }
+.dash-hero-more i { font-style: normal; color: var(--text3); }
+.dash-hero-more button { min-height: 32px; padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--risk); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 
 .dash-tabs {
   position: relative;
@@ -3657,13 +3317,17 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 .dash-card-street { font-size: calc(16px * var(--ts)); font-weight: 650; line-height: 1.25; letter-spacing: -0.01em; color: var(--text); overflow-wrap: anywhere; }
 .dash-card-suburb { font-size: calc(13.5px * var(--ts)); color: var(--text2); }
 .dash-card-sub { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: calc(13px * var(--ts)); color: var(--text3); }
-.dash-card.waiting .dash-card-sub > span:last-child { color: var(--yellow-text); font-weight: 600; }
-.dash-card.done:not(.declined) .dash-card-sub > span:last-child { color: var(--green); font-weight: 600; }
+/* Where the job is up to, after the client: one piece, so a long line
+   wraps it whole instead of leaving its date alone on the next line. */
+.dash-card-status { white-space: nowrap; font-weight: 600; color: var(--text2); }
+.dash-card.waiting .dash-card-status { color: var(--yellow-text); }
+.dash-card.done:not(.declined) .dash-card-status { color: var(--green); }
 .dash-card-tag {
   padding: 2px 7px; border-radius: 6px; background: rgba(var(--accent-rgb), 0.12); color: var(--accent2);
   font-size: calc(10.5px * var(--ts)); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
 }
 .dash-card-tag.sample { background: rgba(var(--pink-rgb), 0.12); color: var(--pink-text); }
+.dash-card-tag.warn { background: rgba(255,182,72,0.16); color: var(--yellow-text); }
 .dash-card-end { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; padding-top: 1px; }
 .dash-card-when { font-size: calc(12.5px * var(--ts)); font-weight: 650; color: var(--text3); white-space: nowrap; }
 .dash-card-total { font-size: calc(14.5px * var(--ts)); font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -3680,11 +3344,18 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 }
 .dash-card-act svg { flex: none; }
 .dash-card-act:active { background: var(--accent-pale); }
-.dash-card.waiting .dash-card-act { border-top-color: rgba(240,168,30,0.4); background: rgba(255,182,72,0.12); color: var(--yellow-text); }
+.dash-card.waiting .dash-card-act, .dash-card-act.wait { border-top-color: rgba(240,168,30,0.4); background: rgba(255,182,72,0.12); color: var(--yellow-text); }
 body:not(.dark-screen) .dash-card { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
 body.dark-screen .dash-card-act { border-top-color: var(--border2); background: rgba(var(--accent-rgb), 0.14); }
 
 .dash-none { margin: 0; padding: 36px 12px; text-align: center; font-size: calc(14px * var(--ts)); color: var(--text3); }
+/* To do, in the order the week runs: a heading where the day changes
+   (still open from earlier, today, coming up). */
+.dash-part { margin: 10px 2px -2px; font-size: calc(11px * var(--ts)); font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); }
+.dash-part:first-child { margin-top: 0; }
+/* Finished jobs a full phone handed to the account, under Done. */
+.dash-parked { margin: 16px 2px 0; font-size: calc(13.5px * var(--ts)); line-height: 1.5; color: var(--text2); }
+.dash-parked .link-btn { display: inline; min-height: 0; padding: 0; font-size: inherit; font-weight: 700; }
 .dash-empty { padding-top: 4px; }
 .dash-cards.fade-in, .dash-none.fade-in { animation: dashFade 0.22s ease-out; }
 @keyframes dashFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
@@ -3774,11 +3445,13 @@ body.dark-screen .dash-card-act { border-top-color: var(--border2); background: 
 .dash-detail-links:empty { display: none; }
 
 /* Re-inspections due (js/reinspection.js): the status line in the tile's colour. */
-.reinspect-card .dash-card-sub > span { color: var(--yellow-text); font-weight: 600; }
-.reinspect-card.overdue .dash-card-sub > span { color: var(--risk); }
-.reinspect-card.reminded .dash-card-sub > span { color: var(--accent2); }
+.reinspect-card .dash-card-status { color: var(--yellow-text); }
+.reinspect-card.overdue .dash-card-status { color: var(--risk); }
+.reinspect-card.reminded .dash-card-status { color: var(--accent2); }
 .dash-detail-chip.overdue { background: rgba(192,57,43,0.12); color: var(--risk); }
 .dash-next .dash-detail-links { margin-top: 10px; }
+.reinspect-prepurchase { color: var(--yellow-text); }
+.reinspect-prepurchase strong { font-weight: 700; }
 .reinspect-note { margin: 12px 2px 0; font-size: calc(13px * var(--ts)); line-height: 1.5; color: var(--text3); }
 .reinspect-form { display: grid; gap: 6px; margin-top: 16px; }
 .reinspect-form .send-review-label { margin-top: 8px; }
@@ -3868,7 +3541,9 @@ body.dark-screen .dash-card-act { border-top-color: var(--border2); background: 
 
 .toast-icon { font-size: calc(15px * var(--ts)); flex-shrink: 0; }
 /* A toast with a button (Undo) takes taps; plain toasts let them through. */
-.toast.toast-has-action { pointer-events: auto; padding-right: 8px; }
+/* Only while it's on screen: one that has faded would still catch taps. */
+.toast.toast-has-action { padding-right: 8px; }
+.toast.show.toast-has-action { pointer-events: auto; }
 .toast-action {
   flex-shrink: 0;
   min-height: 44px;
@@ -3913,7 +3588,6 @@ body.dark-screen .dash-card-act { border-top-color: var(--border2); background: 
 }
 body.ai-busy:has(#app[style*="flex"]) .ai-busy-bar { display: block; }
 .ai-keep-btn { margin: -6px 0 -6px 12px; padding: 6px 10px; min-height: 32px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); color: var(--text2); font: inherit; font-size: calc(12px * var(--ts)); font-weight: 600; cursor: pointer; vertical-align: middle; }
-.ai-keep-btn[hidden] { display: none; }
 @keyframes aiBusySlide {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(290%); }
@@ -3933,32 +3607,9 @@ body.ai-busy:has(#app[style*="flex"]) .ai-busy-bar { display: block; }
 /* The avatar stays a 32px circle; this ring takes the tap out to 44px. */
 .profile-btn::before { content: ''; position: absolute; inset: -6px; border-radius: 50%; }
 .profile-btn:hover { opacity: 0.85; }
-.profile-dropdown {
-  position: absolute; top: 40px; right: 0;
-  width: 240px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(13,17,23,0.16);
-  padding: 12px;
-  z-index: 300;
-  display: none;
-}
-.profile-dropdown.open { display: block; }
 .profile-dropdown-name { font-size: calc(13px * var(--ts)); font-weight: 700; color: var(--text); }
 .profile-dropdown-email { font-size: calc(12px * var(--ts)); color: var(--text3); margin-top: 2px; word-break: break-all; }
 .profile-dropdown-business { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: calc(11.5px * var(--ts)); color: var(--text2); }
-.profile-dropdown-divider { height: 1px; background: var(--border); margin: 10px 0; }
-.profile-dropdown-item[hidden] { display: none; }
-.profile-dropdown-item {
-  display: flex; align-items: center; gap: 8px; width: 100%;
-  padding: 9px 8px; background: none; border: none; border-radius: 7px;
-  color: var(--text2); font-family: 'Inter', sans-serif; font-size: calc(12.5px * var(--ts)); font-weight: 600;
-  cursor: pointer; text-align: left; transition: background 0.15s, color 0.15s;
-  min-height: 44px;
-}
-.profile-dropdown-item:hover { background: var(--surface2); color: var(--accent2); }
-.profile-dropdown-item.profile-signout:hover { color: var(--risk); background: rgba(192,57,43,0.08); }
 
 /* ── SECTION PHOTO WIDGET ── */
 .section-photo-hint { font-size: calc(12px * var(--ts)); color: var(--text3); padding: 8px 12px 0; }
@@ -4116,14 +3767,12 @@ body.ai-busy:has(#app[style*="flex"]) .ai-busy-bar { display: block; }
 .section-photo-card:has(> .section-photo-body > .photo-suggest:not([hidden])) img,
 .photo-card:has(> .photo-card-body > .photo-suggest:not([hidden])) img { height: 160px; }
 .photo-describe-btn { display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 0 11px; border: 1px solid var(--border); border-radius: 99px; background: var(--surface); color: var(--accent2); font: 650 calc(12.5px * var(--ts)) 'Inter', sans-serif; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.photo-describe-btn[hidden] { display: none; }
 .photo-describe-btn:active { background: var(--surface2); }
 .photo-describe-btn:focus-visible { outline: 3px solid rgba(var(--accent-rgb), 0.45); outline-offset: 2px; }
 .photo-describe-btn:disabled { color: var(--text3); cursor: progress; }
 .photo-describe-btn:disabled .icon { animation: dockSpin 1.4s linear infinite; }
 .photo-card-footer .photo-describe-btn { min-height: 30px; padding: 0 8px; font-size: calc(11px * var(--ts)); }
 .photo-suggest { grid-column: 1 / -1; padding: 9px 11px 10px; border: 1px solid rgba(var(--accent-rgb), 0.35); border-radius: 10px; background: rgba(var(--accent-rgb), 0.06); }
-.photo-suggest[hidden] { display: none; }
 .photo-card-body .photo-suggest { margin-bottom: 6px; }
 .photo-suggest-label { display: flex; align-items: center; gap: 5px; font-size: calc(11px * var(--ts)); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent2); }
 .photo-suggest-label .icon { width: 12px; height: 12px; }
@@ -4233,7 +3882,6 @@ body.dark-screen .area-status-btn.status-na { background: rgba(147,163,179,0.2);
 body.dark-screen .area-finding-prompt .area-tile { background: rgba(255,90,79,0.12); border-color: rgba(255,90,79,0.35); }
 /* The same prompt inside the open finding card: "Write it up here?" */
 .finding-area-slot { margin: 10px 6px 0; background: rgba(192,57,43,0.05); border-color: rgba(192,57,43,0.28); }
-.finding-area-slot[hidden] { display: none; }
 .finding-area-slot .area-finding-add { min-width: 76px; justify-content: center; }
 body.dark-screen .finding-area-slot { background: rgba(255,90,79,0.07); border-color: rgba(255,90,79,0.3); }
 /* "What was it?" under an area's evidence: termites, borers, rot or
@@ -4244,15 +3892,15 @@ body.dark-screen .finding-area-slot { background: rgba(255,90,79,0.07); border-c
 .area-finding-prompt .area-finding-picks .area-finding-add { padding: 0 8px; }
 @media (min-width: 460px) { .area-finding-picks { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 359px) { body.text-size-xl .area-finding-picks { grid-template-columns: 1fr; } }
-/* Findings groups out of sight until something calls for them, and the
-   box that says what they hold, with a button to bring each in. */
-.report-section.grouped > details.fgroup[hidden] { display: none; }
+/* The box that says which Findings groups are out of sight, with a button
+   to bring each in. */
 .findings-more {
   margin: 10px 8px 0; padding: 14px 12px; background: var(--surface);
   border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 3px rgba(13,40,60,0.07);
 }
-.findings-more[hidden] { display: none; }
-.findings-more-state { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+.findings-more-state { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-bottom: 14px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+/* "No timber pests found", in the box that says what isn't answered. */
+.findings-more-none { flex: 1 0 100%; width: 100%; margin: 0; }
 .findings-more-icon {
   flex: none; width: 40px; height: 40px; box-sizing: border-box; border-radius: 12px; display: grid; place-items: center;
   background: var(--surface2); border: 1px solid var(--border); color: var(--text3);
@@ -4612,7 +4260,6 @@ body.dark-screen .findings-more-state.is-none .findings-more-icon { background: 
 /* ── ACCESSIBILITY: focus states ── */
 button:focus-visible,
 .field-val:focus-visible,
-.saved-item:focus-visible,
 .job-input:focus-visible,
 .section-tab:focus-visible {
   outline: 2px solid var(--accent2);
@@ -4676,18 +4323,40 @@ body[data-voice="thinking"] .voice-hud { animation: hudPulse 0.6s ease-in-out in
 .did-it-send-title { font-size: calc(16px * var(--ts)); font-weight: 800; color: var(--text); }
 .did-it-send-text { margin: 8px 0 14px; font-size: calc(13px * var(--ts)); line-height: 1.5; color: var(--text2); }
 .did-it-send-btns { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+/* ASK FIRST: SAYON's own sheet for a question, over whatever asked it. */
+#askOverlay { z-index: 950; }
+#askOverlay .did-it-send-text { white-space: pre-line; margin-bottom: 0; }
+#askOverlay .did-it-send-btns { margin-top: 14px; }
+#askOverlay .link-btn { align-self: center; min-height: 44px; }
+#askOverlay .extract-btn.danger { background: var(--risk); }
+#askOverlay .ask-input {
+  width: 100%; box-sizing: border-box; margin-top: 12px; padding: 12px 14px; min-height: 48px;
+  background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px;
+  color: var(--text); font-family: inherit; font-size: calc(16px * var(--ts)); outline: none;
+}
+#askOverlay .ask-input:focus { border-color: var(--accent2); }
+.ask-facts { margin: 10px 0 0; border-top: 1px solid var(--border); }
+.ask-facts > div { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: calc(13px * var(--ts)); line-height: 1.4; }
+.ask-facts dt { flex: 0 0 76px; color: var(--text3); }
+.ask-facts dd { flex: 1; margin: 0; color: var(--text); font-weight: 600; }
 .photo-source-btns { margin-top: 14px; }
+/* One filled button on the sheet; the others are quiet. */
+.photo-source-btns .extract-btn.quiet, body:not(.dark-screen) .photo-source-btns .extract-btn.quiet {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border2); box-shadow: none; font-weight: 600;
+}
+.photo-source-btns .extract-btn.quiet::after { content: none; }
+/* Add photo is the camera; "Choose one instead" sits beside it, quiet. A
+   computer has no camera to open, so Add photo is its file picker and the
+   second way isn't shown. */
+.photo-add-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px; }
+.photo-choose { min-height: 44px; margin: 0; padding: 0 2px; font-size: calc(13px * var(--ts)); }
+.section-photo-hint .photo-choose { display: inline; min-height: 0; padding: 0; font-size: inherit; }
+.photo-toolbar .photo-choose { margin-left: auto; margin-right: 12px; }
+@media (hover: hover) and (pointer: fine) { .photo-choose { display: none !important; } }
 .move-status { margin: 0 0 10px; font-size: calc(13px * var(--ts)); font-weight: 700; line-height: 1.4; color: var(--text); }
 .move-steps { margin: 0 0 14px; padding-left: 20px; font-size: calc(13px * var(--ts)); line-height: 1.5; color: var(--text2); }
 .move-steps li + li { margin-top: 4px; }
 #moveOverlay a.extract-btn { display: block; text-align: center; text-decoration: none; }
-#moveOverlay .did-it-send-btns [hidden] { display: none; }
-.doc-sent-lines { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
-.doc-sent { display: flex; justify-content: space-between; gap: 12px; font-size: calc(12.5px * var(--ts)); color: var(--text2); }
-.doc-sent strong { font-weight: 700; }
-.doc-sent.sent strong { color: var(--green); }
-.doc-sent.stale strong { color: var(--yellow-text); }
-.doc-sent.unsent strong { color: var(--text3, var(--text2)); }
 
 /* After Extract: what was filled and what's still blank */
 .extract-summary-sheet { top: auto; bottom: 0; max-height: 80vh; max-height: 80dvh; border-radius: 16px 16px 0 0; }
@@ -4731,19 +4400,11 @@ body[data-voice="thinking"] .voice-hud { animation: hudPulse 0.6s ease-in-out in
 }
 body:not(.dark-screen) { background: var(--backdrop); background-color: #070B10; }
 body:not(.dark-screen) #splash,
-body:not(.dark-screen) #mainMenu,
 body:not(.dark-screen) #quoteScreen { background: var(--backdrop); background-color: #070B10; color-scheme: dark; }
-body:not(.dark-screen) .splash-logo,
-body:not(.dark-screen) .menu-logo-text { color: var(--on-ink); }
-body:not(.dark-screen) .menu-tagline,
-body:not(.dark-screen) .menu-footer,
-body:not(.dark-screen) .menu-footer a { color: var(--on-ink2); }
-body:not(.dark-screen) .menu-logo-icon { color: var(--accent-hi); }
-body:not(.dark-screen) .menu-tile { border-color: transparent; box-shadow: 0 18px 44px rgba(0,0,0,0.45); }
+body:not(.dark-screen) .splash-logo { color: var(--on-ink); }
 
 /* Top bar and section tabs: ink, light text, blue for the active tab. */
 body:not(.dark-screen) header { background: var(--ink); border-bottom: none; box-shadow: none; }
-body:not(.dark-screen) .app-logo-name { color: var(--on-ink); }
 body:not(.dark-screen) .header-job,
 body:not(.dark-screen) .header-job span,
 body:not(.dark-screen) .header-job.has-job { color: var(--on-ink2); }
@@ -4753,9 +4414,6 @@ body:not(.dark-screen) .hamburger-btn:hover { background: rgba(255,255,255,0.08)
 body:not(.dark-screen) .hamburger-btn span { background: var(--on-ink); }
 body:not(.dark-screen) header .progress-ring-bg { stroke: rgba(255,255,255,0.18); }
 body:not(.dark-screen) header .progress-ring-wrap { color: var(--on-ink2); }
-body:not(.dark-screen) .report-header { border-bottom: none; }
-body:not(.dark-screen) .report-title h2 { color: var(--on-ink); }
-body:not(.dark-screen) .report-title p { color: var(--on-ink2); }
 body:not(.dark-screen) .section-tabs { background: transparent; border-bottom: none; box-shadow: none; }
 body:not(.dark-screen) .section-tab { color: var(--on-ink2); }
 body:not(.dark-screen) .section-tab:hover { color: var(--on-ink); background: rgba(255,255,255,0.06); }
@@ -4836,28 +4494,19 @@ body:not(.dark-screen) .access-group-head {
 body:not(.dark-screen) .edit-mode .field-val:hover { box-shadow: 0 0 0 3px rgba(var(--glow),0.14), 0 0 16px rgba(var(--glow),0.18); }
 /* The same blue glow on the home screen, top bar, menu and dashboard. */
 /* Logo boxes fade like the intro's: near-white at the top into blue. */
-body:not(.dark-screen) .app-logo-icon,
-body:not(.dark-screen) .auth-logo-icon,
-body:not(.dark-screen) .menu-logo-icon {
+body:not(.dark-screen) .auth-logo-icon {
   background: linear-gradient(180deg, #F4F7FA 0%, var(--accent-pale) 40%, var(--accent-hi) 78%, var(--accent) 100%);
   color: var(--accent-ink);
   box-shadow: 0 0 14px rgba(var(--glow-hi),0.4), inset 0 1px 1px rgba(255,255,255,0.6), inset 0 -2px 3px rgba(var(--accent-deep-rgb),0.35);
 }
-body:not(.dark-screen) .menu-logo-icon {
-  width: 46px; height: 46px; border-radius: 13px; justify-content: center; filter: none;
-  box-shadow: 0 0 34px rgba(var(--glow-hi),0.35), 0 8px 22px rgba(var(--glow),0.25), inset 0 1px 1px rgba(255,255,255,0.6), inset 0 -2px 4px rgba(var(--accent-deep-rgb),0.35);
-}
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  body:not(.dark-screen) .app-logo-name,
-  body:not(.dark-screen) .auth-logo-name,
-  body:not(.dark-screen) .menu-logo-text {
+  body:not(.dark-screen) .auth-logo-name {
     background: linear-gradient(180deg, #F4F7FA 0%, var(--accent-pale) 45%, var(--accent-hi) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
     filter: drop-shadow(0 0 10px rgba(var(--glow),0.35));
   }
-  body:not(.dark-screen) .menu-logo-text { font-size: calc(34px * var(--ts)); }
 }
 /* A fine blue line under the top bars, fading out to the right. */
 body:not(.dark-screen) header,
@@ -4865,23 +4514,6 @@ body:not(.dark-screen) .quote-topbar {
   border-bottom: 1px solid rgba(var(--glow),0.5);
   border-image: linear-gradient(90deg, rgba(var(--glow-hi),0.8), rgba(var(--glow),0.4) 45%, rgba(var(--glow),0)) 1;
 }
-/* Home screen: brighter tagline between two fading lines, glowing tiles. */
-body:not(.dark-screen) .menu-tagline { color: #CFEFEB; font-size: calc(11px * var(--ts)); font-weight: 600; white-space: nowrap; display: flex; align-items: center; gap: 10px; }
-body:not(.dark-screen) .menu-tagline::before,
-body:not(.dark-screen) .menu-tagline::after { content: ''; flex: 0 1 40px; min-width: 10px; height: 1px; background: linear-gradient(90deg, rgba(var(--glow-hi),0), rgba(var(--glow-hi),0.8)); }
-body:not(.dark-screen) .menu-tagline::after { transform: scaleX(-1); }
-@media (max-width: 360px) {
-  body:not(.dark-screen) .menu-tagline { white-space: normal; }
-  body:not(.dark-screen) .menu-tagline::before, body:not(.dark-screen) .menu-tagline::after { display: none; }
-}
-body:not(.dark-screen) .menu-tile.live {
-  border-style: solid; border-width: 3px 0 0;
-  border-image: linear-gradient(90deg, rgb(var(--glow)), rgb(var(--glow-hi)) 45%, rgba(var(--glow-hi),0)) 1;
-  clip-path: inset(0 round 14px);
-  background: linear-gradient(135deg, rgba(var(--glow),0.12) 0%, rgba(var(--glow-hi),0.04) 45%, rgba(var(--glow),0) 75%), var(--surface);
-}
-body:not(.dark-screen) .menu-grid { filter: drop-shadow(0 -8px 22px rgba(var(--glow),0.35)); }
-body:not(.dark-screen) .menu-tile.live .menu-tile-icon,
 body:not(.dark-screen) .panel-label .panel-icon {
   background: linear-gradient(180deg, rgba(var(--glow-hi),0.28), rgba(var(--glow),0.14));
   border-color: rgba(var(--glow),0.3);
@@ -4916,12 +4548,10 @@ body:not(.dark-screen) .mic-fab:not(.recording):not(.open):hover { box-shadow: 0
 }
 
 body:not(.dark-screen) .choice-card { transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s, color 0.3s, transform 0.08s; }
-#invasiveDetailsWrap[hidden] { display: none; }
 
 /* Areas (Section 4) */
 .areas-intro { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 14px 6px; }
 .areas-mark-all { font-size: calc(13px * var(--ts)); }
-.areas-mark-all[hidden] { display: none; }
 .area-result-label { padding: 0 12px 6px; font-size: calc(12px * var(--ts)); font-weight: 600; color: var(--text2); }
 .area-result { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 12px 12px; }
 .area-result .obs-item-btn { border-radius: 8px; }
@@ -4933,8 +4563,6 @@ body:not(.dark-screen) .choice-card { transition: background-color 0.3s, border-
 .obs-reasons-restricted .obs-items-label { color: var(--risk); }
 .obs-reasons-hindered .obs-item-btn.selected { background: rgba(245,162,35,0.14); border-color: var(--yellow); color: var(--yellow-text); font-weight: 600; }
 .obs-reasons-restricted .obs-item-btn.selected { background: rgba(192,57,43,0.10); border-color: var(--risk); color: var(--risk); font-weight: 600; }
-.area-where { padding: 0 12px 12px; font-size: calc(12.5px * var(--ts)); color: var(--text3); }
-.area-where .link-btn { display: inline; min-height: 0; margin: 0; padding: 0; font-size: inherit; }
 .area-status-btn { font-size: calc(12px * var(--ts)); line-height: 1.2; }
 
 /* Areas in the job page's look: how many are marked over a bar per area in
@@ -4964,6 +4592,9 @@ body:not(.dark-screen) .choice-card { transition: background-color 0.3s, border-
 .areas-mark-all:focus-visible { outline: 3px solid rgba(var(--accent-rgb), 0.45); outline-offset: 2px; }
 
 #areaChecklist { gap: 10px; padding: 10px 14px 14px; }
+/* The site plan under the areas (THE SITE PLAN IN THE REPORT, js/site-plan.js). */
+.report-plan { padding: 2px 14px 16px; }
+.report-plan-head { margin: 0 0 8px; font-size: calc(13px * var(--ts)); font-weight: 800; color: var(--text); }
 .area-node { position: relative; }
 .area-node:not(:last-child)::after { content: ''; position: absolute; left: 34px; top: 100%; width: 2px; height: 10px; background: var(--border2); }
 .area-node[class*="area-node-"]:not(:last-child)::after { background: var(--green-fill); }
@@ -5026,7 +4657,8 @@ body:not(.dark-screen) .choice-card { transition: background-color 0.3s, border-
 #areaChecklist .obs-reasons .obs-items-label { font-size: calc(12.5px * var(--ts)); font-weight: 650; }
 #areaChecklist .obs-reasons .obs-items { padding: 8px 0 12px; }
 #areaChecklist .obs-item-btn:not(.selected) { background: var(--surface2); }
-#areaChecklist .area-where { padding: 10px 12px 12px; border-top: 1px solid var(--border); }
+/* Where exactly and its photos, under the kind of reason that was ticked. */
+#areaChecklist .area-spot { display: flex; flex-direction: column; gap: 8px; padding: 0 0 12px; }
 @media (min-width: 900px) { #areaChecklist .area-status, #areaChecklist .area-result { max-width: 640px; } }
 /* Large text on a narrow phone: the three status buttons stack, the icon
    beside the words, so none is cut off. */
@@ -5040,7 +4672,8 @@ body:not(.dark-screen) .choice-card { transition: background-color 0.3s, border-
 /* Areas unable to be inspected, in the same look: each kind of limit is a
    card with its icon tile, and each area in it has the head of its card in
    Areas (icon tile in its status colour, status and reasons under the name)
-   which opens it there. Where exactly and photos sit under it. */
+   which opens it there. Where exactly and how many photos read under it;
+   they are added on the area's card. */
 #section-restrictions .access-group { border-radius: 16px; box-shadow: 0 1px 2px rgba(15,23,42,0.05); }
 #section-restrictions .access-group-head { gap: 12px; padding: 14px; }
 #section-restrictions .access-group-icon { width: 36px; height: 36px; border-radius: 10px; }
@@ -5067,19 +4700,15 @@ body:not(.dark-screen) .choice-card { transition: background-color 0.3s, border-
 .access-item-not .access-item-state { color: var(--risk) !important; }
 #section-restrictions .access-item-why { font-size: calc(13.5px * var(--ts)); font-weight: 500; color: var(--text3); line-height: 1.35; }
 #section-restrictions .access-item-why.missing { color: var(--yellow-text); font-weight: 600; }
-#section-restrictions .access-item-head ~ .access-spot,
-#section-restrictions .access-item-head ~ .access-spot-editor,
-#section-restrictions .access-item-head ~ .spot-photos { margin: 0 0 0 58px; }
-#section-restrictions .access-spot { min-height: 48px; display: flex; align-items: center; gap: 9px; padding: 8px 12px; border-radius: 12px; text-align: left; }
-#section-restrictions .access-spot svg { flex: none; color: var(--text3); }
-#section-restrictions .access-spot.empty svg { color: var(--accent2); }
-#section-restrictions .spot-photos { margin-top: 0; }
-#section-restrictions .spot-photo img { border-radius: 10px; }
-@media (max-width: 359px) {
-  #section-restrictions .access-item-head ~ .access-spot,
-  #section-restrictions .access-item-head ~ .access-spot-editor,
-  #section-restrictions .access-item-head ~ .spot-photos { margin-left: 0; }
-}
+.access-item-where { display: flex; align-items: flex-start; gap: 6px; margin-top: 4px; font-size: calc(13.5px * var(--ts)); font-weight: 500; color: var(--text2); line-height: 1.35; }
+.access-item-where svg { flex: none; width: 14px; height: 14px; margin-top: 2px; color: var(--text3); }
+#section-restrictions .access-spot, #areaChecklist .access-spot { min-height: 48px; display: flex; align-items: center; gap: 9px; padding: 8px 12px; border-radius: 12px; text-align: left; }
+#section-restrictions .access-spot svg, #areaChecklist .access-spot svg { flex: none; color: var(--text3); }
+#section-restrictions .access-spot.empty svg, #areaChecklist .access-spot.empty svg { color: var(--accent2); }
+#areaChecklist .access-spot, #areaChecklist .access-spot-editor { margin-top: 0; }
+#areaChecklist .access-spot-input { min-height: 48px; border-radius: 12px; }
+#section-restrictions .spot-photos, #areaChecklist .spot-photos { margin-top: 0; }
+#section-restrictions .spot-photo img, #areaChecklist .spot-photo img { border-radius: 10px; }
 body.dark-screen .access-item-partial .area-tile { background: rgba(255,176,0,0.12); border-color: rgba(255,176,0,0.35); }
 body.dark-screen .access-item-not .area-tile { background: rgba(255,90,79,0.12); border-color: rgba(255,90,79,0.35); }
 body.dark-screen #section-restrictions .access-group { box-shadow: none; }
@@ -5121,7 +4750,6 @@ body.dark-screen .areas-mark-all { background: var(--surface2); border-color: va
   color: #F4F8FB;
   -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
 }
-.photo-viewer[hidden] { display: none; }
 .photo-viewer-bar {
   display: flex; align-items: center; gap: 12px;
   padding: calc(10px + env(safe-area-inset-top, 0px)) 14px 10px;
@@ -5150,7 +4778,6 @@ body.dark-screen .areas-mark-all { background: var(--surface2); border-color: va
   border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.12); color: #fff;
   display: flex; align-items: center; gap: 7px; font: inherit; font-size: calc(15px * var(--ts)); font-weight: 600; cursor: pointer;
 }
-.photo-viewer-markup[hidden] { display: none; }
 
 /* ── PHOTO MARKUP ── circle, arrow, draw or label on a photo (js/photo-markup.js). */
 .photo-markup {
@@ -5158,7 +4785,6 @@ body.dark-screen .areas-mark-all { background: var(--surface2); border-color: va
   display: flex; flex-direction: column;
   background: #05090D; color: #F4F8FB;
 }
-.photo-markup[hidden] { display: none; }
 .photo-markup-bar {
   display: flex; align-items: center; gap: 10px;
   padding: calc(8px + env(safe-area-inset-top, 0px)) 10px 8px;
@@ -5180,9 +4806,7 @@ body.dark-screen .areas-mark-all { background: var(--surface2); border-color: va
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .photo-markup-note { margin: 4px 14px 0; font-size: calc(12.5px * var(--ts)); color: #FFD60A; text-align: center; }
-.photo-markup-note[hidden] { display: none; }
 .photo-markup-label { display: flex; gap: 8px; padding: 8px 12px 0; }
-.photo-markup-label[hidden] { display: none; }
 .photo-markup-label input {
   flex: 1; min-width: 0; min-height: 44px; padding: 0 14px; border-radius: 12px;
   border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: #fff; font: inherit; font-size: calc(16px * var(--ts));
@@ -5212,6 +4836,9 @@ body.dark-screen .areas-mark-all { background: var(--surface2); border-color: va
 /* Photos in the report open the viewer when tapped. */
 img[data-photo-id][src] { cursor: zoom-in; }
 .finding-photos .spot-photos { margin-top: 0; }
+/* A conducive condition's own photos, under its answer. */
+.cond-photos .spot-photos { margin-top: 0; }
+.field > .cond-photos { margin-top: 10px; }
 
 /* ── VOICE CAPTURE ──
    The voice panel in the intro's look: a white card glowing blue along the
@@ -5295,7 +4922,7 @@ body:not(.dark-screen) .ai-dot { width: 7px; height: 7px; box-shadow: 0 0 8px cu
 body:not(.dark-screen) .next-section-btn,
 body:not(.dark-screen) .cleanup-apply-btn,
 body:not(.dark-screen) .profile-btn,
-body:not(.dark-screen) .issue-banner .issue-primary {
+body:not(.dark-screen) .issue-primary {
   background: var(--accent-grad);
   border-color: transparent;
   color: #fff;
@@ -5323,7 +4950,6 @@ body .compass-body .compass-main.locked { background: var(--accent3); box-shadow
 .compass-main:disabled { opacity: 0.6; cursor: default; }
 .compass-note { font-size: calc(13px * var(--ts)); line-height: 1.45; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; max-width: 360px; }
 .compass-body .extract-btn { max-width: 360px; margin-top: 4px; padding: 16px; font-size: calc(17px * var(--ts)); }
-.compass-body .extract-btn[hidden] { display: none; }
 
 /* ── BOTTOM DOCK ──
    Three things in a rounded glass dock that floats above the bottom edge:
@@ -5370,6 +4996,12 @@ body:has(#quoteScreen.open) .tabbar { display: block; }
   transition: background 0.2s, color 0.2s, box-shadow 0.2s;
 }
 .tabbar-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px; }
+/* Away from the job (Jobs, the menu), This job reads as its street. */
+.tab-job-street { display: none; }
+body:has(#dashboardOverlay.open) .tab-job-street:not(:empty),
+body:has(#sidebarPanel.open) .tab-job-street:not(:empty) { display: block; }
+body:has(#dashboardOverlay.open) .tab-job-street:not(:empty) + .tab-job-label,
+body:has(#sidebarPanel.open) .tab-job-street:not(:empty) + .tab-job-label { display: none; }
 .tab-icon { position: relative; display: flex; }
 .tab .icon { transition: transform 0.2s cubic-bezier(0.34, 1.4, 0.5, 1); }
 .tab:active .icon { transform: scale(0.88); }
@@ -5391,7 +5023,6 @@ body:not(:has(#dashboardOverlay.open)):not(:has(#sidebarPanel.open)) .tab[data-t
   background: var(--accent-hi); color: var(--accent-ink); font: 800 calc(10.5px * var(--ts)) 'Inter', sans-serif;
   box-shadow: 0 0 0 2px rgb(14,24,33);
 }
-.tab-count[hidden] { display: none; }
 .tab-progress {
   position: absolute; top: -7px; left: calc(100% - 8px);
   min-width: 17px; height: 17px; padding: 0 4px; box-sizing: border-box; border-radius: 9px;
@@ -5519,6 +5150,11 @@ body:not(.dark-screen) .sidebar:not(.on-page) { background: var(--backdrop); bac
 body:not(.dark-screen) .dash-hero-date { color: var(--accent-glow); }
 body:not(.dark-screen) .dash-hero-title { color: var(--on-ink); }
 body:not(.dark-screen) .dash-hero-title b { color: var(--pink); }
+body:not(.dark-screen) .dash-hero-more, body:not(.dark-screen) .dash-parked { color: var(--on-ink2); }
+body:not(.dark-screen) .dash-hero-more i { color: var(--on-ink2); }
+body:not(.dark-screen) .dash-hero-more button { color: var(--pink); }
+body:not(.dark-screen) .dash-part { color: var(--accent-glow); }
+body:not(.dark-screen) .dash-parked .link-btn { color: var(--accent-glow); }
 body:not(.dark-screen) .dash-tabs { border-bottom-color: rgba(255,255,255,0.1); }
 body:not(.dark-screen) .dash-tab { color: var(--on-ink2); }
 body:not(.dark-screen) .dash-tab.active { color: var(--on-ink); }
@@ -5533,24 +5169,46 @@ body:not(.dark-screen) .sidebar:not(.on-page) .drawer-group-label::after { backg
 body:not(.dark-screen) .sidebar:not(.on-page) .drawer-legal,
 body:not(.dark-screen) .sidebar:not(.on-page) .drawer-legal a { color: var(--on-ink2); }
 
-/* ── MENU: ACCOUNT ── who's signed in, at the top of the menu. */
+/* ── MENU: ACCOUNT ── who's signed in, at the top of the menu. The card
+   is the way in to Your sign-in. */
 .menu-account {
+  display: flex; align-items: center; gap: 12px; width: 100%;
   margin: 4px 0 18px; padding: 14px; border-radius: 14px;
   background: var(--surface); border: 1px solid var(--border);
   box-shadow: 0 6px 20px rgba(0,40,80,0.06);
+  font: inherit; color: var(--text); text-align: left; cursor: pointer;
 }
-.menu-account-who { display: flex; align-items: center; gap: 12px; }
 .menu-account-avatar {
   flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: linear-gradient(145deg, var(--accent-hi), var(--accent2)); color: #fff;
   font: 800 calc(15px * var(--ts)) 'Inter', sans-serif;
 }
-.menu-account-text { min-width: 0; }
+.menu-account-text { flex: 1; min-width: 0; }
+.menu-account-text > span { display: block; }
 .menu-account .profile-dropdown-name { font-size: calc(15px * var(--ts)); }
-.menu-account-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
-.menu-account-actions .profile-dropdown-item { width: auto; flex: 1 1 auto; white-space: nowrap; justify-content: center; min-height: 40px; border: 1px solid var(--border); border-radius: 10px; }
+.menu-account .profile-dropdown-business { margin-top: 4px; }
+.menu-account-go { flex: none; font-size: calc(12px * var(--ts)); color: var(--text3); }
+.menu-account .panel-toggle-chevron { flex: none; color: var(--text3); }
 .sidebar.on-page .menu-account { display: none; }
+/* Sign out: the last thing in the menu, and quiet. */
+.drawer-signout {
+  display: block; margin: 18px auto 0; min-height: 44px; padding: 0 18px;
+  border: none; background: none; cursor: pointer;
+  font: 600 calc(13px * var(--ts)) 'Inter', sans-serif; color: var(--text2);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+body:not(.dark-screen) .sidebar:not(.on-page) .drawer-signout { color: var(--on-ink2); }
+/* Your sign-in (Menu › the card on top) */
+.signin-line { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+.signin-line .job-input { flex: 1; min-width: 0; }
+.signin-email { margin: 6px 0 2px; font-size: calc(14px * var(--ts)); font-weight: 650; color: var(--text); overflow-wrap: anywhere; }
+.signin-pass { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.signin-pass .settings-row-title { margin: 6px 0 0; }
+.signin-pass .job-input { padding-right: 76px; }
+.signin-pass .auth-error:empty { margin-top: 0; }
+.signin-pass .settings-primary-btn { align-self: flex-start; margin-top: 6px; }
+#signinPanel .settings-row-desc a { color: var(--accent2); font-weight: 600; }
 
 /* Delete sits quietly at the foot of the job sheet. */
 .dash-detail-foot { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--border); }
@@ -5592,34 +5250,58 @@ body:not(.dark-screen) .sidebar:not(.on-page) .drawer-legal a { color: var(--on-
 .finish-next-pdf:disabled { opacity: 0.4; cursor: not-allowed; }
 /* Report done: the tick that replaces the Done button once it's tapped. */
 .finish-done { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--green-edge); background: var(--green-wash); color: var(--green); }
-.finish-done[hidden] { display: none; }
 .finish-done-tick { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--green); color: #FFFFFF; }
 .finish-done-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .finish-done-text b { font-size: calc(15.5px * var(--ts)); font-weight: 700; }
 .finish-done-text small { font-size: calc(12.5px * var(--ts)); color: var(--text2); }
 .finish-done .link-btn { flex: none; font-size: calc(12.5px * var(--ts)); }
-.finish-next-label[hidden], .finish-next-btn[hidden] { display: none; }
+.finish-resend { align-self: center; font-size: calc(13px * var(--ts)); }
+/* What the report is still missing, above Report done: the check sheet's
+   own amber box (.send-review-gaps), so the two read as one list. */
+.finish-gaps { margin-bottom: 4px; }
+
+/* Walking that list (SHOW ME in js/app/editing.js): a slim bar under the
+   report, above the dock, with how many are left and Next. */
+.blank-walk {
+  flex: none; display: flex; align-items: center; gap: 8px; margin: 6px 12px 4px; padding: 5px 5px 5px 16px;
+  border-radius: 99px; border: 1px solid rgba(212,146,10,0.45); background: #FDF7EA; box-shadow: 0 8px 22px rgba(0,0,0,0.3);
+}
+.blank-walk-text { flex: 1; min-width: 0; font-size: calc(13px * var(--ts)); font-weight: 650; color: var(--yellow-text); }
+.blank-walk-next {
+  flex: none; min-height: 38px; padding: 0 16px; border: 1px solid var(--border2); border-radius: 99px; background: var(--surface);
+  font-family: inherit; font-size: calc(13.5px * var(--ts)); font-weight: 700; color: var(--accent2); cursor: pointer;
+}
+.blank-walk-close { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--yellow-text); cursor: pointer; }
+body.dark-screen .blank-walk { background: rgba(255,176,0,0.10); }
 body.dark-screen .finish-next-btn { border: 2px solid var(--border2); }
 body.dark-screen .finish-next-btn.primary { background: var(--accent-glow); color: #000000; box-shadow: none; }
 body.dark-screen .finish-next-btn.primary .finish-next-icon { background: rgba(0,0,0,0.12); color: #000000; }
 body.dark-screen .finish-next-btn.primary small, body.dark-screen .finish-next-btn.primary .finish-next-chev { color: rgba(0,0,0,0.75); }
 
-/* The certificate on the quote's Treatment step, and its Email button lit when arriving from the dashboard. */
+/* The treatment certificate on This job (its Next step card, then under Treatment), and its Email button lit when arriving from the Jobs list. */
 .qp-cert { margin-top: 8px; padding: 12px; border-radius: 12px; border: 1px solid rgba(var(--accent-rgb), 0.35); background: var(--surface); }
 .qp-cert.sent { border-color: var(--border); }
 .qp-cert-title { font-size: calc(13.5px * var(--ts)); font-weight: 700; color: var(--text); }
 .qp-cert-text { margin: 3px 0 0; font-size: calc(13px * var(--ts)); line-height: 1.5; color: var(--text2); }
+/* What the certificate would go without, above its Email button. */
+.qp-cert-gaps {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 8px; padding: 8px 12px; border-radius: 10px;
+  border: 1px solid rgba(212,146,10,0.45); background: #FDF7EA; font-size: calc(13px * var(--ts)); line-height: 1.45; color: var(--yellow-text);
+}
+.qp-cert-gaps span { flex: 1 1 60%; min-width: 0; }
+.qp-cert-gaps .quote-link-btn { flex: none; min-height: 36px; }
+body.dark-screen .qp-cert-gaps { background: rgba(255,176,0,0.10); }
 .qp-cert .quote-step-actions, .qp-cert .qp-cert-actions { margin-top: 10px; }
+/* Email and PDF are one row of buttons the same height. */
+.qp-cert .qp-cert-actions { align-items: stretch; }
 .qp-cert-actions .qp-cert-email { flex: 1 1 auto; }
 /* Given in person: a quiet line under the buttons, still a full-size tap. */
 .qp-cert-handed { display: block; min-height: 44px; margin: 2px 0 -8px; padding: 0; border: none; background: none; cursor: pointer;
   font: 500 calc(12.5px * var(--ts)) 'Inter', sans-serif; color: var(--text3); text-align: left; }
 .qp-cert-handed span { font-weight: 650; color: var(--accent2); }
-.qp-cert-email.flash { animation: qp-flash 0.8s ease-in-out 3; }
+.qp-cert-email.flash, .job-way-link.flash, .job-signed-email.flash { animation: qp-flash 0.8s ease-in-out 3; }
 @keyframes qp-flash { 50% { box-shadow: 0 0 0 6px rgba(var(--accent-rgb), 0.3); } }
-@media (prefers-reduced-motion: reduce) { .qp-cert-email.flash { animation: none; } }
-
-.dash-search[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .qp-cert-email.flash, .job-way-link.flash, .job-signed-email.flash { animation: none; } }
 
 /* Two fields that belong together (the termite system and its name),
    joined down the left by the same side line as the job sheet. */
@@ -5665,14 +5347,14 @@ body.dark-screen .finish-next-btn.primary small, body.dark-screen .finish-next-b
 .rec-line-more { border-style: dashed; color: var(--text2); }  /* the lines that don't fit this report */
 .rec-line:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .rec-lines-added { list-style: none; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
-.rec-lines-added[hidden] { display: none; }
 .rec-lines-added li { position: relative; padding-left: 16px; font-size: calc(13px * var(--ts)); line-height: 1.5; color: var(--text2); }
 .rec-lines-added li::before { content: ''; position: absolute; left: 3px; top: 8px; width: 5px; height: 5px; border-radius: 99px; background: var(--accent); }
 
 /* ── REPORT STEPS ──
    Six steps that fit across a phone without sliding: the dot sits over the
    label. The strip still scrolls if larger text makes it wider. */
-.section-tabs { gap: 2px; padding: 6px 8px; }
+/* On a computer the strip sits over the report's column. */
+.section-tabs { gap: 2px; padding: 6px max(8px, calc(50% - 344px)); }
 .section-tab {
   flex: 1 1 auto; min-width: 0;
   flex-direction: column; justify-content: center; gap: 4px;
@@ -5685,9 +5367,17 @@ body.dark-screen .finish-next-btn.primary small, body.dark-screen .finish-next-b
 body.large-touch .section-tab { flex: 0 0 auto; }
 /* The in-app numbers read oddly (the first tab is 3.); the PDF keeps them. */
 .report-section .section-header h3 .sec-num { display: none; }
-/* The agreement banner shows where it's acted on: before the inspection and
-   at sign-off. */
-#reportBody:not([data-step="property"]):not([data-step="finish"]) > #agreementBanner { display: none !important; }
+/* The agreement banner shows where it's acted on, before the inspection.
+   Finish lists an unsigned agreement with what else is missing. */
+#reportBody:not([data-step="property"]) > #agreementBanner { display: none !important; }
+/* One filled button. On Finish the done banner would only repeat Finish's
+   own next step. On Property, an agreement still to sign comes first: its
+   button is the filled one, and the done banner's goes quiet. */
+#reportBody[data-step="finish"] > #reportDoneBanner { display: none !important; }
+#reportBody[data-step="property"]:has(> #agreementBanner:not([hidden]):not(.waiting)) #reportDoneBannerBtn,
+body:not(.dark-screen) #reportBody[data-step="property"]:has(> #agreementBanner:not([hidden]):not(.waiting)) #reportDoneBannerBtn {
+  background: transparent; border-color: currentColor; color: inherit; box-shadow: none;
+}
 /* The Property step's Job details card: back to the address and booking. */
 .report-job-card {
   display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 12px; padding: 12px 14px; text-align: left;
@@ -5703,6 +5393,9 @@ body.large-touch .section-tab { flex: 0 0 auto; }
 .report-job-edit { flex: none; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border2); font-size: calc(13px * var(--ts)); font-weight: 700; color: var(--accent2); }
 body.dark-screen .report-job-card { border: 2px solid var(--border2); box-shadow: none; }
 
+/* The report's top row: back to This job, the address, the ring. */
+body:not(.dark-screen) header .header-back { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
+.header-job { font-size: calc(14px * var(--ts)); }
 /* The header's address opens the job's details. */
 button.header-job { border: none; background: none; padding: 0; text-align: left; font-family: inherit; cursor: pointer; }
 button.header-job.has-job { text-decoration: underline; text-decoration-color: rgba(255,255,255,0.25); text-underline-offset: 3px; }
@@ -5734,14 +5427,8 @@ body.dark-screen .report-done-banner .agreement-banner-btn { background: var(--a
   background: var(--surface); color: var(--text2); border: 1px solid var(--border2); box-shadow: 0 4px 14px rgba(0,0,0,0.25);
   transform: translateX(calc(-44px + var(--pull, 0) * 60px)); opacity: calc(0.3 + var(--pull, 0) * 0.7);
 }
-.edge-back[hidden] { display: none; }
 .edge-back.ready { background: var(--accent2); border-color: var(--accent2); color: #FFFFFF; }
 
-/* The job's documents strip: when it runs off the side, its edge fades so
-   it reads as more to scroll to (renderDocStrips). */
-.doc-strip.more-right { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent); }
-.doc-strip.more-left { -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px); mask-image: linear-gradient(90deg, transparent, #000 32px); }
-.doc-strip.more-left.more-right { -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 40px), transparent); }
 
 
 /* Next: always there, so the steps can be walked in order; quieter until
@@ -5876,8 +5563,6 @@ body.dark-screen .sheet-voice { background: var(--surface2); }
 body:not(.dark-screen) .agreement-banner.last-visit-banner, .agreement-banner.last-visit-banner { border-color: var(--accent-edge); background: var(--accent-wash); color: var(--accent2); box-shadow: none; }
 body.dark-screen .agreement-banner.last-visit-banner { border-color: rgba(var(--accent-rgb),0.45); background: rgba(var(--accent-rgb),0.1); color: var(--accent2); }
 .last-visit-skip { flex-shrink: 0; padding: 0 6px; min-height: 32px; font-size: calc(12px * var(--ts)); font-weight: 700; color: inherit; opacity: 0.8; }
-.last-visit-skip[hidden] { display: none; }
-.agreement-banner[hidden] { display: none; }
 body:not(.dark-screen) .agreement-banner.last-visit-banner .agreement-banner-btn { background: var(--accent2); border-color: var(--accent2); color: #fff; box-shadow: none; }
 .last-visit-rows { display: flex; flex-direction: column; gap: 8px; }
 .last-visit-row { padding: 10px 12px; border-radius: 10px; background: var(--bg); border-left: 3px solid transparent; }
@@ -5892,7 +5577,6 @@ body:not(.dark-screen) .agreement-banner.last-visit-banner .agreement-banner-btn
 .seat-pick label { font-weight: 600; }
 .seat-pick .seat-input { width: 76px; min-height: 40px; padding: 8px 10px; text-align: center; }
 .seat-total { color: var(--text); font-weight: 600; }
-.settings-row[hidden], .auth-field[hidden] { display: none; }
 
 /* Your team */
 .team-places { padding: 4px 0 8px; font-size: calc(12.5px * var(--ts)); color: var(--text2); }
@@ -5908,7 +5592,6 @@ body:not(.dark-screen) .agreement-banner.last-visit-banner .agreement-banner-btn
 .team-invite .job-input { flex: 1; min-width: 0; }
 .team-help { padding: 4px 0 8px; }
 .team-more { margin-top: 4px; }
-.team-more[hidden] { display: none; }
 
 /* ── SMALL PHONES ── at 320–359 px the dashboard's four filters fit
    without scrolling off, and the quote's total keeps to one line beside
@@ -5952,7 +5635,7 @@ body:not(.dark-screen) .agreement-banner.last-visit-banner .agreement-banner-btn
 .job-page #jobPanel > .panel-label { display: none; }
 .job-page #jobPanel { border-radius: 16px; margin-bottom: 8px; }
 .job-page .job-panel-body { padding: 14px 16px 6px; }
-.job-page .job-actions, .job-page .sync-status { padding-left: 16px; padding-right: 16px; }
+.job-page .sync-status { padding-left: 16px; padding-right: 16px; }
 .job-page .sync-status { padding-bottom: 14px; }
 body:not(.dark-screen) .job-hero-addr { color: var(--on-ink); }
 body:not(.dark-screen) .job-hero-sub,
@@ -6040,6 +5723,20 @@ body:not(.dark-screen) .job-page #jobPanel { border-color: transparent; box-shad
 .job-pdf .dash-detail-links button { min-height: 48px; }
 .job-pdf .dash-detail-links button.primary { border-color: transparent; background: var(--accent-grad); color: #fff; }
 .job-pdf.made .job-step-label { color: var(--green); }
+.job-pdf.amending { border-color: #F0B43C; }
+.job-pdf .dash-detail-links { flex-wrap: wrap; }
+/* Amend is the quiet one of the row. */
+.job-pdf .dash-detail-links .job-pdf-amend { flex: 0 0 auto; padding: 0 16px; border-color: transparent; background: none; color: var(--text2); text-decoration: underline; text-underline-offset: 3px; }
+/* Finalise as the next step: Email, Save, then what's in it. */
+.job-next .job-pdf-more { margin: 6px 0 -8px; }
+.job-next .job-pdf-btn:disabled, .job-pdf .job-pdf-btn:disabled { opacity: 0.6; }
+/* What the job skipped: quiet lines under its steps, each with the one
+   thing that can still be done about it. */
+.job-skipped { margin: 12px 4px 0; }
+.job-skipped p { margin: 0; padding: 4px 0; font-size: calc(13.5px * var(--ts)); line-height: 1.45; color: var(--text3); }
+.job-skipped button { min-height: 32px; padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--accent2); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+body:not(.dark-screen) .job-skipped p { color: var(--on-ink2); }
+body:not(.dark-screen) .job-skipped button { color: var(--accent-glow); }
 /* What went in, folded under the buttons. */
 .job-pdf-more { margin: 4px 0 -6px 58px; }
 .job-pdf-more > summary { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; list-style: none;
@@ -6056,6 +5753,27 @@ body:not(.dark-screen) .job-page #jobPanel { border-color: transparent; box-shad
 .job-details[open] .job-details-head .job-step-chev { transform: rotate(90deg); }
 body .job-page .job-details #jobPanel:not(.menu-page-active) { margin: 0; border: none; border-top: 1px solid var(--border); border-radius: 0; box-shadow: none; }
 .job-steps .job-details { margin-top: 0; }
+/* Steps kept on the page (the client's answer, the treatment, bait visits)
+   open in place like Job details: what was recorded, and what can be done
+   about it. */
+.job-fold[open] .job-details-head .job-step-chev { transform: rotate(90deg); }
+.job-fold-body { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 14px; border-top: 1px solid var(--border); }
+.job-fold-text { margin: 0; font-size: calc(14px * var(--ts)); line-height: 1.5; color: var(--text2); }
+.job-fold-text.good strong { color: var(--green); }
+.job-fold-text.bad strong { color: var(--risk); }
+.job-fold-text.warn strong { color: var(--yellow-text); }
+.job-fold-body .qp-links { margin-top: 0; }
+.job-fold-body .qp-cert, .job-fold-body .bait-card { margin-top: 4px; }
+.job-steps li.now > .job-fold { border: 2px solid var(--accent); }
+body:not(.dark-screen) .job-page .job-steps li.now > .job-fold { border-color: var(--accent-hi); }
+/* A step that can't be started yet is a line, not a button. */
+.job-step-still { box-sizing: border-box; cursor: default; }
+/* The Next step card does a step that's done on this page: the client's
+   answer, the certificate. */
+.job-next .quote-answer-btns { margin-top: 14px; }
+.job-next .quote-answer-btns .quote-btn { height: 50px; border-radius: 14px; font-size: calc(15px * var(--ts)); }
+.job-next .qp-links { margin-top: 6px; }
+.job-next .qp-cert { margin-top: 14px; }
 
 /* On the ink backdrop (the light screen): white cards with a shadow, the
    hero's text and buttons light. */
@@ -6089,14 +5807,13 @@ body:not(.dark-screen) .job-page .job-step:active { background: var(--surface2);
 .job-group-icon { flex: none; width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: rgba(var(--accent-rgb), 0.1); color: var(--accent2); }
 .job-group + .job-group { margin-top: 6px; padding-top: 16px; border-top: 1px solid var(--border); }
 .job-field-hint { font-weight: 500; color: var(--text3); }
+/* "Inspected here before, on …", under the address. */
+.job-last-visit { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: rgba(var(--accent-rgb), 0.07); font-size: calc(13.5px * var(--ts)); font-weight: 500; line-height: 1.4; color: var(--text2); }
 #jobPanel .select-cards .choice-card { min-height: 50px; }
 #cards-jobState .choice-card { align-items: center; padding: 6px 4px; text-align: center; }
 #cards-jobInspectionType .choice-card { min-height: 58px; gap: 2px; padding-top: 7px; padding-bottom: 7px; }
 #cards-jobInspectionType .choice-card-desc { font-size: calc(12px * var(--ts)); }
 body.large-touch #jobPanel .select-cards .choice-card { min-height: 64px; }
-.job-page .job-actions { grid-template-columns: 1fr; }
-.job-page .job-action-btn.new { display: none; }
-#jobOverlay.new-job .topbar-new { display: none; }
 
 .job-hero.new { padding-bottom: 2px; }
 .job-hero.new .job-hero-sub { font-size: calc(15.5px * var(--ts)); line-height: 1.45; }
@@ -6109,8 +5826,11 @@ body .job-page .job-details.new #jobPanel:not(.menu-page-active) { border: none;
 .job-details.new .job-group,
 .job-details.new .job-group + .job-group { margin: 0 0 12px; padding: 16px 16px 6px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); }
 .job-details.new .job-group:last-of-type { margin-bottom: 0; }
-.job-details.new .job-actions, .job-details.new .sync-status { display: none; }
+.job-details.new .sync-status { display: none; }
 .job-next-new { margin-top: 12px; }
+/* Under the two ways to sign: coming back to it later is a quiet line. */
+.job-next .job-next-later { margin-top: 4px; }
+.job-next .job-next-later button { border-color: transparent; background: none; color: var(--text2); text-decoration: underline; text-underline-offset: 3px; }
 body:not(.dark-screen) .job-hero-tip { color: var(--on-ink2); }
 body:not(.dark-screen) .job-hero-tip svg { color: var(--accent-glow); }
 body:not(.dark-screen) .job-page .job-details.new,
@@ -6126,33 +5846,6 @@ body.dark-screen .job-tile-tick { color: #04210F; }
 body.dark-screen .job-act { background: var(--surface); border-color: var(--border2); }
 body.dark-screen .job-details { border: 3px solid var(--frame); border-radius: 6px; }
 
-/* ── DOCUMENT STRIP ──
-   At the top of the report and the quote: back to the job's page, then the
-   job's documents, the one on show lit. Scrolls sideways on a small phone. */
-.doc-strip { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 10px 16px 8px; }
-.doc-strip::-webkit-scrollbar { display: none; }
-.doc-strip:empty { display: none; }
-.doc-chip {
-  flex: none; display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 13px; border-radius: 17px;
-  border: 1px solid var(--border); background: var(--surface); color: var(--text2);
-  font: 600 calc(13px * var(--ts)) 'Inter', sans-serif; cursor: pointer; white-space: nowrap;
-}
-.doc-chip.done::after { content: ''; width: 6px; height: 6px; margin-left: 2px; border-radius: 50%; background: var(--accent); }
-.doc-chip.here { background: var(--accent); border-color: var(--accent); color: #fff; cursor: default; }
-.doc-chip.here.done::after { background: rgba(255,255,255,0.85); }
-.doc-chip-job { padding-left: 8px; color: var(--text); }
-body:not(.dark-screen) .doc-chip { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink2); }
-body:not(.dark-screen) .doc-chip-job { color: var(--on-ink); }
-body:not(.dark-screen) .doc-chip.done::after { background: var(--accent-glow); }
-body:not(.dark-screen) .doc-chip.here { background: linear-gradient(180deg, var(--accent-hi) 0%, var(--accent) 100%); border-color: transparent; color: var(--accent-ink); }
-body:not(.dark-screen) .doc-chip.here.done::after { background: var(--accent-ink); }
-.doc-strip-bar { flex-shrink: 0; }
-body:not(.dark-screen) .doc-strip-bar { background: var(--ink); }
-/* The strip names the document, so the report's own title line steps aside. */
-.report-header .report-title { display: none; }
-.report-header { padding: 0; }
-.report-header .doc-strip { flex: 1; min-width: 0; }
-
 /* The logo's dot is the brand's pink. */
 .logo-dot { fill: var(--pink); stroke: var(--pink); }
 /* Done, signed and clear are green, apart from the blue that marks
@@ -6164,7 +5857,6 @@ body:not(.dark-screen) .doc-strip-bar { background: var(--ink); }
   border-color: rgba(var(--green-rgb), 0.35);
 }
 .agr-signed-chip { background: rgba(var(--green-rgb), 0.16); color: var(--green); }
-body:not(.dark-screen) .doc-chip.done::after { background: var(--green-fill); }
 ::selection { background: rgba(var(--pink-rgb), 0.28); }
 
 /* Check before sending, refreshed: section heads in sentence case, roomier
@@ -6203,16 +5895,21 @@ body:not(.dark-screen) .doc-chip.done::after { background: var(--green-fill); }
   content: ''; position: absolute; left: 2px; top: 17px; width: 7px; height: 7px; border-radius: 99px; background: var(--yellow);
 }
 body.dark-screen .send-review-file .link-btn, body.dark-screen .send-review-fixes .link-btn { background: var(--surface2); }
+/* A line and its button side by side; two buttons drop under the line. */
+.send-review-gaps .send-review-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.send-review-gap-text { flex: 1 1 58%; min-width: 0; }
+.send-review-gaps .send-review-fixes { flex: none; max-width: 100%; margin-top: 0; }
 
-/* Saved reports, refreshed: cards at reading size, with a delete button
-   big enough to hit. */
-.saved-item { gap: 12px; padding: 14px 10px 14px 16px; border-radius: 14px; background: var(--surface); }
-.saved-item:hover { background: var(--accent-wash); }
-.saved-item-address { font-size: calc(15px * var(--ts)); letter-spacing: -0.01em; }
-.saved-item-meta { margin-top: 4px; flex-wrap: wrap; gap: 4px 8px; font-size: calc(12.5px * var(--ts)); }
-.saved-item-risk, .saved-item-quote, .saved-item-status { font-size: calc(11px * var(--ts)); padding: 2px 8px; border-radius: 99px; }
-.saved-item-delete { width: 40px; height: 40px; border-radius: 10px; font-size: calc(16px * var(--ts)); }
-body.dark-screen .saved-item:hover { background: var(--surface2); }
+/* The foot of a sheet: its one action, always in reach while the page
+   above it scrolls, with who it goes to on the button. */
+.page-sheet-foot {
+  flex: none; display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 16px calc(8px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border); background: var(--surface);
+}
+.page-sheet-foot .extract-btn { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-sheet-foot .link-btn { align-self: center; min-height: 36px; margin: 0; }
+.page-sheet-foot-note { font-size: calc(12.5px * var(--ts)); font-weight: 600; line-height: 1.35; color: var(--yellow-text); text-align: center; }
+
 
 /* ── YOUR PRICES (js/price-book.js) ─────────────────────────────────────── */
 .pb-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
@@ -6228,11 +5925,9 @@ body.dark-screen .pb-start { color: var(--yellow); }
 .pb-price .pb-input::placeholder { color: var(--text3); opacity: 0.6; }
 .pb-intro { margin-bottom: 8px; }
 .pb-back { width: 100%; margin-bottom: 10px; }
-.pb-back[hidden] { display: none; }
 .pb-status { padding: 8px 10px; border-radius: 8px; background: rgba(var(--accent-rgb),0.06); color: var(--text2, var(--text)); margin-bottom: 4px; }
 .pb-status.warn { background: rgba(183,121,31,0.10); }
 .pb-owner { margin-bottom: 4px; }
-.pb-owner[hidden] { display: none; }
 .pb-terms { padding: 12px 0 4px; display: flex; flex-direction: column; gap: 6px; }
 .pb-terms-input { width: 100%; resize: vertical; font-family: inherit; }
 .ob-price-list { width: 100%; text-align: left; margin: 4px 0 6px; }
@@ -6243,7 +5938,6 @@ body.dark-screen .pb-start { color: var(--yellow); }
 
 /* ── CHEMICAL REGISTER (js/chemicals.js) ───────────────────────────────── */
 .chem-add { width: 100%; margin: 6px 0 10px; }
-.chem-add[hidden], #chemReset[hidden] { display: none; }
 .chem-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 .chem-card { border: 1px solid var(--border); border-radius: 12px; background: var(--surface2); }
 .chem-card > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 12px; min-height: 44px; cursor: pointer; }
@@ -6262,7 +5956,6 @@ body.dark-screen .pb-start { color: var(--yellow); }
 .treat-use-pest { font-weight: 500; color: var(--text3); }
 .treat-use-note { font-size: calc(12px * var(--ts)); color: #8a5a00; line-height: 1.4; margin-top: 4px; }
 body.dark-screen .treat-use-note { color: var(--yellow); }
-.treat-use-note[hidden], .treat-keep-rate[hidden] { display: none; }
 .treat-keep-rate { margin-top: 4px; }
 .chem-nolink { color: var(--text3); font-weight: 500; }
 .chem-unreg { color: var(--risk, #b42318); font-weight: 700; }
@@ -6272,7 +5965,6 @@ body.dark-screen .treat-use-note { color: var(--yellow); }
 .chem-search { position: relative; margin-bottom: 10px; }
 .chem-search .icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text3); pointer-events: none; }
 .chem-search .job-input { width: 100%; padding-left: 36px; min-height: 44px; box-sizing: border-box; }
-.chem-card[hidden], #chemNoMatch[hidden] { display: none; }
 .chem-docs { display: flex; flex-direction: column; gap: 8px; }
 .chem-doc { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px 10px; }
 .chem-doc-title { font-size: calc(12.5px * var(--ts)); font-weight: 700; color: var(--text); margin-bottom: 6px; }
@@ -6288,6 +5980,7 @@ body.dark-screen .chem-doc-exp.soon { color: var(--yellow); }
 .chem-doc-none { font-size: calc(12.5px * var(--ts)); color: var(--text3); }
 .chem-rates { display: flex; flex-direction: column; gap: 6px; }
 .chem-rates:empty { display: none; }
+.chem-rates-note { margin: -2px 0 4px; font-size: calc(12px * var(--ts)); line-height: 1.45; color: var(--text3); }
 .chem-rate { padding: 6px 0; border-bottom: 1px solid var(--border); }
 .chem-rate:last-child { border-bottom: none; }
 .chem-rate-use { font-size: calc(12.5px * var(--ts)); color: var(--text2, var(--text)); line-height: 1.4; }
@@ -6340,11 +6033,8 @@ body.dark-screen .chem-rate-val.none { color: var(--yellow); }
 .dash-sample.fade-in { animation: dashFade 0.22s ease-out; }
 button.drawer-help { width: 100%; font-family: inherit; text-align: left; cursor: pointer; }
 
-#extractReadBackBtn[hidden] { display: none; }
-
 /* A copy of the report for the agent or solicitor, on the check sheet (js/app/send.js) */
 .send-review-copy { margin: -4px 0 4px; }
-.send-review-copy[hidden], .send-copy-add[hidden], .send-copy-open[hidden] { display: none; }
 .send-copy-open { min-height: 40px; padding: 0; font-size: calc(13.5px * var(--ts)); font-weight: 700; color: var(--accent2); text-align: left; }
 .send-copy-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); }
 .send-copy-add .send-review-file-meta { margin-top: 6px; }

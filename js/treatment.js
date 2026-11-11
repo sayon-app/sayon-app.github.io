@@ -101,17 +101,9 @@ function installedSystemAreas(t, rd) {
   return left.charAt(0).toUpperCase() + left.slice(1);
 }
 
-function formatLongDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso + 'T00:00:00');
-  return isNaN(d) ? iso : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
-}
-
 // The quote's report, for pre-filling a first record.
 function treatmentSourceReport() {
-  const src = typeof currentQuoteSource === 'function' ? currentQuoteSource() : null;
-  if (!src) return {};
-  return (src.key === (currentReportId || 'draft') ? reportData : src.reportData) || {};
+  return quoteReport() || {};
 }
 
 // Months between inspections, from the report's recommendation
@@ -244,12 +236,22 @@ function treatmentPestFromReport(rd, methods) {
   return pests.join('; ');
 }
 
-// ── ON THE QUOTE ──
-function renderTreatmentBlock(q) {
+// ── ON THIS JOB ── The treatment is a step of the job (js/app/job.js): its
+// record sheet opens from there, and once it's recorded the step opens to
+// the record and its certificate. On a finalised job they're the record,
+// and changing them starts with Amend.
+function treatmentRecordLine(q) {
   const t = q.treatment;
-  if (!t) {
-    return `<button class="quote-btn primary quote-step-btn" onclick="openTreatmentRecord()">Record the treatment</button>`;
-  }
+  return `<p class="job-fold-text good"><strong>Treatment recorded</strong>: done on ${escapeHtml(formatAnswerDate(t.date))}${t.technician ? ` by ${escapeHtml(t.technician)}` : ''}</p>
+    ${t.nextInspection ? `<div class="quote-answer-note">Next inspection due ${escapeHtml(formatAnswerDate(t.nextInspection))}</div>` : ''}
+    ${isReportLocked() ? '' : '<div class="qp-links"><button type="button" class="quote-text-btn" onclick="openTreatmentRecord()">Edit the record</button></div>'}`;
+}
+
+// The certificate: where it goes or when it went, what it would go
+// without, and the ways to give it to the client.
+function treatmentCertificateCard(q) {
+  const t = q.treatment;
+  if (!t) return '';
   const many = installedSystems(t).length > 0;
   const who = (q.client || '').trim();
   const first = who.split(/\s+/)[0];
@@ -259,21 +261,19 @@ function renderTreatmentBlock(q) {
   const status = q.certificateSentAt ? `Emailed ${formatIssueDate(q.certificateSentAt)}${who ? ` to ${who}` : ''}`
     : q.certificateHandedAt ? `Given${who ? ` to ${who}` : ''} in person ${formatIssueDate(q.certificateHandedAt)}`
     : to ? `Goes to ${to}` : 'Not sent yet';
-  return `<div class="quote-step">
-      <div><strong>Treatment recorded</strong>: done on ${escapeHtml(formatAnswerDate(t.date))}${t.technician ? ` by ${escapeHtml(t.technician)}` : ''}</div>
-      ${t.nextInspection ? `<div class="quote-answer-note">Next inspection due ${escapeHtml(formatAnswerDate(t.nextInspection))}</div>` : ''}
-    </div>
-    <div class="qp-cert ${given ? 'sent' : ''}">
+  // What the certificate would go without, said before it's emailed.
+  const missing = treatmentRecordGaps(t).filter(Boolean).map(g => g.missing);
+  return `<div class="qp-cert ${given ? 'sent' : ''}">
       <div class="qp-cert-title">${many ? 'Treatment and installation certificates' : 'Treatment certificate'}</div>
       <p class="qp-cert-text">${escapeHtml(status)}</p>
-      ${treatmentSourceReport().propertyState === 'QLD' ? '<div class="quote-answer-note">In Queensland, email alone isn\'t enough: also hand the client a printed copy, or leave one in their letterbox.</div>' : ''}
+      ${missing.length ? `<div class="qp-cert-gaps"><span>The certificate${many ? 's don\'t' : ' doesn\'t'} say ${escapeHtml(joinWithAnd(missing))} yet.</span>${isReportLocked() ? '' : `<button type="button" class="quote-link-btn" onclick="openTreatmentRecord()">Add ${missing.length === 1 ? 'it' : 'them'}</button>`}</div>` : ''}
+      ${treatmentReportFor(q).propertyState === 'QLD' ? '<div class="quote-answer-note">In Queensland, email alone isn\'t enough: also hand the client a printed copy, or leave one in their letterbox.</div>' : ''}
       <div class="qp-cert-actions">
-        <button class="${given ? 'quote-link-btn' : 'quote-btn primary'} qp-cert-email" onclick="emailTreatmentCertificate()">${q.certificateSentAt ? 'Email again' : q.certificateHandedAt ? 'Email a copy' : `Email${first ? ' to ' + escapeHtml(first) : ''}`}</button>
-        <button class="quote-link-btn" onclick="downloadTreatmentCertificate()">PDF</button>
-        <button class="quote-link-btn" onclick="openTreatmentRecord()">Edit</button>
+        <button type="button" class="${given ? 'quote-link-btn' : 'quote-btn primary'} qp-cert-email" onclick="emailTreatmentCertificate()">${q.certificateSentAt ? 'Email again' : q.certificateHandedAt ? 'Email a copy' : `Email${first ? ' to ' + escapeHtml(first) : ''}`}</button>
+        <button type="button" class="quote-link-btn" onclick="downloadTreatmentCertificate()">PDF</button>
       </div>
-      ${given ? '' : `<button class="qp-cert-handed" onclick="markCertificateHanded()">Handed ${many ? 'them' : 'it'} over in person? <span>Mark as given</span></button>`}
-    </div>${typeof renderBaitBlock === 'function' ? renderBaitBlock(q) : ''}`;
+      ${given ? '' : `<button type="button" class="qp-cert-handed" onclick="markCertificateHanded()">Handed ${many ? 'them' : 'it'} over in person? <span>Mark as given</span></button>`}
+    </div>`;
 }
 
 // ── THE RECORD SHEET ──
@@ -325,7 +325,12 @@ function openTreatmentRecord() {
   document.getElementById('trSiteExisting').value = site.existing || '';
   renderTreatmentSiteSummary();
   ['trSiteBuilding', 'trSiteFloor', 'trSiteSurrounds', 'trSiteExisting'].forEach(id => { document.getElementById(id).oninput = renderTreatmentSiteSummary; });
-  treatmentPlanDraft = sitePlanHasContent(t.plan) ? JSON.parse(JSON.stringify(t.plan)) : null;
+  // A new record starts from the report's plan, when the inspector drew
+  // one: the house and what was found are there, to add the treatment to.
+  const reportPlan = !q.treatment && treatmentSourceReport().sitePlan;
+  treatmentPlanFromReport = !sitePlanHasContent(t.plan) && sitePlanHasContent(reportPlan);
+  treatmentPlanDraft = sitePlanHasContent(t.plan) ? JSON.parse(JSON.stringify(t.plan))
+    : treatmentPlanFromReport ? JSON.parse(JSON.stringify(reportPlan)) : null;
   renderTreatmentPlan();
   document.getElementById('trAreas').value = t.areas || '';
   document.getElementById('trNotTreated').value = t.notTreated || '';
@@ -338,9 +343,9 @@ function openTreatmentRecord() {
   cancelSheetVoice('treatment');
   document.getElementById('treatmentOverlay').classList.add('open');
   if (!treatmentPad) {
-    treatmentPad = createSignaturePad(document.getElementById('trSigCanvas'), document.getElementById('trSigPlaceholder'), () => { updateTreatmentSaveBtn(); unsavedSheetChanged(); });
+    treatmentPad = createSignaturePad(document.getElementById('trSigCanvas'), document.getElementById('trSigPlaceholder'), () => { keepSheetSignature(treatmentPad, false); updateTreatmentSaveBtn(); unsavedSheetChanged(); });
   }
-  treatmentPad.show(t.signature || '');
+  openSheetSignature(treatmentPad, t.signature || '', t.technician);
   if (!treatmentSketch) {
     treatmentSketch = createSignaturePad(document.getElementById('trSketchCanvas'), document.getElementById('trSketchPlaceholder'), unsavedSheetChanged);
   }
@@ -365,15 +370,25 @@ function openTreatmentRecord() {
 // the rest fold.
 function treatmentFoldLines() {
   const v = id => document.getElementById(id).value.trim();
-  const ticked = document.querySelectorAll('#trMethods input[type=checkbox]:checked').length;
-  const products = readTreatmentProducts().map(p => p.name).filter(Boolean);
-  const notice = v('trNotice');
-  const need = text => ({ warn: true, text });
+  const methods = {};
+  document.querySelectorAll('#trMethods input[type=checkbox]:checked').forEach(box => { methods[box.dataset.key] = ''; });
+  return treatmentRecordGaps({ technician: v('trTech'), licence: v('trLicence'), methods, products: readTreatmentProducts(),
+    areas: v('trAreas'), notice: v('trNotice'), noticeWhere: v('trNoticeWhere'), nextInspection: v('trNext') })
+    .map(g => g ? { warn: true, text: g.need } : {});
+}
+
+// What a record's certificate still needs, part by part (four entries,
+// null where a part is done). need is what the record sheet's fold says;
+// missing is how the certificate card names it once the record is saved,
+// since a record saves with gaps so a technician can finish it later.
+function treatmentRecordGaps(t) {
+  const gap = (need, missing) => ({ need, missing });
+  const products = (t.products || []).map(p => p.name).filter(Boolean);
   return [
-    !v('trTech') ? need('Add the technician') : !v('trLicence') ? need('Add the licence no.') : {},
-    !ticked ? need('Tick what was done') : !products.length ? need('Name the product used') : {},
-    !v('trAreas') ? need('Add the areas treated') : {},
-    notice !== 'none' && !v('trNoticeWhere') ? need('Say where the notice went') : !v('trNext') ? need('Add the next inspection date') : {},
+    !t.technician ? gap('Add the technician', 'the technician\'s name') : !t.licence ? gap('Add the licence no.', 'the technician\'s licence number') : null,
+    !Object.keys(t.methods || {}).length ? gap('Tick what was done', 'what was done') : !products.length ? gap('Name the product used', 'the product used') : null,
+    !t.areas ? gap('Add the areas treated', 'the areas treated') : null,
+    t.notice !== 'none' && !t.noticeWhere ? gap('Say where the notice went', 'where the notice went') : !t.nextInspection ? gap('Add the next inspection date', 'the next inspection date') : null,
   ];
 }
 
@@ -396,45 +411,29 @@ function renderTreatmentSiteSummary() {
 }
 
 // ── THE SITE PLAN ON THE RECORD ── The drawn plan (js/site-plan.js) is kept
-// here until the record is saved.
-let treatmentPlanDraft = null;
+// here until the record is saved. treatmentPlanFromReport: it's still the
+// report's plan as it came, nothing added yet.
+let treatmentPlanDraft = null, treatmentPlanFromReport = false;
 
 function renderTreatmentPlan() {
   drawTreatmentPlan();
   renderTreatmentFolds();
 }
 function drawTreatmentPlan() {
-  const el = document.getElementById('trPlan');
-  const plan = treatmentPlanDraft;
-  if (!sitePlanHasContent(plan)) {
-    el.innerHTML = `<button type="button" class="treat-plan-empty" onclick="openTreatmentSitePlan()">
-        <span class="treat-plan-empty-title">Draw the site plan</span>
-        <span class="treat-plan-empty-text">The building, what you treated, any stations and the notice. It prints on the certificate.</span>
-      </button>`;
-    return;
-  }
-  const sum = sitePlanSummary(plan);
-  const sub = sitePlanHasSubfloor(plan);
-  const subSum = sub ? sitePlanSubSummary(plan) : '';
-  el.innerHTML = `<button type="button" class="treat-plan-view" onclick="openTreatmentSitePlan()" aria-label="Edit the site plan">${sitePlanSVG(plan)}</button>
-    ${sitePlanLegendHTML(plan)}
-    ${sum ? `<p class="quote-hint">The plan shows ${escapeHtml(sum)}.</p>` : ''}
-    ${sub ? `<div class="treat-plan-sub">
-      <p class="treat-plan-caption">Subfloor</p>
-      <button type="button" class="treat-plan-view" onclick="openTreatmentSitePlan('sub')" aria-label="Edit the subfloor plan">${sitePlanSVG(plan, { layer: 'sub' })}</button>
-      ${sitePlanLegendHTML(plan, { layer: 'sub' })}
-      ${subSum ? `<p class="quote-hint">The subfloor plan shows ${escapeHtml(subSum)}.</p>` : ''}
-    </div>` : ''}
-    <button type="button" class="quote-link-btn" onclick="openTreatmentSitePlan()">Edit the site plan</button>
-    ${sub ? '' : '<button type="button" class="quote-link-btn" onclick="openTreatmentSitePlan(\'sub\')">Add the subfloor</button>'}`;
+  document.getElementById('trPlan').innerHTML = sitePlanCardHTML(treatmentPlanDraft, 'openTreatmentSitePlan', {
+    empty: ['Draw the site plan', 'The building, what you treated, any stations and the notice. It prints on the certificate.'],
+    note: treatmentPlanFromReport ? 'Started from the report\'s plan. Add what you treated and any stations.' : '',
+  });
 }
 
 function openTreatmentSitePlan(layer) {
   // The stations counted on the record are how many Stations all round places.
   const baitQty = document.querySelector('#trMethods [data-qty="bait"]');
   const stations = baitQty && !baitQty.hidden ? parseInt(baitQty.value, 10) || 0 : 0;
+  const methods = [...document.querySelectorAll('#trMethods input[type=checkbox]:checked')].map(box => box.dataset.key);
   openSitePlan(treatmentPlanDraft, plan => {
     treatmentPlanDraft = sitePlanHasContent(plan) ? plan : null;
+    treatmentPlanFromReport = false;
     renderTreatmentPlan();
     unsavedSheetChanged();
     // The stations drawn fill an empty station count, and tick baiting.
@@ -451,7 +450,7 @@ function openTreatmentSitePlan(layer) {
       const lQty = document.querySelector(`#trMethods [data-qty="${k}"]`);
       if (lm && lBox && lBox.checked && lQty && !lQty.value.trim()) lQty.value = String(lm);
     });
-  }, { stations });
+  }, { stations, methods });
   if (layer === 'sub') setSitePlanLayer('sub');
 }
 
@@ -874,7 +873,7 @@ function readTreatmentForm() {
     nextInspection: v('trNext'),
     warranty: v('trWarranty'),
     notes: v('trNotes'),
-    signature: treatmentPad && !treatmentPad.empty ? treatmentPad.canvas.toDataURL('image/png') : '',
+    signature: padSignature(treatmentPad),
     at: Date.now(),
   };
 }
@@ -890,12 +889,12 @@ function saveTreatmentRecord() {
   persistQuote();
   storeQuoteOnReport(q, true);
   closeTreatmentRecord();
-  renderQuoteAnswer();
+  renderQuoteProgress();
   if (typeof renderIssueState === 'function') renderIssueState();
-  if (typeof renderSavedList === 'function') renderSavedList();
-  // On to the certificate, with the bait station visits under it.
-  setTimeout(() => { const st = document.getElementById('qgStep4'); if (st) st.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 60);
-  showToast(typeof baitInstalled === 'function' && baitInstalled(q) ? 'Treatment recorded. Send the certificate, and record bait visits just under it' : 'Treatment recorded. The certificate is ready to send', 'success');
+  refreshJobsList();
+  // On to the certificate, which is This job's next step.
+  jobShowNext();
+  showToast('Treatment recorded. The certificate is ready to send', 'success');
   track('treatment_recorded', { methods: Object.keys(t.methods).length });
 }
 
@@ -913,7 +912,7 @@ function downloadTreatmentCertificate() {
       if (!both) return cert;
       const lib = await ensurePdfLibLoaded();
       const joined = await joinPdfs(lib, [cert.blob, (await buildTreatmentCertificatePDF(q, { install: true })).blob]);
-      return { blob: new Blob([await joined.save()], { type: 'application/pdf' }), fname: cert.fname.replace('_Treatment_Certificate_', '_Certificates_') };
+      return { blob: new Blob([await joined.save()], { type: 'application/pdf' }), fname: cert.fname.replace(/^Treatment_Certificate_/, 'Certificates_') };
     })
     .then(({ blob, fname }) => { track('certificate_pdf_made', { install: both }); return deliverPdfBlob(blob, fname, {
       title: name,
@@ -1257,6 +1256,5 @@ function buildTreatmentCertificatePDF(q, { install = false } = {}) {
   }
 
   drawPdfDocFooters(doc, `${install ? 'Installation certificate' : 'Certificate'} ${number}${company.name ? `  ·  ${company.name}` : ''}`, q.reportKey);
-  const safe = fileNamePart(q.address) || 'Property';
-  return { blob: doc.output('blob'), fname: `SAYON_${install ? 'Installation' : 'Treatment'}_Certificate_${number.replace(/[^\w-]+/g, '')}_${safe}.pdf` };
+  return { blob: doc.output('blob'), fname: pdfFileName(install ? 'Installation Certificate' : 'Treatment Certificate', q.address, { ref: number }) };
 }

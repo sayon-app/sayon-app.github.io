@@ -54,15 +54,16 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   state.saveFails = true;
   await p.evaluate(async () => { await populateFields({ structureType: 'Single storey house', riskLevel: 'low' }); saveCurrentReport(true); });
   await p.waitForTimeout(1500);
-  let list = await p.evaluate(() => { renderSavedList(); return { html: document.getElementById('savedList').innerText, waiting: getSavedReports().filter(notInAccount).length }; });
-  check(list.waiting === 1 && /Not in your account yet/.test(list.html), 'a report the account refused is marked "Not in your account yet"');
-  await p.evaluate(() => { toggleDrawer(); openMenuPage('savedPanel'); }); await p.waitForTimeout(400);
+  const jobsText = () => p.evaluate(() => ({ html: document.getElementById('dashboardJobs').innerText, waiting: getSavedReports().filter(notInAccount).length }));
+  await p.evaluate(() => tabGo('dashboard')); await p.waitForTimeout(500);
+  let list = await jobsText();
+  check(list.waiting === 1 && /Not in your account yet/i.test(list.html), 'a job the account refused is tagged "Not in your account yet" on its Jobs card');
   await p.screenshot({ path: `${OUT}/1-not-in-account.png` });
-  await p.evaluate(() => { showMenuPage(null); toggleDrawer(); });
   state.saveFails = false; const savesBefore = state.saves;
   await p.evaluate(() => window.dispatchEvent(new Event('online'))); await p.waitForTimeout(1500);
-  list = await p.evaluate(() => ({ html: document.getElementById('savedList').innerText, waiting: getSavedReports().filter(notInAccount).length }));
-  check(state.saves > savesBefore && list.waiting === 0 && !/Not in your account yet/.test(list.html), 'back online, the report goes up by itself and the badge clears');
+  list = await jobsText();
+  check(state.saves > savesBefore && list.waiting === 0 && !/Not in your account yet/i.test(list.html), 'back online, the job goes up by itself and the tag clears while Jobs is open');
+  await p.evaluate(() => tabGo('report'));
 
   // 3. The quote saved onto the report counts as a new save, so it syncs.
   const before = await p.evaluate(() => getSavedReports()[0].savedAt);
@@ -74,12 +75,14 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   check(after > before && state.saves > savesBeforeQuote, 'storing the quote bumps savedAt and saves to the account');
 
   // 4. Every delete asks first; No keeps the job.
-  p.once('dialog', d => d.dismiss());
   const idToDelete = await p.evaluate(() => getSavedReports()[0].id);
-  await p.evaluate(id => deleteReport(id), idToDelete); await p.waitForTimeout(200);
+  await p.evaluate(id => { deleteReport(id); }, idToDelete); await p.waitForTimeout(200);
+  await p.click('#askNo'); await p.waitForTimeout(200);
   check(await p.evaluate(id => getSavedReports().some(r => r.id === id), idToDelete), 'deleting a draft job asks first, and No keeps it');
-  p.once('dialog', d => { check(/Delete the job at/.test(d.message()), 'the question names the job: ' + d.message().slice(0, 60)); d.accept(); });
-  await p.evaluate(id => deleteReport(id), idToDelete); await p.waitForTimeout(200);
+  await p.evaluate(id => { deleteReport(id); }, idToDelete); await p.waitForTimeout(200);
+  const delAsk = await p.evaluate(() => document.getElementById('askTitle').textContent);
+  check(/Delete the job at/.test(delAsk), 'the question names the job: ' + delAsk.slice(0, 60));
+  await p.click('#askYes'); await p.waitForTimeout(200);
   check(await p.evaluate(id => !getSavedReports().some(r => r.id === id), idToDelete), 'Yes deletes it');
 
   // 5. A full phone: old finished jobs already in the account are parked there.
@@ -91,19 +94,27 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
     const orig = Storage.prototype.setItem; let thrown = false;
     Storage.prototype.setItem = function (k, v) { if (!thrown && k.startsWith('korva_saved_reports')) { thrown = true; const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; } return orig.call(this, k, v); };
   });
-  p.once('dialog', d => { check(/storage is full/.test(d.message()) && /2 oldest finished jobs/.test(d.message()), 'asks to park the 2 oldest finished jobs: ' + d.message().slice(0, 80)); d.accept(); });
-  const saved = await p.evaluate(() => { const reports = getSavedReports(); reports.unshift({ id: 'report_new', address: 'New', jobAddress: 'New', reportData: {}, fieldNotes: {}, savedAt: Date.now(), cloudSavedAt: 0 }); return setSavedReports(reports); });
-  const parked = await p.evaluate(() => ({ ids: getSavedReports().map(r => r.id), archived: getArchivedReportIds(), text: (renderSavedList(), document.getElementById('savedList').innerText) }));
+  // Not asked: parking is what lets the save go through, and Bring them
+  // back undoes it. The note says what happened and where they come back from.
+  let parkAsked = false; p.once('dialog', d => { parkAsked = true; d.dismiss(); });
+  const saved = await p.evaluate(() => { window.__parkToasts = []; const o = window.showToast; window.showToast = (m, k, a) => { window.__parkToasts.push(m); return o(m, k, a); }; const reports = getSavedReports(); reports.unshift({ id: 'report_new', address: 'New', jobAddress: 'New', reportData: {}, fieldNotes: {}, savedAt: Date.now(), cloudSavedAt: 0 }); const ok = setSavedReports(reports); window.showToast = o; return ok; });
+  const parkSaid = await p.evaluate(() => window.__parkToasts.join(' | '));
+  check(!parkAsked && !(await p.evaluate(() => document.getElementById('askOverlay').classList.contains('open'))) && /This phone was full, so the 2 oldest finished jobs are now kept in your account only/.test(parkSaid) && /Bring them back from Jobs, under Done/.test(parkSaid), 'a full phone parks the 2 oldest finished jobs without asking, and says where they come back from: ' + parkSaid);
+  const parked = await p.evaluate(() => ({ ids: getSavedReports().map(r => r.id), archived: getArchivedReportIds() }));
   check(saved && parked.ids.join() === 'report_new,report_old1,report_old2' && parked.archived.sort().join() === 'report_old3,report_old4', 'the save goes through with the two oldest finished jobs parked: ' + parked.ids.join());
-  check(/2 older jobs are kept in your account only/.test(parked.text) && /Bring them back/.test(parked.text), 'Saved Reports says where they went');
-  await p.evaluate(() => { toggleDrawer(); openMenuPage('savedPanel'); }); await p.waitForTimeout(400);
+  // Jobs says where they went, where they'd be looked for: under Done and under a search.
+  await p.evaluate(() => { tabGo('dashboard'); setDashboardTab('todo'); }); await p.waitForTimeout(400);
+  const onTodo = (await jobsText()).html;
+  await p.evaluate(() => setDashboardTab('done')); await p.waitForTimeout(400);
+  const onDone = (await jobsText()).html;
+  check(!/kept in your account only/.test(onTodo) && /2 older jobs are kept in your account only/.test(onDone) && /Bring them back/.test(onDone), 'the Done tab says two older jobs are kept in the account only');
   await p.screenshot({ path: `${OUT}/2-parked.png` });
   // Bring them back: sync-on-open restores them from the account.
   state.rows = ['report_old3', 'report_old4'].map(id => ({ report_id: id, saved_at: new Date(Date.now() - 86400000).toISOString(), data: { id, address: id + ' Old Street', jobAddress: id, reportData: { issue: { completedAt: 1 } }, fieldNotes: {}, savedAt: Date.now() - 86400000 } }));
-  await p.evaluate(() => restoreArchivedReports()); await p.waitForTimeout(800);
-  const back = await p.evaluate(() => ({ ids: getSavedReports().map(r => r.id).sort(), archived: getArchivedReportIds() }));
-  check(back.ids.includes('report_old3') && back.ids.includes('report_old4') && back.archived.length === 0, 'Bring them back restores them from the account');
-  await p.evaluate(() => { showMenuPage(null); toggleDrawer(); });
+  await p.getByRole('button', { name: 'Bring them back' }).click(); await p.waitForTimeout(900);
+  const back = await p.evaluate(() => ({ ids: getSavedReports().map(r => r.id).sort(), archived: getArchivedReportIds(), text: document.getElementById('dashboardJobs').innerText }));
+  check(back.ids.includes('report_old3') && back.ids.includes('report_old4') && back.archived.length === 0 && !/kept in your account only/.test(back.text) && /report_old3 Old Street/.test(back.text), 'Bring them back restores them from the account, onto the list');
+  await p.evaluate(() => tabGo('report'));
 
   // 6. The fix links on the sheets neither overlap nor stand tall.
   await p.evaluate(async sc => { resetReportState(); const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; }; for (const [k, v] of Object.entries(sc.job)) set(k, v); updateJob(); window.__before = extractSnapshot(); await populateFields(sc.fields); }, sc);

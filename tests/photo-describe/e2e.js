@@ -38,7 +38,7 @@ const ai = (obj) => ({ json: { content: [{ type: 'text', text: JSON.stringify(ob
   await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(3000);
 
   // A report with a termite finding, a restricted roof void, and photos in
-  // the finding, the roof void spot, Conducive and Other photos.
+  // the finding, the roof void spot, a conducive condition and Other photos.
   const ids = await p.evaluate(async (sc) => {
     storeCompanyDetails(sc.company); openApp('inspect'); resetReportState();
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
@@ -53,13 +53,13 @@ const ai = (obj) => ({ json: { content: [{ type: 'text', text: JSON.stringify(ob
     const f = reportData.findings[1];
     await handleSectionPhotoFiles([await photo('bearer.jpg', '#8a6a45')], findingPhotoSection(f.id));
     await handleSectionPhotoFiles([await photo('roof.jpg', '#6b6b6b')], spotPhotoSection('hindered', 'roofvoid'));
-    await handleSectionPhotoFiles([await photo('garden.jpg', '#4f6b3a')], 'conducive');
+    await handleSectionPhotoFiles([await photo('garden.jpg', '#4f6b3a')], conditionPhotoSection('timberSoil'));
     await handlePhotoFiles([await photo('other.jpg', '#7a5a3a')]);
     renderFindingsUI(); renderAccessSummary(); renderReportWidgets();
     return {
       finding: getSectionPhotos(findingPhotoSection(f.id))[0].id, findingId: f.id,
       roof: getSectionPhotos(spotPhotoSection('hindered', 'roofvoid'))[0].id,
-      conducive: getSectionPhotos('conducive')[0].id, other: reportData.photos[0].id,
+      conducive: getSectionPhotos(conditionPhotoSection('timberSoil'))[0].id, other: reportData.photos[0].id,
     };
   }, sc);
   await p.waitForTimeout(800);
@@ -103,8 +103,9 @@ const ai = (obj) => ({ json: { content: [{ type: 'text', text: JSON.stringify(ob
   await centre(btn(ids.finding));
   await p.screenshot({ path: `${OUT}/4-finding-used.png` });
 
-  // ── The roof void spot: a caption is already typed, so Add to caption ──
-  await p.evaluate(() => showSection('restrictions')); await p.waitForTimeout(400);
+  // ── The roof void spot, on the roof void's card in Areas: a caption is
+  // already typed, so Add to caption ──
+  await p.evaluate(() => openAreaRow('roofvoid')); await p.waitForTimeout(600);
   const roofInput = p.locator(`[data-caption-for="${ids.roof}"]`).filter({ visible: true }).first();
   await centre(roofInput);
   await roofInput.fill('Hatch in the laundry ceiling.');
@@ -125,6 +126,7 @@ const ai = (obj) => ({ json: { content: [{ type: 'text', text: JSON.stringify(ob
   await centre(btn(ids.conducive));
   next = ai({ caption: 'Garden bed over the weep holes, a high risk for termite entry', unclear: null });
   await btn(ids.conducive).click(); await p.waitForTimeout(600);
+  check(/Conducive conditions: Timber-to-soil contact/.test(calls[calls.length - 1].messages[0].content[1].text), 'a condition\'s photo tells the AI the condition: ' + calls[calls.length - 1].messages[0].content[1].text.slice(0, 80));
   check(!(await suggested(ids.conducive)) && await caption(ids.conducive) === '', 'a caption that rates risk is not offered');
   check(/couldn't suggest a caption/.test(await p.locator('#toast').textContent()), 'and the inspector is told to add it themselves');
   next = ai({ caption: null, unclear: 'too dark to make out' });
@@ -133,7 +135,7 @@ const ai = (obj) => ({ json: { content: [{ type: 'text', text: JSON.stringify(ob
   next = ai({ caption: 'Garden bed built up over the slab edge and weep holes', unclear: null });
   await btn(ids.conducive).click(); await p.waitForTimeout(600);
   await centre(box(ids.conducive));
-  check(await box(ids.conducive).isVisible(), 'a section photo box shows the suggestion too');
+  check(await box(ids.conducive).isVisible(), 'a condition\'s photo shows the suggestion too');
   await p.screenshot({ path: `${OUT}/6-conducive-suggestion.png` });
   await box(ids.conducive).getByRole('button', { name: 'Not this' }).click(); await p.waitForTimeout(200);
   check(!(await suggested(ids.conducive)) && await caption(ids.conducive) === '' && await btn(ids.conducive).isVisible(), 'Not this drops the suggestion and leaves the caption alone');
@@ -186,8 +188,9 @@ const ai = (obj) => ({ json: { content: [{ type: 'text', text: JSON.stringify(ob
   await p.evaluate(() => { reportData.issue = { version: 1 }; reportData.amending = false; });
   const lockedBefore = calls.length;
   await p.evaluate(id => describePhoto(id), ids.conducive); await p.waitForTimeout(200);
-  check(calls.length === lockedBefore && /locked/.test(await p.locator('#toast').textContent()), 'a complete, locked job can\'t be described');
-  await p.evaluate(() => { delete reportData.issue; });
+  check(calls.length === lockedBefore && /locked/.test(await p.locator('#toast').textContent()), 'a finalised, locked job can\'t be described');
+  await p.evaluate(() => { delete reportData.issue; dismissToast(); });
+  check(await p.evaluate(() => getComputedStyle(document.getElementById('toast')).pointerEvents) === 'none', 'a note with a button stops catching taps once it has gone');
 
   // ── Larger text ──
   await p.evaluate(() => { document.documentElement.style.setProperty('--ts', '1.3'); showSection('findings'); });

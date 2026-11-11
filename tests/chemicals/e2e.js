@@ -123,7 +123,7 @@ const patches = [];
     openQuoteFromReport();
     quoteState.items = [newQuoteItem('barrier_lm', { qty: '40' })];
     quoteState.answer = { status: 'accepted', by: 'Sam Taylor', date: todayIsoDate(), method: 'signed', note: '', at: Date.now(), hash: quoteContentHash(quoteState) };
-    persistQuote(); storeQuoteOnReport(quoteState, false); renderQuoteAnswer();
+    persistQuote(); storeQuoteOnReport(quoteState, false); renderQuoteProgress();
     openTreatmentRecord();
     document.getElementById('trFold2').open = true;
   }, { sc });

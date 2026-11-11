@@ -15,8 +15,9 @@ import { dirname, join } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..');
 
-// Keep in step with requestExtraction() in js/app/extraction.js.
-const MODEL = 'claude-sonnet-5';
+// Keep in step with requestExtraction() in js/app/extraction.js. The model
+// is read from AI_MODEL in js/app/common.js, the one place the app names it.
+const MODEL = readFileSync(join(repo, 'js/app/common.js'), 'utf8').match(/const AI_MODEL = '([^']+)'/)[1];
 const MAX_TOKENS = 16000;
 const EFFORT = process.env.SAYON_EFFORT || 'medium'; // override only to compare settings
 // SAYON_THINKING=off sends thinking disabled, to measure speed against accuracy. The app leaves thinking on.

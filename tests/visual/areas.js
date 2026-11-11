@@ -1,9 +1,10 @@
 // The report's Areas step (Areas inspected), for before and after shots and
 // a quick check that it still works. Fills the standard job, leaves a few
 // areas unmarked, opens one, then taps through: an area's status, a reason,
-// what was found, Mark the rest as inspected. Shoots the card closed, with
-// an area open, and all marked. Prints what it checks; a FAIL line means a
-// check failed.
+// what was found, Mark the rest as inspected, and where exactly on the
+// area's own card. Shoots the card closed, with an area open, all marked,
+// and Areas unable to be inspected reading it back. Prints what it checks;
+// a FAIL line means a check failed.
 // node areas.js <outDir> [w]  (serve the repo on :8765; see README.md)
 // MODES=light,dark adds dark shots.
 const { chromium } = require('playwright'); const fs = require('fs');
@@ -88,16 +89,27 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   console.log('rows:', JSON.stringify(await rows()));
   await shoot('4-all-marked');
 
-  // Areas unable to be inspected: filled in from the ticks above.
-  const access = p.locator('#section-restrictions');
-  const acc = await p.evaluate(() => [...document.querySelectorAll('#section-restrictions .access-item-name')].map(e => e.textContent));
-  check(acc.includes('Interior') && acc.includes('Outbuildings'), 'Areas unable to be inspected lists the limited areas: ' + JSON.stringify(acc));
-  // Where exactly, typed on the interior's row.
-  await p.locator('#section-restrictions .access-spot[data-key="interior"]').click();
+  // Where exactly, typed on the interior's own card, under the reasons
+  // ticked for it.
+  await p.locator('[data-zone-node="interior"] summary').click(); await p.waitForTimeout(300);
+  const spots = await p.evaluate(() => [...document.querySelectorAll('#areaChecklist .access-spot')].map(e => e.dataset.kind + ':' + e.dataset.key));
+  check(spots.join(' ') === 'hindered:interior hindered:roofvoid restricted:outbuildings', 'each limited area has its exact spot under the kind of reason ticked: ' + spots.join(' '));
+  await p.locator('[data-zone-node="interior"] .obs-reasons-hindered .access-spot').click();
   await p.keyboard.type('Bedroom 2 walls behind the wardrobe'); await p.keyboard.press('Enter'); await p.waitForTimeout(400);
-  const spot = await p.evaluate(() => ({ saved: accessSpot('hindered', 'interior', accessZones('hindered')), shown: (document.querySelector('#section-restrictions .access-spot[data-key="interior"]') || {}).textContent }));
-  check(/wardrobe/.test(spot.saved) && /wardrobe/.test(spot.shown), 'an exact spot is saved and shown on its row: ' + JSON.stringify(spot));
-  await shoot('5-access', access);
+  const spot = await p.evaluate(() => ({ saved: accessSpot('hindered', 'interior', accessZones('hindered')), shown: (document.querySelector('[data-zone-node="interior"] .access-spot') || {}).textContent,
+    open: document.querySelector('[data-zone-node="interior"] details').open, add: !!document.querySelector('[data-zone-node="interior"] .obs-reasons-hindered .spot-photo-add') }));
+  check(/wardrobe/.test(spot.saved) && /wardrobe/.test(spot.shown) && spot.open && spot.add, 'an exact spot is saved and shown on the area\'s card, with Add photo under it: ' + JSON.stringify(spot));
+  await shoot('5-spot-on-card');
+  await p.locator('[data-zone-node="interior"] summary').click(); await p.waitForTimeout(200);
+
+  // Areas unable to be inspected: what the report will print, read back
+  // from the ticks above. Nothing is entered there.
+  const access = p.locator('#section-restrictions');
+  const acc = await p.evaluate(() => ({ names: [...document.querySelectorAll('#section-restrictions .access-item-name')].map(e => e.textContent),
+    where: (document.querySelector('#section-restrictions .access-item-where') || {}).textContent, entry: document.querySelectorAll('#section-restrictions .access-spot, #section-restrictions .spot-photo-add').length }));
+  check(acc.names.includes('Interior') && acc.names.includes('Outbuildings'), 'Areas unable to be inspected lists the limited areas: ' + JSON.stringify(acc.names));
+  check(/wardrobe/.test(acc.where || '') && acc.entry === 0, 'and reads the exact spot back, with nothing to fill in there: ' + JSON.stringify(acc));
+  await shoot('6-access', access);
   // Tapping an area's status there opens it in Areas.
   await p.locator('#section-restrictions .access-item-head').first().click(); await p.waitForTimeout(600);
   check(await p.evaluate(() => [...document.querySelectorAll('#areaChecklist details')].some(d => d.open)), 'tapping a status in Areas unable to be inspected opens the area above');

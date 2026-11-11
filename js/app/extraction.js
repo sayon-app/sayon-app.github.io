@@ -57,7 +57,7 @@ async function callExtraction(text) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-5',
+        model: AI_MODEL,
         // The model thinks before it answers, and that thinking counts
         // toward max_tokens. At 4096 and its default (high) effort, a
         // whole-house note thought for so long the JSON was cut off.
@@ -392,8 +392,8 @@ function forgetLearned(id) {
   storeLearned(l);
 }
 
-function forgetAllLearned() {
-  if (!confirm('Forget everything SAYON has learned from your corrections?')) return;
+async function forgetAllLearned() {
+  if (!(await askFirst({ title: 'Forget what SAYON has learned?', text: 'The words and answers it learned from your corrections are cleared. It starts learning again from your next correction.', yes: 'Forget them', danger: true }))) return;
   const l = getLearned();
   l.removed.push(...l.fields.map(f => f.id), ...l.words.map(w => w.id));
   l.fields = []; l.words = [];
@@ -537,7 +537,7 @@ function noteForEarlierJob(target, note) {
   const id = savedIdFor.get(target);
   const reports = getSavedReports();
   const entry = id && reports.find(r => r.id === id);
-  setAI('ready', 'AI ready');
+  setAI('ready', 'Ready');
   if (!isRecording) document.getElementById('extractBtn').disabled = false;
   if (!entry) {
     showToast('You changed job while that note was filling in, so it is still in the box', 'info');
@@ -614,7 +614,7 @@ async function runFill({ whileRecording = false } = {}) {
     // can never land on top of a newer one and overwrite it.
     if (getPendingNotes().length && navigator.onLine) {
       if (!queuePendingNote(note)) {
-        setAI('ready', 'AI ready');
+        setAI('ready', 'Ready');
         if (!isRecording) document.getElementById('extractBtn').disabled = false;
         return false;
       }
@@ -627,14 +627,14 @@ async function runFill({ whileRecording = false } = {}) {
       await populateFields(data, note);
       extracted = true;
       pendingNotesProblem = null;
-      setAI('ready', 'Data extracted');
+      setAI('ready', 'Report filled in');
       // The after-Extract sheet says what was filled, so no toast here.
     }
   } catch (err) {
     // A note too long to answer in one go would fail the same way every
     // time, so it stays in the box to be split up.
     if (err.tooLong || err.status === 413) {
-      setAI('ready', 'AI ready');
+      setAI('ready', 'Ready');
       if (!isRecording) document.getElementById('extractBtn').disabled = false;
       showToast('That note is too long for the AI in one go. Split it into shorter notes and fill each one in', 'error');
       return false;
@@ -645,7 +645,7 @@ async function runFill({ whileRecording = false } = {}) {
     pendingNotesProblem = (err.noSignal || isNoteSpecificProblem(err)) ? null : extractionProblem(err);
     if (reportData !== fillTarget) { noteForEarlierJob(fillTarget, note); return false; }
     if (!queuePendingNote(note)) {
-      setAI('ready', 'AI ready');
+      setAI('ready', 'Ready');
       if (!isRecording) document.getElementById('extractBtn').disabled = false;
       return false;
     }
@@ -775,8 +775,8 @@ function queuePendingNote(text) {
   return true;
 }
 
-function removePendingNote(id) {
-  if (!confirm('Delete this saved note? It hasn\'t been added to the report yet.')) return;
+async function removePendingNote(id) {
+  if (!(await askFirst({ title: 'Delete this saved note?', text: 'It hasn\'t been added to the report yet.', yes: 'Delete note', danger: true }))) return;
   reportData.pendingNotes = getPendingNotes().filter(n => n.id !== id);
   if (!reportData.pendingNotes.length) delete reportData.pendingNotes;
   saveDraft();
@@ -863,9 +863,9 @@ async function processPendingNotes(manual) {
     pendingNotesRunning = false;
     if (reportData === target && !getPendingNotes().length) delete reportData.pendingNotes;
     renderPendingNotes();
-    setAI('ready', 'AI ready');
+    setAI('ready', 'Ready');
   }
-  // A report that's already in Saved Reports is re-saved, so its copy
+  // A report that's already on the Jobs list is re-saved, so its copy
   // there doesn't keep the notes and fill them in a second time.
   if (filled && reportData === target && currentReportId && getSavedReports().some(r => r.id === currentReportId)) {
     saveCurrentReport(true);
@@ -1196,7 +1196,7 @@ async function askAiAboutPhoto({ system, base64, mediaType, text, maxTokens, eff
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-5',
+        model: AI_MODEL,
         // Room for the model's thinking as well as the small JSON answer
         // (see callExtraction()).
         max_tokens: maxTokens,
@@ -1344,6 +1344,8 @@ function photoPlaceLabel(section) {
     const where = String((termite ? termite.activityLocation : borer ? borer.location : '') || '').trim();
     return (borer ? 'Borer finding' : 'Termite finding') + (where ? `, at ${where.slice(0, 120)}` : '');
   }
+  const cond = /^cond-(.+)$/.exec(section);
+  if (cond && CONDITION_PHOTO_LABELS[cond[1]]) return 'Conducive conditions: ' + CONDITION_PHOTO_LABELS[cond[1]];
   return PHOTO_PLACE_NAMES[section] || 'Inspection photos';
 }
 
@@ -1413,7 +1415,7 @@ function updatePhotoAiUI(id) {
 
 async function describePhoto(id) {
   if (describingPhotos.has(id)) return;
-  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  if (isReportLocked()) { sayLocked(); return; }
   const found = findReportPhoto(id);
   if (!found) return;
   if (!navigator.onLine) { showToast(photoAiProblem({ noSignal: true }), 'info'); return; }
@@ -1455,7 +1457,7 @@ async function describePhoto(id) {
 // Use puts the suggestion in the caption, after any words already there;
 // the caption box stays editable as always.
 function useSuggestedCaption(id) {
-  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  if (isReportLocked()) { sayLocked(); return; }
   const found = findReportPhoto(id);
   if (!found || !found.photo.suggested) return;
   const p = found.photo;

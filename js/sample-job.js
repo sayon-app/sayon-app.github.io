@@ -133,29 +133,37 @@ function sampleReportData(inspector) {
     riskLevel: 'HIGH',
     inspectorLicence: inspector.licence,
     inspectorSignature: inspector.signature,
+    sitePlan: sampleSitePlan(false),
     photosBySection: { general: [], durable: [], obstructions: [], restrictions: [], findings: [], conducive: [], recommendations: [] },
   };
 }
 
-// The drawn site plan on the treatment record: the house, the barrier all
-// round it, the laundry where the termites were and the old stump. North is
-// up and the street is at the top. 400 plan units across the house is 16 m.
-// The laundry's marks sit on the east wall so their labels fall outside the
-// house, clear of its walls, and the back fence clears the scale bar.
-function sampleSitePlan() {
+// The drawn site plan. The report's (treated false) is what the inspector
+// saw: the house, the laundry where the termites were, the bridged weep
+// holes behind the garden bed, the dripping tap and the old stump. The
+// treatment record's is the same drawing with the barrier all round the
+// house and the foamed laundry wall added, as a record started from the
+// report's plan is. North is up and the street is at the top. 400 plan
+// units across the house is 16 m. The laundry's marks sit on the east wall
+// so their labels fall outside the house, clear of its walls, and the back
+// fence clears the scale bar.
+function sampleSitePlan(treated = true) {
+  const treatment = [
+    { id: 'ps_barrier', k: 'barrier', pts: [[290, 190], [710, 190], [710, 485], [290, 485]], loop: true, label: 'Trenched and rodded' },
+    { id: 'ps_foam', k: 'treated', x: 688, y: 440, label: 'Foamed' },
+  ];
   return { v: 1, north: 0, mpu: 0.04, items: [
     { id: 'ps_street', k: 'text', x: 500, y: 70, label: 'Example Street' },
     { id: 'ps_drive', k: 'driveway', x: 160, y: 120, w: 100, h: 330, label: 'Driveway' },
     { id: 'ps_house', k: 'house', x: 300, y: 200, w: 400, h: 275, label: 'House' },
-    { id: 'ps_barrier', k: 'barrier', pts: [[290, 190], [710, 190], [710, 485], [290, 485]], loop: true, label: 'Trenched and rodded' },
     { id: 'ps_garden', k: 'garden', x: 728, y: 205, w: 45, h: 130, label: '' },
+    { id: 'ps_bridge', k: 'bridge', x: 800, y: 255, label: 'Weep holes bridged' },
     { id: 'ps_found', k: 'activity', x: 688, y: 395, label: 'Laundry' },
-    { id: 'ps_foam', k: 'treated', x: 688, y: 440, label: 'Foamed' },
     { id: 'ps_tap', k: 'tap', x: 740, y: 490, label: 'Dripping' },
     { id: 'ps_meter', k: 'notice', x: 310, y: 240, label: 'Meter box' },
     { id: 'ps_stump', k: 'tree', x: 470, y: 625, label: 'Old stump' },
     { id: 'ps_fence', k: 'fence', pts: [[60, 675], [940, 675]], label: 'Back fence' },
-  ] };
+  ].concat(treated ? treatment : []) };
 }
 
 // The quote at the business's own prices, sent, then accepted and signed.
@@ -299,7 +307,7 @@ function removeSampleJob() {
     localStorage.setItem(quotesStorageKey(), JSON.stringify(all));
   } catch (e) {}
   if (wasOpen) startBlankReport();
-  renderSavedList();
+  refreshJobsList();
   closeJobPage();
   openDashboard();
   showToast('Sample job removed. Bring it back from the menu any time', 'info');

@@ -60,6 +60,8 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
     document.getElementById('jobClientEmail').value = 'sam@example.com'; updateJob();
     await populateFields(sc.fields);
     reportData.sent = { at: Date.now() - 31 * 86400000, to: 'sam@example.com' };
+    const v = agreementFormValues();
+    reportData.agreement = { method: 'paper', signerName: 'Sam Taylor', signedAt: Date.now() - 32 * 86400000, inspectionDate: v.inspectionDate, fee: '350', notes: '', standard: v.standard, text: v.text };
     saveCurrentReport(true);
     directEmail = true;
     openQuoteFromReport();
@@ -70,9 +72,11 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
     quoteState.treatment = { date: installDate, technician: 'Alex Example', licence: 'NSW 000000', methods: { bait: '12' }, products: [{ name: 'Exterra', active: 'chlorfluazuron', batch: 'B-0003' }], areas: 'Perimeter of the building', notice: 'new', noticeWhere: 'Meter box', nextInspection: '', signature: '', at: Date.now() };
     quoteState.certificateSentAt = Date.now();
     persistQuote(); storeQuoteOnReport(quoteState, false);
-    renderQuoteAnswer(); renderDocStrips();
+    // The visits are a step of the job, so they're recorded on This job.
+    closeQuote(); tabGo('job');
   }, { sc, installDate });
   await p.waitForTimeout(800);
+  const openBaitFold = () => p.evaluate(() => { const f = document.querySelector('#jobOverlay .job-fold[data-step="bait"]'); f.open = true; f.scrollIntoView({ block: 'center' }); });
 
   // 1. The job knows about the stations: the first check is due 4 weeks
   // after the install, so this job is back in To do.
@@ -80,11 +84,14 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   console.log('job before any visit:', JSON.stringify(j0));
   check(j0.group === 'todo' && /First bait station check due/.test(j0.status) && j0.next === 'bait', 'a baiting job with no visit yet is in To do, first check due');
   check(j0.steps.length === 5 && /Bait station visits:now:First check due .*overdue/.test(j0.steps[4]) && j0.bars === 7, 'the job has a fifth stage, Bait station visits, and its Jobs card shows seven steps with Job details and the agreement');
-  const strip = await p.evaluate(() => [...document.querySelectorAll('#quoteScreen .doc-strip .doc-chip')].map(c => c.textContent.trim()));
-  check(strip.includes('Bait visits'), 'the document strip gains Bait visits: ' + strip.join(', '));
-  await p.evaluate(() => document.getElementById('qpBait').scrollIntoView({ block: 'center' })); await shot('bait-card');
+  const page0 = await p.evaluate(() => ({ next: document.querySelector('#jobOverlay .job-next').innerText.replace(/\s+/g, ' '), btn: (document.querySelector('#jobOverlay .job-next .dash-detail-primary') || {}).textContent,
+    step: !!document.querySelector('#jobOverlay .job-fold[data-step="bait"]'), quote: document.getElementById('quoteScreen').classList.contains('open') }));
+  check(page0.step && /First bait station check due/.test(page0.next) && page0.btn === 'Record the visit' && !page0.quote, 'This job lists Bait station visits as a step and its Next step is the first check: ' + page0.next.slice(0, 120));
+  await openBaitFold(); await p.waitForTimeout(200); await shot('bait-card');
   const card = await p.evaluate(() => document.getElementById('qpBait').innerText);
-  check(/First check of the stations due/.test(card) && /12 stations installed/.test(card), 'the quote shows the bait card with the first check due: ' + card.replace(/\n/g, ' | ').slice(0, 120));
+  check(/First check of the stations due/.test(card) && /12 stations installed/.test(card), 'the step opens to the bait card with the first check due: ' + card.replace(/\n/g, ' | ').slice(0, 120));
+  const recordBtn = () => p.evaluate(() => [...document.querySelectorAll('#qpBait button')].find(b => /Record a(nother)? visit/.test(b.textContent)).className);
+  check(/primary/.test(await recordBtn()), 'with the check due, Record a visit is the filled button');
 
   // 2. Record a visit by tapping.
   await tap(p.locator('#qpBait button', { hasText: 'Record a visit' }), 'Record a visit'); await p.waitForTimeout(600); await shot('visit-open');
@@ -92,18 +99,40 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   console.log('sheet opened:', JSON.stringify(open));
   check(open.stations === 12 && open.product === 'Exterra' && open.batch === 'B-0003' && open.tech === 'Alex Example', '12 stations listed, bait and technician from the treatment record');
   check(open.save && /Mark each station/.test(open.need), 'save waits until every station is marked: ' + open.need);
-  await p.fill('#bvStations .bait-station[data-i="5"] .bait-station-where', 'Rear left corner');
-  await tap(p.locator('#bvStations .bait-station[data-i="5"] .bait-chip.active'), 'station 6 active'); await p.waitForTimeout(200);
-  const after6 = await p.evaluate(() => ({ extra: !!document.querySelector('#bvStations .bait-station[data-i="5"] .bait-station-extra input'), next: document.getElementById('bvNext').value, date: document.getElementById('bvDate').value }));
-  check(after6.extra, 'an active station opens a Bait added box');
+  // One row per station, all shut: its number, where it is and what was found.
+  const rows = await p.evaluate(() => { const r = [...document.querySelectorAll('#bvStations .bait-station')]; const a = r[0].getBoundingClientRect(), z = r[r.length - 1].getBoundingClientRect();
+    return { open: r.filter(x => x.classList.contains('open')).length, chips: document.querySelectorAll('#bvStations .bait-chip').length, tall: Math.round(z.bottom - a.top), first: r[0].querySelector('.bait-row').innerText.replace(/\s+/g, ' ').trim() }; });
+  console.log('rows:', JSON.stringify(rows));
+  check(rows.open === 0 && rows.chips === 0 && rows.tall < 700 && /^1 Where not set Not marked$/.test(rows.first), 'the 12 stations are one row each, shut, and fit on a screen: ' + JSON.stringify(rows));
+  const row = i => p.locator(`#bvStations .bait-station[data-i="${i}"]`);
+  await tap(row(5).locator('.bait-row'), 'station 6'); await p.waitForTimeout(200);
+  check(await row(5).locator('.bait-chip').count() === 6 && await p.locator('#bvStations .bait-station.open').count() === 1, 'a tap on a row opens it to the six answers');
+  await shot('station-open');
+  await row(5).locator('.bait-station-where').fill('Rear left corner');
+  await tap(row(5).locator('.bait-chip.active'), 'station 6 active'); await p.waitForTimeout(200);
+  const after6 = await p.evaluate(() => ({ extra: !!document.querySelector('#bvStations .bait-station[data-i="5"] .bait-station-bait'), open: document.querySelector('#bvStations .bait-station[data-i="5"]').classList.contains('open'), next: document.getElementById('bvNext').value, date: document.getElementById('bvDate').value }));
+  check(after6.extra && after6.open, 'an active station stays open, with a Bait added box');
   check(after6.next === daysFrom(after6.date, 28), 'termites feeding: the next visit starts at 4 weeks (' + after6.next + ')');
-  await p.fill('#bvStations .bait-station[data-i="5"] .bait-station-extra input', '2 cartridges');
-  await tap(p.locator('#bvStations .bait-station[data-i="6"] .bait-chip.damaged'), 'station 7 damaged'); await p.waitForTimeout(200);
-  await p.fill('#bvStations .bait-station[data-i="6"] .bait-station-extra input', 'Lid replaced');
+  await row(5).locator('.bait-station-bait').fill('2 cartridges');
+  // The next row opened shuts this one, which then reads back what was said.
+  await tap(row(6).locator('.bait-row'), 'station 7'); await p.waitForTimeout(200);
+  const shut6 = await row(5).locator('.bait-row').innerText();
+  check(await p.locator('#bvStations .bait-station.open').count() === 1 && /Rear left corner/.test(shut6) && /Bait added: 2 cartridges/.test(shut6) && /Active/.test(shut6), 'opening the next row shuts the last, which reads back where, what was found and the bait: ' + shut6.replace(/\s+/g, ' '));
+  await tap(row(6).locator('.bait-chip.damaged'), 'station 7 damaged'); await p.waitForTimeout(200);
+  await row(6).locator('.bait-station-note').fill('Lid replaced');
+  // Clear needs nothing more: its row shuts once it says where it is.
+  await tap(row(0).locator('.bait-row'), 'station 1'); await p.waitForTimeout(200);
+  await tap(row(0).locator('.bait-chip.clear'), 'station 1 clear'); await p.waitForTimeout(200);
+  check(await row(0).evaluate(e => e.classList.contains('open')), 'a clear station with no "where" yet stays open for it');
+  await row(0).locator('.bait-station-where').fill('Front tap');
+  await tap(row(1).locator('.bait-row'), 'station 2'); await p.waitForTimeout(200);
+  await row(1).locator('.bait-station-where').fill('Driveway side');
+  await tap(row(1).locator('.bait-chip.clear'), 'station 2 clear'); await p.waitForTimeout(200);
+  check(await p.locator('#bvStations .bait-station.open').count() === 0 && /Driveway side/.test(await row(1).locator('.bait-row').innerText()), 'one that says where it is shuts on Clear');
   await tap(p.locator('.bait-rest-btn'), 'Rest are clear'); await p.waitForTimeout(200);
   const marked = await p.evaluate(() => ({ summary: document.getElementById('bvSummary').textContent, need: document.getElementById('bvNeed').textContent, clear: document.querySelectorAll('#bvStations .bait-station.clear').length }));
   console.log('marked:', JSON.stringify(marked));
-  check(marked.clear === 10 && /10 clear, 1 active, 1 damaged/.test(marked.summary), 'Rest are clear marks the other 10, and the summary says so');
+  check(marked.clear === 10 && /10 clear, 1 active, 1 damaged/.test(marked.summary), 'Rest are clear marks the others, and the summary says so');
   check(/Sign the visit/.test(marked.need), 'then only the signature is missing: ' + marked.need);
   await shot('visit-marked');
   await sign('#bvSigCanvas'); await p.waitForTimeout(200);
@@ -117,6 +146,8 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   // 3. The job now waits on the report going out, then on the next visit.
   const j1 = await p.evaluate(() => { const j = dashboardJob(getSavedReports()[0], getSavedQuotes()); return { group: j.group, status: j.status, step: j.steps[4] }; });
   check(j1.group === 'todo' && j1.status === 'Email the visit report' && j1.step.state === 'now', 'a visit not yet emailed keeps the job in To do: ' + JSON.stringify(j1));
+  const next1 = await p.evaluate(() => ({ title: document.querySelector('#jobOverlay .job-next .dash-next-title').textContent, btn: (document.querySelector('#jobOverlay .job-next .dash-detail-primary') || {}).textContent, open: document.querySelector('#jobOverlay .job-fold[data-step="bait"]').open }));
+  check(next1.title === 'Email the visit report' && next1.btn === 'Email the visit report to Sam' && next1.open, 'saving the visit leaves This job on its next step, emailing the report, with the visits still open: ' + JSON.stringify(next1));
   const card1 = await p.evaluate(() => document.getElementById('qpBait').innerText);
   check(/1 of 12 active, 1 damaged/.test(card1) && /Not sent yet/.test(card1) && /Next due/.test(card1), 'the card lists the visit, not sent, with the next due: ' + card1.replace(/\n/g, ' | ').slice(0, 160));
   await shot('card-one-visit');
@@ -124,7 +155,7 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   // 4. Email the visit report.
   await p.evaluate(() => ensureJsPDFLoaded()); await p.waitForTimeout(500);
   let em = emails.length;
-  await tap(p.locator('#qpBait button', { hasText: /^Email report/ }), 'Email report'); await p.waitForTimeout(4000);
+  await tap(p.locator('#jobOverlay .job-next .dash-detail-primary'), 'Email the visit report, from the Next step card'); await p.waitForTimeout(4000);
   const sentMail = emails.slice(em);
   console.log('emails:', sentMail.map(e => `${e.subject} -> ${e.to} [${(e.attachments || []).map(a => a.filename)}]`));
   check(sentMail.length === 1 && /Bait station visit report/.test(sentMail[0].subject) && sentMail[0].to === 'sam@example.com' && (sentMail[0].attachments || []).some(a => /Bait_Visit/.test(a.filename)), 'the visit report goes to the client by email');
@@ -132,11 +163,12 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   const j2 = await p.evaluate(() => { const j = dashboardJob(getSavedReports()[0], getSavedQuotes()); return { group: j.group, status: j.status, sent: !!quoteState.baitVisits[0].sentAt, step: j.steps[4] }; });
   console.log('after email:', JSON.stringify(j2));
   check(j2.sent && j2.group === 'waiting' && /Bait check due/.test(j2.status), 'once emailed, the job waits for the next visit: ' + j2.status);
+  check(await recordBtn() === 'quote-link-btn', 'and Record a visit goes quiet until that check is due');
 
   // 5. The PDF: a summary, the station table and what happens next.
   const pdf = await p.evaluate(async () => { const { blob, fname } = buildBaitVisitPDF(quoteState, quoteState.baitVisits[0]); const buf = new Uint8Array(await blob.arrayBuffer()); let s = ''; for (let i = 0; i < buf.length; i += 32768) s += String.fromCharCode.apply(null, buf.subarray(i, i + 32768)); return { b64: btoa(s), fname, pages: (s.match(/\/Type\s*\/Page[^s]/g) || []).length }; });
   fs.writeFileSync(`${OUT}/visit-report.pdf`, Buffer.from(pdf.b64, 'base64'));
-  check(/^SAYON_Bait_Visit_BV-.*\.pdf$/.test(pdf.fname) && pdf.pages === 1, `the visit report is one page: ${pdf.fname}, ${pdf.pages} page(s)`);
+  check(/^Bait_Visit_BV-.*\.pdf$/.test(pdf.fname) && pdf.pages === 1, `the visit report is one page: ${pdf.fname}, ${pdf.pages} page(s)`);
   let text = '';
   try { text = require('child_process').execFileSync('pdftotext', ['-layout', `${OUT}/visit-report.pdf`, '-']).toString(); } catch (e) {}
   if (text) {
@@ -149,8 +181,12 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   // 6. A second visit, said instead of typed: the spots carry over, and the
   // spoken note fills the stations.
   await tap(p.locator('#qpBait button', { hasText: 'Record a visit' }), 'Record a visit (2)'); await p.waitForTimeout(500);
-  const open2 = await p.evaluate(() => ({ where6: document.querySelector('#bvStations .bait-station[data-i="5"] .bait-station-where').value, status: document.querySelectorAll('#bvStations .bait-station.set').length, product: document.getElementById('bvProduct').value }));
+  const open2 = await p.evaluate(() => ({ where6: document.querySelector('#bvStations .bait-station[data-i="5"] .bait-row-where').textContent, status: document.querySelectorAll('#bvStations .bait-station.set').length, product: document.getElementById('bvProduct').value }));
   check(open2.where6 === 'Rear left corner' && open2.status === 0 && open2.product === 'Exterra', 'the next visit keeps where each station is and the bait, not what was found');
+  // The technician signed the last visit, so this one opens signed the same.
+  const sig2 = await p.evaluate(() => ({ kept: document.getElementById('bvSigCanvas').parentElement.classList.contains('kept'), same: padSignature(baitPad) === quoteState.baitVisits[0].signature, by: document.getElementById('bvSigBy').textContent,
+    again: !document.querySelector('#baitOverlay .agr-sig-clear').hidden, taps: getComputedStyle(document.getElementById('bvSigCanvas')).pointerEvents }));
+  check(sig2.kept && sig2.same && sig2.by === 'Alex Example' && sig2.again && sig2.taps === 'none', 'the technician\'s signature from the last visit is already on this one, with Sign again: ' + JSON.stringify(sig2));
   await p.evaluate(() => sheetVoiceFill('bait', 'one to five clear, six active added two cartridges, seven lid was off replaced it, rest are clear, Exterra batch 4471, back in four weeks'));
   await p.waitForTimeout(1500);
   const voiced = await p.evaluate(() => ({ summary: document.getElementById('bvSummary').textContent, s6: baitDraft.stations[5], s7: baitDraft.stations[6], batch: document.getElementById('bvBatch').value, next: document.getElementById('bvNext').value, date: document.getElementById('bvDate').value, notes: document.getElementById('bvNotes').value, said: document.querySelector('#bvVoice .sheet-voice-text').textContent }));
@@ -158,7 +194,14 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   check(voiced.s6.status === 'active' && voiced.s6.bait === '2 cartridges' && voiced.s7.status === 'damaged' && voiced.s7.note === 'Lid replaced' && /10 clear/.test(voiced.summary), 'the spoken note marks the stations, bait and note');
   check(voiced.batch === '4471' && voiced.next === daysFrom(voiced.date, 28) && /mulch/.test(voiced.notes), 'and the batch, next visit and client note');
   await shot('visit-voiced');
-  await sign('#bvSigCanvas'); await tap(p.locator('#bvSaveBtn'), 'Save visit (2)'); await p.waitForTimeout(800);
+  // Another name typed over a carried signature: it doesn't stay.
+  await p.evaluate(() => { document.getElementById('bvFold1').open = true; });
+  await p.fill('#bvTech', 'Chris Other'); await p.waitForTimeout(200);
+  check(await p.evaluate(() => baitPad.empty && document.getElementById('bvSaveBtn').disabled && /Sign the visit/.test(document.getElementById('bvNeed').textContent)), 'a carried signature doesn\'t stay under another technician\'s name');
+  await p.fill('#bvTech', 'Alex Example');
+  await sign('#bvSigCanvas'); await p.waitForTimeout(200);
+  check(await p.evaluate(() => !baitPad.empty && !document.querySelector('#baitOverlay .agr-sig-clear').hidden), 'signing afresh shows Sign again beside it');
+  await tap(p.locator('#bvSaveBtn'), 'Save visit (2)'); await p.waitForTimeout(800);
   check(await p.evaluate(() => quoteState.baitVisits.length === 2), 'the second visit is kept too');
 
   // 7. Editing a sent visit: a change the client would see needs sending again.
@@ -171,11 +214,12 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   await tap(p.locator('#qpBait .bait-visit-row').first().locator('button', { hasText: 'Edit' }), 'Edit again'); await p.waitForTimeout(500);
   // A finished visit opens with every part folded: open The stations first.
   await p.locator('#bvFold2 > summary').click(); await p.waitForTimeout(200);
+  await tap(p.locator('#bvStations .bait-station[data-i="2"] .bait-row'), 'station 3'); await p.waitForTimeout(200);
   await tap(p.locator('#bvStations .bait-station[data-i="2"] .bait-chip.eaten'), 'station 3 bait eaten'); await p.waitForTimeout(200);
   await tap(p.locator('#bvSaveBtn'), 'Save the change'); await p.waitForTimeout(500);
   check(await p.evaluate(() => !quoteState.baitVisits.find(v => v.stations[2].status === 'eaten').sentAt), 'a change the client would see clears the sent mark');
 
-  // 8. The job page shows the stage; the quote's bait card lists the visits.
+  // 8. The job page shows the stage, which opens to the visits.
   await p.evaluate(() => { jobGo('job'); });
   await p.waitForTimeout(600); await shot('job-page');
   const jp = await p.evaluate(() => [...document.querySelectorAll('#jobOverlay .job-steps li')].map(li => li.className + ':' + li.querySelector('.job-step-label').firstChild.textContent + ':' + li.querySelector('.job-step-text').textContent));
@@ -185,15 +229,19 @@ const daysFrom = (from, n) => { const d = new Date(from + 'T00:00:00'); d.setDat
   await p.evaluate(() => { closeJobPage(); openDashboard(); openDashboardJob(getSavedReports()[0].id, 'job'); });
   await p.waitForTimeout(600);
   check(await p.evaluate(() => navPlace() === 'job' && currentReportId === getSavedReports()[0].id), 'the job\'s card on the Jobs list opens its page');
-  await p.evaluate(() => { jobGo('quote'); document.getElementById('qpBait').scrollIntoView({ block: 'center' }); });
-  await p.waitForTimeout(600); await shot('quote-bait-card');
+  await p.locator('#jobOverlay .job-fold[data-step="bait"] > summary').click(); await p.waitForTimeout(300); await shot('job-bait-card');
   const baitCard = await p.evaluate(() => document.getElementById('qpBait').innerText);
-  check(/1 of 12 active/.test(baitCard), 'the quote\'s bait card lists the visits: ' + baitCard.replace(/\n/g, ' | ').slice(0, 200));
+  check(/1 of 12 active/.test(baitCard), 'tapping the step opens the visits in place: ' + baitCard.replace(/\n/g, ' | ').slice(0, 200));
+  // The quote screen is only the quote: no visits, answer or treatment on it.
+  await p.evaluate(() => jobGo('quote')); await p.waitForTimeout(600);
+  check(await p.evaluate(() => !document.querySelector('#quoteScreen .bait-card, #quoteScreen .qp-cert, #quoteScreen [onclick*="openQuoteAnswer"], #quoteScreen [onclick*="openTreatmentRecord"]')), 'the quote screen carries no bait visits, certificate or answer buttons');
   await p.evaluate(() => tabGo('job'));
 
   // 9. Finished: the job is done.
   await p.evaluate(() => { jobGo('bait'); });
   await p.waitForTimeout(600);
+  check(await p.evaluate(() => navPlace() === 'job' && !document.getElementById('baitOverlay').classList.contains('open')), 'with a visit report still to email, the bait step lands on This job, not on a new visit');
+  await openBaitFold(); await p.waitForTimeout(200);
   await tap(p.locator('#qpBait button', { hasText: 'Record a visit' }), 'Record a visit (3)'); await p.waitForTimeout(500);
   await tap(p.locator('.bait-rest-btn'), 'Rest are clear (3)'); await p.waitForTimeout(200);
   const quiet = await p.evaluate(() => ({ next: document.getElementById('bvNext').value, date: document.getElementById('bvDate').value }));

@@ -37,12 +37,14 @@ async function run(b, { blocker, stripe = { status: 200, json: { deleted: true }
   await ctx.addInitScript(u => {
     localStorage.setItem('korva_session', JSON.stringify({ access_token: 'a.b.c', refresh_token: 'r', expires_at: Math.floor(Date.now() / 1000) + 3600, user: u }));
     localStorage.setItem('korva_onboarded_v1:' + u.id, '1');
-    window.prompt = () => 'DELETE'; window.confirm = () => true; window.__toasts = [];
+    window.__toasts = [];
   }, USER);
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(3200);
   await p.evaluate(() => { const o = window.showToast; window.showToast = (m, k) => { window.__toasts.push(m); return o(m, k); }; });
-  await p.evaluate(() => deleteMyAccount()); await p.waitForTimeout(1500);
+  // Asked on SAYON's sheet, which wants DELETE typed before its button works.
+  await p.evaluate(() => { deleteMyAccount(); }); await p.waitForTimeout(300);
+  await p.fill('#askInput', 'delete'); await p.click('#askYes'); await p.waitForTimeout(1500);
   const toasts = await p.evaluate(() => window.__toasts);
   await ctx.close();
   return { st, toasts, errs };

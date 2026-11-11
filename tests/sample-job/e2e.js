@@ -45,13 +45,12 @@ let shotN = 0;
 
   // 1. Sign-up ends with the offer.
   check(await p.evaluate(() => getComputedStyle(document.getElementById('onboardScreen')).display !== 'none'), 'a new account lands on business setup');
-  await p.fill('#ob-companyName', 'Example Pest Co');
   await p.fill('#ob-licence', 'NSW 123456');
   await p.fill('#ob-phone', '0400 000 000');
   await tap(p.locator('#obBusinessSave'), 'Continue (business)');
   await p.fill('#obPriceList .pb-row[data-key="barrier_lm"] .pb-input', '32');
   await p.evaluate(() => obNext(1)); await p.waitForTimeout(300);
-  await p.evaluate(() => obShowPanel(3)); await shot('ready-panel');
+  await p.evaluate(() => obShowPanel(2)); await shot('ready-panel');
   const priceList = () => p.evaluate(() => { const m = Object.assign({}, quotePriceMemory()); delete m.__updatedAt; return JSON.stringify(m); });
   const pricesBefore = await priceList();
   await tap(p.getByRole('button', { name: /See a finished sample job first/i }), 'See a finished sample job first');
@@ -69,10 +68,10 @@ let shotN = 0;
   check(q.barrier && q.barrier.price === 32 && q.barrier.qty === 57, 'the quote uses the business\'s own prices');
   check(q.plan && q.inspector === 'NSW 123456' && q.tech === 'Alex Example', 'the treatment has a site plan, and the inspector is the account\'s own name and licence');
   // Opened for the first time, every banner already reads the finished job.
-  const looks = await p.evaluate(() => ({ banner: document.getElementById('agreementBannerText').textContent, sync: document.getElementById('syncStatusText').textContent,
+  const looks = await p.evaluate(() => ({ banner: document.getElementById('agreementBanner').getBoundingClientRect().height, signed: !!reportData.agreement, sync: document.getElementById('syncStatusText').textContent,
     number: reportData.reportNumber, inspected: reportData.jobInspectionDate, phone: reportData.jobClientPhone }));
   console.log('looks:', JSON.stringify(looks));
-  check(/^Agreement signed by Jordan Sample/.test(looks.banner), 'the report screen shows the agreement signed, first time open');
+  check(looks.signed && looks.banner === 0, 'the agreement is signed, first time open, so the report has no banner asking for it');
   check(/Sample job: kept on this phone only/.test(looks.sync), 'the save line says the sample stays on this phone, not that it syncs');
   check(looks.number.startsWith('SY-' + looks.inspected.replace(/-/g, '')), 'the report number carries the inspection date');
   check(looks.phone === '0491 570 156', 'the client\'s phone number is one kept for made-up use');
@@ -91,18 +90,24 @@ let shotN = 0;
   check(!/Check \d+ prices?|Set the service period/.test(guide), 'the sent quote asks for nothing more: no prices to check, a service period set');
   await tap(p.locator('#quotePdfBtn'), 'quote PDF'); await p.waitForTimeout(2500);
   check(await priceList() === pricesBefore, 'saving the sample\'s quote PDF leaves the price list alone');
-  await tap(p.locator('#quoteScreen .doc-chip', { hasText: 'Treatment' }), 'Treatment chip'); await p.waitForTimeout(1200); await shot('treatment');
-  await p.evaluate(() => { if (document.getElementById('treatmentOverlay')?.classList.contains('open')) closeTreatmentRecord(); jobGo('job'); }); await p.waitForTimeout(800);
+  // Back to This job, where the treatment and its certificate are.
+  await tap(p.locator('#quoteScreen .quote-topbar-back'), 'Back to the job'); await p.waitForTimeout(800);
+  await tap(p.locator('#jobOverlay .job-fold[data-step="treatment"] > summary'), 'Treatment step'); await p.waitForTimeout(500); await shot('treatment');
+  const treat = await p.evaluate(() => document.querySelector('#jobOverlay .job-fold[data-step="treatment"] .job-fold-body').innerText.replace(/\s+/g, ' '));
+  check(/Treatment recorded/.test(treat) && /certificate/i.test(treat) && /Email again|Email a copy/.test(treat), 'the Treatment step opens in place to the record and its certificate: ' + treat.slice(0, 140));
+  await p.evaluate(() => jobGo('job')); await p.waitForTimeout(800);
 
   // 3. Finalise: one PDF, and emailing it goes to the business.
-  await tap(p.getByRole('button', { name: 'Email it to me' }), 'Email it to me'); await p.waitForTimeout(6000); await shot('after-email');
+  await tap(p.getByRole('button', { name: 'Finalise and email it to me' }), 'Finalise and email it to me'); await p.waitForTimeout(6000); await shot('after-email');
   console.log('emails:', emails.map(e => `${e.subject} -> ${e.to} [${(e.attachments || []).map(a => a.filename)}]`));
   check(emails.length === 1 && emails[0].to === 'owner@example.com' && /^Sample: /.test(emails[0].subject), 'the sample\'s email goes to the business, marked Sample');
   if (emails[0]) { const s = Buffer.from(emails[0].attachments[0].content, 'base64'); fs.writeFileSync(`${OUT}/job-file.pdf`, s); check((s.toString('latin1').match(/\(SAMPLE\) Tj/g) || []).length >= 1, 'the job file carries SAMPLE'); }
   // Sending the quote again also goes to the business, with no client link,
   // and still leaves the price list alone.
   await p.evaluate(() => { closeJobPage(); jobGo('quote'); }); await p.waitForTimeout(1200);
-  await tap(p.locator('#quoteEmailBtn'), 'Send again'); await p.waitForTimeout(5000);
+  // Send opens the check before sending; its button is what sends.
+  await tap(p.locator('#quoteEmailBtn'), 'Send again'); await p.waitForTimeout(1500);
+  await tap(p.locator('#sendReviewBtn'), 'Send (check sheet)'); await p.waitForTimeout(5000);
   const qmail = emails[1] || {};
   check(emails.length === 2 && qmail.to === 'owner@example.com' && /^Sample: Quote /.test(qmail.subject || ''), 'the sample\'s quote goes to the business: ' + (qmail.subject || 'none'));
   check(!/sign\.html|\?r=/.test(qmail.text || ''), 'the sample\'s quote email has no link for a client to accept');

@@ -36,11 +36,18 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   const banner = await p.evaluate(() => ({ hidden: document.getElementById('lastVisitBanner').hidden, text: document.getElementById('lastVisitText').textContent, btn: document.getElementById('lastVisitBtn').textContent }));
   check(!banner.hidden && /Inspected here before, on/.test(banner.text) && banner.btn === 'Start from it', 'same address, differently typed, offers the last report');
   await p.screenshot({ path: `${OUT}/1-banner.png`, fullPage: false });
+  // The job's details say so too, under the address, before the report is opened.
+  await p.evaluate(() => { tabGo('job'); document.getElementById('jobLastVisit').scrollIntoView({ block: 'center' }); }); await p.waitForTimeout(400);
+  const line = await p.evaluate(() => { const l = document.getElementById('jobLastVisit'); const after = document.getElementById('jobState').compareDocumentPosition(l) & Node.DOCUMENT_POSITION_FOLLOWING;
+    return { shown: l.getBoundingClientRect().height > 0, text: l.textContent, after: !!after, before: !!(l.compareDocumentPosition(document.getElementById('jobClient')) & Node.DOCUMENT_POSITION_FOLLOWING) }; });
+  check(line.shown && /^Inspected here before, on .+\. The report can start from that one\.$/.test(line.text) && line.after && line.before, 'the job page says it was inspected before, under the address: ' + line.text);
+  await p.screenshot({ path: `${OUT}/1b-job-page-line.png`, fullPage: false });
+  await p.evaluate(() => jobGo('report')); await p.waitForTimeout(300);
   // Not now hides it for this job; another address shows nothing.
   await p.evaluate(() => dismissLastVisit());
   check(await p.evaluate(() => document.getElementById('lastVisitBanner').hidden && !!reportData.lastVisitDismissed), 'Not now hides the offer');
   await p.evaluate(() => { delete reportData.lastVisitDismissed; document.getElementById('jobAddress').value = '9 Banksia Dr'; updateJob(); });
-  check(await p.evaluate(() => document.getElementById('lastVisitBanner').hidden), 'a different number is a different place');
+  check(await p.evaluate(() => document.getElementById('lastVisitBanner').hidden && document.getElementById('jobLastVisit').hidden), 'a different number is a different place, on the report and on the job page');
   await p.evaluate(() => { document.getElementById('jobAddress').value = '7 Banksia Drive'; updateJob(); });
   // The inspector already said something: it is kept.
   await p.evaluate(() => { reportData.roofType = 'Metal roof'; const el = document.getElementById('f-roofType'); renderField(el, 'roofType', 'Metal roof'); });
@@ -53,6 +60,7 @@ const fails = []; const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAI
   check(!after.rd.riskLevel && !after.rd.treatmentRecommended && !after.rd.weatherConditions, 'no risk, recommendation or weather copied');
   check(/^Termites reported before \(our inspection on .*live termites, gum tree/.test(after.rd.termiteHistory), `termite history written from the last report: ${after.rd.termiteHistory}`);
   check(after.rd.lastVisit && after.rd.lastVisit.copied > 5 && /Started from the/.test(after.banner) && after.btn === 'What changed', 'banner now says started from it');
+  check(/^Started from the .+ inspection here\.$/.test(await p.evaluate(() => document.getElementById('jobLastVisit').textContent)), 'and so does the job page');
   await p.screenshot({ path: `${OUT}/2-started.png`, fullPage: false });
   // What changed: this visit found less.
   await p.evaluate(() => { reportData.riskLevel = 'MEDIUM'; reportData.findings = [{ id: 'f1', termiteActivity: 'NONE' }]; reportData.timberSoil = 'NO'; reportData.treatmentRecommended = 'NO'; openLastVisitChanges(); });

@@ -1,5 +1,5 @@
 /* ── QUOTE SCREEN ──────────────────────────────────────────────────────────
-   Full-screen sibling of #mainMenu and #app. Builds a treatment quote from an
+   Full-screen sibling of #app. Builds a treatment quote from an
    inspection report; see js/quote.js. Uses the design tokens in css/app.css. */
 
 #quoteScreen {
@@ -188,20 +188,15 @@ select.quote-input { cursor: pointer; }
   font-weight: 600;
 }
 
-.quote-answer { display: flex; flex-direction: column; gap: 10px; }
-.quote-answer-status { font-size: calc(13.5px * var(--ts)); color: var(--text2); line-height: 1.45; }
-.quote-answer-status.good strong { color: var(--green); }
-.quote-answer-status.bad strong { color: var(--risk); }
 .quote-answer-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .quote-answer-note { font-size: calc(13px * var(--ts)); color: var(--text2); font-style: italic; }
 .quote-answer-sig { max-width: 180px; max-height: 64px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+/* The client's signed copy: where it went, and the way to send it. */
+.quote-answer-copy { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: calc(13px * var(--ts)); color: var(--text2); }
+.quote-answer-copy .quote-text-btn { min-height: 36px; padding: 0; }
 .quote-answer-warn { font-size: calc(12.5px * var(--ts)); color: var(--yellow-text); font-weight: 600; }
-.quote-answer .quote-link-btn { align-self: flex-start; }
 
-.quote-step-btn { width: 100%; flex: none; }
 .quote-step-actions .quote-btn { flex: none; height: 36px; padding: 0 14px; font-size: calc(13px * var(--ts)); }
-.quote-step { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(var(--green-rgb),0.35); background: rgba(var(--green-rgb),0.06); font-size: calc(13.5px * var(--ts)); color: var(--text2); }
-.quote-step strong { color: var(--green); }
 .quote-step-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 
 /* Treatment record */
@@ -232,16 +227,30 @@ body.dark-screen .treat-product { background: var(--surface2); border-color: var
 .bait-rest-btn { width: auto; flex: none; min-height: 40px; padding: 8px 14px; font-size: calc(13.5px * var(--ts)); }
 .bait-count-btn { width: auto; flex: none; align-self: flex-end; min-height: 48px; }
 .bait-summary { font-size: calc(12.5px * var(--ts)); color: var(--text3); }
-.bait-stations { display: flex; flex-direction: column; gap: 8px; }
-.bait-station { padding: 10px; border: 1px solid var(--border); border-left: 4px solid var(--border2); border-radius: 10px; background: var(--surface); }
+.bait-stations { display: flex; flex-direction: column; gap: 6px; }
+/* One row per station: number, where it is, what was found. A tap opens it. */
+.bait-station { border: 1px solid var(--border); border-left: 4px solid var(--border2); border-radius: 10px; background: var(--surface); }
 .bait-station.clear { border-left-color: var(--green); }
 .bait-station.active, .bait-station.eaten { border-left-color: var(--risk); }
 .bait-station.damaged, .bait-station.missing, .bait-station.noaccess { border-left-color: var(--yellow); }
-.bait-station-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.bait-station-no { flex: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--surface3); color: var(--text); font-size: calc(13px * var(--ts)); font-weight: 800; }
+.bait-station.open { border-color: var(--border2); }
+.bait-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 8px 10px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; border-radius: 8px; }
+.bait-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.bait-station-no { flex: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--surface3); color: var(--text); font-size: calc(13px * var(--ts)); font-weight: 700; }
+.bait-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.bait-row-where { font-size: calc(14px * var(--ts)); font-weight: 600; overflow-wrap: anywhere; }
+.bait-row-where.empty { color: var(--text3); font-weight: 500; }
+.bait-row-more { font-size: calc(12px * var(--ts)); color: var(--text3); overflow-wrap: anywhere; }
+.bait-row-found { flex: none; max-width: 42%; font-size: calc(12.5px * var(--ts)); font-weight: 700; color: var(--text3); text-align: right; }
+.bait-station.clear .bait-row-found { color: var(--green); }
+.bait-station.active .bait-row-found, .bait-station.eaten .bait-row-found { color: var(--risk); }
+.bait-station.damaged .bait-row-found, .bait-station.missing .bait-row-found, .bait-station.noaccess .bait-row-found { color: var(--yellow-text); }
+.bait-row-chev { flex: none; color: var(--text3); transition: transform 0.15s; }
+.bait-station.open .bait-row-chev { transform: rotate(180deg); }
+.bait-row-body { padding: 2px 10px 10px; }
 .bait-station-where { flex: 1; min-height: 40px; padding: 8px 10px; font-size: calc(14px * var(--ts)); }
 .bait-chips { gap: 5px; }
-.bait-chip { min-height: 34px; padding: 5px 10px; font-size: calc(12.5px * var(--ts)); }
+.bait-chip { min-height: 38px; padding: 6px 11px; font-size: calc(13px * var(--ts)); }
 .bait-chip.active.on, .bait-chip.eaten.on { background: rgba(192,57,43,0.1); border-color: rgba(192,57,43,0.5); color: var(--risk); }
 .bait-chip.damaged.on, .bait-chip.missing.on, .bait-chip.noaccess.on { background: rgba(212,146,10,0.12); border-color: rgba(212,146,10,0.55); color: var(--yellow-text); }
 .bait-station-extra { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: calc(12.5px * var(--ts)); color: var(--text3); }
@@ -346,40 +355,22 @@ body:not(.dark-screen) .quote-card-head {
   border-top: 1px solid var(--border);
   box-shadow: 0 -10px 30px rgba(0,0,0,0.25);
 }
-/* The total is also the fold button for the bar: label and chevron over
-   the amount; folded, one row. */
-.quote-bar-total { flex: 1; min-width: 0; display: grid; grid-template-columns: auto auto 1fr; grid-template-areas: "label chev ." "amount amount amount"; column-gap: 4px; align-items: center; justify-items: start; align-content: center; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.quote-bar-label { grid-area: label; font-size: calc(11px * var(--ts)); font-weight: 600; color: var(--text3); }
-.quote-bar-chev { grid-area: chev; color: var(--text3); transition: transform 0.2s; }
-.quote-bar-amount { grid-area: amount; }
+/* The total: its label over the amount. */
+.quote-bar-total { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; min-height: 44px; }
+.quote-bar-label { font-size: calc(11px * var(--ts)); font-weight: 600; color: var(--text3); }
 .quote-bar-amount { font: 800 calc(19px * var(--ts)) 'Space Grotesk', sans-serif; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .quote-bar .quote-btn { flex: none; height: 46px; padding: 0 14px; }
 .quote-bar-send { padding: 0 18px; }
 
 body:not(.dark-screen) .quote-bar { background: var(--ink); border-top-color: rgba(255,255,255,0.08); }
-body:not(.dark-screen) .quote-bar-label, body:not(.dark-screen) .quote-bar-chev { color: var(--on-ink2); }
+body:not(.dark-screen) .quote-bar-label { color: var(--on-ink2); }
 
-/* Folding the bars (toggleQuoteBar): the top bar loses the job's documents
-   and slims to one row; the total bar slims to the total alone. */
-.quote-fold-btn { flex-shrink: 0; width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); cursor: pointer; }
-.quote-fold-btn .icon { transition: transform 0.2s; }
-body:not(.dark-screen) .quote-fold-btn { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
-#quoteScreen.top-folded .doc-strip-bar { display: none; }
-/* With the strip folded away, its Job chip goes too: a back button stands in. */
-.quote-topbar-back { display: none; }
-#quoteScreen.top-folded .quote-topbar-back { display: flex; width: 32px; height: 32px; margin-left: -4px; }
+/* The top row's back button, to This job. */
+.quote-topbar-back { margin-left: -4px; }
 body:not(.dark-screen) .quote-topbar .drawer-back { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); color: var(--on-ink); }
-#quoteScreen.top-folded .quote-topbar { min-height: calc(42px + env(safe-area-inset-top, 0px)); padding-top: calc(4px + env(safe-area-inset-top, 0px)); padding-bottom: 4px; }
-#quoteScreen.top-folded .quote-topbar-title { font-size: calc(15px * var(--ts)); }
-#quoteScreen.top-folded .quote-fold-btn { width: 32px; height: 32px; }
-#quoteScreen.top-folded .quote-fold-btn .icon { transform: rotate(180deg); }
-#quoteScreen.bottom-folded .quote-bar { padding-top: 2px; padding-bottom: calc(2px + env(safe-area-inset-bottom)); box-shadow: none; }
-#quoteScreen.bottom-folded .quote-bar .quote-btn { display: none; }
-#quoteScreen.bottom-folded .quote-bar-total { grid-template-columns: auto auto auto 1fr; grid-template-areas: "label amount chev ."; column-gap: 8px; min-height: 40px; }
-#quoteScreen.bottom-folded .quote-bar-amount { font-size: calc(15px * var(--ts)); }
-#quoteScreen.bottom-folded .quote-bar-chev { transform: rotate(180deg); }
 body:not(.dark-screen) .quote-bar-amount { color: var(--on-ink); }
-body:not(.dark-screen) .quote-bar .quote-bar-pdf { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.16); color: var(--on-ink); }
+/* PDF, and Send again once the quote has gone as it stands, are the quiet buttons. */
+body:not(.dark-screen) .quote-bar .quote-bar-pdf, body:not(.dark-screen) .quote-bar .quote-bar-send:not(.primary) { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.16); color: var(--on-ink); }
 body:not(.dark-screen) .quote-fold > summary .quote-card-title { padding: 0; border: none; }
 
 /* ── Header: who it's for, big, then where, with a pill for where it's up to.
@@ -412,40 +403,9 @@ body:not(.dark-screen) .quote-card-title { color: var(--text); }
 .qi-desc { font-size: calc(15px * var(--ts)); }
 .qi-price { font-size: calc(15px * var(--ts)); }
 
-/* ── Progress: the job's four steps down a line, at the foot. ── */
-.qp { list-style: none; margin: 4px 0 0; padding: 0; }
-.qp-step { position: relative; display: flex; gap: 12px; padding-bottom: 18px; }
-.qp-step:last-child { padding-bottom: 2px; }
-.qp-step::before {
-  content: ''; position: absolute; left: 13px; top: 30px; bottom: 2px; width: 2px;
-  border-radius: 2px; background: var(--border2);
-}
-.qp-step:last-child::before { display: none; }
-.qp-step.done::before { background: linear-gradient(rgb(var(--glow)), rgba(var(--glow), 0.35)); }
-.qp-dot {
-  flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font: 700 calc(12px * var(--ts)) 'Inter', sans-serif; color: var(--text3);
-  background: var(--surface2); border: 2px solid var(--border2);
-}
-.qp-step.done .qp-dot { background: var(--green-fill); border-color: transparent; color: #fff; }
-.qp-step.now .qp-dot { border-color: var(--accent); color: var(--accent2); background: #fff; box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.16); }
-.qp-step.warn .qp-dot { border-color: #E0A100; color: #8a5a00; background: #FFF6E0; }
-.qp-step.bad .qp-dot { border-color: var(--risk); color: var(--risk); background: #FDECEA; }
-/* A step the job didn't need: counted as done, with a dash for its dot. */
-.qp-step.skip::before { background: rgba(var(--glow), 0.35); }
-.qp-step.skip .qp-dot { border-color: rgba(var(--accent-rgb), 0.45); color: var(--accent2); background: rgba(var(--accent-rgb), 0.08); }
-.qp-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding-top: 3px; }
-.qp-title { font-size: calc(15px * var(--ts)); font-weight: 700; color: var(--text); line-height: 1.3; }
-.qp-step.todo .qp-title, .qp-step.skip .qp-title { color: var(--text2); }
-.qp-text { font-size: calc(13px * var(--ts)); color: var(--text2); line-height: 1.45; margin-top: -4px; }
-.qp-step.done .qp-text strong { color: var(--green); }
-.qp-step.bad .qp-text strong { color: var(--risk); }
-.qp-step.warn .qp-text { color: var(--yellow-text); }
+/* Text buttons in a row (Check now, Share the link, Change answer). */
 .qp-links { display: flex; gap: 18px; margin-top: -4px; }
 .qp-links .quote-text-btn, .qp-body > .quote-text-btn { padding: 6px 0; min-height: 36px; align-self: flex-start; }
-.qp-body .quote-answer-btns { margin-top: 2px; }
-.qp-body .quote-step-btn { margin-top: 2px; }
 
 /* What the quote fixes, under the address. Tapping it opens it to change. */
 .quote-hero-problem {
@@ -455,7 +415,8 @@ body:not(.dark-screen) .quote-card-title { color: var(--text); }
   background: linear-gradient(135deg, rgba(var(--accent-hi-rgb),0.14), rgba(var(--accent-hi-rgb),0.03));
 }
 .quote-hero-problem-label { font-size: calc(11px * var(--ts)); font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--accent-glow); }
-.quote-hero-problem-text { font-size: calc(14.5px * var(--ts)); line-height: 1.45; color: var(--on-ink); }
+/* Two lines of it; the rest is a tap away, under Client details. */
+.quote-hero-problem-text { font-size: calc(14.5px * var(--ts)); line-height: 1.45; color: var(--on-ink); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 
 /* The folded work row carries the total. */
 .quote-work-total { flex-shrink: 0; font: 700 calc(17px * var(--ts)) 'Space Grotesk', sans-serif; color: var(--accent2); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -497,13 +458,11 @@ body:not(.dark-screen) .quote-card-title { color: var(--text); }
   padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px;
   background: var(--surface2); cursor: pointer;
 }
-.qlist[hidden] { display: none; }
 .qlist:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .qlist ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .qlist li { position: relative; padding-left: 16px; font-size: calc(14px * var(--ts)); line-height: 1.45; color: var(--text); }
 .qlist li::before { content: ''; position: absolute; left: 2px; top: 8px; width: 6px; height: 6px; border-radius: 99px; background: var(--accent); }
 .qlist-empty { font-size: calc(13px * var(--ts)); color: var(--text3); }
-textarea.quote-input[hidden] { display: none; }
 
 /* The plan's timing: on the day, after, then. Each point has a dot and
    the line runs down to the next. */
@@ -522,14 +481,12 @@ textarea.quote-input[hidden] { display: none; }
 .q-line .quote-hint { margin-top: 6px; }
 .quote-fold .fsub .fsub-action { margin: 0; }
 .quote-fold > .quote-add-btn { width: calc(100% - 28px); }
-.quote-answer .quote-card-head .quote-card-title { display: flex; align-items: center; gap: 10px; }
 .quote-fold-sub { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; line-height: 1.35; }
 
-/* ── The quote guide: Progress holds the whole quote. Step 1's folds sit
-   inside it as lighter cards, on the same side line as the steps. ── */
-.qp-folds { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
-.qp-extra[hidden] { display: none; }
-.qp-extra:empty { display: none; }
+/* ── The quote's parts, in the order they're worked on: Say the quote,
+   the work, the second opinion, the plan, the terms, the client. ── */
+.qp-folds { display: flex; flex-direction: column; gap: 10px; }
+.qp-folds > .quote-voice, .qp-folds > .tp-card { margin: 0; }
 .quote-guide .qp-folds .quote-fold { border: 1px solid var(--border); border-radius: 12px; }
 body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--border); box-shadow: 0 1px 3px rgba(13,40,60,0.08); }
 .quote-guide .qp-folds .quote-fold > summary { padding: 12px 10px; min-height: 56px; gap: 10px; }
@@ -538,7 +495,7 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { border-color: var(--
 .quote-guide .qp-folds .quote-fold > .quote-add-btn { width: calc(100% - 24px); }
 /* The boxes sit flush with the fold's sides, not past them. */
 .quote-guide .qp-folds .quote-fold > .quote-input { width: calc(100% - 24px); box-sizing: border-box; }
-/* On the white quote guide, as on the treatment record: plain white folds
+/* As on the treatment record: plain white folds
    with a clear edge instead of a blue-grey tint, white fields with a firm
    border, and dark labels, so nothing reads as grey on grey. */
 body:not(.dark-screen) .quote-guide .qp-folds .quote-fold { background: var(--surface); border-color: var(--border2); }
@@ -556,16 +513,11 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-system-choice { background:
 .quote-guide .qp-folds .fgroup-icon { width: 32px; height: 32px; border-radius: 9px; }
 .quote-guide .qp-folds .quote-card-title { font-size: calc(15.5px * var(--ts)); }
 .quote-guide .qp-folds .quote-work-total { font-size: calc(15px * var(--ts)); }
-.quote-guide > .qp > .qp-step > .qp-body { min-width: 0; }
-.quote-card.quote-guide { padding: 14px 12px; }
-.quote-guide > .qp > .qp-step { gap: 10px; }
 
-/* Small phones (320 wide): the guide's side line and nested folds left the
-   line names about 90 px, one word to a line. Less padding, no fold icons. */
+/* Small phones (320 wide): less padding and no fold icons, so the line
+   names keep their width. */
 @media (max-width: 359px) {
   .quote-shell { padding-left: 10px; padding-right: 10px; }
-  .quote-card.quote-guide { padding: 12px 10px; }
-  .quote-guide > .qp > .qp-step { gap: 8px; }
   .quote-guide .qp-folds .quote-fold > summary { padding: 10px 8px; gap: 8px; }
   .quote-guide .qp-folds .quote-fold > :not(summary) { margin-left: 8px; margin-right: 8px; }
   .quote-guide .qp-folds .quote-fold > .quote-add-btn { width: calc(100% - 16px); }
@@ -609,6 +561,8 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-system-choice { background:
 .sp-selrow .job-input { flex: 1; min-width: 0; min-height: 42px; }
 .sp-delete { color: var(--risk); }
 .sp-groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 3px; border-radius: 12px; background: var(--surface3); }
+/* The report's plan has four tabs (no Treatment or Stations): one row. */
+.sp-groups[data-n="4"] { grid-template-columns: repeat(4, 1fr); }
 .sp-group { min-height: 38px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: calc(12.5px * var(--ts)); font-weight: 700; color: var(--text2); cursor: pointer; }
 .sp-group.on { background: var(--surface); color: var(--accent2); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
 .sp-tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
@@ -629,7 +583,6 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-system-choice { background:
 .bait-plan { margin: 8px 0 10px; }
 .bait-plan .site-plan-svg { border: 1px solid var(--border); }
 .bait-plan-caption { margin-top: 4px; font-size: calc(12px * var(--ts)); font-weight: 600; color: var(--text3); }
-.sp-finish[hidden] { display: none; }
 .sp-zoom { min-width: 44px; font-size: calc(18px * var(--ts)); font-weight: 800; }
 .sp-zoom:disabled { opacity: 0.4; }
 .sp-size { margin-top: 8px; font-size: calc(13px * var(--ts)); color: var(--text2); }
@@ -638,7 +591,6 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-system-choice { background:
 .sp-bg { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 12px; border: 1px dashed var(--border2); border-radius: 12px; }
 .sp-bg-btn { cursor: pointer; }
 .sp-bg .quote-hint { flex-basis: 100%; margin: 0; }
-.sp-selrow[hidden], #spBgRemove[hidden] { display: none; }
 .sp-turn { margin-top: 8px; font-size: calc(13px * var(--ts)); color: var(--text2); }
 .sp-turn-label { flex: 1; }
 .sp-turn .job-input { flex: 0 0 64px; max-width: 64px; text-align: center; }
@@ -647,13 +599,11 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-system-choice { background:
 .sp-part .sp-size { margin-top: 0; margin-bottom: 8px; }
 .sp-part-btns { display: flex; flex-wrap: wrap; gap: 8px; }
 .sp-part-btns .quote-link-btn { min-height: 40px; }
-.sp-part[hidden], .sp-part-btns .quote-link-btn[hidden] { display: none; }
 .sp-views { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1.5px solid var(--accent); border-radius: 12px; overflow: hidden; }
 .sp-view { min-height: 40px; border: 0; background: var(--surface); font: inherit; font-size: calc(14px * var(--ts)); font-weight: 800; color: var(--accent2); cursor: pointer; }
 .sp-view.on { background: var(--accent); color: #fff; }
 .treat-plan-sub { margin-top: 14px; }
 .treat-plan-caption { margin: 0 0 6px; font-size: calc(13px * var(--ts)); font-weight: 800; color: var(--text); }
-.sp-bg[hidden] { display: none; }
 
 /* Treatment record: the other kinds of treatment, folded under the ticked ones */
 .treat-more { margin-top: 2px; }
@@ -783,11 +733,9 @@ body:not(.dark-screen) .quote-guide .qp-folds .quote-system-choice { background:
 .tp-again .quote-btn { width: 100%; flex: none; }
 .tp-foot { margin-top: 8px; font-size: calc(11.5px * var(--ts)); color: var(--text3); }
 .tp-report-link { display: flex; align-items: center; gap: 12px; width: calc(100% - 28px); margin: 4px 14px 14px; padding: 12px 14px; min-height: 44px; text-align: left; border-radius: 12px; border: 1px dashed rgba(var(--accent-rgb),0.45); background: transparent; color: var(--text); font: inherit; cursor: pointer; }
-.tp-report-link[hidden] { display: none; }
 .tp-report-link .icon { flex-shrink: 0; color: var(--accent); }
 .tp-report-link span { display: flex; flex-direction: column; gap: 2px; }
 .tp-report-link strong { font-size: calc(14px * var(--ts)); }
 .tp-report-link small { font-size: calc(12px * var(--ts)); color: var(--text2); line-height: 1.4; }
 
-/* Say the quote: the spoken-quote box at the top of the editor (js/quote.js) */
-#quoteEditor > .quote-voice { margin: 0 0 12px; }
+

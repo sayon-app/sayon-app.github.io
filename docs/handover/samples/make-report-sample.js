@@ -15,7 +15,7 @@ const sess = { access_token:'a.b.c', refresh_token:'r', expires_at: Math.floor(D
   await ctx.route(/fonts\.g/, r => r.fulfill({ status:200, body:'', contentType:'text/css' }));
   await ctx.route(/workers\.dev/, r => r.fulfill({ json:{ plan:'starter', status:'active', ai_calls_used_this_period:1, limit:150 } }));
   await ctx.route(/supabase\.co/, r => { const u = r.request().url(); if (u.includes('businesses?owner_id')) return r.fulfill({ json:[{ id:'b1', name:'Example Pest Co', owner_id: uid, settings:{} }] }); return r.fulfill({ json:[] }); });
-  await ctx.addInitScript((s) => { localStorage.setItem('korva_session', JSON.stringify(s)); localStorage.setItem('korva_onboarded_v1','1'); }, sess);
+  await ctx.addInitScript((s) => { localStorage.setItem('korva_session', JSON.stringify(s)); localStorage.setItem('korva_onboarded_v1:' + s.user.id, '1'); }, sess);
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(3500);
   await p.evaluate(async () => {

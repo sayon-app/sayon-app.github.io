@@ -346,6 +346,11 @@ async function buildReportPdf() {
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = 210, M = 15, CW = W - M * 2;
+  // A section with nothing in it stays out of the report and its contents.
+  // Photographs is the one that can be empty; the parts after it move up
+  // one, so the numbers run on without a gap.
+  const hasGallery = (reportData.photos || []).length > 0;
+  const partNo = key => REPORT_PARTS[key] - (!hasGallery && REPORT_PARTS[key] > REPORT_PARTS.photos ? 1 : 0);
   const address   = getFullAddress() || 'Address Not Set';
   const client    = document.getElementById('jobClient').value    || 'Not specified';
   const inspector = document.getElementById('jobInspector').value || 'Not specified';
@@ -361,7 +366,9 @@ async function buildReportPdf() {
   const reportNumber = ensureReportNumber();
   const version = reportVersion();
   const reportId = `${reportNumber} · Version ${version}`;
-  const fingerprint = reportFingerprint();
+  // A locked report carries the code it was locked under, so the same
+  // version made again reads the same.
+  const fingerprint = isReportLocked() && reportData.issue.fingerprint || reportFingerprint();
   let y = 0;
 
   const STANDARD_NAMES = {
@@ -389,7 +396,10 @@ async function buildReportPdf() {
   // titleUntil: where the room just under the last section title on this
   // page ends (the title and the lines straight after it), or -1.
   let titleUntil = -1;
-  function newPage() { doc.addPage(); compactHeader(pageLabel); _rowShade = false; pageTopUntil = y; titleUntil = -1; }
+  // strayUntil: where photos that ran over from the page before end on
+  // this page, or -1. partsStarted counts startPart calls. Both for keep().
+  let strayUntil = -1, partsStarted = 0;
+  function newPage() { doc.addPage(); compactHeader(pageLabel); _rowShade = false; pageTopUntil = y; titleUntil = -1; strayUntil = -1; }
   const atPageTop = () => y <= pageTopUntil + 0.5;
   function gap(n=5) { y += n; }
   // Starts a part of the report: on a fresh page when asked or when little of
@@ -397,7 +407,7 @@ async function buildReportPdf() {
   // just unset) means the part is drawn through keep(), which moves it to a
   // fresh page itself if it doesn't fit.
   function startPart(label, freshPage) {
-    pageLabel = label;
+    pageLabel = label; partsStarted++;
     if (freshPage || (freshPage !== false && y > 215)) newPage();
     else if (!atPageTop()) gap(8);
     _rowShade = false;
@@ -409,18 +419,19 @@ async function buildReportPdf() {
   // off again and drawn from a fresh page, with draw(true). So a part that
   // fits on a page is never split across two. A longer one starts at the top
   // of its own page, unless a good part of the page before was left: then it
-  // starts there, as it splits either way. Taking a part off cuts the pages
+  // starts there, as it splits either way. So does a section that follows
+  // photos which ran over onto its page. Taking a part off cuts the pages
   // it added and the page's drawing back to where they were.
   function pdfState() {
     const n = doc.internal.getNumberOfPages();
-    return { n, len: doc.internal.pages[n].length, y, pageNum, pageLabel, pageTopUntil, titleUntil, shade: _rowShade, photoNo, parts: { ...partPages },
+    return { n, len: doc.internal.pages[n].length, y, pageNum, pageLabel, pageTopUntil, titleUntil, strayUntil, shade: _rowShade, photoNo, parts: { ...partPages },
       font: doc.getFont(), size: doc.getFontSize(), text: doc.getTextColor() };
   }
   function restorePdfState(s) {
     while (doc.internal.getNumberOfPages() > s.n) doc.deletePage(doc.internal.getNumberOfPages());
     doc.setPage(s.n);
     doc.internal.pages[s.n].length = s.len;
-    y = s.y; pageNum = s.pageNum; pageLabel = s.pageLabel; pageTopUntil = s.pageTopUntil; titleUntil = s.titleUntil; _rowShade = s.shade; photoNo = s.photoNo;
+    y = s.y; pageNum = s.pageNum; pageLabel = s.pageLabel; pageTopUntil = s.pageTopUntil; titleUntil = s.titleUntil; strayUntil = s.strayUntil; _rowShade = s.shade; photoNo = s.photoNo;
     Object.keys(partPages).forEach(k => delete partPages[k]);
     Object.assign(partPages, s.parts);
     doc.setFont(s.font.fontName, s.font.fontStyle); doc.setFontSize(s.size); doc.setTextColor(s.text);
@@ -432,8 +443,14 @@ async function buildReportPdf() {
     const outer = leftTitle;
     const s = pdfState();
     const run = fresh => { leftTitle = false; draw(fresh); };
+    const before = partsStarted;
     run(false);
-    if (doc.internal.getNumberOfPages() > s.n && s.y > s.pageTopUntil + 4) {
+    // A section that starts straight under photos that ran over stays
+    // there and splits as it falls, so a page isn't left holding a photo
+    // or two and white space. Only with a good part of the page left, and
+    // not when that leaves its title by itself.
+    const underStray = partsStarted > before && s.strayUntil >= 0 && s.y <= s.strayUntil + 6 && s.y < 190 && !leftTitle;
+    if (doc.internal.getNumberOfPages() > s.n && s.y > s.pageTopUntil + 4 && !underStray) {
       restorePdfState(s);
       run(true);
       let moved = true;
@@ -748,20 +765,27 @@ async function buildReportPdf() {
   }
 
   // Photos two to a row, each with its number and caption under it.
-  // The height of one row of the grid: two photos and their captions.
-  function photoRow(pair, w = CW) {
-    const boxW = (w - 5) / 2, boxH = boxW * 0.72;
+  // The height of one row of the grid: its photos and their captions.
+  function photoRow(list, w = CW, across = 2) {
+    const boxW = (w - 5 * (across - 1)) / across, boxH = boxW * 0.72;
     doc.setFontSize(7);
-    const caps = pair.map(p => pdfClipLines(doc, (p.caption || '').trim(), boxW - 16, 2));
+    const caps = list.map(p => pdfClipLines(doc, (p.caption || '').trim(), boxW - 16, 2));
     return { boxW, boxH, caps, h: boxH + 5 + Math.max(...caps.map(c => Math.max(1, c.length))) * 3.3 + 4 };
   }
   function photoGrid(photos, x = M, w = CW) {
-    const gutter = 5;
-    for (let i = 0; i < photos.length; i += 2) {
-      const pair = photos.slice(i, i + 2);
-      const { boxW, boxH, caps, h: rowH } = photoRow(pair, w);
+    const gutter = 5, startPage = doc.internal.getNumberOfPages();
+    for (let i = 0; i < photos.length;) {
+      // The last photo would go over to a new page by itself: it goes
+      // beside the two before it instead, three to the row.
+      let across = 2;
+      if (photos.length - i === 3) {
+        const pairH = photoRow(photos.slice(i, i + 2), w).h;
+        if (y + pairH <= 280 && y + pairH + photoRow(photos.slice(i + 2), w).h > 280) across = 3;
+      }
+      const list = photos.slice(i, i + across);
+      const { boxW, boxH, caps, h: rowH } = photoRow(list, w, across);
       if (y + rowH > 280) newPage();
-      pair.forEach((p, k) => {
+      list.forEach((p, k) => {
         const px = x + k * (boxW + gutter);
         const no = ++photoNo;
         try {
@@ -776,17 +800,23 @@ async function buildReportPdf() {
         }
       });
       y += rowH;
+      i += across;
     }
+    // Photos that ran over: what's on this page so far is only them.
+    if (doc.internal.getNumberOfPages() > startPage) strayUntil = y;
   }
 
   function renderSectionPhotosInPDF(sectionKey, label, list) {
     const photos = list || (reportData.photosBySection || {})[sectionKey] || [];
     if (photos.length === 0) return;
     gap(2);
+    const startPage = doc.internal.getNumberOfPages();
     // Keep the label with the first row of photos.
     if (y + 9 + photoRow(photos.slice(0, 2)).h > 280) newPage();
     subhead('PHOTOS — ' + label.toUpperCase());
     photoGrid(photos);
+    // Moved over whole, label and all: this page so far is only them too.
+    if (doc.internal.getNumberOfPages() > startPage) strayUntil = y;
     gap(3);
   }
 
@@ -803,19 +833,13 @@ async function buildReportPdf() {
     y += 3;
   }
 
+  // The general photos, the ones that belong to no one finding, area or
+  // condition. A report with none has no Photographs section (hasGallery).
   function photoGallery() {
     const photos = reportData.photos || [];
-    // With no photos it's two lines: they fit under the recommendations
-    // instead of taking a near-empty page of their own.
-    if (!photos.length) { pageLabel = 'Photographs'; if (y + 24 > 278) newPage(); else gap(8); _rowShade = false; }
-    else startPart('Photographs');
-    sectionTitle('PHOTOGRAPHS', REPORT_PARTS.photos, photos.length ? photoRow(photos.slice(0, 2)).h : 30);
-    if (!photos.length) {
-      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...C.inkLight);
-      doc.text('No general photographs were attached. Photos of each area appear in the section they belong to.', M, y);
-      y += 8;
-      return;
-    }
+    if (!photos.length) return;
+    startPart('Photographs');
+    sectionTitle('PHOTOGRAPHS', partNo('photos'), photoRow(photos.slice(0, 2)).h);
     photoGrid(photos);
     gap(4);
   }
@@ -1151,7 +1175,7 @@ async function buildReportPdf() {
       subhead('TERMITE MANAGEMENT SYSTEM');
       const identified = hasIdentifiedSystem(reportData.existingSystem);
       facts([
-        ['Existing System', RENAMED_CHOICES.existingSystem[reportData.existingSystem] || reportData.existingSystem || 'None recorded'],
+        ['Existing System', RENAMED_CHOICES.existingSystem[reportData.existingSystem] || reportData.existingSystem || 'Not recorded'],
         ['System Name', reportData.existingSystemOther],
         ['Durable Notice Present (Meter Box)', reportData.durableNoticePresent, true],
         ...(identified ? [
@@ -1206,6 +1230,28 @@ async function buildReportPdf() {
     });
     if (!anyStatus) noneRow(false);
     notesBlock('obstructions');
+    // The site plan, when the inspector drew one: under the areas, each
+    // view kept on one page with its legend (js/site-plan.js draws it).
+    const plan = reportData.sitePlan;
+    if (typeof sitePlanHasContent === 'function' && sitePlanHasContent(plan)) {
+      ['site', 'sub'].filter(layer => layer === 'site' || sitePlanHasSubfloor(plan)).forEach(layer => keepGroup(() => {
+        const sum = layer === 'sub' ? sitePlanSubSummary(plan) : sitePlanSummary(plan, { report: true });
+        const words = layer === 'sub' ? `The area under the suspended floor, with the building's walls above it in grey.${sum ? ` It shows ${sum}.` : ''}`
+          : sum ? `The plan shows ${sum}.` : '';
+        // The drawing can't run over a page, so the room it takes (heading,
+        // words, plan and legend) is found first.
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+        const legendRows = sitePlanLegendKeys(plan, layer).length + (layer === 'sub' ? 1 : 0);
+        const need = 13 + (words ? doc.splitTextToSize(words, CW).length * 4.3 + 3 : 0) + CW * PLAN_H / PLAN_W + 4 + 6 + Math.ceil(legendRows / 3) * 6.6;
+        if (y + (atPageTop() ? 0 : 4) + need > 280) newPage();
+        if (!atPageTop()) gap(4);
+        subhead(layer === 'sub' ? 'SUBFLOOR PLAN' : 'SITE PLAN');
+        gap(3);
+        if (words) para(words);
+        y += drawSitePlanPdf(doc, plan, { x: M, y, w: CW, layer }) + 4;
+        y += drawSitePlanLegendPdf(doc, plan, { x: M, y, w: CW, layer }) + 2;
+      }));
+    }
     renderSectionPhotosInPDF('obstructions', 'Areas Inspected');
   });
 
@@ -1394,10 +1440,17 @@ async function buildReportPdf() {
     subhead('TERMITES');
     // A report with nothing recorded about termites says so in a row, rather
     // than printing an empty "Not recorded" finding card.
+    const findingPhotos = f => ((reportData.photosBySection || {})[findingPhotoSection(f.id)] || []).length;
     const findingRecorded = f => ['termiteActivity','species','activityLocation','timberAffected','damageDescription','nestLocated','structuralConcern']
-      .some(k => f[k] && String(f[k]).trim()) || ((reportData.photosBySection || {})[findingPhotoSection(f.id)] || []).length;
-    if (findings.some(findingRecorded)) findings.forEach((f, idx) => findingCard(f, idx));
-    else { row('Termite Activity', 'Not recorded'); gap(4); }
+      .some(k => f[k] && String(f[k]).trim()) || findingPhotos(f);
+    // "Nothing found" with no more said is one row, like the borers and
+    // decay rows under it: no numbered card, and no nest question about
+    // termites that weren't there.
+    const nothingFound = f => f.termiteActivity === 'NONE' && f.nestLocated !== 'YES' && f.structuralConcern !== 'YES' && !findingPhotos(f)
+      && !['species','activityLocation','timberAffected','damageDescription'].some(k => f[k] && String(f[k]).trim());
+    const cards = findings.filter(f => findingRecorded(f) && !nothingFound(f));
+    if (cards.length) findings.forEach((f, idx) => { if (cards.includes(f)) findingCard(f, idx); });
+    else { row('Termite Activity', findings.some(nothingFound) ? 'NONE' : 'Not recorded'); gap(4); }
 
     // Borers, decay and delignification: the other timber pests AS 4349.3
     // covers. Always printed, so an unanswered field reads "Not recorded"
@@ -1454,9 +1507,11 @@ async function buildReportPdf() {
     };
     const ADVERSE = { waterLeaks: ['YES'], moistureReadings: ['YES'], siteDrainage: ['POOR'], subfloorDrainage: ['POOR'], subfloorVentilation: ['POOR'], mouldSeen: ['YES'],
       timberSoil: ['YES'], slabEdge: ['OBSTRUCTED'], weepHoles: ['BRIDGED'], antCapping: ['GAPS', 'NONE'], nonDurableTimber: ['YES'] };
+    // A required question left blank prints as "Not recorded", so neither
+    // heading stands over nothing. The others are left out when blank.
     function condRow(label, key, shown) {
       const v = reportData[key];
-      row(label, shown || v, v && (ADVERSE[key] || []).includes(v) ? 'bad' : undefined);
+      row(label, shown || v || (REQUIRED_FIELDS.conducive.includes(key) ? 'Not recorded' : ''), v && (ADVERSE[key] || []).includes(v) ? 'bad' : undefined);
       if (v && (ADVERSE[key] || []).includes(v) && WHY_IT_MATTERS[key]) {
         doc.setFont('helvetica','italic'); doc.setFontSize(7.3);
         const lines = doc.splitTextToSize(WHY_IT_MATTERS[key], CW - 8);
@@ -1507,7 +1562,8 @@ async function buildReportPdf() {
 
     notesBlock('conducive');
     gap(4);
-    renderSectionPhotosInPDF('conducive', 'Conducive Conditions');
+    // Each condition's own photos, then any from the old section box.
+    renderSectionPhotosInPDF(null, 'Conducive Conditions', [...conditionPhotos(), ...((reportData.photosBySection || {}).conducive || [])]);
   });
 
   // ─────────────────────────────────────────────────────────────────────
@@ -1534,16 +1590,16 @@ async function buildReportPdf() {
     gap(8);
   });
 
-  // 9. PHOTOGRAPHS
+  // 9. PHOTOGRAPHS, when there are general photos
   photoGallery();
 
   // ─────────────────────────────────────────────────────────────────────
-  // 10. SCOPE, LIMITATIONS, DEFINITIONS & TERMS
+  // 10. SCOPE, LIMITATIONS, DEFINITIONS & TERMS (numbered by partNo)
   // ─────────────────────────────────────────────────────────────────────
   // Straight on from the part before when half a page or more is left: the
   // columns start there and run on over the page.
   startPart('Scope, Limitations, Definitions & Terms', y > 150);
-  sectionTitle('SCOPE, LIMITATIONS, DEFINITIONS & TERMS', REPORT_PARTS.terms);
+  sectionTitle('SCOPE, LIMITATIONS, DEFINITIONS & TERMS', partNo('terms'));
 
   // ── TWO COLUMNS ── the scope, definitions and terms are fine print, set
   // in two columns: the text runs down the left column, then the right,
@@ -1727,7 +1783,7 @@ async function buildReportPdf() {
   // 11. INSPECTOR DETAILS and 12. CLIENT ACKNOWLEDGEMENT, kept together.
   // ─────────────────────────────────────────────────────────────────────
   startPart('Inspector Details', y > 120);
-  sectionTitle('INSPECTOR DETAILS', REPORT_PARTS.inspector);
+  sectionTitle('INSPECTOR DETAILS', partNo('inspector'));
   // Signature blocks: the value sits on the line, its caption under it.
   const sigColW = (CW - 16) / 3;
   const onSigLine = (text, x) => drawPdfOnLine(doc, text, x, y, sigColW);
@@ -1748,7 +1804,7 @@ async function buildReportPdf() {
   y += 12;
 
   startPart('Client Acknowledgement', y > 175);
-  sectionTitle('CLIENT ACKNOWLEDGEMENT', REPORT_PARTS.acknowledgement);
+  sectionTitle('CLIENT ACKNOWLEDGEMENT', partNo('acknowledgement'));
   disclaimer('This report relates to the condition of the property in respect of timber pest activity at the time of inspection, limited to those areas that were reasonably accessible. It is not a warranty, guarantee, or certificate of compliance with any law, insurance policy, or building standard, and does not guarantee the property is, or will remain, free of termites or other timber pests. Conditions affecting the property may change after the inspection date, and concealed or inaccessible areas may contain damage or activity that could not be identified.');
   gap(2);
   if (!prePurchase) {
@@ -1786,8 +1842,8 @@ async function buildReportPdf() {
   }
 
   // ── Version history ─────────────────────────────────────────────────────
-  // Every earlier completed version, and why each amendment was made (see
-  // COMPLETED REPORTS), so a reader can see this isn't the first issue.
+  // Every earlier finalised version, and why each amendment was made (see
+  // FINALISED JOBS), so a reader can see this isn't the first issue.
   const history = reportData.issueHistory || [];
   if (version > 1 && history.length) {
     if (y + 20 > 270) newPage();
@@ -1842,15 +1898,15 @@ async function buildReportPdf() {
       [REPORT_PARTS.client, 'Client & Inspection Details', 'Who the report is for, the property, and who inspected it.'],
       [REPORT_PARTS.summary, 'Summary', 'The main results under access, activity and safety & risk, with where to read more.'],
       [REPORT_PARTS.property, 'About the Property', 'How the building is built and used, and its termite management system.'],
-      [REPORT_PARTS.areas, 'Areas Inspected', 'Each area, how much of it was inspected, and what was found there.'],
+      [REPORT_PARTS.areas, 'Areas Inspected', `Each area, how much of it was inspected, and what was found there${typeof sitePlanHasContent === 'function' && sitePlanHasContent(reportData.sitePlan) ? ', with the site plan' : ''}.`],
       [REPORT_PARTS.access, 'Areas Unable to Be Inspected, and Why', 'Obstructions, restricted access, high risk areas and invasive inspection.'],
       [REPORT_PARTS.findings, 'Findings', 'Termites, borers, wood decay, chemical delignification and previous treatment.'],
       [REPORT_PARTS.conducive, 'Conducive Conditions', 'Conditions that make timber pest attack more likely, and why each matters.'],
       [REPORT_PARTS.recommendations, 'Recommendations & Risk', 'The risk of termite attack, treatment and when to inspect again.'],
-      [REPORT_PARTS.photos, 'Photographs', 'Photos taken during the inspection.'],
-      [REPORT_PARTS.terms, 'Scope, Limitations, Definitions & Terms', 'What this inspection covers, the terms used, and the terms and conditions.'],
-      [REPORT_PARTS.inspector, 'Inspector Details', 'The inspector, their licence and signature.'],
-      [REPORT_PARTS.acknowledgement, 'Client Acknowledgement', 'The client\'s acknowledgement of the report and its limits.'],
+      ...(hasGallery ? [[partNo('photos'), 'Photographs', 'General photos. A photo of a finding, an area or a condition is in its own section.']] : []),
+      [partNo('terms'), 'Scope, Limitations, Definitions & Terms', 'What this inspection covers, the terms used, and the terms and conditions.'],
+      [partNo('inspector'), 'Inspector Details', 'The inspector, their licence and signature.'],
+      [partNo('acknowledgement'), 'Client Acknowledgement', 'The client\'s acknowledgement of the report and its limits.'],
       ...(agreement ? [['A', 'Appendix: Pre-Inspection Agreement', 'The agreement the client signed before the inspection.']] : []),
     ];
     CONTENTS.forEach(([no, title, desc]) => {
@@ -1880,10 +1936,11 @@ async function buildReportPdf() {
     doc.text(`Page ${p-1} of ${totalPages-1}`, W-M, 290, { align:'right' });
   }
 
-  const fname = `SAYON_${fileNamePart(address) || 'Property'}_${fileNamePart(today)}.pdf`;
+  const fname = pdfFileName(reportKindTitle().replace(' Inspection', ''), getFullAddress(), { date: (issuedAt ? new Date(issuedAt) : new Date()).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) });
   const blob = doc.output('blob');
   saveDraft(); // keeps the report number it was given
-  return { blob, fname, fingerprint, version };
+  // agreementPage: the page of this PDF its agreement appendix starts on (0 with none), for the job file's contents.
+  return { blob, fname, fingerprint, version, agreementPage: partPages.A || 0 };
 }
 
 async function _buildAndDownloadPDF() {

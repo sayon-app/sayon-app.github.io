@@ -1,16 +1,19 @@
 // ── BUSINESS SETTINGS SYNC ──────────────────────────────────────────────────
-// The business details (entered at sign-up and in Your business, with the
+// The business details (entered at sign-up and in Business details, with the
 // logo) and the quote price list belong to the business, not the phone.
 // They're kept in businesses.settings so a new phone, or a technician already
 // on the business, starts with them:
 //   settings = { company: {..., updatedAt}, prices: {..., __updatedAt},
 //                learned: { fields, words, removed, updatedAt },
-//                chemicals: { products, updatedAt } (js/chemicals.js) }
+//                chemicals: { products, updatedAt } (js/chemicals.js),
+//                reinspect: { marks } (reminders sent and properties taken
+//                off the Due list, js/reinspection.js) }
 // The owner's phone writes them; the team only reads (see
 // supabase/business-settings.sql). Company details and prices each go by
 // their own time, newest wins. What SAYON learned from corrections (see
 // LEARNED CORRECTIONS in js/app/) is put together from both copies instead,
-// so a correction made on either side is kept. Anything else already in settings (such as
+// so a correction made on either side is kept, and so are the Due list's
+// marks. Anything else already in settings (such as
 // the old invoice counter, invoiceSeq) is kept as it is.
 const BUSINESS_SYNC_DELAY_MS = 1500;
 let businessSyncTimer = null;
@@ -33,6 +36,8 @@ function localBusinessSettings() {
   // then it's SAYON's starting list, and the account copy is left alone.
   const chemicals = typeof storedChemicalRegister === 'function' ? storedChemicalRegister() : null;
   if (chemicals) out.chemicals = chemicals;
+  const marks = typeof getReinspectMarks === 'function' ? getReinspectMarks() : {};
+  if (Object.keys(marks).length) out.reinspect = { marks };
   return out;
 }
 
@@ -53,6 +58,7 @@ function applyCloudBusinessSettings() {
       localStorage.setItem(chemicalsStorageKey(), JSON.stringify(chem));
     }
     if (cloud.learned && typeof cloud.learned === 'object') storeLearned(mergeLearned(cloud.learned, local.learned), { sync: false });
+    if (cloud.reinspect && cloud.reinspect.marks) storeReinspectMarks(mergeReinspectMarks(cloud.reinspect.marks, (local.reinspect || {}).marks));
   } catch (e) { console.warn('Could not apply business settings:', e); }
   // Settings made on this phone before syncing existed go up now.
   if (isBusinessOwner() && localSettingsAhead(cloud)) scheduleBusinessSync();
@@ -79,7 +85,8 @@ function localSettingsAhead(cloud) {
   return newer(local.company, cloud.company, 'updatedAt') ||
     newer(local.prices, cloud.prices, '__updatedAt') ||
     (!!local.chemicals && newer(local.chemicals, cloud.chemicals, 'updatedAt')) ||
-    learnedAhead(local.learned, cloud.learned);
+    learnedAhead(local.learned, cloud.learned) ||
+    reinspectMarksAhead((local.reinspect || {}).marks, (cloud.reinspect || {}).marks);
 }
 
 // This phone has a correction (or a removal) the account copy doesn't.

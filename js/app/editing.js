@@ -5,7 +5,7 @@
 
 // ── EDITING ───────────────────────────────────────────────────────────────
 // There's no Edit Mode: any field opens for editing when tapped, unless the
-// job is complete and locked.
+// job is finalised and locked.
 
 // Global species list — used by both startEdit and startFindingEdit
 const SPECIES_LIST = [
@@ -38,7 +38,7 @@ function wireInlineTextEdit(input, onSave, onCancel, onBlur) {
 // The last choice in a list that opens a typing box instead of saving.
 const OTHER_TYPE_IT = 'Other (type it)';
 function startEdit(el, key, type) {
-  if (isReportLocked()) { showToast('This job is complete and locked. Tap Amend to change it', 'info'); return; }
+  if (isReportLocked()) { sayLocked(); return; }
   if (el.classList.contains('editing')) return;
   commitActive();
   activeEditEl = el;
@@ -543,10 +543,6 @@ function commitEdit(el, key, value) {
   checkSystemVerify();
   checkSecondaryColonyFlag();
   ensureTreatmentForLiveTermites();
-  if (key === 'standard') {
-    const sel = document.getElementById('standardSelect');
-    if (sel) sel.value = value.trim();
-  }
   saveDraft();
 }
 
@@ -621,6 +617,9 @@ function showSection(name) {
     const scroller = document.getElementById('reportBody');
     if (scroller) scroller.scrollTop = 0;
   }
+  // On Finish the list of what's missing is right there, so the bar that
+  // walks it goes (SHOW ME).
+  renderBlankWalk();
   track('screen_viewed', { screen: 'report_' + name });
 }
 
@@ -811,6 +810,7 @@ function syncInvasiveDetails() {
 
 function updateProgress() {
   syncInvasiveDetails();
+  renderConditionPhotos();
   // FIX: this duplicated calculateCompletion()'s old plain-presence check
   // independently, so the same bug (a routine render lazily creating a
   // placeholder finding via getFindings(), silently marking the Findings
@@ -820,10 +820,16 @@ function updateProgress() {
   let filled = 0, total = 0;
   const secState = {};
   Object.entries(SECTIONS).forEach(([sec, cfg]) => {
-    const req = REQUIRED_FIELDS[sec] || [];
+    const all = REQUIRED_FIELDS[sec] || [];
+    filled += all.filter(k => isFieldFilled(k)).length; total += all.length;
+    // A section's badge counts what the section itself asks. The agreement
+    // is a step of the job, signed before the report is touched: it is on
+    // the percentage and the list of what's missing, not on Sign-off's badge.
+    const own = k => k !== 'agreement';
+    const req = all.filter(own);
     const reqFilled = req.filter(k => isFieldFilled(k)).length;
-    const any = cfg.fields.some(k => isFieldFilled(k));
-    filled += reqFilled; total += req.length;
+    // Areas is under way from the first area marked, not only once all are.
+    const any = cfg.fields.some(k => own(k) && isFieldFilled(k)) || (sec === 'obstructions' && Object.keys(OBS_ZONES).some(z => areaStatusOf(z)));
 
     const sts = document.getElementById('sts-' + sec);
     const nextBtn = document.getElementById('next-btn-' + sec);
@@ -852,10 +858,14 @@ function updateProgress() {
   });
   renderFieldGroups();
 
-  // A completed (locked) job reads Complete whatever the count says.
+  // A completed (locked) job reads Complete whatever the count says. The
+  // percentage is read off the one list of what's missing (reportProgress
+  // in js/app/dashboard.js), so it and Finish can't disagree.
   const locked = isReportLocked();
   const done = isReportDone();
-  const pct = locked || done ? 100 : Math.round((filled / total) * 100);
+  const progress = typeof reportProgress === 'function' ? reportProgress()
+    : { gaps: [], open: total - filled, blank: total - filled, checks: 0, total, pct: Math.round((filled / total) * 100) };
+  const pct = locked || done ? 100 : progress.pct;
   document.getElementById('progressFill').style.width = pct + '%';
   document.getElementById('generateBtn').disabled = filled === 0 && !locked;
   document.getElementById('shareBtn').disabled = filled === 0 && !locked;
@@ -871,17 +881,17 @@ function updateProgress() {
     const wrap = ringFill.closest('.progress-ring-wrap');
     if (wrap) {
       wrap.classList.toggle('locked', locked || done);
-      wrap.title = locked ? 'Job complete' : done ? 'Report done' : `Report ${pct}% complete (required fields)`;
+      wrap.title = locked ? 'Job finalised' : done ? 'Report done' : `Report ${pct}% complete`;
       wrap.setAttribute('aria-label', wrap.title);
     }
     const label = document.getElementById('progressRingLabel');
-    if (label) { label.style.display = locked || done ? '' : 'none'; label.textContent = locked ? 'Complete' : 'Done'; }
+    if (label) { label.style.display = locked || done ? '' : 'none'; label.textContent = locked ? 'Finalised' : 'Done'; }
   }
-  renderFinishNext(total - filled);
+  renderFinishNext(progress);
+  renderBlankWalk(progress);
   renderReportJobCard();
-  syncDockReport(pct, locked || done);
+  syncDockReport();
   syncDockJobs();
-  renderDocStrips();
   syncNothingFoundButtons();
   syncFindingsGroups();
   syncAccessGroups();
@@ -903,6 +913,7 @@ function setReportDone(on) {
   if (on) reportData.doneAt = Date.now(); else delete reportData.doneAt;
   if (document.getElementById('jobAddress').value.trim()) saveCurrentReport(true); else saveDraft();
   updateProgress();
+  renderLastVisitBanner();
   if (on) {
     showToast('Report done', 'success');
     track('report_marked_done', {});
@@ -913,12 +924,12 @@ function setReportDone(on) {
 
 // What comes after the report: the quote while the report recommends a
 // treatment and there's none yet, else sending. 'sent' once it has gone
-// (and hasn't changed for an amendment since).
+// and hasn't changed since (gone: the client has it as it stands).
 function reportNextStep() {
   const q = currentJobQuote(), hasQuote = quoteHasItems(q);
   const wantsQuote = reportData.treatmentRecommended === 'YES' && !reportData.noQuoteNeeded;
-  const sent = reportData.sent, amending = reportData.amending;
-  const gone = !!sent && !(amending && sent.at < amending.startedAt);
+  const sent = reportData.sent;
+  const gone = !!sent && (isReportLocked() || reportMatches(sent.fingerprint));
   return { q, hasQuote, wantsQuote, sent, gone, next: wantsQuote && !hasQuote ? 'quote' : gone ? 'sent' : 'send' };
 }
 
@@ -928,34 +939,49 @@ function doneWhen(ts) {
   return w === 'Today' || w === 'Yesterday' ? w.toLowerCase() : formatIssueDate(ts);
 }
 
-// The Finish step's end: Report done until it's ticked (with how many
-// required answers are still blank), then one big button for the next step
-// and the rest quiet. blank: required answers not filled in.
-function renderFinishNext(blank) {
+// The Finish step's end: what the report is still missing, each with its
+// way there, then Report done until it's ticked, then one big button for
+// the next step and the rest quiet. progress: reportProgress().
+function renderFinishNext(progress) {
   const doneBtn = document.getElementById('reportDoneBtn');
   if (!doneBtn || typeof quoteHasItems !== 'function') return;
   const done = isReportDone(), locked = isReportLocked();
-  const { q, hasQuote, wantsQuote, sent, next } = reportNextStep();
+  const { q, hasQuote, wantsQuote, sent, gone, next } = reportNextStep();
   doneBtn.hidden = done;
-  document.getElementById('reportDoneSub').textContent = blank > 0
-    ? `${blank} required answer${blank === 1 ? ' is' : 's are'} still blank. You can tick it off anyway.`
+  // The same list the check before sending shows. Once the report has
+  // gone (or the job is locked) it's the record, and the list goes quiet.
+  const gapsBox = document.getElementById('finishGaps');
+  const gaps = locked || gone ? [] : progress.gaps;
+  gapsBox.hidden = !gaps.length;
+  gapsBox.innerHTML = gaps.length ? reportGapsHtml(gaps) : '';
+  const { blank, checks } = progress;
+  document.getElementById('reportDoneSub').textContent = blank || checks
+    ? `${[blank ? `${blank} still blank` : '', checks ? `${checks} to check` : ''].filter(Boolean).join(' and ')}. You can tick it off anyway.`
     : 'Ticks it off on the job. You can still change it.';
   document.getElementById('finishDone').hidden = !done;
-  document.getElementById('finishDoneWhen').textContent = locked ? 'Job complete and locked'
+  document.getElementById('finishDoneWhen').textContent = locked ? 'Job finalised and locked'
+    : sent && !gone ? `Changed since it was sent ${doneWhen(sent.at)}`
     : sent ? `Sent ${doneWhen(sent.at)}` : reportData.doneAt ? `Ticked off ${doneWhen(reportData.doneAt)}` : '';
   // Only a plain mark comes off; a sent or completed report stays done.
   document.getElementById('finishDoneUndo').hidden = !reportData.doneAt || !!sent || !!reportData.issue;
-  document.getElementById('finishNextLabel').hidden = !done;
+  // Once the report has gone (and nothing's waiting on a quote), there's
+  // nothing more to do here: one button back to the job, where the next
+  // step is, and sending again as a quiet link.
+  const away = done && next === 'sent';
+  document.getElementById('finishNextLabel').hidden = !done || away;
   const quoteBtn = document.getElementById('finishQuoteBtn');
   const shareBtn = document.getElementById('shareBtn');
-  quoteBtn.hidden = !done || !(hasQuote || wantsQuote);
-  shareBtn.hidden = !done;
+  quoteBtn.hidden = !done || away || !(hasQuote || wantsQuote);
+  shareBtn.hidden = !done || away;
+  document.getElementById('finishJobBtn').hidden = !away;
+  document.getElementById('finishResend').hidden = !away;
   document.getElementById('finishQuoteTitle').textContent = hasQuote ? 'Open the quote' : 'Write the quote';
   document.getElementById('finishQuoteSub').textContent = hasQuote ? (q.sentAt ? 'Sent ' + formatIssueDate(q.sentAt) : 'Check it before it goes') : 'Starts from what the report found';
-  document.getElementById('shareTitle').textContent = next === 'sent' ? 'Send it again' : 'Send to client';
-  document.getElementById('shareSub').textContent = next === 'sent' ? 'Only if something changed since it went'
+  const client = document.getElementById('jobClient').value;
+  document.getElementById('shareTitle').textContent = sent && !gone ? 'Send it again' : emailToLabel(client);
+  document.getElementById('shareSub').textContent = sent && !gone ? 'So the client has it as it is now'
     : hasQuote ? 'Check the report, then email it with the quote' : 'Check the report, then email it';
-  // One big button. Once everything has gone, nothing shouts.
+  // One big button.
   quoteBtn.classList.toggle('primary', done && next === 'quote');
   shareBtn.classList.toggle('primary', done && next === 'send');
   if (next === 'quote') quoteBtn.after(shareBtn); else shareBtn.after(quoteBtn);
@@ -964,13 +990,70 @@ function renderFinishNext(blank) {
   const banner = document.getElementById('reportDoneBanner');
   if (banner) {
     banner.hidden = !reportData.doneAt || !!sent || locked;
+    // One filled button: while the banner offers the next step, the steps'
+    // Next buttons go quiet.
+    document.getElementById('mainPanel').classList.toggle('done-waiting', !banner.hidden);
     if (!banner.hidden) {
       document.getElementById('reportDoneBannerText').textContent = `Report done ${doneWhen(reportData.doneAt)}. Next, ${next === 'quote' ? 'the quote' : 'send it to the client'}.`;
       const btn = document.getElementById('reportDoneBannerBtn');
-      btn.textContent = next === 'quote' ? 'Write the quote' : 'Send to client';
+      btn.textContent = next === 'quote' ? 'Write the quote' : emailToLabel(client);
       btn.onclick = next === 'quote' ? () => tabGo('quote') : () => openSendReview();
     }
   }
+}
+
+// ── SHOW ME ──
+// "Show me" on the list of what's missing goes to the answer in the report.
+// A small bar then stays above the dock with how many are left and Next,
+// which goes on to the next one down the report, so the list is walked
+// without going back to Finish each time. The bar goes on its cross, on
+// the Finish step (the list is there), and with the report: it sits
+// inside the report's panel.
+let blankWalk = null; // { last: the place shown last } while it's being walked
+// Every place the list points at, in its order ("id" or "id:referral").
+const blankTargets = gaps => gaps.flatMap(g => g.targets || []);
+const blankTargetEl = t => document.getElementById(String(t).replace(/:referral$/, ''));
+// The places further down the report than the one shown last.
+function blankTargetsAhead(gaps) {
+  const targets = blankTargets(gaps);
+  const last = blankWalk && blankTargetEl(blankWalk.last);
+  if (!last) return targets;
+  return targets.filter(t => { const el = blankTargetEl(t); return el && (last.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) && !last.contains(el); });
+}
+
+function showBlank(target) {
+  if (navPlace() !== 'report') tabGo('report');
+  blankWalk = { last: target };
+  goToReportField(target.replace(/:referral$/, ''), target.endsWith(':referral'));
+  renderBlankWalk();
+}
+
+// On to the next one down the report; past the last, back to Finish,
+// where the list shows whatever is still on it.
+function blankWalkNext() {
+  const next = blankWalk && blankTargetsAhead(reportPrepGaps('finish'))[0];
+  if (next) { showBlank(next); return; }
+  stopBlankWalk();
+  goStep('finish');
+  document.getElementById('finishNext').scrollIntoView({ block: 'start' });
+}
+
+function stopBlankWalk() {
+  blankWalk = null;
+  renderBlankWalk();
+}
+
+function renderBlankWalk(progress) {
+  const bar = document.getElementById('blankWalk');
+  if (!bar) return;
+  if (blankWalk && (currentStep === 'finish' || isReportLocked())) blankWalk = null;
+  bar.hidden = !blankWalk;
+  if (!blankWalk) return;
+  const { blank, checks, gaps } = progress || reportProgress();
+  document.getElementById('blankWalkText').textContent = blank || checks
+    ? [blank ? `${blank} still blank` : '', checks ? `${checks} to check` : ''].filter(Boolean).join(', ')
+    : 'Nothing left on the list';
+  document.getElementById('blankWalkNext').textContent = blankTargetsAhead(gaps).length ? 'Next' : 'Back to Finish';
 }
 
 // The Property step's Job details card: the address and client, then the
@@ -1037,6 +1120,7 @@ function createSignaturePad(canvas, placeholder, onSigned) {
     drawing = false;
     if (ink < MIN_INK || !strokeInk) return;
     pad.empty = false;
+    pad.shown = '';
     if (onSigned) onSigned();
   }
   canvas.addEventListener('mousedown', start);
@@ -1051,8 +1135,10 @@ function createSignaturePad(canvas, placeholder, onSigned) {
   pad.clear = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     pad.empty = true; ink = 0;
+    pad.shown = '';
     if (placeholder) placeholder.style.display = 'flex';
   };
+  // shown: the signature the pad was given, until a stroke is drawn on it.
   pad.show = (dataUrl) => {
     pad.clear();
     if (!dataUrl) return;
@@ -1060,9 +1146,46 @@ function createSignaturePad(canvas, placeholder, onSigned) {
     img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     img.src = dataUrl;
     pad.empty = false; ink = MIN_INK;
+    pad.shown = dataUrl;
     if (placeholder) placeholder.style.display = 'none';
   };
   return pad;
+}
+// What a pad holds, as an image: the signature it was given while that's
+// untouched, else what's drawn on it. '' for an empty pad.
+function padSignature(pad) {
+  return !pad || pad.empty ? '' : pad.shown || pad.canvas.toDataURL('image/png');
+}
+
+// ── A SHEET'S SIGNATURE ── The treatment record and the bait station visit
+// are signed by the technician. As on the report's Sign-off, the last
+// signature drawn under the technician's name is already there
+// (lastSignatureOf in js/app/sync.js), kept so a thumb scrolling past can't
+// mark it, with Sign again to draw a new one.
+// saved: the signature already on the record ('' for a new one). name: the
+// technician the sheet opens with.
+function openSheetSignature(pad, saved, name) {
+  const carried = saved ? '' : lastSignatureOf(name);
+  pad.carried = carried ? (name || '').trim() : null;
+  pad.show(saved || carried);
+  keepSheetSignature(pad, !pad.empty);
+}
+function keepSheetSignature(pad, kept) {
+  const wrap = pad.canvas.parentElement;
+  wrap.classList.toggle('kept', kept);
+  const again = wrap.parentElement.querySelector('.agr-sig-clear');
+  if (again) again.hidden = pad.empty;
+}
+function signSheetAgain(pad) {
+  pad.clear();
+  pad.carried = null;
+  keepSheetSignature(pad, false);
+}
+// The technician's name changed. A signature carried over was signed as the
+// name it came with, so it doesn't stay under another one; a signature
+// drawn on this sheet, or saved with the record, does.
+function sheetSignerChanged(pad, name) {
+  if (pad && pad.carried != null && pad.carried !== (name || '').trim()) signSheetAgain(pad);
 }
 
 let inspectorSignaturePad = null;
@@ -1083,20 +1206,45 @@ function initSignaturePads() {
   }
 }
 
+// "Sign again": the pad empties to be signed afresh.
 function clearInspectorSignature() {
   if (inspectorSignaturePad) inspectorSignaturePad.clear();
   delete reportData.inspectorSignature;
+  keepInspectorSignature(false);
   setInspectorSignatureStatus(false);
   updateProgress();
   saveDraft();
 }
 
+// A signature already on the report (saved with it, or carried over from
+// the inspector's last report) can't be drawn on: a thumb scrolling past
+// would mark it. Sign again empties the pad to draw a new one.
+function keepInspectorSignature(kept) {
+  const wrap = document.getElementById('sigCanvasInspector');
+  if (wrap) wrap.parentElement.classList.toggle('kept', kept);
+}
+
 function setInspectorSignatureStatus(signed) {
   const status = document.getElementById('sigStatusInspector');
   if (status) {
-    status.textContent = signed ? 'Signed' : 'Not signed';
+    const name = (document.getElementById('jobInspector').value || '').trim();
+    status.textContent = signed ? (name ? `Signed as ${name}` : 'Signed') : 'Not signed';
     status.classList.toggle('signed', signed);
   }
+  const again = document.getElementById('sigAgainInspector');
+  if (again) again.hidden = !signed;
+}
+
+// The inspector's name changed. A signature carried over from the last
+// report was signed as the name it came with, so it doesn't stay under
+// another one; a signature drawn on this report does.
+function onInspectorName() {
+  const last = lastInspectorDetails(currentReportId);
+  const name = document.getElementById('jobInspector').value.trim();
+  if (reportData.inspectorSignature && reportData.inspectorSignature === last.signature && name !== last.name) clearInspectorSignature();
+  else setInspectorSignatureStatus(!!reportData.inspectorSignature);
+  saveDraft();
+  updateProgress();
 }
 
 function restoreLicenceField() {
@@ -1108,6 +1256,7 @@ function restoreLicenceField() {
 // loaded, and brings the agreement banner up to date.
 function restoreSignaturePads() {
   if (inspectorSignaturePad) inspectorSignaturePad.show(reportData.inspectorSignature);
+  keepInspectorSignature(!!reportData.inspectorSignature);
   setInspectorSignatureStatus(!!reportData.inspectorSignature);
   renderAgreementBanner();
 }
@@ -1270,7 +1419,7 @@ async function sheetVoiceFill(kind, text) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-5',
+        model: AI_MODEL,
         max_tokens: 4000,
         output_config: { effort: 'low' },
         system: k.prompt(),

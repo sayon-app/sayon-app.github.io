@@ -7,12 +7,11 @@
 // Findings, moisture readings, Sign again on the signature) and checks each tap
 // lands in the report; a FAIL line means a check failed.
 // node report-tabs.js <outDir> [w] [scenario] [steps]  (serve the repo on :8765)
-// MODES=light,dark adds dark shots; TS=xl shoots at Extra large text.
+// TS=xl shoots at Extra large text.
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2] || '/tmp/report-tabs'; fs.mkdirSync(OUT, { recursive: true });
 const W = +(process.argv[3] || 390), SCN = process.argv[4] || 'standard', uid = 'u-owner';
 const STEPS = (process.argv[5] || 'property,areas,findings,conducive,recommendations,finish').split(',');
-const MODES = (process.env.MODES || 'light').split(',');
 const sess = { access_token: 'a.b.c', refresh_token: 'r', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: uid, email: 'office@example.com', user_metadata: { name: 'Alex Example', business_name: 'Example Pest Co' } } };
 const sc = require('./scenarios.js').find(s => s.name === SCN);
 let fails = 0;
@@ -40,17 +39,14 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
     await p.waitForTimeout(500);
     for (const sec of secs) {
       const card = p.locator('#section-' + sec);
-      for (const mode of MODES) {
-        await p.evaluate(m => { document.body.classList.toggle('dark-screen', m === 'dark'); const t = document.getElementById('toast'); if (t) t.className = 'toast'; }, mode);
-        const h = await card.evaluate(c => c.scrollHeight);
-        await p.setViewportSize({ width: W, height: Math.min(9000, h + 700) });
-        await p.waitForTimeout(350);
-        await card.scrollIntoViewIfNeeded();
-        await card.screenshot({ path: `${OUT}/${st}-${sec}-${mode}.png` });
-      }
+      await p.evaluate(() => { const t = document.getElementById('toast'); if (t) t.className = 'toast'; });
+      const h = await card.evaluate(c => c.scrollHeight);
+      await p.setViewportSize({ width: W, height: Math.min(9000, h + 700) });
+      await p.waitForTimeout(350);
+      await card.scrollIntoViewIfNeeded();
+      await card.screenshot({ path: `${OUT}/${st}-${sec}.png` });
       const wide = await card.evaluate(c => [...c.querySelectorAll('*')].filter(e => e.offsetWidth && e.getBoundingClientRect().right > c.getBoundingClientRect().right + 1).map(e => e.className).slice(0, 4));
       if (wide.length) { console.log(`FAIL ${sec}: runs past the card: ${JSON.stringify(wide)}`); fails++; }
-      await p.evaluate(() => document.body.classList.remove('dark-screen'));
       await p.setViewportSize({ width: W, height: 844 });
     }
     console.log('shot', st, secs.join(','));

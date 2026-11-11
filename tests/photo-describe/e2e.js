@@ -222,11 +222,6 @@ const ai = (obj) => ({ json: { content: [{ type: 'text', text: JSON.stringify(ob
   await p.evaluate(() => document.body.classList.remove('text-size-xl'));
   await p.setViewportSize({ width: 390, height: 844 });
 
-  // ── Dark screen ──
-  await p.evaluate(() => { document.body.classList.add('dark-screen'); showSection('findings'); }); await p.waitForTimeout(300);
-  await centre(box(ids.finding));
-  await p.screenshot({ path: `${OUT}/9-dark.png` });
-
   check(!errs.length, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await b.close();
   console.log(fails.length ? `\n${fails.length} FAILED` : '\nall passed');

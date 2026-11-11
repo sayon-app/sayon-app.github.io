@@ -5,7 +5,6 @@
 // list with the new job on it and the job's page once it's saved. Prints
 // what it checks; a FAIL line means a check failed.
 // node new-job.js <outDir> [w]  (serve the repo on :8765; see README.md)
-// MODES=light,dark adds dark shots of the empty page.
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2] || '/tmp/new-job'; fs.mkdirSync(OUT, { recursive: true });
 const W = +(process.argv[3] || 390), uid = 'u-owner';
@@ -23,17 +22,14 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   await ctx.addInitScript((s) => { localStorage.setItem('korva_session', JSON.stringify(s)); localStorage.setItem('korva_onboarded_v1:u-owner', '1'); localStorage.setItem('korva_onboarded_v1', '1'); }, sess);
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto('http://localhost:8765/'); await p.waitForTimeout(2500);
-  const shoot = async (name, modes = ['light']) => {
-    for (const mode of modes) {
-      await p.setViewportSize({ width: W, height: 844 });
-      await p.evaluate(m => { document.body.classList.toggle('dark-screen', m === 'dark'); const t = document.getElementById('toast'); if (t) t.className = 'toast'; }, mode);
-      await p.waitForTimeout(350); await p.screenshot({ path: `${OUT}/${name}-${mode}.png` });
-      const h = await p.evaluate(() => { const b = document.querySelector('#jobOverlay.open #jobPageBody, #dashboardOverlay.open #dashboardBody'); return b ? b.scrollHeight + b.getBoundingClientRect().top + 120 : 844; });
-      await p.setViewportSize({ width: W, height: Math.max(844, Math.min(4000, Math.ceil(h))) });
-      await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/${name}-${mode}-full.png` });
-    }
+  const shoot = async name => {
     await p.setViewportSize({ width: W, height: 844 });
-    await p.evaluate(() => document.body.classList.remove('dark-screen'));
+    await p.evaluate(() => { const t = document.getElementById('toast'); if (t) t.className = 'toast'; });
+    await p.waitForTimeout(350); await p.screenshot({ path: `${OUT}/${name}.png` });
+    const h = await p.evaluate(() => { const b = document.querySelector('#jobOverlay.open #jobPageBody, #dashboardOverlay.open #dashboardBody'); return b ? b.scrollHeight + b.getBoundingClientRect().top + 120 : 844; });
+    await p.setViewportSize({ width: W, height: Math.max(844, Math.min(4000, Math.ceil(h))) });
+    await p.waitForTimeout(300); await p.screenshot({ path: `${OUT}/${name}-full.png` });
+    await p.setViewportSize({ width: W, height: 844 });
   };
   // One job already on the account, open on the Jobs list.
   await p.evaluate((sc) => {
@@ -49,7 +45,7 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   console.log('new job:', JSON.stringify(start));
   check(start.open && !start.addr, 'New job opens an empty job page');
   check(start.date === await p.evaluate(() => todayIsoDate()), 'the inspection date starts as today');
-  await shoot('1-empty', (process.env.MODES || 'light').split(','));
+  await shoot('1-empty');
 
   // Typed in by hand.
   await p.locator('#jobAddress').click(); await p.keyboard.type('14 Wattle Court'); await p.keyboard.press('Escape');

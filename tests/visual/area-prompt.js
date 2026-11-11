@@ -8,11 +8,9 @@
 // the card with the prompt in it.
 // Prints what it checks; a FAIL line means a check failed.
 // node area-prompt.js <outDir> [w]  (serve the repo on :8765; see README.md)
-// MODES=light,dark adds dark shots.
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2] || '/tmp/area-prompt'; fs.mkdirSync(OUT, { recursive: true });
 const W = +(process.argv[3] || 390), uid = 'u-owner';
-const MODES = (process.env.MODES || 'light').split(',');
 const sess = { access_token: 'a.b.c', refresh_token: 'r', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: uid, email: 'office@example.com', user_metadata: { name: 'Alex Example', business_name: 'Example Pest Co' } } };
 const sc = require('./scenarios.js').find(s => s.name === 'standard');
 let fails = 0;
@@ -48,12 +46,9 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   }));
   const shoot = async name => {
     const card = p.locator('#findingsList .finding-card').first();
-    for (const mode of MODES) {
-      await p.evaluate(m => { document.body.classList.toggle('dark-screen', m === 'dark'); const t = document.getElementById('toast'); if (t) t.className = 'toast'; }, mode);
-      await p.waitForTimeout(200); await card.scrollIntoViewIfNeeded();
-      await card.screenshot({ path: `${OUT}/${name}-${mode}.png` });
-    }
-    await p.evaluate(() => document.body.classList.remove('dark-screen'));
+    await p.evaluate(() => { const t = document.getElementById('toast'); if (t) t.className = 'toast'; });
+    await p.waitForTimeout(200); await card.scrollIntoViewIfNeeded();
+    await card.screenshot({ path: `${OUT}/${name}.png` });
   };
 
   // Termites out of sight: the prompt asks what it was, at the top.

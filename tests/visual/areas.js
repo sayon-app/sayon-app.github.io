@@ -6,11 +6,9 @@
 // and Areas unable to be inspected reading it back. Prints what it checks;
 // a FAIL line means a check failed.
 // node areas.js <outDir> [w]  (serve the repo on :8765; see README.md)
-// MODES=light,dark adds dark shots.
 const { chromium } = require('playwright'); const fs = require('fs');
 const OUT = process.argv[2] || '/tmp/areas'; fs.mkdirSync(OUT, { recursive: true });
 const W = +(process.argv[3] || 390), uid = 'u-owner';
-const MODES = (process.env.MODES || 'light').split(',');
 const sess = { access_token: 'a.b.c', refresh_token: 'r', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: uid, email: 'office@example.com', user_metadata: { name: 'Alex Example', business_name: 'Example Pest Co' } } };
 const sc = require('./scenarios.js').find(s => s.name === 'standard');
 let fails = 0;
@@ -37,17 +35,14 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   }, sc);
   await p.waitForTimeout(800);
   const shoot = async (name, card = p.locator('#section-obstructions')) => {
-    for (const mode of MODES) {
-      await p.evaluate(m => { document.body.classList.toggle('dark-screen', m === 'dark'); const t = document.getElementById('toast'); if (t) t.className = 'toast'; }, mode);
-      // A tall window so the whole card is in view, not cut off by the
-      // report's scroll box.
-      const h = await card.evaluate(c => c.scrollHeight);
-      await p.setViewportSize({ width: W, height: Math.min(5000, h + 700) });
-      await p.waitForTimeout(300);
-      await card.scrollIntoViewIfNeeded();
-      await card.screenshot({ path: `${OUT}/${name}-${mode}.png` });
-    }
-    await p.evaluate(() => document.body.classList.remove('dark-screen'));
+    await p.evaluate(() => { const t = document.getElementById('toast'); if (t) t.className = 'toast'; });
+    // A tall window so the whole card is in view, not cut off by the
+    // report's scroll box.
+    const h = await card.evaluate(c => c.scrollHeight);
+    await p.setViewportSize({ width: W, height: Math.min(5000, h + 700) });
+    await p.waitForTimeout(300);
+    await card.scrollIntoViewIfNeeded();
+    await card.screenshot({ path: `${OUT}/${name}.png` });
     await p.setViewportSize({ width: W, height: 844 });
   };
   const rows = () => p.evaluate(() => [...document.querySelectorAll('#areaChecklist [data-zone-node]')].map(n => n.dataset.zoneNode + ':' + (n.querySelector('.area-sum-state') || {}).textContent));

@@ -139,9 +139,6 @@ async function backend(ctx) {
   await p.screenshot({ path: `${OUT}/2-plan-card.png` });
   await p.setViewportSize({ width: 390, height: 2400 });
   await p.locator('#quoteAiPlan').screenshot({ path: `${OUT}/2a-sections-folded.png` });
-  await p.evaluate(() => document.body.classList.add('dark-screen'));
-  await p.locator('#quoteAiPlan').screenshot({ path: `${OUT}/2c-dark-screen.png` });
-  await p.evaluate(() => document.body.classList.remove('dark-screen'));
   const text = await p.locator('#quoteAiPlan').innerText();
   check(await p.evaluate(() => document.querySelector('#quoteAiPlan .tp-wrap').open), 'the card opens by itself when the answer comes back');
   check(/SAYON recommendation/.test(text) && /Scope of works/i.test(text) && /Items to confirm/.test(text) && /Rationale/.test(text) && /Quote items/.test(text) && /Compared with your quote/i.test(text) && /Guide only/i.test(text), 'card shows the scope of works, the folded rows, the comparison and Guide only');

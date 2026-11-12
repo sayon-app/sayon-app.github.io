@@ -1346,9 +1346,10 @@ function setNewBuildJob(on) {
 // job no. (jobInitialRef). The report is titled for it, and the agreement
 // and the report's Client & Inspection Details say what it's for.
 const SPECIAL_PURPOSE_JOB_TYPE = 'Special Purpose — Termite Inspection';
+const SPECIAL_PURPOSE_INVASIVE = 'Carry out a physically invasive inspection';
 const SPECIAL_PURPOSES = [
   'Follow up an earlier inspection',
-  'Carry out a physically invasive inspection',
+  SPECIAL_PURPOSE_INVASIVE,
   'Carry out a specialised non-invasive inspection',
   'Inspect areas that were hindered or restricted and can now be reached',
   'Inspect areas not inspected before',

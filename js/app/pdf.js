@@ -260,6 +260,30 @@ function drawPdfSignature(doc, { x, y, w, image, note, caption }) {
   pdfTracked(doc, (caption || 'SIGNATURE').toUpperCase(), x, y + 4, { cs: 0.3 });
 }
 
+// A photo in a rounded box: 'contain' shows all of it on a pale ground,
+// 'cover' fills the box and trims the edges. src is a data URL.
+function drawPdfPhoto(doc, src, x, top, w, h, mode = 'contain') {
+  const C = PDF_COLORS;
+  const fmt = src.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+  const props = doc.getImageProperties(src);
+  const ratio = props.width / props.height;
+  doc.saveGraphicsState();
+  doc.roundedRect(x, top, w, h, 1.6, 1.6, null); doc.clip(); doc.discardPath();
+  if (mode === 'cover') {
+    let iw = w, ih = w / ratio;
+    if (ih < h) { ih = h; iw = h * ratio; }
+    doc.addImage(src, fmt, x + (w - iw) / 2, top + (h - ih) / 2, iw, ih, undefined, 'FAST');
+  } else {
+    doc.setFillColor(...C.rowAlt); doc.rect(x, top, w, h, 'F');
+    let iw = w, ih = w / ratio;
+    if (ih > h) { ih = h; iw = h * ratio; }
+    doc.addImage(src, fmt, x + (w - iw) / 2, top + (h - ih) / 2, iw, ih, undefined, 'FAST');
+  }
+  doc.restoreGraphicsState();
+  doc.setDrawColor(...C.rule); doc.setLineWidth(0.3);
+  doc.roundedRect(x, top, w, h, 1.6, 1.6, 'D');
+}
+
 // Text cut to fit w at the current font, with an ellipsis when it's cut.
 function pdfFitText(doc, text, w) {
   text = String(text || '');
@@ -738,26 +762,7 @@ async function buildReportPdf() {
   // house); 'contain' shows the whole photo on a light panel, so evidence is
   // never cropped or stretched.
   let photoNo = 0;
-  function drawPhoto(src, x, top, w, h, mode = 'contain') {
-    const fmt = src.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-    const props = doc.getImageProperties(src);
-    const ratio = props.width / props.height;
-    doc.saveGraphicsState();
-    doc.roundedRect(x, top, w, h, 1.6, 1.6, null); doc.clip(); doc.discardPath();
-    if (mode === 'cover') {
-      let iw = w, ih = w / ratio;
-      if (ih < h) { ih = h; iw = h * ratio; }
-      doc.addImage(src, fmt, x + (w - iw) / 2, top + (h - ih) / 2, iw, ih, undefined, 'FAST');
-    } else {
-      doc.setFillColor(...C.rowAlt); doc.rect(x, top, w, h, 'F');
-      let iw = w, ih = w / ratio;
-      if (ih > h) { ih = h; iw = h * ratio; }
-      doc.addImage(src, fmt, x + (w - iw) / 2, top + (h - ih) / 2, iw, ih, undefined, 'FAST');
-    }
-    doc.restoreGraphicsState();
-    doc.setDrawColor(...C.rule); doc.setLineWidth(0.3);
-    doc.roundedRect(x, top, w, h, 1.6, 1.6, 'D');
-  }
+  function drawPhoto(src, x, top, w, h, mode = 'contain') { drawPdfPhoto(doc, src, x, top, w, h, mode); }
   function photoUnavailable(x, top, w, h) {
     doc.setFillColor(...C.rowAlt); doc.roundedRect(x, top, w, h, 1.6, 1.6, 'F');
     doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);

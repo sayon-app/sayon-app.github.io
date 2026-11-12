@@ -67,7 +67,7 @@ function jobPdfParts() {
   }
   if (q && q.treatment) {
     const t = q.treatment;
-    parts.push({ kind: 'cert', title: 'Treatment certificate', note: `Treated ${formatAnswerDate(t.date)}${t.technician ? ' by ' + t.technician : ''}`, build: () => buildTreatmentCertificatePDF(q) });
+    parts.push({ kind: 'cert', title: 'Treatment certificate', note: `Treated ${formatAnswerDate(t.date)}${t.technician ? ' by ' + t.technician : ''}`, build: async () => { await loadTreatmentPhotos(q, true); return buildTreatmentCertificatePDF(q); } });
   }
   if (q && typeof baitVisitsOf === 'function') baitVisitsOf(q).forEach(v => {
     parts.push({ kind: 'bait', title: `Bait station visit, ${formatAnswerDate(v.date)}`, note: baitVisitShort(v), build: () => buildBaitVisitPDF(q, v) });

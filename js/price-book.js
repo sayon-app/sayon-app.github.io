@@ -123,7 +123,7 @@ function renderPriceBook() {
   if (!list) return;
   const canEdit = canEditBusiness();
   list.innerHTML = PRICE_BOOK_GROUPS.map(g =>
-    `<div class="settings-group-title">${escapeHtml(g.title)}</div>` + g.keys.map(k => priceBookRow(k, 'pb')).join('')
+    `<div class="settings-group-title">${escapeHtml(g.title)}</div><div class="menu-card pb-card">` + g.keys.map(k => priceBookRow(k, 'pb')).join('') + '</div>'
   ).join('');
   list.querySelectorAll('input').forEach(el => { el.disabled = !canEdit; });
   const gst = document.getElementById('pbGst');

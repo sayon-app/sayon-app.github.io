@@ -113,7 +113,33 @@ function placeBusinessFields(inSetup) {
   if (!inSetup) document.getElementById('obNameField').hidden = false;
 }
 
-function businessFormTouched() { businessFormDirty = true; }
+function businessFormTouched() { businessFormDirty = true; renderBusinessPreview(); }
+
+// Business details' top card: the business as the top of each PDF prints
+// it, redrawn as the boxes are typed in. Its logo is the one in the logo
+// box, so a new upload or Remove shows here before Save.
+function renderBusinessPreview() {
+  const nameEl = document.getElementById('bizPreviewName');
+  if (!nameEl) return;
+  const val = id => (document.getElementById(id).value || '').trim();
+  const name = val('ob-companyName');
+  nameEl.textContent = name || 'Your business name';
+  nameEl.classList.toggle('blank', !name);
+  // The same two lines the PDF prints (drawPdfLetterhead in js/app/pdf.js).
+  const licence = val('ob-licence'), abn = val('ob-abn');
+  // Each detail stays whole, so a narrow phone breaks between them.
+  const lines = [[licence && 'Licence ' + licence, abn && 'ABN ' + abn], [val('ob-phone'), val('ob-email')]]
+    .map(l => l.filter(Boolean).map(t => `<span>${escapeHtml(t)}</span>`).join(' · ')).filter(Boolean);
+  const line = document.getElementById('bizPreviewLine');
+  line.innerHTML = lines.length ? lines.map(l => `<span class="biz-preview-row">${l}</span>`).join('') : 'Your licence, phone and email show here';
+  line.classList.toggle('blank', !lines.length);
+  const logo = document.querySelector('#companyLogoPreview img');
+  const box = document.getElementById('bizPreviewLogo');
+  box.innerHTML = '';
+  if (logo) { const img = document.createElement('img'); img.src = logo.src; img.alt = ''; box.appendChild(img); }
+  else box.textContent = (name || 'SAYON').split(/\s+/).filter(w => /^[A-Za-z0-9]/.test(w)).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  box.classList.toggle('has-logo', !!logo);
+}
 
 function fillBusinessForm() {
   const d = getCompanyDetails();
@@ -130,6 +156,7 @@ function fillBusinessForm() {
   businessFormLicence = d.licence || '';
   businessFormDirty = false;
   renderCompanyLogoPreview(d.logo);
+  renderBusinessPreview();
 }
 
 // Only the owner changes the business details. A technician on the business

@@ -1249,7 +1249,7 @@ function migrateLegacySavedReports() {
 // Invoice no., referral source and payment status were dropped from the
 // screen (nothing printed or used them); older reports keep their values.
 const JOB_INFO_FIELDS = ['jobOrderId','jobInspectionType','jobInspectionDate','jobInspectionTime',
-                          'jobFee','jobClientPhone','jobClientEmail','jobNotes'];
+                          'jobFee','jobClientPhone','jobClientEmail','jobNotes','jobInitialRef'];
 
 function saveJobInfo() {
   const day = reportData.jobInspectionDate || '';
@@ -1311,6 +1311,8 @@ function setJobBookingField(id, value) {
 // the owner's annual one (AS 3660.2 points to it for inspections), and the
 // report's termite management advice refers to AS 3660.2 (T&C 10).
 const INSPECTION_TYPE_STANDARD = {
+  // A special purpose inspection is a termite inspection with its own scope (AS 3660.2).
+  'Special Purpose — Termite Inspection': 'AS 3660.2-2017',
   'Pre-Purchase — Timber Pest': 'AS 4349.3-2010',
   'Pre-Purchase — Combined Building & Pest': 'AS 4349.3-2010',
   'Annual — Existing Building': 'AS 4349.3-2010',
@@ -1324,6 +1326,7 @@ const INSPECTION_TYPE_STANDARD = {
 // inspection (termites, borers, decay, delignification), AS 3660.2 and the
 // rest a termite inspection.
 function reportKindTitle() {
+  if (isSpecialPurposeJob()) return 'Special Purpose Termite Inspection Report';
   const timberPest = isPrePurchaseJob() || /^AS 4349\.3/.test(reportData.standard || '');
   return timberPest ? 'Timber Pest Inspection Report' : 'Termite Inspection Report';
 }
@@ -1345,6 +1348,57 @@ function setNewBuildJob(on) {
   onInspectionTypeChange();
 }
 
+// ── SPECIAL PURPOSE ── A special purpose termite inspection: one with a
+// scope of its own, often after an earlier inspection (a follow-up, an
+// invasive look, areas that couldn't be reached before, how a treatment or
+// a system is doing). Chosen as the type of job; Job details then asks what
+// it's for (reportData.jobPurposes) and the first inspection's report or
+// job no. (jobInitialRef). The report is titled for it, and the agreement
+// and the report's Client & Inspection Details say what it's for.
+const SPECIAL_PURPOSE_JOB_TYPE = 'Special Purpose — Termite Inspection';
+const SPECIAL_PURPOSES = [
+  'Follow up an earlier inspection',
+  'Carry out a physically invasive inspection',
+  'Carry out a specialised non-invasive inspection',
+  'Inspect areas that were hindered or restricted and can now be reached',
+  'Inspect areas not inspected before',
+  'Assess the termite management action taken',
+  'Assess the termite management systems in place',
+  'Assess how well a termite treatment worked',
+  'Assess the risk management measures taken',
+];
+function isSpecialPurposeJob(d = reportData) {
+  return !!d && d.jobInspectionType === SPECIAL_PURPOSE_JOB_TYPE;
+}
+// "To follow up an earlier inspection and inspect areas not inspected before."
+function specialPurposeText(d = reportData) {
+  const list = isSpecialPurposeJob(d) && Array.isArray(d.jobPurposes) ? d.jobPurposes.filter(Boolean) : [];
+  return list.length ? `To ${joinWithAnd(list.map(lowerFirst))}.` : '';
+}
+// Job details and the agreement's sheet tick the same list (box: its wrap).
+const SPECIAL_PURPOSE_BOXES = { jobPurposes: 'jobPurposeWrap', agreementPurposes: 'agreementPurposeWrap' };
+function renderJobPurposes() {
+  const on = isSpecialPurposeJob();
+  const picked = Array.isArray(reportData.jobPurposes) ? reportData.jobPurposes : [];
+  const html = [...new Set([...SPECIAL_PURPOSES, ...picked])].map(p => `<label class="treat-method">
+      <input type="checkbox" value="${escapeHtml(p)}" ${picked.includes(p) ? 'checked' : ''} onchange="onJobPurposeToggle(this)"><span>${escapeHtml(p)}</span></label>`).join('');
+  Object.entries(SPECIAL_PURPOSE_BOXES).forEach(([box, wrap]) => {
+    const w = document.getElementById(wrap), b = document.getElementById(box);
+    if (!w || !b) return;
+    w.hidden = !on;
+    b.innerHTML = html;
+  });
+}
+function onJobPurposeToggle(input) {
+  const box = input.closest('.treat-methods');
+  reportData.jobPurposes = [...box.querySelectorAll('input:checked')].map(i => i.value);
+  // The other list follows, without redrawing the one being ticked.
+  Object.keys(SPECIAL_PURPOSE_BOXES).filter(id => id !== box.id).forEach(id =>
+    document.querySelectorAll(`#${id} input`).forEach(i => { i.checked = reportData.jobPurposes.includes(i.value); }));
+  if (agreementEditOpen()) refreshAgreementPreview();
+  saveDraft();
+}
+
 function isPrePurchaseJob(d = reportData) {
   const type = d.jobInspectionType || '';
   if (type) return /pre-purchase/i.test(type);
@@ -1358,6 +1412,7 @@ function onInspectionTypeChange() {
     setStandard(std);
     showToast(`Report will follow ${std}`, 'info');
   }
+  renderJobPurposes();
   // A new construction job has other steps, so This job is drawn again.
   if (document.getElementById('jobOverlay')?.classList.contains('open')) renderJobPage();
 }
@@ -1373,6 +1428,7 @@ function loadJobInfo() {
   });
   syncAllSelectCards();
   renderDateChips();
+  renderJobPurposes();
 }
 
 function clearJobInfo() {
@@ -1381,8 +1437,10 @@ function clearJobInfo() {
     if (el) el.value = '';
     delete reportData[id];
   });
+  delete reportData.jobPurposes;
   syncAllSelectCards();
   renderDateChips();
+  renderJobPurposes();
 }
 
 // Details saved under the old shared key (COMPANY_KEY, in common.js) move to the business whose name

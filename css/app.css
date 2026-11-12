@@ -5842,6 +5842,9 @@ body .job-hero-tip svg { color: var(--accent-glow); }
 body .job-page .job-details.new,
 body .job-page .job-details.new #jobPanel { box-shadow: none; }
 body .job-details.new .job-group { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
+/* A special purpose inspection's ticks sit on Job details' light card, so
+   an unticked box is drawn light too (the Jobs screen around it is dark). */
+#jobPurposes { color-scheme: light; }
 
 /* The logo's dot is the brand's pink. */
 .logo-dot { fill: var(--pink); stroke: var(--pink); }

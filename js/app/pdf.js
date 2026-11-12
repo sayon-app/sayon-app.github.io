@@ -1032,7 +1032,11 @@ async function buildReportPdf() {
   facts([
     ['Property Inspected', address, false, 'wide'],
     ['Inspection Date', inspectionDate], ['Inspection Time', inspectionTime],
-    ['Inspection Type', inspType], ['People Present', reportData.peoplePresent],
+    ['Inspection Type', inspType],
+    // A special purpose inspection says what it was for, and what it follows.
+    ['Purpose of the Inspection', specialPurposeText(), false, 'wide'],
+    ['First Inspection Reference', isSpecialPurposeJob() ? reportData.jobInitialRef : ''],
+    ['People Present', reportData.peoplePresent],
     ['Weather Conditions', reportData.weatherConditions], ['Temperature', reportData.temperature],
     ['Humidity', reportData.humidity], ['Rain in the Last 24 Hours', reportData.rainLast24h],
     ['Recent Weather', reportData.recentWeather], ['Tools Used', reportData.toolsUsed],

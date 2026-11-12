@@ -8,6 +8,7 @@ One name for each thing, everywhere: on the screens, in the emails and PDFs, on 
 | **report** | The inspection report: its steps on screen and its PDF. | |
 | **Job details** | The job's first step: the address, the client and the booking. Only that. | |
 | **new construction job** | A termite management system put in while the building goes up: Job details, then the treatment and its treatment certificate (to AS 3660.1). No agreement, report or quote. Its client is usually the builder. Chosen as the type of job. | |
+| **special purpose inspection** | A termite inspection with a scope of its own (to AS 3660.2), often after an earlier one. Chosen as the type of job; Job details and the agreement then ask what it's for and the first inspection's no., and the report is a Special Purpose Termite Inspection Report. | |
 | **The visit** | The first part of a treatment record or a bait visit: when, who, the weather. | |
 | **your note** | What the inspector says into the mic. Notes waiting to go in are saved notes. | `Voice capture` |
 | **Say it** | The mic on a box or a sheet. | `Dictate`, `Dictating` |

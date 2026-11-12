@@ -1226,11 +1226,24 @@
                   <option>Pre-Purchase — Combined Building & Pest</option>
                   <option>New Construction — Completion</option>
                   <option>New Construction — Termite Management System</option>
+                  <option>Special Purpose — Termite Inspection</option>
                   <option>Treatment Follow-Up</option>
                   <option>Re-inspection</option>
                   <option>Insurance / Legal</option>
                   <option>Other</option>
                 </select>
+              </div>
+              <!-- A special purpose inspection: what it's for, and the
+                   inspection it follows (SPECIAL PURPOSE in js/app/job.js). -->
+              <div id="jobPurposeWrap" hidden>
+                <div class="job-field">
+                  <div class="job-field-label">What it's for</div>
+                  <div class="treat-methods" id="jobPurposes" role="group" aria-label="What the special purpose inspection is for"></div>
+                </div>
+                <div class="job-field">
+                  <label class="job-field-label" for="jobInitialRef">The first inspection's report or job no.</label>
+                  <input class="job-input" id="jobInitialRef" autocomplete="off" placeholder="Optional" oninput="saveJobInfo()">
+                </div>
               </div>
               <div class="job-row">
                 <div class="job-field">
@@ -2823,11 +2836,19 @@
               <option>Pre-Purchase — Timber Pest</option>
               <option>Pre-Purchase — Combined Building & Pest</option>
               <option>New Construction — Completion</option>
+              <option>Special Purpose — Termite Inspection</option>
               <option>Treatment Follow-Up</option>
               <option>Re-inspection</option>
               <option>Insurance / Legal</option>
               <option>Other</option>
             </select>
+          </div>
+          <!-- A special purpose inspection: what it's for, the same ticks as
+               Job details, so the client signs to it (SPECIAL PURPOSE in
+               js/app/job.js). -->
+          <div class="job-field" id="agreementPurposeWrap" hidden>
+            <div class="job-field-label">What it's for</div>
+            <div class="treat-methods" id="agreementPurposes" role="group" aria-label="What the special purpose inspection is for"></div>
           </div>
           <div class="job-row" id="agreementDateFeeRow">
             <div class="job-field" id="agreementDateField">

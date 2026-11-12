@@ -596,7 +596,9 @@ function setAI(state, text) {
 const ISSUE_META_KEYS_FIRST = ['reportNumber', 'sent', 'issue', 'issueHistory', 'amending', 'pendingNotes', 'noQuoteNeeded', 'noteText', 'heardNotes', 'weatherFilled', 'naFromHouse', 'jobPdfAt', 'jobPdfSentAt', 'copyTo', 'copySent', 'doneAt'];
 // Added on 10 Nov 2026, when a report started saying it had changed since
 // it was sent. A fingerprint from before then was taken with these in.
-const ISSUE_META_KEYS_LATER = ['pdfAt', 'agreementRequest', 'quoteSpoken', 'lastVisit', 'lastVisitDismissed', 'jobFee', 'aiFilled', 'treatmentAutoSet', 'noneFromAreas'];
+const ISSUE_META_KEYS_LATER = ['pdfAt', 'agreementRequest', 'quoteSpoken', 'lastVisit', 'lastVisitDismissed', 'jobFee', 'aiFilled', 'treatmentAutoSet', 'noneFromAreas',
+  // The safety checks before the work (js/safety.js), added 12 Nov 2026.
+  'safetyChecks'];
 const ISSUE_META_KEYS = [...ISSUE_META_KEYS_FIRST, ...ISSUE_META_KEYS_LATER];
 const ISSUE_SECTION_NAMES = { job:'Job details', quote:'Quote', property:'Property', obstructions:'Areas inspected', restrictions:'Areas unable to be inspected',
   findings:'Findings', conducive:'Conducive', recommendations:'Recommendations', photos:'Photos', signoff:'Sign-off' };

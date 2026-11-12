@@ -16,6 +16,7 @@ One name for each thing, everywhere: on the screens, in the emails and PDFs, on 
 | **Report done** | The inspector's mark that the report is finished. It can still change. | `Mark complete` |
 | **Finalise** | A job's one ending: it locks the report and quote as a version and makes the job PDF. Amend unlocks it. | `Complete job` |
 | **Book it in** | A new job from the Due list. | |
+| **Safety check** | The technician's check before starting work on site: the questions, the hazards the SWMS doesn't cover (each with its control and risk score), the permits and their signature. One for each visit, done from This job. Kept with the job; not sent to the client. | |
 | **Business details** | The business's name, licence, ABN, phone, email and logo (Menu, Business details). | `Company details`, `company details` |
 | **Download a copy** | The backup file of everything, to load back into SAYON. Not the PDFs. | `Export your data` |
 | **Menu, Billing** | Where the plan is changed or cancelled. | `tap your initials` |

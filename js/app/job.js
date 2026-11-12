@@ -498,6 +498,7 @@ function renderJobPage(opening) {
       ${next.next ? jobNextAction(next, q) : ''}
       ${waitLinks || skipLink ? `<div class="dash-detail-links">${waitLinks || skipLink}</div>` : ''}
     </section>
+    ${typeof safetyCheckHTML === 'function' ? safetyCheckHTML(j) : ''}
     ${stepsHTML}
     ${jobFinalisedHTML(j)}
     ${currentReportId && !isSampleJob(currentReportId) && getSavedReports().some(r => r.id === currentReportId) ? `<div class="dash-detail-foot job-delete">

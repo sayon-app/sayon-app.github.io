@@ -33,7 +33,7 @@ jobs:
           node-version: 22
 
       - name: Syntax check
-        run: for f in js/app/*.js js/*.js tests/*/e2e.js; do node --check "$f"; done
+        run: for f in service-worker.js worker/worker.js js/app/*.js js/*.js tests/*/e2e.js; do node --check "$f"; done
 
       - name: Playwright, Chromium and pdftotext
         run: |

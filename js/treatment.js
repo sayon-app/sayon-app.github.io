@@ -8,8 +8,10 @@
 // (the drawn site plan, see js/site-plan.js), sketch (JPEG data URL of a
 // hand-drawn plan, used when there's no drawn one), notice:
 // 'new'|'updated'|'none', noticeWhere, cautions, nextInspection, warranty,
-// notes, signature, at }. It's kept with the quote, so it syncs with the
-// report, and gives the client a treatment certificate PDF.
+// notes, signature, at, photos: [{ id, width, height, caption, kind:
+// 'work'|'notice', path? }] (PHOTOS ON THE RECORD below) }. It's kept with
+// the quote, so it syncs with the report, and gives the client a treatment
+// certificate PDF.
 //
 // The certificate carries what AS 3660.2 asks for (including a site plan),
 // the wording of the durable notice (AS 3660.1, NCC 2022 Housing Provisions 3.4.3: system, date,
@@ -263,6 +265,8 @@ function treatmentCertificateCard(q) {
     : to ? `Goes to ${to}` : 'Not sent yet';
   // What the certificate would go without, said before it's emailed.
   const missing = treatmentRecordGaps(t).filter(Boolean).map(g => g.missing);
+  // Its photos are read in now, ready for the tap that emails it.
+  loadTreatmentPhotos(q);
   return `<div class="qp-cert ${given ? 'sent' : ''}">
       <div class="qp-cert-title">Treatment certificate</div>
       <p class="qp-cert-text">${escapeHtml(status)}</p>
@@ -336,6 +340,8 @@ function openTreatmentRecord() {
   document.getElementById('trNotTreated').value = t.notTreated || '';
   document.getElementById('trNotice').value = t.notice || 'new';
   document.getElementById('trNoticeWhere').value = t.noticeWhere || '';
+  treatmentPhotosDraft = treatmentRecordPhotos(t).map(p => ({ ...p }));
+  renderTreatmentPhotos();
   onTreatmentNoticeChange();
   document.getElementById('trNext').value = t.nextInspection || '';
   document.getElementById('trNotes').value = t.notes || '';
@@ -575,7 +581,102 @@ function onTreatmentMethodToggle(box, quiet) {
 
 function onTreatmentNoticeChange() {
   const none = document.getElementById('trNotice').value === 'none';
-  document.getElementById('trNoticeWhereWrap').style.display = none ? 'none' : '';
+  document.getElementById('trNoticeWhereWrap').hidden = none;
+  document.getElementById('trNoticePhotoWrap').hidden = none;
+}
+
+// ── PHOTOS ON THE RECORD ── Photos of the work (what went in, where) and
+// of the durable notice, for the certificate's Photos page. Each is kept
+// like a report photo: in the photo store on the phone and, once the job
+// syncs, in the account's Storage (js/app/photos.js, which keeps and
+// uploads them with the job's own). t.photos holds what they are.
+const TREATMENT_PHOTO_KINDS = {
+  work: { box: 'trWorkPhotos', limit: 12, label: 'The work' },
+  notice: { box: 'trNoticePhotos', limit: 3, label: 'The durable notice' },
+};
+let treatmentPhotosDraft = [];
+
+function renderTreatmentPhotos() {
+  Object.entries(TREATMENT_PHOTO_KINDS).forEach(([kind, k]) => {
+    const box = document.getElementById(k.box);
+    if (!box) return;
+    const photos = treatmentPhotosDraft.filter(p => p.kind === kind);
+    box.innerHTML = photos.map(p => `<div class="spot-photo">
+        <img data-photo-id="${escapeHtml(p.id)}" alt="Photo">
+        <input class="photo-caption-input spot-photo-caption" type="text" placeholder="Add details…" value="${escapeHtml(p.caption || '')}"
+          aria-label="Details of the photo" oninput="updateTreatmentPhotoCaption('${escapeHtml(p.id)}', this.value)">
+        <div class="photo-actions"><button type="button" class="photo-remove-btn" onclick="removeTreatmentPhoto('${escapeHtml(p.id)}')">Remove</button></div>
+      </div>`).join('')
+      + (photos.length >= k.limit ? '' : `<div class="photo-add-row"><button type="button" class="spot-photo-add" onclick="addTreatmentPhoto('${kind}')">${PHOTO_ADD_ICON}Add photo</button>
+        <button type="button" class="link-btn photo-choose" onclick="addTreatmentPhoto('${kind}', true)">Choose one instead</button></div>`);
+    hydratePhotoImages(box, photos);
+  });
+}
+
+// Add photo is the camera; choosing: "Choose one instead" (js/app/photos.js).
+function addTreatmentPhoto(kind, choosing) {
+  const input = document.getElementById('trPhotoInput');
+  input.dataset.kind = kind;
+  if (choosing) choosePhotoSource(input, true); else takePhoto(input);
+}
+
+async function handleTreatmentPhotoFiles(input) {
+  const kind = TREATMENT_PHOTO_KINDS[input.dataset.kind] ? input.dataset.kind : 'work';
+  const files = Array.from(input.files || []);
+  input.value = '';
+  if (!files.length) return;
+  const draft = treatmentPhotosDraft;
+  const limit = TREATMENT_PHOTO_KINDS[kind].limit;
+  const take = files.slice(0, Math.max(0, limit - draft.filter(p => p.kind === kind).length));
+  if (files.length > take.length) showToast(`Only ${take.length} of ${files.length} added. This box holds ${limit} photos`, 'error');
+  for (const file of take) {
+    try {
+      const { blob, width, height } = await compressPhotoFile(file);
+      const id = genPhotoId();
+      await putPhotoBlob(id, blob);
+      draft.push({ id, width, height, caption: '', kind });
+    } catch (e) { showToast(photoStoreProblem(e), 'error'); }
+  }
+  // The sheet was closed, or opened for another job, while they were stored.
+  if (draft !== treatmentPhotosDraft) return;
+  renderTreatmentPhotos();
+  unsavedSheetChanged();
+}
+
+// Removing a photo offers Undo, which puts it back where it was.
+function removeTreatmentPhoto(id) {
+  const draft = treatmentPhotosDraft;
+  const i = draft.findIndex(p => p.id === id);
+  if (i < 0) return;
+  const [photo] = draft.splice(i, 1);
+  renderTreatmentPhotos();
+  unsavedSheetChanged();
+  showToast('Photo removed', 'info', { label: 'Undo', run: () => {
+    if (draft !== treatmentPhotosDraft || draft.some(p => p.id === id)) return;
+    draft.splice(Math.min(i, draft.length), 0, photo);
+    renderTreatmentPhotos();
+    unsavedSheetChanged();
+  } });
+}
+
+function updateTreatmentPhotoCaption(id, value) {
+  const p = treatmentPhotosDraft.find(x => x.id === id);
+  if (p) p.caption = value;
+}
+
+// Once the job has synced, its record's photos are in the account's
+// Storage. Their paths go on the quote kept on this phone as well, so
+// later saves keep them and another device can fetch the photos.
+function keepTreatmentPhotoPaths(reportId, photos) {
+  const paths = new Map(photos.filter(p => p && p.path).map(p => [p.id, p.path]));
+  if (!paths.size) return;
+  const mark = q => treatmentRecordPhotos(q && q.treatment).forEach(p => { if (!p.path && paths.has(p.id)) p.path = paths.get(p.id); });
+  const all = readJSON(quotesStorageKey(), {});
+  if (all[reportId]) {
+    mark(all[reportId]);
+    try { localStorage.setItem(quotesStorageKey(), JSON.stringify(all)); } catch (e) {}
+  }
+  if (quoteState && quoteState.reportKey === reportId) mark(quoteState);
 }
 
 function renderTreatmentProducts(products) {
@@ -873,6 +974,8 @@ function readTreatmentForm() {
     nextInspection: v('trNext'),
     warranty: v('trWarranty'),
     notes: v('trNotes'),
+    // The notice's photos only while a notice was placed.
+    photos: treatmentPhotosDraft.filter(p => p.kind !== 'notice' || v('trNotice') !== 'none').map(p => ({ ...p })),
     signature: padSignature(treatmentPad),
     at: Date.now(),
   };
@@ -900,10 +1003,42 @@ function saveTreatmentRecord() {
 
 // ── CERTIFICATE PDF ──
 // The card's PDF button.
+// ── PHOTOS ON THE CERTIFICATE ── The PDF is made inside the tap that
+// emails it, so the record's photos (and the report's front photo, which
+// leads them) are read from the photo store beforehand, when the
+// certificate card shows: treatmentPhotoSrc maps a photo's id to its data
+// URL, or to null when it couldn't be found (tried again when the PDF is
+// made: retry).
+const treatmentPhotoSrc = {};
+function treatmentPdfPhotos(q) {
+  const t = q && q.treatment;
+  const own = treatmentRecordPhotos(t).filter(p => p.kind !== 'notice' || t.notice !== 'none');
+  if (!own.length) return [];
+  const front = ((treatmentReportFor(q).photosBySection || {}).general || [])[0];
+  return [
+    ...(front ? [{ ...front, label: 'Front of the property', caption: '' }] : []),
+    ...own.filter(p => p.kind !== 'notice').map(p => ({ ...p, label: TREATMENT_PHOTO_KINDS.work.label })),
+    ...own.filter(p => p.kind === 'notice').map(p => ({ ...p, label: TREATMENT_PHOTO_KINDS.notice.label })),
+  ];
+}
+async function loadTreatmentPhotos(q, retry) {
+  for (const p of treatmentPdfPhotos(q)) {
+    if (treatmentPhotoSrc[p.id] || (p.id in treatmentPhotoSrc && !retry)) continue;
+    try {
+      const blob = await getPhotoImage(p);
+      treatmentPhotoSrc[p.id] = blob ? await blobToDataUrl(blob) : null;
+    } catch (e) { treatmentPhotoSrc[p.id] = null; }
+  }
+}
+function treatmentPhotosLoaded(q) {
+  return treatmentPdfPhotos(q).every(p => p.id in treatmentPhotoSrc);
+}
+
 function downloadTreatmentCertificate() {
   const q = quoteState;
   if (!q || !q.treatment) return;
   ensureJsPDFLoaded()
+    .then(() => loadTreatmentPhotos(q, true))
     .then(() => buildTreatmentCertificatePDF(q))
     .then(({ blob, fname }) => { track('certificate_pdf_made'); return deliverPdfBlob(blob, fname, {
       title: 'Treatment certificate',
@@ -922,8 +1057,9 @@ function downloadTreatmentCertificate() {
 function emailTreatmentCertificate() {
   const q = quoteState;
   if (!q || !q.treatment) return;
-  if (!jsPDF) {
+  if (!jsPDF || !treatmentPhotosLoaded(q)) {
     ensureJsPDFLoaded()
+      .then(() => loadTreatmentPhotos(q, true))
       .then(() => showToast('Ready. Tap Email again to send it', 'info'))
       .catch(e => showToast((e && e.message) || 'Could not load the PDF tools', 'error'));
     return;
@@ -1247,6 +1383,35 @@ function buildTreatmentCertificatePDF(q) {
     para(`The area under the suspended floor, with the building's walls above it in grey.${subSum ? ` It shows ${subSum}.` : ''}`, { size: 9, lh: 4.3, after: 2 });
     y += drawSitePlanPdf(doc, t.plan, { x: M, y: y - 1, w: CW, layer: 'sub' }) + 5;
     drawSitePlanLegendPdf(doc, t.plan, { x: M, y, w: CW, layer: 'sub' });
+  }
+
+  // ── PHOTOS ── The work and the durable notice, two to a row, led by the
+  // front of the property so the reader knows the place. A page of their
+  // own after the plans, so the first page stays the certificate itself.
+  const photos = treatmentPdfPhotos(q).filter(p => treatmentPhotoSrc[p.id]);
+  if (photos.some(p => p.label !== 'Front of the property')) {
+    doc.addPage();
+    y = drawPdfRunningHeader(doc, company, docName, q.address, number);
+    section('PHOTOS');
+    const gap = 6, boxW = (CW - gap) / 2, boxH = boxW * 0.72;
+    for (let i = 0; i < photos.length; i += 2) {
+      const row = photos.slice(i, i + 2);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+      const caps = row.map(p => doc.splitTextToSize((p.caption || '').trim(), boxW));
+      const rowH = boxH + 6 + Math.max(...caps.map(c => c.length)) * 3.4 + 4;
+      ensure(rowH);
+      row.forEach((p, k) => {
+        const x = M + k * (boxW + gap);
+        try { drawPdfPhoto(doc, treatmentPhotoSrc[p.id], x, y, boxW, boxH); } catch (e) {}
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
+        pdfTracked(doc, p.label.toUpperCase(), x, y + boxH + 4.5, { cs: 0.3 });
+        if (caps[k].length) {
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...C.ink);
+          doc.text(caps[k], x, y + boxH + 8.5);
+        }
+      });
+      y += rowH;
+    }
   }
 
   drawPdfDocFooters(doc, `Certificate ${number}${company.name ? `  ·  ${company.name}` : ''}`, q.reportKey);

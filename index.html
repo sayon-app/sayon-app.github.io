@@ -612,6 +612,11 @@
         <textarea class="job-input" id="trNotTreated" rows="2" placeholder="e.g. Under the rear deck, no access"></textarea>
       </div>
       <div class="job-field">
+        <div class="job-field-label">Photos of the work</div>
+        <div class="spot-photos treat-photos" id="trWorkPhotos"></div>
+        <input type="file" id="trPhotoInput" accept="image/*" multiple hidden onchange="handleTreatmentPhotoFiles(this)">
+      </div>
+      <div class="job-field">
         <div class="job-field-label">Site plan</div>
         <div class="treat-plan" id="trPlan"></div>
       </div>
@@ -671,6 +676,10 @@
           <div class="job-field-label">Where</div>
           <input class="job-input" id="trNoticeWhere" placeholder="e.g. Meter box">
         </div>
+      </div>
+      <div class="job-field" id="trNoticePhotoWrap">
+        <div class="job-field-label">Photo of the notice</div>
+        <div class="spot-photos treat-photos" id="trNoticePhotos"></div>
       </div>
       <div class="job-field">
         <div class="job-field-label">Next inspection due</div>

@@ -742,4 +742,21 @@ body .quote-guide .qp-folds .quote-system-choice { background: var(--surface); b
 .tp-report-link strong { font-size: calc(14px * var(--ts)); }
 .tp-report-link small { font-size: calc(12px * var(--ts)); color: var(--text2); line-height: 1.4; }
 
-
+/* Safety check (js/safety.js): its card on This job, and its sheet. */
+.job-safety { margin-top: 16px; padding: 12px 14px 14px 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); }
+.job-safety .dash-detail-links { margin-left: 58px; flex-wrap: wrap; }
+.job-safety .dash-detail-links:empty { display: none; }
+.job-safety .dash-detail-links button { min-height: 44px; }
+.job-safety.bad .job-step-text { color: var(--risk); }
+.sc-questions { display: flex; flex-direction: column; gap: 10px; }
+.sc-question { display: flex; flex-direction: column; gap: 6px; }
+.sc-question + .sc-question, #scHazardWrap + .sc-question { margin-top: 12px; }
+.sc-question-text { font-size: calc(14.5px * var(--ts)); font-weight: 600; color: var(--text); line-height: 1.35; }
+.sc-question .qp-chip { min-width: 72px; }
+.sc-warn { margin: 0; font-size: calc(13px * var(--ts)); line-height: 1.4; color: var(--yellow-text); font-weight: 600; }
+#scNotSafe { color: var(--risk); }
+#scHazardWrap { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.sc-hazard { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border2); border-left: 4px solid var(--accent); }
+.sc-hazard-head { display: flex; justify-content: space-between; align-items: center; font: 700 calc(14px * var(--ts)) 'Space Grotesk', sans-serif; color: var(--text); }
+.sc-score { margin: 0; font-size: calc(13px * var(--ts)); color: var(--text2); font-weight: 600; }
+#scHazardWrap > .quote-link-btn { align-self: flex-start; }

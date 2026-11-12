@@ -824,6 +824,69 @@
   </div>
 </div>
 
+<!-- SAFETY CHECK (js/safety.js): the technician's check before starting work on site, from This job -->
+<div class="page-sheet-overlay" id="safetyOverlay">
+  <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="safetyTitle">
+    <div class="page-sheet-header">
+      <span class="page-sheet-title" id="safetyTitle">Safety check</span>
+      <button class="voice-popover-close" onclick="cancelSheet('safetyOverlay')" aria-label="Close"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+    </div>
+    <div class="page-sheet-body sheet-secs">
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <div><h3 class="sheet-sec-title">Before you start</h3><p class="sheet-sec-sub" id="scFor">Before the work starts.</p></div>
+        </div>
+        <div class="sc-questions" id="scQuestions"></div>
+      </section>
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <div><h3 class="sheet-sec-title">This site</h3><p class="sheet-sec-sub">Anything your safe work method statement (SWMS) doesn't cover.</p></div>
+        </div>
+        <div class="sc-question">
+          <div class="sc-question-text" id="scExtraLabel">Any hazards to control that the SWMS doesn't cover?</div>
+          <div class="qp-chips" id="scExtra" role="radiogroup" aria-labelledby="scExtraLabel"></div>
+        </div>
+        <div id="scHazardWrap" hidden>
+          <div id="scHazards"></div>
+          <datalist id="scHazardList"></datalist>
+          <button type="button" class="quote-link-btn" onclick="addSafetyHazard()">Add another hazard</button>
+          <p class="quote-hint sheet-hint">If the same hazard keeps coming up, it belongs in the SWMS. Bring it up at the next toolbox meeting.</p>
+        </div>
+        <div class="sc-question">
+          <div class="sc-question-text" id="scPermitsLabel">Permits for the work</div>
+          <div class="qp-chips" id="scPermits" role="radiogroup" aria-labelledby="scPermitsLabel"></div>
+        </div>
+      </section>
+      <section class="sheet-sec">
+        <div class="sheet-sec-head">
+          <div><h3 class="sheet-sec-title">Sign-off</h3><p class="sheet-sec-sub">Signing says you've been trained in, and understand, the hazards and controls above.</p></div>
+        </div>
+        <div class="sc-question">
+          <div class="sc-question-text" id="scSafeLabel">Can you do the job safely?</div>
+          <div class="qp-chips" id="scSafe" role="radiogroup" aria-labelledby="scSafeLabel"></div>
+          <p class="sc-warn" id="scNotSafe" hidden>Don't start. Sort out the hazards first, or talk to your supervisor. Saving keeps a record that you didn't go ahead.</p>
+        </div>
+        <div class="job-field">
+          <label class="job-field-label" for="scName">Your name</label>
+          <input class="job-input" id="scName" oninput="sheetSignerChanged(safetyPad, this.value)">
+        </div>
+        <div class="job-field">
+          <div class="signature-pad-wrap agreement-sig-wrap">
+            <canvas class="signature-canvas" id="scSigCanvas" width="640" height="220"></canvas>
+            <div class="signature-placeholder" id="scSigPlaceholder">Sign here</div>
+          </div>
+          <div class="agreement-sig-actions">
+            <span class="agr-sig-by">the technician</span>
+            <button class="agr-sig-clear" onclick="signSheetAgain(safetyPad);updateSafetySaveBtn()" hidden>Sign again</button>
+          </div>
+        </div>
+        <button class="extract-btn" id="scSaveBtn" onclick="saveSafetyCheck()">Save the safety check</button>
+        <button class="link-btn send-review-cancel" onclick="cancelSheet('safetyOverlay')">Cancel</button>
+      </section>
+    </div>
+  </div>
+</div>
+
 <!-- SITE PLAN (js/site-plan.js): the drawn plan with its legend, from the treatment record -->
 <div class="page-sheet-overlay" id="sitePlanOverlay">
   <div class="page-sheet" role="dialog" aria-modal="true" aria-labelledby="spTitle">
@@ -2831,6 +2894,7 @@
 <script src="js/treatment-plan.js"></script>
 <script src="js/treatment.js"></script>
 <script src="js/bait.js"></script>
+<script src="js/safety.js"></script>
 <script src="js/reinspection.js"></script>
 <script src="js/job-pack.js"></script>
 <script src="js/site-plan.js"></script>

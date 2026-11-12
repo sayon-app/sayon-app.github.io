@@ -3,7 +3,7 @@
 // leaving SAYON; a sheet closed unfinished goes back to where it was opened;
 // a job on the Jobs list opens its own page; every screen has a way back;
 // the app reopens where it was; the Last visit line no longer offers a job
-// its own saved copy; the report's Job details card, date and time chips,
+// its own saved copy; the report's Job details card, date chips,
 // and Report done with one clear next step.
 // node e2e.js <outDir>   (serve the repo on :8765; see tests/visual/README.md)
 const { chromium } = require('playwright'); const fs = require('fs');
@@ -53,15 +53,15 @@ async function setup(b, opts) {
   await p.evaluate(() => startNewJob()); await p.waitForTimeout(800);
   await p.fill('#jobAddress', '22 Test Road'); await p.fill('#jobSuburb', 'Epping'); await p.fill('#jobClient', 'Sam Client');
   await p.evaluate(() => { document.getElementById('jobState').value = 'NSW'; updateJob(); }); await p.waitForTimeout(300);
-  const chips = await p.evaluate(() => ({ days: [...document.querySelectorAll('#jobDateChips .date-chip')].map(c => c.textContent), times: [...document.querySelectorAll('#jobTimeChips .date-chip')].map(c => c.textContent) }));
+  const chips = await p.evaluate(() => ({ days: [...document.querySelectorAll('#jobDateChips .date-chip')].map(c => c.textContent), times: document.querySelectorAll('#jobTimeChips, #jobTimeChips .date-chip').length }));
   console.log('chips:', JSON.stringify(chips));
   check(chips.days[0] === 'Today' && chips.days[1] === 'Tomorrow' && chips.days.length === 7, 'the day chips read Today, Tomorrow and the next five days');
-  check(chips.times[0] === '7am' && chips.times.includes('12pm') && chips.times.includes('2pm'), 'the time chips read 7am to 4pm');
+  check(chips.times === 0, 'no time buttons: the time is typed in its own box');
   await p.locator('#jobDateChips .date-chip').nth(1).click();
-  await p.locator('#jobTimeChips .date-chip', { hasText: /^9am$/ }).click(); await p.waitForTimeout(300);
+  await p.fill('#jobInspectionTime', '09:00'); await p.waitForTimeout(300);
   const booked = await p.evaluate(() => ({ d: reportData.jobInspectionDate, t: reportData.jobInspectionTime, on: [...document.querySelectorAll('.date-chip.on')].map(c => c.textContent) }));
   const tomorrow = await p.evaluate(() => { const d = new Date(); d.setDate(d.getDate() + 1); return isoDate(d); });
-  check(booked.d === tomorrow && booked.t === '09:00' && booked.on.join('|') === 'Tomorrow|9am', 'one tap each books tomorrow at 9am, and both chips light: ' + JSON.stringify(booked));
+  check(booked.d === tomorrow && booked.t === '09:00' && booked.on.join('|') === 'Tomorrow', 'one tap books tomorrow, the time box takes 9am, and only the day chip lights: ' + JSON.stringify(booked));
   await p.evaluate(() => document.getElementById('jobDateChips').scrollIntoView({ block: 'center' })); await shot('01-date-time-chips');
   await p.evaluate(() => saveJobNow()); await p.waitForTimeout(500);
   const ourId = await p.evaluate(() => currentReportId);

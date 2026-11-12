@@ -113,6 +113,7 @@ function placeTalkPhotos() {
   for (const p of waiting) {
     const text = p.heard.text || heardAround(p.heard.at);
     const f = findingForHeard(text, findings);
+    saveTestEvent('talk-photo', text, { placedOn: f ? [f.activityLocation, f.timberAffected].filter(Boolean).join(', ') : null, caption: f && !p.caption ? talkCaption(text, f) : (p.caption || null) });
     if (!f) continue;
     const section = findingPhotoSection(f.id);
     if (getSectionPhotos(section).length >= sectionPhotoLimit(section)) continue;

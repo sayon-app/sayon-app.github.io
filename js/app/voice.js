@@ -386,6 +386,28 @@ function correctKnownMishearings(text) {
   fix(/\bcordon\b(?=\s+(?:physical\s+|termite\s+)*barrier\b)/gi, 'Kordon');
   fix(/\bbats\b(?=\s+(?:laid|lying|covering|over (?:the\s+)?(?:ceiling|joists|top plates|everything)|(?:are|were|get|have been)\s+(?:re)?moved)\b)/gi, 'batts');
   fix(/\binsulation bats\b/gi, 'insulation batts');
+  // Full-coverage car test, 5 Nov 2026. Each has no sensible literal reading
+  // in an inspection, or is fixed only in the phrase it was heard in.
+  fix(/\btermite or foam\b/gi, 'Termidor Foam');
+  fix(/\bultra ?set\b/gi, 'Altriset');
+  fix(/\bthermal track\b/gi, 'Termatrac');
+  // Every-section car test, 12 Nov 2026 (Whisper on an iPhone).
+  fix(/\bterminal foam\b/gi, 'Termidor Foam');
+  fix(/\bterminal\b(?=\s+(?:foam|dust|chemical\b|soil\b|barrier\b|treatment\b))/gi, 'Termidor');
+  fix(/\bturn my track\b/gi, 'Termatrac');
+  fix(/\bknown as found\b/gi, 'no nest found');
+  fix(/\bflood boards\b/gi, 'floorboards');
+  fix(/\bink capping\b/gi, 'ant capping');
+  fix(/\banubium\b/gi, 'Anobium');
+  fix(/\bacinasiformis\b/gi, 'acinaciformis');
+  // "The bearer is damaged" straight after a pier came back as "barrier".
+  text = text.replace(/(\bpiers?\b[^.!?]{0,80}[.!?]\s+)(the) barrier (is|was) damaged\b/gi, (m, pre, the, verb) => pre + the + ' bearer ' + verb + ' damaged');
+  fix(/\bacid nasiformis\b/gi, 'acinaciformis');
+  fix(/\brepurchase\b(?=\s+(?:timber\s+)?pest\b)/gi, 'pre-purchase');
+  fix(/\bferry fibrous\b/gi, 'furry fibrous');
+  fix(/\bdrainings\b/gi, 'drainage');
+  fix(/\bbathroom ward\b/gi, 'bathroom wall');
+  text = text.replace(/\b(slab edge)\.?\s+of the extinction\b/gi, '$1 of the extension');
   // "soil barrier" lost its first letter at a phrase break ("Oil barrier").
   text = text.replace(/(^|[.!?]\s+|\bchemical\s+)oil barrier\b/gi, (m, pre) => pre + (/^\s*$|[.!?]\s*$/.test(pre) ? 'Soil' : 'soil') + ' barrier');
   // Subfloor clearance is always millimetres; "400ml", "400 mil".
@@ -407,8 +429,8 @@ function correctKnownMishearings(text) {
 // contextual reasoning, which can see the whole sentence.
 const TRANSCRIPTION_VOCAB = [
   'Kordon', 'Termidor', 'Altriset', 'Premise', 'Bifenthrin', 'Biflex',
-  'Exterra', 'Sentricon', 'Trelona', 'Termimesh',
-  'Coptotermes', 'Schedorhinotermes', 'Nasutitermes', 'Cryptotermes',
+  'Exterra', 'Sentricon', 'Trelona', 'Termimesh', 'Termatrac',
+  'Coptotermes', 'acinaciformis', 'Schedorhinotermes', 'Nasutitermes', 'Cryptotermes', 'Anobium',
 ];
 
 // ── AI TRANSCRIPT CLEANUP (suggest-and-confirm, never automatic) ──────────
@@ -470,6 +492,7 @@ async function suggestTranscriptCleanup() {
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
     if (!parsed || typeof parsed.cleaned !== 'string') throw new Error('Unexpected response shape');
     cleanupSuggestion = parsed;
+    saveTestEvent('cleanup', currentTranscript, { cleaned: parsed.cleaned, hasUncertainSections: !!parsed.hasUncertainSections });
     showCleanupSuggestion(parsed);
   } catch (err) {
     const reason = ((err && err.message) ? String(err.message) : 'unknown error').slice(0, 140);
@@ -679,6 +702,7 @@ async function tryServerSideTranscription(blob, before) {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (!data || typeof data.transcript !== 'string' || !data.transcript.trim()) throw new Error('Unexpected response shape');
+    saveTestEvent('other-version', data.transcript.trim(), { onDevice: currentTranscript.slice((before || '').length).trim() });
     showServerTranscriptionSuggestion(data.transcript.trim(), before);
   } catch (err) {
     console.warn('Server-side transcription unavailable this recording — keeping the on-device transcript:', err && err.message);
@@ -904,7 +928,7 @@ function whisperApply() {
     let text = (entry.text || '').trim();
     if (!text || WHISPER_NOISE_RE.test(text)) continue;
     if (entry.epoch !== voiceJobEpoch) { showToast('You changed job before the last words came back, so they were left out', 'info'); continue; }
-    text = correctKnownMishearings(text);
+    text = correctHeard(text);
     const stopAt = text.search(VOICE_STOP_LIVE_RE);
     if (stopAt >= 0) text = text.slice(0, stopAt).trim();
     // "Fill it in, Sayon": the words before it fill now, the words after
@@ -1034,7 +1058,7 @@ function startRecording() {
           if (typeof conf === 'number' && conf > 0 && conf < 0.6) {
             lowConfidenceFlagged = true;
           }
-          finalChunk = correctKnownMishearings(finalChunk);
+          finalChunk = correctHeard(finalChunk);
           // Cut from the stop words on, again if the phone repeated them.
           for (let stopAt; (stopAt = finalChunk.search(VOICE_STOP_RE)) >= 0;) { finalChunk = finalChunk.slice(0, stopAt); stopByVoice = true; }
           // "Fill it in, Sayon": what came before fills now, the rest waits.
@@ -1093,7 +1117,7 @@ function startRecording() {
     };
     recognition.onend = () => {
       if (!isRecording) return;
-      let kept = correctKnownMishearings(pendingInterim).trim();
+      let kept = correctHeard(pendingInterim).trim();
       pendingInterim = '';
       if (kept) {
         const stopAt = kept.search(VOICE_STOP_RE);

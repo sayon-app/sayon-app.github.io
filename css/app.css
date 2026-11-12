@@ -5820,6 +5820,11 @@ body.large-touch #jobPanel .select-cards .choice-card { min-height: 64px; }
 .job-hero.new .job-hero-sub { font-size: calc(15.5px * var(--ts)); line-height: 1.45; }
 .job-hero-tip { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0 0; font-size: calc(13.5px * var(--ts)); line-height: 1.4; color: var(--text3); }
 .job-hero-tip svg { flex: none; margin-top: 1px; color: var(--accent2); }
+/* A new job's kind: an inspection, or a new construction job. A quiet line. */
+.job-hero-kind { margin: 8px 0 0; font-size: calc(13.5px * var(--ts)); line-height: 1.4; color: var(--text3); }
+.job-hero-kind button { padding: 0; border: none; background: none; font: inherit; font-weight: 600; color: var(--accent2); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+body .job-hero-kind { color: var(--on-ink2); }
+body .job-hero-kind button { color: var(--accent-glow); }
 .job-details.new { margin-top: 16px; background: transparent; border: none; overflow: visible; }
 .job-details.new > .job-details-head { display: none; }
 body .job-page .job-details.new #jobPanel:not(.menu-page-active) { border: none; background: transparent; overflow: visible; }
@@ -5837,6 +5842,9 @@ body .job-hero-tip svg { color: var(--accent-glow); }
 body .job-page .job-details.new,
 body .job-page .job-details.new #jobPanel { box-shadow: none; }
 body .job-details.new .job-group { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
+/* A special purpose inspection's ticks sit on Job details' light card, so
+   an unticked box is drawn light too (the Jobs screen around it is dark). */
+#jobPurposes { color-scheme: light; }
 
 /* The logo's dot is the brand's pink. */
 .logo-dot { fill: var(--pink); stroke: var(--pink); }

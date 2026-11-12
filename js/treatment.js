@@ -8,8 +8,12 @@
 // (the drawn site plan, see js/site-plan.js), sketch (JPEG data URL of a
 // hand-drawn plan, used when there's no drawn one), notice:
 // 'new'|'updated'|'none', noticeWhere, cautions, nextInspection, warranty,
-// notes, signature, at }. It's kept with the quote, so it syncs with the
-// report, and gives the client a treatment certificate PDF.
+// notes, signature, at, photos: [{ id, width, height, caption, kind:
+// 'work'|'notice'|'slab', path? }] (PHOTOS ON THE RECORD below), build
+// (a new construction job's building and slab, NEW CONSTRUCTION below) }.
+// It's kept with the quote, so it syncs with the report, and gives the
+// client a treatment certificate PDF. A new construction job has no quote,
+// so its record is kept on one made for it (newBuildRecordQuote).
 //
 // The certificate carries what AS 3660.2 asks for (including a site plan),
 // the wording of the durable notice (AS 3660.1, NCC 2022 Housing Provisions 3.4.3: system, date,
@@ -157,6 +161,7 @@ function addMonthsIso(iso, months) {
 // today; the technician is whoever is signed in, else the report's inspector.
 function draftTreatment(q) {
   const rd = treatmentSourceReport();
+  const build = isNewBuildJob(treatmentReportFor(q)) ? draftNewBuild() : null;
   const company = getCompanyDetails();
   const me = typeof lastInspectorDetails === 'function' ? lastInspectorDetails() : { name: '', licence: '' };
   const signedIn = (typeof authUser !== 'undefined' && authUser && authUser.user_metadata && authUser.user_metadata.name) || '';
@@ -194,9 +199,10 @@ function draftTreatment(q) {
     notice: 'new',
     noticeWhere: 'Meter box',
     cautions: TREATMENT_DEFAULT_CAUTIONS,
-    nextInspection: addMonthsIso(date, inspectionFrequencyMonths(rd)),
+    nextInspection: addMonthsIso(date, build ? +build.inspectEvery : inspectionFrequencyMonths(rd)),
     warranty: treatmentWarrantyFromQuote(q),
     notes: '',
+    ...(build ? { build } : {}),
   };
 }
 
@@ -263,6 +269,8 @@ function treatmentCertificateCard(q) {
     : to ? `Goes to ${to}` : 'Not sent yet';
   // What the certificate would go without, said before it's emailed.
   const missing = treatmentRecordGaps(t).filter(Boolean).map(g => g.missing);
+  // Its photos are read in now, ready for the tap that emails it.
+  loadTreatmentPhotos(q);
   return `<div class="qp-cert ${given ? 'sent' : ''}">
       <div class="qp-cert-title">Treatment certificate</div>
       <p class="qp-cert-text">${escapeHtml(status)}</p>
@@ -274,6 +282,215 @@ function treatmentCertificateCard(q) {
       </div>
       ${given ? '' : `<button type="button" class="qp-cert-handed" onclick="markCertificateHanded()">Handed it over in person? <span>Mark as given</span></button>`}
     </div>`;
+}
+
+// ── NEW CONSTRUCTION ── A new construction job (isNewBuildJob in
+// js/app/job.js) is a termite management system put in while the building
+// goes up, so its record carries what AS 3660.1 asks for as well, kept as
+// t.build = { buildingClass, structure, systemIs, slab: 'yes'|'no'|'',
+// slabTypes, inclusions, collars, softCollars, wraps, jointLm, jointLitres,
+// discontinuities, slabNotes, suspended: 'yes'|'no'|'', suspendedNotes,
+// physicalHow, limits, inspectEvery (months, as the system's maker
+// directs), care: ['chemical', 'disturbed'] }. The sheet shows its parts
+// (the building and slab fold, how a physical system went in, the limits,
+// the care lines) and its certificate says AS 3660.1.
+const NEW_BUILD_METHODS = ['physical', 'barrier', 'retic', 'bait'];
+const NEW_BUILD_CLASSES = ['Class 1', 'Class 1 and 10', 'Class 2', 'Class 3', 'Class 4', 'Class 5 to 9', 'Class 10'];
+const NEW_BUILD_SYSTEM_IS = {
+  complete: 'A complete termite management system',
+  integrated: 'Part of an integrated system, with the slab or another system',
+  partial: 'A partial system, for part of the building only',
+};
+const NEW_BUILD_SLAB_TYPES = ['Raft', 'Waffle pod', 'Monolithic', 'Infill', 'Suspended', 'Driveway', 'Pathway'];
+const NEW_BUILD_INCLUSIONS = ['Water pipes', 'In-slab heating', 'Hydronic heating', 'Underground tank'];
+const NEW_BUILD_PHYSICAL_HOW = ['Perimeter', 'Slab penetrations', 'Construction joints', 'Slab cure', 'Block wall', 'Piers', 'Pole plate', 'Slab repair cut-out', 'Trim'];
+const NEW_BUILD_PLACES = ['Perimeter of the building', 'Slab penetrations', 'Construction joints', 'Slab or path against the building', 'Driveway', 'Patios', 'Tilt panel joints', 'Block walls', 'Piers and stumps', 'Subfloor'];
+const NEW_BUILD_CARE = {
+  chemical: 'This system needs its chemical put back regularly to keep working. Keep up the timber pest inspections for the warranty.',
+  disturbed: 'If the system, the building or the garden against it is changed or disturbed, the system needs inspecting and may need putting back.',
+};
+
+function draftNewBuild() {
+  return { buildingClass: '', structure: '', systemIs: 'complete', slab: '', slabTypes: [], inclusions: [], collars: '', softCollars: '', wraps: '',
+    jointLm: '', jointLitres: '', discontinuities: '', slabNotes: '', suspended: '', suspendedNotes: '', physicalHow: [], limits: '',
+    inspectEvery: '12', care: ['disturbed'] };
+}
+
+// The record sheet is open on a new construction job's record.
+function treatmentIsNewBuild() {
+  return document.getElementById('treatmentOverlay').classList.contains('new-build');
+}
+
+// A new construction job has no quote, so the first time its treatment is
+// recorded one is made for it, with no lines, to keep the record on: the
+// record, its certificate and any bait visits then work as they do on any
+// job (THE JOB'S QUOTE in js/quote.js). It's stored when the record is
+// saved. The job is saved first, so the record has a job to go with.
+function newBuildRecordQuote() {
+  if (!getFullAddress()) { askForJobAddress(); return null; }
+  if (!currentReportId && !saveCurrentReport(true)) return null;
+  const client = ((document.getElementById('jobClient') || {}).value || '').trim();
+  const seen = { client, clientPhone: (reportData.jobClientPhone || '').trim(), clientEmail: (reportData.jobClientEmail || '').trim() };
+  quoteState = { reportKey: currentReportId, number: newQuoteNumber(), createdAt: Date.now(), updatedAt: Date.now(), ...seen, clientSeen: { ...seen },
+    address: getFullAddress(), sourceAddress: getFullAddress(), inspector: inspectorDisplayName(), items: [], newBuild: true };
+  return quoteState;
+}
+
+// Chips for a choice: radio (one, a yes or no) or several (multi).
+function newBuildChips(id, options, picked, multi) {
+  document.getElementById(id).innerHTML = options.map(o => {
+    const on = picked.includes(o);
+    return `<button type="button" role="${multi ? 'checkbox' : 'radio'}" aria-checked="${on}" class="qp-chip${on ? ' on' : ''}" data-value="${escapeHtml(o)}" onclick="tapNewBuildChip(this, ${!!multi})">${escapeHtml(o)}</button>`;
+  }).join('');
+}
+function tapNewBuildChip(btn, multi) {
+  const on = multi ? !btn.classList.contains('on') : true;
+  if (!multi) btn.parentElement.querySelectorAll('.qp-chip').forEach(b => { b.classList.remove('on'); b.setAttribute('aria-checked', 'false'); });
+  btn.classList.toggle('on', on);
+  btn.setAttribute('aria-checked', String(on));
+  showNewBuildParts();
+  renderTreatmentFolds();
+  unsavedSheetChanged();
+}
+function newBuildChipValues(id) {
+  return [...document.querySelectorAll(`#${id} .qp-chip.on`)].map(b => b.dataset.value);
+}
+const newBuildYes = id => ({ Yes: 'yes', No: 'no' })[newBuildChipValues(id)[0]] || '';
+
+// Which of the new construction parts show: none on another job; how a
+// physical system went in once one is ticked; the slab's details after a
+// yes to the slab, and the suspended floor's after a yes to that.
+function showNewBuildParts() {
+  const nb = treatmentIsNewBuild();
+  const physical = !!document.querySelector('#trMethods input[data-key="physical"]:checked');
+  document.getElementById('trFold5').hidden = !nb;
+  document.getElementById('trSiteMore').hidden = nb;
+  ['trLimitsWrap', 'trCareWrap', 'trAreaChips'].forEach(id => { document.getElementById(id).hidden = !nb; });
+  document.getElementById('trPhysicalWrap').hidden = !(nb && physical);
+  document.getElementById('trBuildSlabWrap').hidden = !(nb && newBuildYes('trBuildSlab') === 'yes');
+  document.getElementById('trBuildSuspendedWrap').hidden = !(nb && newBuildYes('trBuildSuspended') === 'yes');
+}
+// The slab's certification photos are kept while the system is part of a slab.
+function slabPhotosKept() {
+  return treatmentIsNewBuild() && newBuildYes('trBuildSlab') === 'yes';
+}
+
+function fillNewBuildForm(b) {
+  b = b || draftNewBuild();
+  const set = (id, v) => { document.getElementById(id).value = v == null ? '' : v; };
+  document.getElementById('trBuildClass').innerHTML = '<option value="">Select…</option>'
+    + [...new Set([...NEW_BUILD_CLASSES, b.buildingClass].filter(Boolean))].map(c => `<option>${escapeHtml(c)}</option>`).join('');
+  document.getElementById('trBuildSystemIs').innerHTML = Object.entries(NEW_BUILD_SYSTEM_IS).map(([k, label]) => `<option value="${k}">${escapeHtml(label)}</option>`).join('');
+  set('trBuildClass', b.buildingClass);
+  set('trBuildStructure', b.structure);
+  set('trBuildSystemIs', NEW_BUILD_SYSTEM_IS[b.systemIs] ? b.systemIs : 'complete');
+  const yn = v => v === 'yes' ? ['Yes'] : v === 'no' ? ['No'] : [];
+  newBuildChips('trBuildSlab', ['Yes', 'No'], yn(b.slab), false);
+  newBuildChips('trBuildSlabTypes', [...new Set([...NEW_BUILD_SLAB_TYPES, ...(b.slabTypes || [])])], b.slabTypes || [], true);
+  newBuildChips('trBuildInclusions', [...new Set([...NEW_BUILD_INCLUSIONS, ...(b.inclusions || [])])], b.inclusions || [], true);
+  newBuildChips('trBuildSuspended', ['Yes', 'No'], yn(b.suspended), false);
+  newBuildChips('trPhysicalHow', [...new Set([...NEW_BUILD_PHYSICAL_HOW, ...(b.physicalHow || [])])], b.physicalHow || [], true);
+  [['trBuildCollars', b.collars], ['trBuildSoftCollars', b.softCollars], ['trBuildWraps', b.wraps], ['trBuildJointLm', b.jointLm],
+    ['trBuildJointLitres', b.jointLitres], ['trBuildDiscontinuities', b.discontinuities], ['trBuildSlabNotes', b.slabNotes],
+    ['trBuildSuspendedNotes', b.suspendedNotes], ['trLimits', b.limits]].forEach(([id, v]) => set(id, v));
+  set('trInspectEvery', ['3', '6', '12'].includes(String(b.inspectEvery)) ? String(b.inspectEvery) : '12');
+  document.getElementById('trInspectEvery').dataset.was = document.getElementById('trInspectEvery').value;
+  document.getElementById('trInspectEvery').onchange = onNewBuildInspectEvery;
+  document.getElementById('trCareChemical').checked = (b.care || []).includes('chemical');
+  document.getElementById('trCareDisturbed').checked = (b.care || []).includes('disturbed');
+  ['trBuildCollars', 'trBuildSoftCollars', 'trBuildWraps'].forEach(id => { document.getElementById(id).oninput = renderNewBuildPenTotal; });
+  document.getElementById('trAreas').oninput = renderTreatmentAreaChips;
+  renderNewBuildPenTotal();
+  renderTreatmentAreaChips();
+  showNewBuildParts();
+}
+
+function readNewBuildForm() {
+  if (!treatmentIsNewBuild()) return null;
+  const v = id => document.getElementById(id).value.trim();
+  const slab = newBuildYes('trBuildSlab'), suspended = newBuildYes('trBuildSuspended');
+  const inSlab = id => slab === 'yes' ? v(id) : '';
+  const physical = !!document.querySelector('#trMethods input[data-key="physical"]:checked');
+  // What sits under a "no" isn't kept.
+  return {
+    buildingClass: v('trBuildClass'), structure: v('trBuildStructure'), systemIs: v('trBuildSystemIs') || 'complete',
+    slab,
+    slabTypes: slab === 'yes' ? newBuildChipValues('trBuildSlabTypes') : [],
+    inclusions: slab === 'yes' ? newBuildChipValues('trBuildInclusions') : [],
+    collars: inSlab('trBuildCollars'), softCollars: inSlab('trBuildSoftCollars'), wraps: inSlab('trBuildWraps'),
+    jointLm: inSlab('trBuildJointLm'), jointLitres: inSlab('trBuildJointLitres'),
+    discontinuities: inSlab('trBuildDiscontinuities'), slabNotes: inSlab('trBuildSlabNotes'),
+    suspended, suspendedNotes: suspended === 'yes' ? v('trBuildSuspendedNotes') : '',
+    physicalHow: physical ? newBuildChipValues('trPhysicalHow') : [],
+    limits: v('trLimits'),
+    inspectEvery: v('trInspectEvery') || '12',
+    care: [document.getElementById('trCareChemical').checked && 'chemical', document.getElementById('trCareDisturbed').checked && 'disturbed'].filter(Boolean),
+  };
+}
+
+// "18 in all", beside the penetrations, as the counts are typed.
+function newBuildPenetrations(b) {
+  return ['collars', 'softCollars', 'wraps'].reduce((n, k) => n + (parseInt(b[k], 10) || 0), 0);
+}
+function renderNewBuildPenTotal() {
+  const n = newBuildPenetrations({ collars: document.getElementById('trBuildCollars').value, softCollars: document.getElementById('trBuildSoftCollars').value, wraps: document.getElementById('trBuildWraps').value });
+  document.getElementById('trBuildPenTotal').textContent = n ? `· ${n} in all` : '';
+}
+
+// The next inspection follows a change to how often the maker asks for
+// one, unless it was typed in by hand.
+function onNewBuildInspectEvery() {
+  const sel = document.getElementById('trInspectEvery'), next = document.getElementById('trNext');
+  const date = document.getElementById('trDate').value || todayIsoDate();
+  if (!next.value || next.value === addMonthsIso(date, +sel.dataset.was || 12)) next.value = addMonthsIso(date, +sel.value);
+  sel.dataset.was = sel.value;
+  renderTreatmentFolds();
+}
+
+// The usual places a new build's system goes, as chips under Treated: a tap
+// adds the place to the box, or takes it out again.
+function renderTreatmentAreaChips() {
+  const box = document.getElementById('trAreaChips');
+  if (!box || !treatmentIsNewBuild()) return;
+  const parts = document.getElementById('trAreas').value.split(/\s*[;,]\s*/).map(p => p.trim().toLowerCase());
+  box.innerHTML = NEW_BUILD_PLACES.map(place => {
+    const on = parts.includes(place.toLowerCase());
+    return `<button type="button" role="checkbox" aria-checked="${on}" class="qp-chip${on ? ' on' : ''}" onclick="tapTreatmentArea(${escapeHtml(JSON.stringify(place))})">${escapeHtml(place)}</button>`;
+  }).join('');
+}
+function tapTreatmentArea(place) {
+  const el = document.getElementById('trAreas');
+  const parts = el.value.split(/\s*;\s*/).map(p => p.trim()).filter(Boolean);
+  const kept = parts.filter(p => p.toLowerCase() !== place.toLowerCase());
+  el.value = joinPlaces(kept.length < parts.length ? kept : [...parts, place]);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+// What "Say it instead" also asks for on a new construction job.
+function newBuildVoicePrompt() {
+  const list = a => a.map(x => `"${x}"`).join(', ');
+  return `
+- This is a new construction job: a termite management system put in while the building goes up. Also return "build": {"buildingClass":string,"structure":string,"slab":"yes"|"no","slabTypes":[string],"inclusions":[string],"collars":number,"softCollars":number,"wraps":number,"jointLm":number,"jointLitres":number,"suspended":"yes"|"no","physicalHow":[string]}, each null unless said.
+- buildingClass: one of ${list(NEW_BUILD_CLASSES)}. structure: the kind of building ("House, single dwelling"). slab: whether the system is part of the concrete slab. slabTypes from ${list(NEW_BUILD_SLAB_TYPES)}. inclusions (what's in the slab) from ${list(NEW_BUILD_INCLUSIONS)}.
+- collars, softCollars and wraps: how many slab penetrations were treated each way. jointLm: metres of construction joint treated; jointLitres: litres applied to them. suspended: whether any of it is under a suspended floor. physicalHow: how a physical system went in, from ${list(NEW_BUILD_PHYSICAL_HOW)}.`;
+}
+function applyNewBuildVoice(b) {
+  let n = 0;
+  if (NEW_BUILD_CLASSES.includes(b.buildingClass)) n += setSpokenBox('trBuildClass', b.buildingClass);
+  n += setSpokenBox('trBuildStructure', b.structure);
+  const pick = (id, values, multi) => (Array.isArray(values) ? values : []).forEach(val => {
+    const btn = [...document.querySelectorAll(`#${id} .qp-chip`)].find(c => c.dataset.value.toLowerCase() === String(val).toLowerCase());
+    if (btn && !btn.classList.contains('on')) { tapNewBuildChip(btn, multi); n++; }
+  });
+  if (b.slab === 'yes' || b.slab === 'no') pick('trBuildSlab', [b.slab === 'yes' ? 'Yes' : 'No'], false);
+  if (b.suspended === 'yes' || b.suspended === 'no') pick('trBuildSuspended', [b.suspended === 'yes' ? 'Yes' : 'No'], false);
+  pick('trBuildSlabTypes', b.slabTypes, true);
+  pick('trBuildInclusions', b.inclusions, true);
+  pick('trPhysicalHow', b.physicalHow, true);
+  [['collars', 'trBuildCollars'], ['softCollars', 'trBuildSoftCollars'], ['wraps', 'trBuildWraps'], ['jointLm', 'trBuildJointLm'], ['jointLitres', 'trBuildJointLitres']]
+    .forEach(([k, id]) => { if (Number(b[k]) > 0) n += setSpokenBox(id, String(Number(b[k]))); });
+  renderNewBuildPenTotal();
+  return n;
 }
 
 // ── THE RECORD SHEET ──
@@ -289,6 +506,11 @@ function openTreatmentRecord() {
   const copy = unsavedSheetCopy(sheetKey);
   const restored = !!copy && copy.at > ((q.treatment && q.treatment.at) || 0);
   const t = restored ? copy.data : q.treatment || draftTreatment(q);
+  // A new construction job's record: its building and slab, its own care
+  // lines, and the client as Job details has them now.
+  const nb = isNewBuildJob(treatmentReportFor(q));
+  if (nb && fillQuoteClientFromJob(q, { client: (document.getElementById('jobClient') || {}).value || q.client, reportData: treatmentReportFor(q) }) && q.treatment) persistQuote();
+  document.getElementById('treatmentOverlay').classList.toggle('new-build', nb);
   track('screen_viewed', { screen: 'treatment_record' });
   document.getElementById('trDate').value = t.date || todayIsoDate();
   document.getElementById('trTech').value = t.technician || '';
@@ -314,9 +536,12 @@ function openTreatmentRecord() {
           value="${escapeHtml((t.methods || {})[key] || '')}" placeholder="${m.qty}" aria-label="${m.qty}" ${on ? '' : 'hidden'}>` : ''}
       </label>`;
   };
-  const all = Object.entries(TREATMENT_METHODS), ticked = all.filter(([k]) => k in (t.methods || {})), rest = all.filter(([k]) => !(k in (t.methods || {})));
-  document.getElementById('trMethods').innerHTML = !ticked.length ? all.map(method).join('')
-    : ticked.map(method).join('') + (rest.length ? `<details class="sheet-more treat-more" id="trMethodsMore"><summary>Something else done?</summary>${rest.map(method).join('')}</details>` : '');
+  // A new construction job puts a system in, so those lead.
+  const all = Object.entries(TREATMENT_METHODS), ticked = all.filter(([k]) => k in (t.methods || {}));
+  const shown = ticked.length ? ticked : nb ? NEW_BUILD_METHODS.map(k => [k, TREATMENT_METHODS[k]]) : all;
+  const rest = all.filter(([k]) => !shown.some(([s]) => s === k));
+  document.getElementById('trMethods').innerHTML = shown.map(method).join('')
+    + (rest.length ? `<details class="sheet-more treat-more" id="trMethodsMore"><summary>Something else done?</summary>${rest.map(method).join('')}</details>` : '');
   renderTreatmentProducts(t.products && t.products.length ? t.products : [{}]);
   const site = t.site || treatmentSiteFromReport(treatmentSourceReport());
   document.getElementById('trSiteBuilding').value = site.building || '';
@@ -336,6 +561,9 @@ function openTreatmentRecord() {
   document.getElementById('trNotTreated').value = t.notTreated || '';
   document.getElementById('trNotice').value = t.notice || 'new';
   document.getElementById('trNoticeWhere').value = t.noticeWhere || '';
+  treatmentPhotosDraft = treatmentRecordPhotos(t).map(p => ({ ...p }));
+  fillNewBuildForm(nb ? (t.build || draftNewBuild()) : null);
+  renderTreatmentPhotos();
   onTreatmentNoticeChange();
   document.getElementById('trNext').value = t.nextInspection || '';
   document.getElementById('trNotes').value = t.notes || '';
@@ -373,7 +601,7 @@ function treatmentFoldLines() {
   const methods = {};
   document.querySelectorAll('#trMethods input[type=checkbox]:checked').forEach(box => { methods[box.dataset.key] = ''; });
   return treatmentRecordGaps({ technician: v('trTech'), licence: v('trLicence'), methods, products: readTreatmentProducts(),
-    areas: v('trAreas'), notice: v('trNotice'), noticeWhere: v('trNoticeWhere'), nextInspection: v('trNext') })
+    areas: v('trAreas'), notice: v('trNotice'), noticeWhere: v('trNoticeWhere'), nextInspection: v('trNext'), build: readNewBuildForm() })
     .map(g => g ? { warn: true, text: g.need } : {});
 }
 
@@ -389,6 +617,9 @@ function treatmentRecordGaps(t) {
     !Object.keys(t.methods || {}).length ? gap('Tick what was done', 'what was done') : !products.length ? gap('Name the product used', 'the product used') : null,
     !t.areas ? gap('Add the areas treated', 'the areas treated') : null,
     t.notice !== 'none' && !t.noticeWhere ? gap('Say where the notice went', 'where the notice went') : !t.nextInspection ? gap('Add the next inspection date', 'the next inspection date') : null,
+    // A new construction job's building and slab (the fold after Treatment applied).
+    !t.build ? null : !t.build.buildingClass ? gap('Add the building class', 'the building class')
+      : !t.build.slab ? gap('Say if it\'s part of the slab', 'whether the system is part of the slab') : null,
   ];
 }
 
@@ -512,7 +743,7 @@ function treatmentVoicePrompt() {
 - notice: "new" when they put a new durable notice up, "updated" when they updated the existing one, "none" when none was placed. noticeWhere: where it is ("Meter box").
 - weather: as said ("Fine, 22°C"). equipment: what they used ("Rodding gun, foam rig").
 - nextInspectionMonths or nextInspectionDate: when the next timber pest inspection is due, as said. A return visit to check bait stations or the knockdown is not the next inspection: it goes in notes.
-- Only words actually said. Never guess, and never invent a rate, an amount or a batch number.`;
+- Only words actually said. Never guess, and never invent a rate, an amount or a batch number.${treatmentIsNewBuild() ? newBuildVoicePrompt() : ''}`;
 }
 
 // Fills the open record from the spoken note. Returns how many boxes changed.
@@ -559,6 +790,7 @@ function applyTreatmentVoice(f) {
     });
     renderTreatmentProducts(rows.length ? rows : [{}]);
   }
+  if (treatmentIsNewBuild() && f.build && typeof f.build === 'object') n += applyNewBuildVoice(f.build);
   n += fillTreatmentRatesFromRegister();
   updateTreatmentSaveBtn();
   renderTreatmentFolds(true);
@@ -569,13 +801,111 @@ function applyTreatmentVoice(f) {
 function onTreatmentMethodToggle(box, quiet) {
   const qty = document.querySelector(`#trMethods [data-qty="${box.dataset.key}"]`);
   if (qty) qty.hidden = !box.checked;
+  if (box.dataset.key === 'physical') showNewBuildParts();
   if (box.checked && !quiet) fillTreatmentRatesFromRegister();
   updateTreatmentSaveBtn();
 }
 
 function onTreatmentNoticeChange() {
   const none = document.getElementById('trNotice').value === 'none';
-  document.getElementById('trNoticeWhereWrap').style.display = none ? 'none' : '';
+  document.getElementById('trNoticeWhereWrap').hidden = none;
+  document.getElementById('trNoticePhotoWrap').hidden = none;
+}
+
+// ── PHOTOS ON THE RECORD ── Photos of the work (what went in, where) and
+// of the durable notice, for the certificate's Photos page. Each is kept
+// like a report photo: in the photo store on the phone and, once the job
+// syncs, in the account's Storage (js/app/photos.js, which keeps and
+// uploads them with the job's own). t.photos holds what they are.
+const TREATMENT_PHOTO_KINDS = {
+  work: { box: 'trWorkPhotos', limit: 12, label: 'The work' },
+  // A new construction job's slab certification, from the builder or concreter.
+  slab: { box: 'trSlabPhotos', limit: 3, label: 'The slab\'s certification' },
+  notice: { box: 'trNoticePhotos', limit: 3, label: 'The durable notice' },
+};
+let treatmentPhotosDraft = [];
+
+function renderTreatmentPhotos() {
+  Object.entries(TREATMENT_PHOTO_KINDS).forEach(([kind, k]) => {
+    const box = document.getElementById(k.box);
+    if (!box) return;
+    const photos = treatmentPhotosDraft.filter(p => p.kind === kind);
+    box.innerHTML = photos.map(p => `<div class="spot-photo">
+        <img data-photo-id="${escapeHtml(p.id)}" alt="Photo">
+        <input class="photo-caption-input spot-photo-caption" type="text" placeholder="Add details…" value="${escapeHtml(p.caption || '')}"
+          aria-label="Details of the photo" oninput="updateTreatmentPhotoCaption('${escapeHtml(p.id)}', this.value)">
+        <div class="photo-actions"><button type="button" class="photo-remove-btn" onclick="removeTreatmentPhoto('${escapeHtml(p.id)}')">Remove</button></div>
+      </div>`).join('')
+      + (photos.length >= k.limit ? '' : `<div class="photo-add-row"><button type="button" class="spot-photo-add" onclick="addTreatmentPhoto('${kind}')">${PHOTO_ADD_ICON}Add photo</button>
+        <button type="button" class="link-btn photo-choose" onclick="addTreatmentPhoto('${kind}', true)">Choose one instead</button></div>`);
+    hydratePhotoImages(box, photos);
+  });
+}
+
+// Add photo is the camera; choosing: "Choose one instead" (js/app/photos.js).
+function addTreatmentPhoto(kind, choosing) {
+  const input = document.getElementById('trPhotoInput');
+  input.dataset.kind = kind;
+  if (choosing) choosePhotoSource(input, true); else takePhoto(input);
+}
+
+async function handleTreatmentPhotoFiles(input) {
+  const kind = TREATMENT_PHOTO_KINDS[input.dataset.kind] ? input.dataset.kind : 'work';
+  const files = Array.from(input.files || []);
+  input.value = '';
+  if (!files.length) return;
+  const draft = treatmentPhotosDraft;
+  const limit = TREATMENT_PHOTO_KINDS[kind].limit;
+  const take = files.slice(0, Math.max(0, limit - draft.filter(p => p.kind === kind).length));
+  if (files.length > take.length) showToast(`Only ${take.length} of ${files.length} added. This box holds ${limit} photos`, 'error');
+  for (const file of take) {
+    try {
+      const { blob, width, height } = await compressPhotoFile(file);
+      const id = genPhotoId();
+      await putPhotoBlob(id, blob);
+      draft.push({ id, width, height, caption: '', kind });
+    } catch (e) { showToast(photoStoreProblem(e), 'error'); }
+  }
+  // The sheet was closed, or opened for another job, while they were stored.
+  if (draft !== treatmentPhotosDraft) return;
+  renderTreatmentPhotos();
+  unsavedSheetChanged();
+}
+
+// Removing a photo offers Undo, which puts it back where it was.
+function removeTreatmentPhoto(id) {
+  const draft = treatmentPhotosDraft;
+  const i = draft.findIndex(p => p.id === id);
+  if (i < 0) return;
+  const [photo] = draft.splice(i, 1);
+  renderTreatmentPhotos();
+  unsavedSheetChanged();
+  showToast('Photo removed', 'info', { label: 'Undo', run: () => {
+    if (draft !== treatmentPhotosDraft || draft.some(p => p.id === id)) return;
+    draft.splice(Math.min(i, draft.length), 0, photo);
+    renderTreatmentPhotos();
+    unsavedSheetChanged();
+  } });
+}
+
+function updateTreatmentPhotoCaption(id, value) {
+  const p = treatmentPhotosDraft.find(x => x.id === id);
+  if (p) p.caption = value;
+}
+
+// Once the job has synced, its record's photos are in the account's
+// Storage. Their paths go on the quote kept on this phone as well, so
+// later saves keep them and another device can fetch the photos.
+function keepTreatmentPhotoPaths(reportId, photos) {
+  const paths = new Map(photos.filter(p => p && p.path).map(p => [p.id, p.path]));
+  if (!paths.size) return;
+  const mark = q => treatmentRecordPhotos(q && q.treatment).forEach(p => { if (!p.path && paths.has(p.id)) p.path = paths.get(p.id); });
+  const all = readJSON(quotesStorageKey(), {});
+  if (all[reportId]) {
+    mark(all[reportId]);
+    try { localStorage.setItem(quotesStorageKey(), JSON.stringify(all)); } catch (e) {}
+  }
+  if (quoteState && quoteState.reportKey === reportId) mark(quoteState);
 }
 
 function renderTreatmentProducts(products) {
@@ -873,8 +1203,13 @@ function readTreatmentForm() {
     nextInspection: v('trNext'),
     warranty: v('trWarranty'),
     notes: v('trNotes'),
+    // The notice's photos only while a notice was placed, the slab's only
+    // while the system is part of one.
+    photos: treatmentPhotosDraft.filter(p => (p.kind !== 'notice' || v('trNotice') !== 'none') && (p.kind !== 'slab' || slabPhotosKept()))
+      .map(p => ({ ...p })),
     signature: padSignature(treatmentPad),
     at: Date.now(),
+    ...(treatmentIsNewBuild() ? { build: readNewBuildForm() } : {}),
   };
 }
 
@@ -900,10 +1235,43 @@ function saveTreatmentRecord() {
 
 // ── CERTIFICATE PDF ──
 // The card's PDF button.
+// ── PHOTOS ON THE CERTIFICATE ── The PDF is made inside the tap that
+// emails it, so the record's photos (and the report's front photo, which
+// leads them) are read from the photo store beforehand, when the
+// certificate card shows: treatmentPhotoSrc maps a photo's id to its data
+// URL, or to null when it couldn't be found (tried again when the PDF is
+// made: retry).
+const treatmentPhotoSrc = {};
+function treatmentPdfPhotos(q) {
+  const t = q && q.treatment;
+  const own = treatmentRecordPhotos(t).filter(p => p.kind !== 'notice' || t.notice !== 'none');
+  if (!own.length) return [];
+  const front = ((treatmentReportFor(q).photosBySection || {}).general || [])[0];
+  const kindOf = p => TREATMENT_PHOTO_KINDS[p.kind] ? p.kind : 'work';
+  // The work, then the slab's certification, then the notice.
+  return [
+    ...(front ? [{ ...front, label: 'Front of the property', caption: '' }] : []),
+    ...['work', 'slab', 'notice'].flatMap(kind => own.filter(p => kindOf(p) === kind).map(p => ({ ...p, label: TREATMENT_PHOTO_KINDS[kind].label }))),
+  ];
+}
+async function loadTreatmentPhotos(q, retry) {
+  for (const p of treatmentPdfPhotos(q)) {
+    if (treatmentPhotoSrc[p.id] || (p.id in treatmentPhotoSrc && !retry)) continue;
+    try {
+      const blob = await getPhotoImage(p);
+      treatmentPhotoSrc[p.id] = blob ? await blobToDataUrl(blob) : null;
+    } catch (e) { treatmentPhotoSrc[p.id] = null; }
+  }
+}
+function treatmentPhotosLoaded(q) {
+  return treatmentPdfPhotos(q).every(p => p.id in treatmentPhotoSrc);
+}
+
 function downloadTreatmentCertificate() {
   const q = quoteState;
   if (!q || !q.treatment) return;
   ensureJsPDFLoaded()
+    .then(() => loadTreatmentPhotos(q, true))
     .then(() => buildTreatmentCertificatePDF(q))
     .then(({ blob, fname }) => { track('certificate_pdf_made'); return deliverPdfBlob(blob, fname, {
       title: 'Treatment certificate',
@@ -922,8 +1290,9 @@ function downloadTreatmentCertificate() {
 function emailTreatmentCertificate() {
   const q = quoteState;
   if (!q || !q.treatment) return;
-  if (!jsPDF) {
+  if (!jsPDF || !treatmentPhotosLoaded(q)) {
     ensureJsPDFLoaded()
+      .then(() => loadTreatmentPhotos(q, true))
       .then(() => showToast('Ready. Tap Email again to send it', 'info'))
       .catch(e => showToast((e && e.message) || 'Could not load the PDF tools', 'error'));
     return;
@@ -948,6 +1317,10 @@ function buildTreatmentCertificatePDF(q) {
   const number = treatmentCertNumber(q);
   const docName = 'Treatment Certificate';
   const systems = installedSystems(t);
+  // A new construction job's record (NEW CONSTRUCTION above): its building
+  // and slab, and AS 3660.1 in place of AS 3660.2.
+  const build = t.build || null;
+  const standard = build ? 'AS 3660.1' : 'AS 3660.2';
   let y = 0;
 
   // A new page keeps the text style it broke in, as the header changes it.
@@ -997,17 +1370,18 @@ function buildTreatmentCertificatePDF(q) {
     y += h + 1;
   };
 
-  y = drawPdfDocCover(doc, company, { compact: true, kicker: 'Termite management', title: docName, date: formatLongDate(t.date), left: [
+  y = drawPdfDocCover(doc, company, { compact: true, kicker: build ? 'Termite management · new construction' : 'Termite management', title: docName, date: formatLongDate(t.date), left: [
     ['CLIENT', q.client || 'Not specified'],
     ['PROPERTY ADDRESS', q.address || 'Not specified'],
     ['CONTACT', [q.clientPhone, q.clientEmail].map(v => (v || '').trim()).filter(Boolean).join('  ·  ')],
   ], right: [
     ['CERTIFICATE NO.', number],
-    ['TREATMENT DATE', formatLongDate(t.date) + (t.start ? `, ${formatClockTime(t.start)}${t.finish ? ` to ${formatClockTime(t.finish)}` : ''}` : '')],
+    [build ? 'DATE INSTALLED' : 'TREATMENT DATE', formatLongDate(t.date) + (t.start ? `, ${formatClockTime(t.start)}${t.finish ? ` to ${formatClockTime(t.finish)}` : ''}` : '')],
     ['TECHNICIAN', t.technician],
     ['LICENCE NO.', t.licence],
     ['SUPERVISOR', t.supervisor],
     ['SUPERVISOR LICENCE', t.supervisor && t.supervisorLicence],
+    ['STANDARD', build && standard],
   ] });
 
   // ── WHAT WAS DONE ──
@@ -1044,9 +1418,29 @@ function buildTreatmentCertificatePDF(q) {
     y += 1.5; cellRow([['System installed', Object.entries(t.methods).filter(([k]) => systems.includes(k)).map(([k, qty]) => methodText(k, qty)).join('; ')], ['Where it was installed', where !== (t.areas || '') ? where : '']]);
   }
 
+  // ── THE BUILDING AND SLAB ── A new construction job's, in the same rows.
+  if (build) {
+    section('THE BUILDING AND SLAB');
+    const yesNo = v => v === 'yes' ? 'Yes' : v === 'no' ? 'No' : '';
+    // Chips as one phrase: "Raft and waffle pod".
+    const phrase = list => joinWithAnd((list || []).map((x, i) => i ? lowerFirst(x) : x));
+    cellRow([['Building class', build.buildingClass], ['Structure', build.structure], ['The system is', NEW_BUILD_SYSTEM_IS[build.systemIs]]]);
+    const slab = build.slab === 'yes';
+    cellRow([['Part of the slab', yesNo(build.slab)], ['Slab type', slab ? phrase(build.slabTypes) : ''],
+      ['In the slab', slab ? (build.inclusions || []).length ? phrase(build.inclusions) : 'Nothing noted' : '']]);
+    const pens = newBuildPenetrations(build);
+    const each = [['collars', 'collar'], ['softCollars', 'soft collar'], ['wraps', 'wrap']].map(([k, word]) => { const n = parseInt(build[k], 10) || 0; return n ? `${n} ${word}${n === 1 ? '' : 's'}` : ''; }).filter(Boolean);
+    const joints = build.jointLm ? `${build.jointLm} linear metres${build.jointLitres ? `, ${build.jointLitres} litres applied` : ''}` : build.jointLitres ? `${build.jointLitres} litres applied` : '';
+    cellRow([['Penetrations treated', pens ? `${pens} in all: ${joinWithAnd(each)}` : ''], ['Construction joints', joints],
+      ['How the physical system went in', phrase(build.physicalHow)]]);
+    const certPhoto = treatmentRecordPhotos(t).some(p => p.kind === 'slab') && slab;
+    cellRow([['Breaks in the slab or its edges', build.discontinuities], ['Slab notes', build.slabNotes], ['Slab certification', certPhoto ? 'Photo on the Photos page' : '']]);
+    cellRow([['Under a suspended floor', build.suspended === 'yes' ? (build.suspendedNotes || 'Yes') : yesNo(build.suspended)], ['Limits on the installation', build.limits || 'None noted']]);
+  }
+
   // ── THE SITE ──
   const site = t.site || {};
-  if (site.building || site.floor || site.surrounds || site.existing) {
+  if (!build && (site.building || site.floor || site.surrounds || site.existing)) {
     section('THE SITE');
     cellRow([['Building', site.building], ['Floor and footings', site.floor], ['Surrounds', site.surrounds], ['Existing system', site.existing]]);
   }
@@ -1121,7 +1515,7 @@ function buildTreatmentCertificatePDF(q) {
   const chemicalApplied = systems.length ? systems.some(k => k === 'barrier' || k === 'retic')
     : Object.keys(t.methods || {}).some(k => k !== 'bait' && k !== 'physical');
   const productLife = !chemicalApplied ? [] : products.filter(p => !BAIT_PRODUCT_RE.test(`${p.name || ''} ${p.active || ''}`)).map(p => `${p.name || p.active}${p.name && p.active ? ` (${p.active})` : ''}: ${p.life || 'see label'}`);
-  const every = ongoingInspectionMonths(treatmentReportFor(q));
+  const every = build ? (+build.inspectEvery || 12) : ongoingInspectionMonths(treatmentReportFor(q));
   const everyText = `at least every ${every} month${every === 1 ? '' : 's'}`;
   // A trainee's work carries the licensed supervisor's name on the notice too.
   const installer = [company.name, [t.technician, t.licence ? `licence ${t.licence}` : ''].filter(Boolean).join(', '),
@@ -1171,7 +1565,10 @@ function buildTreatmentCertificatePDF(q) {
   if (systems.includes('bait')) steps.push('The bait stations need checking as often as the manufacturer directs. Do not move, cover or remove them.');
   if (systems.includes('retic')) steps.push('The reticulation system needs recharging when the label\'s life runs out. Keep its filling points clear and don\'t cut or dig through the pipes.');
   if (systems.includes('physical')) steps.push('The physical barrier only works while it stays whole and visible. Do not cover, cut or build over it.');
-  if (t.nextInspection) steps.push(`Book your next timber pest inspection by ${formatLongDate(t.nextInspection)}. AS 3660.2 recommends one at least every 12 months.`);
+  // A new build's care lines, and its inspections as the system's maker directs.
+  if (build) (build.care || []).forEach(k => { if (NEW_BUILD_CARE[k]) steps.push(NEW_BUILD_CARE[k]); });
+  if (build) steps.push(`${t.nextInspection ? `Book a timber pest inspection by ${formatLongDate(t.nextInspection)}, then` : 'Have a timber pest inspection'} at least every ${every} month${every === 1 ? '' : 's'}, as the system's maker directs. It lowers the risk of hidden termite attack and keeps any product warranty.`);
+  else if (t.nextInspection) steps.push(`Book your next timber pest inspection by ${formatLongDate(t.nextInspection)}. AS 3660.2 recommends one at least every 12 months.`);
   // Short points, so the signature can stay on page 1. Treated soil is
   // said once: the barrier's own line already covers it.
   steps.push((systems.includes('retic') && !systems.includes('barrier') ? 'Do not dig or build against the treated soil without asking us. ' : '') +
@@ -1182,7 +1579,9 @@ function buildTreatmentCertificatePDF(q) {
   const stepsH = 12 + stepLines.reduce((a, l) => a + l.length * 3.9 + 0.8, 0);
   // The closing words under the signature, measured now so the sign-off
   // can keep them with it.
-  const closing = systems.length
+  const closing = build
+    ? `The termite management system above was installed by this technician in line with the manufacturer's directions, the product label and ${standard}. No system can guarantee termites will never get in. Regular inspections are the best protection.`
+    : systems.length
     ? 'The treatment above was carried out, and the system installed, by this technician in line with the manufacturer\'s directions, the product label and AS 3660.2. Neither repairs existing damage, and no treatment or system can guarantee termites will never return. Regular inspections are the best protection.'
     : 'The treatment above was carried out by this technician in line with the product label directions and AS 3660.2. It does not repair existing damage, and no treatment can guarantee termites will never return. Regular inspections are the best protection.';
   doc.setFontSize(7);
@@ -1247,6 +1646,35 @@ function buildTreatmentCertificatePDF(q) {
     para(`The area under the suspended floor, with the building's walls above it in grey.${subSum ? ` It shows ${subSum}.` : ''}`, { size: 9, lh: 4.3, after: 2 });
     y += drawSitePlanPdf(doc, t.plan, { x: M, y: y - 1, w: CW, layer: 'sub' }) + 5;
     drawSitePlanLegendPdf(doc, t.plan, { x: M, y, w: CW, layer: 'sub' });
+  }
+
+  // ── PHOTOS ── The work and the durable notice, two to a row, led by the
+  // front of the property so the reader knows the place. A page of their
+  // own after the plans, so the first page stays the certificate itself.
+  const photos = treatmentPdfPhotos(q).filter(p => treatmentPhotoSrc[p.id]);
+  if (photos.some(p => p.label !== 'Front of the property')) {
+    doc.addPage();
+    y = drawPdfRunningHeader(doc, company, docName, q.address, number);
+    section('PHOTOS');
+    const gap = 6, boxW = (CW - gap) / 2, boxH = boxW * 0.72;
+    for (let i = 0; i < photos.length; i += 2) {
+      const row = photos.slice(i, i + 2);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+      const caps = row.map(p => doc.splitTextToSize((p.caption || '').trim(), boxW));
+      const rowH = boxH + 6 + Math.max(...caps.map(c => c.length)) * 3.4 + 4;
+      ensure(rowH);
+      row.forEach((p, k) => {
+        const x = M + k * (boxW + gap);
+        try { drawPdfPhoto(doc, treatmentPhotoSrc[p.id], x, y, boxW, boxH); } catch (e) {}
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
+        pdfTracked(doc, p.label.toUpperCase(), x, y + boxH + 4.5, { cs: 0.3 });
+        if (caps[k].length) {
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...C.ink);
+          doc.text(caps[k], x, y + boxH + 8.5);
+        }
+      });
+      y += rowH;
+    }
   }
 
   drawPdfDocFooters(doc, `Certificate ${number}${company.name ? `  ·  ${company.name}` : ''}`, q.reportKey);

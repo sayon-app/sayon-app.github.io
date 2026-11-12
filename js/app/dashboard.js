@@ -114,9 +114,22 @@ function dashboardJob(r, quotes) {
   const needsQuote = d.treatmentRecommended === 'YES' && !d.noQuoteNeeded;
   const total = hasQuote ? quoteTotals(q).total : 0;
   const who = (r.client || '').trim() || 'the client';
+  // A new construction job is its treatment and certificate, nothing before them.
+  const newBuild = isNewBuildJob(d);
   let group, status, hint = '', next = null;
   let onlyReportUnsent = false;
-  if (!reportDone) {
+  if (newBuild && !(q && q.treatment)) {
+    group = 'todo'; status = 'Record the treatment';
+    hint = 'Once the system is in, record what went in and where. The treatment certificate is made from the record.';
+    next = { label: 'Record treatment', to: 'treatment' };
+  } else if (newBuild && !certificateGiven(q)) {
+    group = 'todo'; status = 'Email the certificate';
+    hint = 'The treatment is recorded. Email ' + who + ' the treatment certificate. You\'ll see who it goes to before it sends.';
+    next = { label: 'Email the certificate', to: 'certificate' };
+  } else if (newBuild) {
+    group = 'done'; status = 'System installed';
+    hint = 'Finished. ' + who.charAt(0).toUpperCase() + who.slice(1) + ' has the treatment certificate.';
+  } else if (!reportDone) {
     group = 'todo'; status = 'Finish the report';
     hint = 'Fill in the rest of the report, then tick Report done on its last step.';
     next = { label: 'Open report', to: 'report' };
@@ -169,7 +182,7 @@ function dashboardJob(r, quotes) {
   // Everything else is finished (a declined quote, say) but the report
   // itself never went, or changed after it did: that's still the
   // inspector's to do.
-  if (group === 'done' && reportDone && (reportStale || !reportSent && !reportWentWithQuote)) {
+  if (!newBuild && group === 'done' && reportDone && (reportStale || !reportSent && !reportWentWithQuote)) {
     onlyReportUnsent = true;
     group = 'todo'; status = reportStale ? 'Send the report again' : 'Send the report';
     hint = reportStale && d.amending ? 'The amended report hasn\'t gone to ' + who + '. Send it, then finalise the new version.'
@@ -204,7 +217,10 @@ function dashboardJob(r, quotes) {
 
   const answered = a && !a.stale;
   const sentOn = d.issue ? d.issue.completedAt : d.sent ? d.sent.at : null;
-  const steps = [
+  const treatStep = { label: 'Treatment', to: 'treatment', state: q && q.treatment ? 'done' : answered && a.status !== 'accepted' || !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
+      text: q && q.treatment ? `Done ${dashDay(q.treatment.date)} · certificate ${q.certificateSentAt ? 'sent' : q.certificateHandedAt ? 'given' : 'not sent'}` : 'Not recorded yet' };
+  if (newBuild && treatStep.state === 'skip') treatStep.state = 'todo';
+  const steps = newBuild ? [treatStep] : [
     { label: 'Report', to: 'report', state: reportDone ? 'done' : 'todo',
       text: d.sent ? `Sent ${dashDate(d.sent.at)}` : d.issue ? `Completed${sentOn ? ' ' + dashDate(sentOn) : ''}`
         : d.pdfAt ? `PDF made ${dashDate(d.pdfAt)}, not sent yet`
@@ -217,8 +233,7 @@ function dashboardJob(r, quotes) {
         : a.stale ? 'The quote changed after they answered'
         : a.status === 'accepted' ? `Accepted${a.by ? ' by ' + a.by : ''} ${dashDay(a.date)}`
         : `Declined ${dashDay(a.date)}${a.note ? ' · ' + a.note : ''}` },
-    { label: 'Treatment', to: 'treatment', state: q && q.treatment ? 'done' : answered && a.status !== 'accepted' || !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
-      text: q && q.treatment ? `Done ${dashDay(q.treatment.date)} · certificate ${q.certificateSentAt ? 'sent' : q.certificateHandedAt ? 'given' : 'not sent'}` : 'Not recorded yet' },
+    treatStep,
   ];
   steps.forEach(s => { if (s.state === 'skip') s.text = clientNotGoingAhead ? 'Skipped, client not going ahead' : 'Not needed'; });
   // Each step just says whether it's done; the preview has the detail. A declined answer keeps its wording.
@@ -228,12 +243,13 @@ function dashboardJob(r, quotes) {
   // A PDF made but never sent isn't a finished report: the client still
   // hasn't got it (unless it went on the quote's link), so the step says so
   // instead of "Completed".
-  if (!reportSent && reportDone && !reportWentWithQuote) Object.assign(steps[0], { state: 'now', ready: true, text: d.pdfAt ? 'PDF made, not sent yet' : 'Ready to send' });
+  if (newBuild) { /* no report */ }
+  else if (!reportSent && reportDone && !reportWentWithQuote) Object.assign(steps[0], { state: 'now', ready: true, text: d.pdfAt ? 'PDF made, not sent yet' : 'Ready to send' });
   // Sent, then changed: the step says so, and it's the next one once
   // nothing else on the job is.
   else if (reportStale) { const line = d.amending ? 'Amended, not sent yet' : 'Changed since it was sent'; Object.assign(steps[0], { full: line }, onlyReportUnsent ? { state: 'now', ready: true, text: line } : {}); }
   // Recorded but the certificate hasn't gone: the treatment isn't finished.
-  if (q && q.treatment && !certificateGiven(q) && steps[3].state === 'done') Object.assign(steps[3], { state: 'now', text: 'Certificate not emailed yet' });
+  if (q && q.treatment && !certificateGiven(q) && treatStep.state === 'done') Object.assign(treatStep, { state: 'now', text: 'Certificate not emailed yet' });
   // Bait station visits, as a fifth stage once a baiting system is in.
   if (bait) {
     const st = baitJobStep(bait);
@@ -244,7 +260,7 @@ function dashboardJob(r, quotes) {
   // Everything the job needs is done (bait checks may still be coming):
   // the job page offers to finalise it into one PDF.
   const finished = group === 'done' || baitWaiting || onlyReportUnsent;
-  return { r, q, group, status, hint, next, steps, total, time: dashboardJobTime(r), finished, onlyReportUnsent, reportStale, clientNotGoingAhead };
+  return { r, q, group, status, hint, next, steps, total, time: dashboardJobTime(r), finished, onlyReportUnsent, reportStale, clientNotGoingAhead, newBuild };
 }
 
 function setDashboardTab(tab) {
@@ -580,7 +596,9 @@ function setAI(state, text) {
 const ISSUE_META_KEYS_FIRST = ['reportNumber', 'sent', 'issue', 'issueHistory', 'amending', 'pendingNotes', 'noQuoteNeeded', 'noteText', 'heardNotes', 'weatherFilled', 'naFromHouse', 'jobPdfAt', 'jobPdfSentAt', 'copyTo', 'copySent', 'doneAt'];
 // Added on 10 Nov 2026, when a report started saying it had changed since
 // it was sent. A fingerprint from before then was taken with these in.
-const ISSUE_META_KEYS_LATER = ['pdfAt', 'agreementRequest', 'quoteSpoken', 'lastVisit', 'lastVisitDismissed', 'jobFee', 'aiFilled', 'treatmentAutoSet', 'noneFromAreas'];
+const ISSUE_META_KEYS_LATER = ['pdfAt', 'agreementRequest', 'quoteSpoken', 'lastVisit', 'lastVisitDismissed', 'jobFee', 'aiFilled', 'treatmentAutoSet', 'noneFromAreas',
+  // The safety checks before the work (js/safety.js), added 12 Nov 2026.
+  'safetyChecks'];
 const ISSUE_META_KEYS = [...ISSUE_META_KEYS_FIRST, ...ISSUE_META_KEYS_LATER];
 const ISSUE_SECTION_NAMES = { job:'Job details', quote:'Quote', property:'Property', obstructions:'Areas inspected', restrictions:'Areas unable to be inspected',
   findings:'Findings', conducive:'Conducive', recommendations:'Recommendations', photos:'Photos', signoff:'Sign-off' };

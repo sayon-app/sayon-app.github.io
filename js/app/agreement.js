@@ -53,7 +53,15 @@ function getAgreementTemplate() {
   return (custom && custom.trim()) ? custom : DEFAULT_AGREEMENT_TEXT;
 }
 
+// What a special purpose inspection is for, and the inspection it follows,
+// as the agreement and the report say it.
+function specialPurposeLine(d = reportData) {
+  const what = specialPurposeText(d), ref = isSpecialPurposeJob(d) ? String(d.jobInitialRef || '').trim() : '';
+  return [what && `The purpose of this inspection is ${lowerFirst(what)}`, ref && `It follows the inspection with report or job no. ${ref}.`].filter(Boolean).join(' ');
+}
+
 function agreementInspectionType() {
+  if (isSpecialPurposeJob()) return 'special purpose termite';
   return isPrePurchaseJob() ? 'pre-purchase timber pest' : 'timber pest';
 }
 
@@ -104,7 +112,8 @@ function agreementFormValues() {
       standard,
       inspectionType: agreementInspectionType(),
       fee: fee || 'As quoted.',
-      notes: notes || 'None.',
+      // A special purpose inspection's scope leads the special requests.
+      notes: [specialPurposeLine(), notes].filter(Boolean).join('\n') || 'None.',
     }),
   };
 }

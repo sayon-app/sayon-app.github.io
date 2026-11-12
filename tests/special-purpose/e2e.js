@@ -95,6 +95,16 @@ let shotN = 0;
   check(agr2.purposes.length === 3 && agr2.onJob.length === 3, 'a third ticked on the agreement is ticked on Job details too');
   check(/inspect areas not inspected before and assess how well a termite treatment worked\. It follows/.test(agr2.text) && /R-1001\.\nCheck the back deck closely/.test(agr2.text), 'the agreement reads all three, then the typed request');
   check(/assess how well a termite treatment worked/.test(agr2.preview), 'and the agreement on the sheet shows it');
+  check(!/This is a physically invasive inspection/.test(agr2.text), 'not ticked physically invasive, the agreement keeps clause 3\'s limits');
+  // Physically invasive: the agreement says it is the separate written agreement clause 4 asks for.
+  await tap(p.locator('#agreementPurposes label', { hasText: 'Carry out a physically invasive inspection' }), 'Carry out a physically invasive inspection');
+  await p.waitForTimeout(300);
+  const inv = await p.evaluate(() => ({ text: agreementFormValues().text, preview: document.getElementById('agreementStepRead').innerText }));
+  check(/R-1001\. This is a physically invasive inspection\. This agreement is the separate written agreement clause 4 refers to, so the limits in clause 3 on moving things and on cutting, drilling or removing any part of the building don't apply to it\. Before we cut, drill or remove anything, we'll tell you where and why, and go ahead only with your okay\.\nCheck the back deck closely/.test(inv.text), 'ticked physically invasive, the special requests say this agreement covers it, before the typed request');
+  check(/This is a physically invasive inspection/.test(inv.preview), 'and the agreement on the sheet shows it');
+  await tap(p.locator('#agreementPurposes label', { hasText: 'Carry out a physically invasive inspection' }), 'untick physically invasive');
+  await p.waitForTimeout(300);
+  check(await p.evaluate(() => !/This is a physically invasive inspection/.test(agreementFormValues().text)), 'unticked, the line goes');
   await p.locator('#agreementPurposeWrap').scrollIntoViewIfNeeded(); await shot('agreement-sheet');
   await p.evaluate(() => closeAgreementSheet()); await p.waitForTimeout(300);
 

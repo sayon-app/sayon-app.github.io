@@ -1337,7 +1337,7 @@ function startSheetRecorder(kind) {
 function sheetPhrasesIn(v) {
   if (v.cancelled) return;
   while (v.queue.length && v.queue[0].done) {
-    let text = correctKnownMishearings((v.queue.shift().text || '').trim());
+    let text = correctHeard((v.queue.shift().text || '').trim());
     if (!text || WHISPER_NOISE_RE.test(text) || v.heardStop) continue;
     const stopAt = text.search(VOICE_STOP_LIVE_RE);
     if (stopAt >= 0) text = text.slice(0, stopAt).trim();
@@ -1412,6 +1412,8 @@ async function sheetVoiceFill(kind, text) {
   text = (text || '').trim();
   if (!text) { setSheetVoiceState(kind, 'idle', ''); showToast('Didn\'t catch anything. Try again', 'info'); return; }
   setSheetVoiceState(kind, 'filling', text);
+  const started = Date.now();
+  const seconds = () => Math.round((Date.now() - started) / 100) / 10;
   try {
     const res = await workerFetch('', {
       method: 'POST',
@@ -1430,10 +1432,14 @@ async function sheetVoiceFill(kind, text) {
     const answer = (data.content || []).map(c => c.text || '').join('');
     const fields = JSON.parse(answer.replace(/```json|```/g, '').trim());
     const n = k.apply(fields || {});
+    saveTestEvent(kind, text, { fields: fields || {}, boxesFilled: n }, null, seconds());
+    flushTestHeard(kind);
     setSheetVoiceState(kind, 'idle', text);
     showToast(k.done ? k.done(n) : n ? `Filled in ${n} box${n === 1 ? '' : 'es'}. Check them before you save` : 'Nothing in that note fits these boxes', n ? 'success' : 'info');
     track('sheet_voice_filled', { kind, boxes: n });
   } catch (e) {
+    saveTestEvent(kind, text, null, e && e.status ? 'http_' + e.status : 'failed', seconds());
+    flushTestHeard(kind);
     setSheetVoiceState(kind, 'idle', text);
     showToast(e && e.status ? extractionProblem(e) : 'Couldn\'t fill it in. Check the signal and try again, or type it', 'error');
   }

@@ -22,12 +22,14 @@ async function requestExtraction(text) {
     const parsed = await callExtraction(text);
     track('note_filled', { seconds: seconds(), words: text.split(/\s+/).filter(Boolean).length });
     saveTestNote(text, parsed, null, seconds());
+    flushTestHeard('report');
     return parsed;
   } catch (err) {
     const reason = err.kept ? 'kept_for_later' : err.noSignal ? 'no_signal' : err.tooLong ? 'too_long' : err.badAnswer ? 'bad_answer'
       : err.status ? 'http_' + err.status : 'other';
     track('note_failed', { reason, seconds: seconds() });
     saveTestNote(text, null, reason, seconds());
+    flushTestHeard('report');
     if (!err.noSignal && ![401, 402, 429].includes(err.status)) reportError(new Error('Extraction failed: ' + reason), 'extraction');
     throw err;
   }
@@ -234,6 +236,7 @@ function learnFieldCorrection(key, value) {
   }
   fill.cid = entry.id;
   storeLearned(l);
+  saveTestEvent('field-fix', entry.said || `${entry.label}: ${entry.ai}`, { key, label: entry.label, ai: entry.ai, fixed: entry.fixed });
 }
 
 // Where two transcripts differ, word by word: [{ from: [words], to: [words],
@@ -286,6 +289,7 @@ function wordFixesFromEdit(heardText, typedText) {
 
 function learnWordFixes(fixes) {
   if (!fixes.length) return;
+  saveTestEvent('word-fix', fixes.map(f => `${f.heard} → ${f.meant}`).join('\n'), { fixes });
   const l = getLearned();
   fixes.forEach(f => {
     const have = l.words.find(w => w.heard === f.heard);
@@ -439,6 +443,40 @@ function saveTestNote(transcript, extraction, problem, seconds) {
     headers: getAuthHeaders({ 'Prefer': 'return=minimal' }),
     body: JSON.stringify({ transcript: String(transcript).slice(0, 100000), extraction, problem, seconds }),
   }).catch(() => {});
+}
+
+// Everything else Test mode saves, in the same table: each row's extraction
+// carries a "kind" saying where it came from, so a report note (no kind)
+// reads as it always has. Kinds: agreement, treatment, bait (Say it instead
+// on those sheets), heard (what the speech service heard, before the app's
+// own word fixes), fill-summary (what the sheet after a fill said and read
+// aloud), cleanup (the AI's suggested transcript fixes), other-version (the
+// server's version of a recording), word-fix and field-fix (a correction
+// the inspector made), talk-photo (a photo placed on a finding from speech),
+// plate-photo and photo-id (what the AI read from a photo, never the photo),
+// photo-caption (Describe: the caption the AI suggested and the part of the
+// report the photo was in, never the photo), treatment-plan (the AI's plan
+// for the quote).
+function saveTestEvent(kind, transcript, data, problem, seconds) {
+  if (!testModeOn()) return;
+  const text = String(transcript == null ? '' : transcript).trim();
+  if (!text) return;
+  saveTestNote(text, Object.assign({ kind }, data || {}), problem || null, seconds == null ? null : seconds);
+}
+
+// The words as the speech service heard them, before correctKnownMishearings,
+// gathered until the next note is filled. Only kept while Test mode is on.
+let testHeardRaw = [];
+function correctHeard(raw) {
+  const fixed = correctKnownMishearings(raw);
+  if (raw && String(raw).trim() && testModeOn()) testHeardRaw.push({ raw: String(raw).trim(), fixed: String(fixed || '').trim() });
+  return fixed;
+}
+function flushTestHeard(source) {
+  if (!testHeardRaw.length) return;
+  const heard = testHeardRaw; testHeardRaw = [];
+  const changed = heard.filter(h => h.raw !== h.fixed);
+  saveTestEvent('heard', heard.map(h => h.raw).join(' '), { source, phrases: heard.length, fixed: changed });
 }
 
 function toggleTestMode() {
@@ -921,6 +959,9 @@ function showExtractSummary(before) {
   const readBtn = document.getElementById('extractReadBackBtn');
   if (readBtn) { readBtn.hidden = !('speechSynthesis' in window); readBtn.textContent = 'Read it back'; }
   overlay.classList.add('open');
+  if (testModeOn()) {
+    try { saveTestEvent('fill-summary', readBackText(), { filled: n, blanks: extractSummaryBlanks.map(b => b.label), gaps: gaps.map(g => g.text) }); } catch (e) { /* testing never gets in the way */ }
+  }
 }
 
 function closeExtractSummary() {
@@ -1082,6 +1123,7 @@ async function scanCompliancePlate(fromFile) {
       text: 'Read this termite management system durable notice and return the JSON described in your instructions.',
     });
 
+    saveTestEvent('plate-photo', 'Durable notice photo', { read: parsed });
     if (parsed.systemFound === 'YES') {
       const update = {};
       if (parsed.existingSystem) update.existingSystem = parsed.existingSystem;
@@ -1226,6 +1268,7 @@ async function analyzeGalleryPhoto(photoId) {
       text: 'Identify the insect or insect damage shown in this photo and return the JSON described in your instructions.',
     });
 
+    saveTestEvent('photo-id', photo.caption || 'Photo of an insect or damage', { read: parsed });
     if (parsed.identified === 'YES' && parsed.species) {
       const confLabel = parsed.confidence ? parsed.confidence.toLowerCase() + ' confidence' : 'unconfirmed';
       const note = `Possible ID: ${parsed.species} (${confLabel})`;
@@ -1390,7 +1433,7 @@ async function describePhoto(id) {
     });
     const caption = cleanPhotoCaption(parsed.caption);
     const unclear = typeof parsed.unclear === 'string' ? parsed.unclear.trim().replace(/[\s.]+$/, '') : '';
-    if (typeof saveTestEvent === 'function') saveTestEvent('photo-caption', place, { caption: caption || null, said: parsed.caption || null, unclear: unclear || null });
+    saveTestEvent('photo-caption', place, { caption: caption || null, said: parsed.caption || null, unclear: unclear || null });
     track('photo_described', { seconds: Math.round((Date.now() - started) / 100) / 10, suggested: !!caption });
     // Another job may have been opened while the AI looked.
     const now = reportData === target && findReportPhoto(id);

@@ -579,6 +579,11 @@
         </summary>
         <div class="sheet-fold-body">
       <div class="treat-methods" id="trMethods"></div>
+      <!-- A new construction job's physical system: how it went in (NEW CONSTRUCTION in js/treatment.js). -->
+      <div class="job-field" id="trPhysicalWrap" hidden>
+        <div class="job-field-label">How the physical system went in</div>
+        <div class="qp-chips" id="trPhysicalHow" role="group" aria-label="How the physical system went in"></div>
+      </div>
       <div class="job-field">
         <div class="job-field-label">Target pest</div>
         <input class="job-input" id="trPest" placeholder="e.g. Subterranean termites (Coptotermes)">
@@ -595,6 +600,84 @@
       </div>
         </div>
       </details>
+      <!-- A new construction job's building and slab (NEW CONSTRUCTION in js/treatment.js). -->
+      <details class="quote-card quote-fold sheet-fold" id="trFold5" hidden>
+        <summary>
+          <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V10l7-5 7 5v11"/><path d="M3 17h18"/></svg></span>
+          <span class="quote-fold-text"><span class="quote-card-title">The building and slab</span><span class="quote-fold-sub" id="trSub5"></span><span class="sr-only fold-tick-text">Done</span></span>
+          <span class="fold-tick" aria-hidden="true"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></span>
+          <svg class="icon quote-fold-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="sheet-fold-body">
+      <div class="job-row">
+        <div class="job-field">
+          <label class="job-field-label" for="trBuildClass">Building class</label>
+          <select class="job-input" id="trBuildClass"></select>
+        </div>
+        <div class="job-field">
+          <label class="job-field-label" for="trBuildStructure">Type of structure</label>
+          <input class="job-input" id="trBuildStructure" list="trStructureList" placeholder="e.g. House, single dwelling">
+          <datalist id="trStructureList"><option value="House, single dwelling"><option value="Dual occupancy"><option value="Townhouses"><option value="Units"><option value="Granny flat"><option value="Extension"><option value="Garage or shed"></datalist>
+        </div>
+      </div>
+      <div class="job-field">
+        <label class="job-field-label" for="trBuildSystemIs">The system put in is</label>
+        <select class="job-input" id="trBuildSystemIs"></select>
+      </div>
+      <div class="job-field">
+        <div class="job-field-label" id="trBuildSlabLabel">Is it part of a concrete slab?</div>
+        <div class="qp-chips" id="trBuildSlab" role="radiogroup" aria-labelledby="trBuildSlabLabel"></div>
+      </div>
+      <div id="trBuildSlabWrap" hidden>
+        <div class="job-field">
+          <div class="job-field-label">Slab type</div>
+          <div class="qp-chips" id="trBuildSlabTypes" role="group" aria-label="Slab type"></div>
+        </div>
+        <div class="job-field">
+          <div class="job-field-label">In the slab</div>
+          <div class="qp-chips" id="trBuildInclusions" role="group" aria-label="In the slab"></div>
+        </div>
+        <div class="job-field">
+          <div class="job-field-label">Penetrations treated <span class="job-field-hint" id="trBuildPenTotal"></span></div>
+          <div class="job-row treat-build-counts">
+            <div class="job-field"><label class="job-field-label" for="trBuildCollars">Collars</label><input class="job-input" id="trBuildCollars" type="number" min="0" step="1" inputmode="numeric" placeholder="0"></div>
+            <div class="job-field"><label class="job-field-label" for="trBuildSoftCollars">Soft collars</label><input class="job-input" id="trBuildSoftCollars" type="number" min="0" step="1" inputmode="numeric" placeholder="0"></div>
+            <div class="job-field"><label class="job-field-label" for="trBuildWraps">Wraps</label><input class="job-input" id="trBuildWraps" type="number" min="0" step="1" inputmode="numeric" placeholder="0"></div>
+          </div>
+        </div>
+        <div class="job-row">
+          <div class="job-field">
+            <label class="job-field-label" for="trBuildJointLm">Construction joints</label>
+            <input class="job-input" id="trBuildJointLm" type="number" min="0" step="any" inputmode="decimal" placeholder="linear metres">
+          </div>
+          <div class="job-field">
+            <label class="job-field-label" for="trBuildJointLitres">Applied to them</label>
+            <input class="job-input" id="trBuildJointLitres" type="number" min="0" step="any" inputmode="decimal" placeholder="litres">
+          </div>
+        </div>
+        <div class="job-field">
+          <label class="job-field-label" for="trBuildDiscontinuities">Work on breaks in the slab or its edges</label>
+          <textarea class="job-input" id="trBuildDiscontinuities" rows="2" placeholder="e.g. Cut-out at the shower waste sealed"></textarea>
+        </div>
+        <div class="job-field">
+          <div class="job-field-label">The slab's certification <span class="job-field-hint">· from the builder or concreter, AS 2870 or AS 3600</span></div>
+          <div class="spot-photos treat-photos" id="trSlabPhotos"></div>
+        </div>
+        <div class="job-field">
+          <label class="job-field-label" for="trBuildSlabNotes">Notes on the slab</label>
+          <textarea class="job-input" id="trBuildSlabNotes" rows="2" placeholder="Optional"></textarea>
+        </div>
+      </div>
+      <div class="job-field">
+        <div class="job-field-label" id="trBuildSuspendedLabel">Any of it under a suspended floor?</div>
+        <div class="qp-chips" id="trBuildSuspended" role="radiogroup" aria-labelledby="trBuildSuspendedLabel"></div>
+      </div>
+      <div class="job-field" id="trBuildSuspendedWrap" hidden>
+        <label class="job-field-label" for="trBuildSuspendedNotes">What went in under the floor</label>
+        <textarea class="job-input" id="trBuildSuspendedNotes" rows="2" placeholder="e.g. Ant caps on the piers and stumps"></textarea>
+      </div>
+        </div>
+      </details>
       <details class="quote-card quote-fold sheet-fold" id="trFold3">
         <summary>
           <span class="fgroup-icon" aria-hidden="true"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
@@ -606,10 +689,15 @@
       <div class="job-field">
         <div class="job-field-label">Treated</div>
         <textarea class="job-input" id="trAreas" rows="2" placeholder="e.g. Laundry east wall; perimeter of the building"></textarea>
+        <div class="qp-chips treat-area-chips" id="trAreaChips" role="group" aria-label="Add a place" hidden></div>
       </div>
       <div class="job-field">
         <div class="job-field-label">Not treated, and why</div>
         <textarea class="job-input" id="trNotTreated" rows="2" placeholder="e.g. Under the rear deck, no access"></textarea>
+      </div>
+      <div class="job-field" id="trLimitsWrap" hidden>
+        <label class="job-field-label" for="trLimits">Limits on the installation</label>
+        <textarea class="job-input" id="trLimits" rows="2" placeholder="Leave blank if there are none"></textarea>
       </div>
       <div class="job-field">
         <div class="job-field-label">Photos of the work</div>
@@ -684,6 +772,21 @@
       <div class="job-field">
         <div class="job-field-label">Next inspection due</div>
         <input class="job-input" id="trNext" type="date">
+      </div>
+      <div id="trCareWrap" hidden>
+        <div class="job-field">
+          <label class="job-field-label" for="trInspectEvery">Inspections after that, as the system's maker directs</label>
+          <select class="job-input" id="trInspectEvery">
+            <option value="3">Every 3 months</option>
+            <option value="6">Every 6 months</option>
+            <option value="12">Every 12 months</option>
+          </select>
+        </div>
+        <div class="job-field">
+          <div class="job-field-label">Care lines on the certificate</div>
+          <label class="treat-method"><input type="checkbox" id="trCareChemical"><span>The system needs its chemical put back regularly</span></label>
+          <label class="treat-method"><input type="checkbox" id="trCareDisturbed"><span>Changes to the building or garden mean an inspection</span></label>
+        </div>
       </div>
       <div class="job-field">
         <div class="job-field-label">Safety and re-entry</div>
@@ -1052,13 +1155,14 @@
             <section class="job-group" aria-labelledby="jobGroupBooking">
               <h3 class="job-group-head" id="jobGroupBooking"><span class="job-group-icon" aria-hidden="true"><svg class="icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg></span>Booking</h3>
               <div class="job-field">
-                <div class="job-field-label">Type of inspection</div>
+                <div class="job-field-label">Type of job</div>
                 <select class="job-input job-select" id="jobInspectionType" onchange="onInspectionTypeChange()">
                   <option value="">Select…</option>
                   <option>Annual — Existing Building</option>
                   <option>Pre-Purchase — Timber Pest</option>
                   <option>Pre-Purchase — Combined Building & Pest</option>
                   <option>New Construction — Completion</option>
+                  <option>New Construction — Termite Management System</option>
                   <option>Treatment Follow-Up</option>
                   <option>Re-inspection</option>
                   <option>Insurance / Legal</option>

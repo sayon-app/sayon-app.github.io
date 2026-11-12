@@ -77,6 +77,8 @@ function jobPdfParts() {
 
 // What the job skipped, said once on the contents page.
 function jobPdfSkipped() {
+  // A new construction job never has a report or quote.
+  if (isNewBuildJob()) return '';
   const q = currentJobQuote();
   const ans = quoteHasItems(q) ? quoteAnswerState(q) : null;
   if (!quoteHasItems(q)) return reportData.noQuoteNeeded && reportData.treatmentRecommended === 'YES'
@@ -112,7 +114,8 @@ async function buildJobPdf() {
     ['CLIENT', client.trim()],
     ['PROPERTY ADDRESS', address || 'Not specified'],
   ], right: [
-    ['REPORT NUMBER', ensureReportNumber()],
+    // A new construction job has no report: its certificate's number instead.
+    isNewBuildJob() ? ['CERTIFICATE NO.', currentJobQuote() ? treatmentCertNumber(currentJobQuote()) : ''] : ['REPORT NUMBER', ensureReportNumber()],
     ['DOCUMENTS', String(built.length)],
   ] });
   const rowH = 14, perFirst = Math.floor((272 - y - 14) / rowH), perNext = Math.floor((272 - 26) / rowH);
@@ -205,7 +208,8 @@ async function makeJobPdf(how) {
       saveCurrentReport(true);
       if (locking) {
         const v = reportData.issue.version;
-        showToast(v > 1 ? `Version ${v} finalised. The report and quote are locked` : 'Job finalised. The report and quote are locked', 'success');
+        const what = isNewBuildJob() ? 'The treatment record is locked' : 'The report and quote are locked';
+        showToast(v > 1 ? `Version ${v} finalised. ${what}` : `Job finalised. ${what}`, 'success');
         track('report_completed', { version: v });
       }
     } else if (unlock) {
@@ -265,6 +269,7 @@ function jobFinaliseNext(j) {
   const v = reportVersion();
   const sample = isSampleJob(currentReportId);
   const what = locked ? 'Every document from the job goes into one PDF.'
+    : isNewBuildJob() ? `Finalising locks the treatment record${v > 1 ? ` as version ${v}` : ''}, so it matches the certificate ${who} received, and puts every document from the job into one PDF.`
     : `Finalising locks the report and quote${v > 1 ? ` as version ${v}` : ''}, so they match what ${who} received, and puts every document from the job into one PDF.`;
   const lead = `Everything\'s done${j.group === 'waiting' ? ' apart from the bait station checks' : ''}. `;
   const emailBtn = email ? `<button type="button" class="dash-detail-primary job-pdf-btn" data-busy="Making it…" onclick="makeJobPdf('email')">${sample ? 'Finalise and email it to me' : `Finalise and email to ${escapeHtml(who)}`}</button>` : '';

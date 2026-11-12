@@ -167,6 +167,8 @@ function jobAgreementStep(d = reportData) {
 // signed, nothing after it is next.
 function jobPageSteps(j) {
   const d = j.r.reportData || {};
+  // A new construction job has no agreement: Job details, then the treatment.
+  if (isNewBuildJob(d)) return [jobDetailsStep(j), ...j.steps.map(st => ({ ...st }))];
   const steps = [jobDetailsStep(j), jobAgreementStep(d), ...j.steps.map(st => ({ ...st }))];
   if (!d.agreement && steps[1].state !== 'skip') steps.slice(2).forEach(st => { if (st.state === 'now') st.state = 'todo'; });
   return steps;
@@ -216,7 +218,7 @@ function jobStepLine(j, st) {
   if (st.to === 'quote' && j.total && st.state !== 'skip') return `${formatAUD(j.total).replace(/\.00$/, '')}${j.q && j.q.sentAt ? ', sent ' + dashDate(j.q.sentAt) : ', not sent yet'}`;
   if (st.to === 'quote' && open) return 'Not written yet';
   if (st.to === 'answer' && open) return j.q && j.q.sentAt ? `Waiting on ${who} since ${dashDate(j.q.sentAt)}` : 'Once the quote is sent';
-  if (st.to === 'treatment' && open && !(j.q && j.q.treatment)) return quoteHasItems(j.q) && (quoteAnswerState(j.q) || {}).status === 'accepted' ? 'Accepted, not recorded yet' : `Once ${who} accepts`;
+  if (st.to === 'treatment' && open && !(j.q && j.q.treatment)) return j.newBuild ? 'Not recorded yet' : quoteHasItems(j.q) && (quoteAnswerState(j.q) || {}).status === 'accepted' ? 'Accepted, not recorded yet' : `Once ${who} accepts`;
   if (st.state === 'now' || st.state === 'bad' || st.state === 'skip' || !st.full) return st.text;
   return st.full.replace(/ · /g, ', ');
 }
@@ -268,7 +270,7 @@ function jobStepsHTML(j, steps, tap, details, q) {
             <div class="job-fold-body">${panel}</div>
           </details>
         </li>`;
-        if ((st.to === 'answer' || st.to === 'treatment') && !quoteHasItems(q)) return `
+        if ((st.to === 'answer' || st.to === 'treatment' && !j.newBuild) && !quoteHasItems(q)) return `
         <li class="${st.state}"><div class="job-step job-step-still" ${label.replace('aria-label', 'role="group" aria-label')}>${inner}</div></li>`;
         return `
         <li class="${st.state}">
@@ -310,6 +312,18 @@ function agreementWaysHTML(next, isNew) {
 // follows the booking's day and the client's email, so the card is redrawn
 // as Job details are typed (refreshJobNewNext).
 function jobNewNextHTML() {
+  // A new construction job starts at the treatment.
+  if (isNewBuildJob()) return `
+      <div class="job-next-head">
+        <span class="job-tile now" aria-hidden="true">${jobIcon('treatment', 22)}</span>
+        <div>
+          <div class="dash-next-label">Next step</div>
+          <div class="dash-next-title">Record the treatment</div>
+        </div>
+      </div>
+      <p class="dash-next-hint">Once the system is in, record what went in and where. The treatment certificate is made from the record.</p>
+      <button type="button" class="dash-detail-primary" onclick="jobGo('treatment')">Record treatment</button>
+      <div class="dash-detail-links job-next-later"><button type="button" onclick="saveJobNow(true)">Save it for later</button></div>`;
   const next = agreementNext(Object.assign({}, reportData, { agreement: null, agreementRequest: null }), document.getElementById('jobClient').value);
   return `
       <div class="job-next-head">
@@ -386,7 +400,7 @@ function renderJobPage(opening) {
   // the last step, Finalise is: it locks the job and makes its PDF.
   const reportGone = !!(reportData.sent || reportData.issue);
   const finalise = jobCanFinalise(j) && (!isReportLocked() || !reportData.jobPdfAt) ? jobFinaliseNext(j) : null;
-  const next = !reportData.agreement && addr && !reportGone ? agreementNext(reportData, j.r.client)
+  const next = !j.newBuild && !reportData.agreement && addr && !reportGone ? agreementNext(reportData, j.r.client)
     : finalise || { status: j.status, hint: j.hint, next: j.next };
   // Treatment recommended but the client isn't having a quote: skip it, and
   // the treatment and bait steps with it.
@@ -439,13 +453,19 @@ function renderJobPage(opening) {
     <div class="job-section-head">Job steps</div>
     ${jobStepsHTML(j, isNew ? steps.slice(1) : steps, st => `jobGo('${st.to}')`, detailsHTML, q)}
     ${isNew ? '' : jobSkippedHTML(j, steps)}`;
-  // A new job: what to fill in, the form, then the agreement as the next step.
+  // The client of a new construction job is usually the builder.
+  const clientBox = document.getElementById('jobClient');
+  if (clientBox) clientBox.placeholder = j.newBuild ? 'The builder, or the owner' : 'Full name';
+  // A new job: what to fill in, the form, then the agreement as the next
+  // step (the treatment, on a new construction job).
   if (isNew) {
     body.innerHTML = `
     <div class="job-hero new">
       <div class="job-hero-eyebrow">${escapeHtml(eyebrow || new Date().toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }))}</div>
-      <h3 class="job-hero-addr">New job</h3>
-      <p class="job-hero-sub">Fill in the property and the client. The rest can wait.</p>
+      <h3 class="job-hero-addr">${j.newBuild ? 'New construction job' : 'New job'}</h3>
+      <p class="job-hero-sub">${j.newBuild ? 'Fill in the site and the client, usually the builder. The rest can wait.' : 'Fill in the property and the client. The rest can wait.'}</p>
+      <p class="job-hero-kind">${j.newBuild ? 'Not a new build? <button type="button" onclick="setNewBuildJob(false)">Make it an inspection</button>'
+        : 'Putting a termite system in a new build? <button type="button" onclick="setNewBuildJob(true)">Make it a new construction job</button>'}</p>
       <p class="job-hero-tip"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v4"/></svg><span>Or tap the mic and say the address and the client's name.</span></p>
     </div>
     ${detailsHTML}
@@ -512,7 +532,8 @@ function jobGo(to, from) {
   if (to === 'job') { closeJobPage(); openJobPage(); return; }
   if (!document.getElementById('jobOverlay').classList.contains('open')) openJobPage();
   if (to === 'details') { const f = document.getElementById('jobDetailsFold'); if (f) f.open = true; document.getElementById('jobDetailsHead')?.scrollIntoView({ block: 'start' }); return; }
-  const q = quoteState;
+  // A new construction job's record is kept on a quote made for it (newBuildRecordQuote in js/treatment.js).
+  const q = quoteState || (to === 'treatment' && isNewBuildJob() ? newBuildRecordQuote() : null);
   if (to === 'treatment' && q) { openTreatmentRecord(); rememberSheetFrom('treatmentOverlay', from); }
   if (to === 'bait' && q && typeof baitProgram === 'function') {
     // A visit's report still to email is on the Next step card. Otherwise
@@ -615,6 +636,14 @@ function tabMic() {
     showToast(`The report for ${street || 'this job'} is done, so the mic didn't start`, 'info', { label: 'Open report', run: () => tabGo('report') });
     return;
   }
+  // A new construction job has no report to talk into: the mic fills in
+  // its treatment record, once the job has its address.
+  if (isNewBuildJob() && getFullAddress()) {
+    if (isReportLocked()) { tabGo('job'); return; }
+    jobGo('treatment');
+    if (document.getElementById('treatmentOverlay').classList.contains('open')) toggleSheetVoice('treatment');
+    return;
+  }
   const popover = document.getElementById('voicePopover');
   const onReport = document.getElementById('app').style.display === 'flex'
     && !['quoteScreen', 'sidebarPanel', 'dashboardOverlay', 'jobOverlay'].some(id => document.getElementById(id).classList.contains('open'));
@@ -713,7 +742,7 @@ function updateJob() {
 
   // The job's page shows the address as it's typed into its details.
   const heroAddr = document.querySelector('#jobOverlay.open .job-hero-addr');
-  if (heroAddr) heroAddr.textContent = addr || 'New job';
+  if (heroAddr) heroAddr.textContent = addr || (isNewBuildJob() ? 'New construction job' : 'New job');
 
   syncAllSelectCards();
   renderLastVisitBanner();
@@ -1298,6 +1327,23 @@ function reportKindTitle() {
   return timberPest ? 'Timber Pest Inspection Report' : 'Termite Inspection Report';
 }
 
+// A new construction job: a termite management system put in while the
+// building goes up (AS 3660.1). There's no agreement, inspection report or
+// quote: the treatment record is the job, and its treatment certificate
+// goes to the client, usually the builder. Chosen as the type of job, or
+// from a new job's page (setNewBuildJob).
+const NEW_BUILD_JOB_TYPE = 'New Construction — Termite Management System';
+function isNewBuildJob(d = reportData) {
+  return !!d && d.jobInspectionType === NEW_BUILD_JOB_TYPE;
+}
+// From a new job's page: make it a new construction job, or back to an inspection.
+function setNewBuildJob(on) {
+  const sel = document.getElementById('jobInspectionType');
+  if (!sel) return;
+  sel.value = on ? NEW_BUILD_JOB_TYPE : '';
+  onInspectionTypeChange();
+}
+
 function isPrePurchaseJob(d = reportData) {
   const type = d.jobInspectionType || '';
   if (type) return /pre-purchase/i.test(type);
@@ -1311,6 +1357,8 @@ function onInspectionTypeChange() {
     setStandard(std);
     showToast(`Report will follow ${std}`, 'info');
   }
+  // A new construction job has other steps, so This job is drawn again.
+  if (document.getElementById('jobOverlay')?.classList.contains('open')) renderJobPage();
 }
 
 function loadJobInfo() {

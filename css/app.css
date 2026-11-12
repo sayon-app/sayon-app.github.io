@@ -5299,7 +5299,6 @@ button.header-job.has-job { text-decoration: underline; text-decoration-color: r
   color: var(--text); font: 600 calc(13px * var(--ts)) 'Inter', sans-serif; cursor: pointer; white-space: nowrap;
 }
 .date-chip.on { border-color: transparent; background: var(--accent-grad); color: #FFFFFF; }
-#jobDateChips { margin-bottom: 6px; }
 
 /* Report done, not sent yet: the line at the top of every step. */
 body .report-done-banner .agreement-banner-btn { background: var(--accent2); border-color: var(--accent2); color: #FFFFFF; box-shadow: none; }

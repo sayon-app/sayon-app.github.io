@@ -63,6 +63,9 @@ function reinspectDaysBetween(fromIso, toIso) {
 function reinspectionFor(r, quotes) {
   const d = r.reportData || {};
   if (!(d.issue || d.sent || d.pdfAt)) return null;
+  // A new construction job's client is the builder, not whoever ends up
+  // living there: the durable notice tells them when it's due.
+  if (isNewBuildJob(d)) return null;
   const q = (quotes && quotes[r.id]) || r.quote || null;
   const t = q && q.treatment;
   const lastIso = d.jobInspectionDate || (d.agreement && d.agreement.inspectionDate) || isoDate(new Date(dashboardJobTime(r)));

@@ -54,10 +54,16 @@ function getAgreementTemplate() {
 }
 
 // What a special purpose inspection is for, and the inspection it follows,
-// as the agreement and the report say it.
+// as the agreement says it. A physically invasive one is agreed here, so
+// clause 3's limits don't hold for it (the owner's wording: change it only
+// with the owner).
+const SPECIAL_PURPOSE_INVASIVE_LINE = 'This is a physically invasive inspection. This agreement is the separate written agreement clause 4 refers to, so the limits in clause 3 on moving things and on cutting, drilling or removing any part of the building don\'t apply to it. Before we cut, drill or remove anything, we\'ll tell you where and why, and go ahead only with your okay.';
 function specialPurposeLine(d = reportData) {
-  const what = specialPurposeText(d), ref = isSpecialPurposeJob(d) ? String(d.jobInitialRef || '').trim() : '';
-  return [what && `The purpose of this inspection is ${lowerFirst(what)}`, ref && `It follows the inspection with report or job no. ${ref}.`].filter(Boolean).join(' ');
+  const on = isSpecialPurposeJob(d);
+  const what = specialPurposeText(d), ref = on ? String(d.jobInitialRef || '').trim() : '';
+  const invasive = on && Array.isArray(d.jobPurposes) && d.jobPurposes.includes(SPECIAL_PURPOSE_INVASIVE);
+  return [what && `The purpose of this inspection is ${lowerFirst(what)}`, ref && `It follows the inspection with report or job no. ${ref}.`,
+    invasive && SPECIAL_PURPOSE_INVASIVE_LINE].filter(Boolean).join(' ');
 }
 
 function agreementInspectionType() {

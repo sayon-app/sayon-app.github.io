@@ -38,11 +38,15 @@ async function supabaseSaveNow(entry, quiet) {
   if (!stored || stored.savedAt !== entry.savedAt) return true;
   // Photos go to Storage, not into the row. Record their cloud paths on
   // the saved copy (and the open draft, which shares the photo objects).
-  if (await uploadPendingPhotos(entry.reportData)) {
+  // The treatment record's photos go up with the job's, and their paths go
+  // on the quote too (js/treatment.js).
+  const recordPhotos = treatmentRecordPhotos(entry.quote && entry.quote.treatment);
+  if (await uploadPendingPhotos(entry.reportData, recordPhotos)) {
     const reports = getSavedReports();
     const i = reports.findIndex(r => r.id === entry.id);
     if (i >= 0 && reports[i].savedAt === entry.savedAt) { reports[i] = entry; setSavedReports(reports); }
     if (currentReportId === entry.id) saveDraft();
+    if (recordPhotos.length && typeof keepTreatmentPhotoPaths === 'function') keepTreatmentPhotoPaths(entry.id, recordPhotos);
   }
   // Saved again on this phone while the photos went up: that save goes next.
   if ((getSavedReports().find(r => r.id === entry.id) || {}).savedAt !== entry.savedAt) return true;
@@ -828,7 +832,7 @@ async function deleteReport(id, event) {
   if (wasOpen) startBlankReport();
   refreshJobsList();
 
-  const photos = allReportPhotos(deleted.reportData).filter(p => p.path);
+  const photos = jobPhotos(deleted).filter(p => p.path);
   const item = { id, paths: photos.map(p => p.path), photoIds: photos.map(p => p.id) };
   setPendingDeletes([...getPendingDeletes().filter(d => d.id !== id), item]);
   deleteTimers[id] = setTimeout(() => finishDelete(item), DELETE_UNDO_MS);
@@ -859,7 +863,7 @@ function deleteAllReports() {
   refreshJobsList();
 
   const items = all.map(r => {
-    const photos = allReportPhotos(r.reportData).filter(p => p.path);
+    const photos = jobPhotos(r).filter(p => p.path);
     return { id: r.id, paths: photos.map(p => p.path), photoIds: photos.map(p => p.id) };
   });
   const ids = new Set(items.map(i => i.id));
@@ -895,10 +899,10 @@ async function exportAllData() {
       if (v !== null) prefs[key] = v;
     });
 
-    // Photos aren't in localStorage, so add each saved report's images.
+    // Photos aren't in localStorage, so add each saved job's images.
     const photos = {};
     for (const r of reports) {
-      for (const p of allReportPhotos(r.reportData)) {
+      for (const p of jobPhotos(r)) {
         if (photos[p.id]) continue;
         const blob = await getPhotoImage(p);
         if (blob) photos[p.id] = await blobToDataUrl(blob);

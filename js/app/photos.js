@@ -167,13 +167,14 @@ async function externalizePhotos(rd) {
   return changed;
 }
 
-// Uploads every photo in rd that isn't in the cloud yet. Returns true if
+// Uploads every photo in rd that isn't in the cloud yet, and any others
+// given in more (the job's treatment record photos). Returns true if
 // any photo gained a path. A missing bucket or no signal just leaves the
 // photo pending, to try again on the next save.
-async function uploadPendingPhotos(rd) {
+async function uploadPendingPhotos(rd, more = []) {
   if (!authSession || !authUser?.id) return false;
   let changed = false;
-  for (const p of allReportPhotos(rd)) {
+  for (const p of [...allReportPhotos(rd), ...more]) {
     if (p.path) continue;
     const blob = await getPhotoImage(p);
     if (!blob) continue;
@@ -202,18 +203,40 @@ function deleteCloudPhotos(paths) {
   }).catch(() => {});
 }
 
+// A treatment record's photos (js/treatment.js), kept in the same store.
+function treatmentRecordPhotos(t) {
+  return (t && Array.isArray(t.photos)) ? t.photos : [];
+}
+// Every photo of a saved job: its report's, and its treatment record's on
+// the quote it carries.
+function jobPhotos(entry) {
+  if (!entry) return [];
+  return [...allReportPhotos(entry.reportData), ...treatmentRecordPhotos(entry.quote && entry.quote.treatment)];
+}
+
 // Photo ids still used by the open report, the draft, or any saved report
 // on this device, for every account that has signed in here (each keeps
-// its saved reports under its own korva_saved_reports_<id> key).
+// its saved reports under its own korva_saved_reports_<id> key), and by
+// the treatment records: on each saved quote (korva_quotes_<id>), and on a
+// record still being filled in (korva_unsaved_sheets).
 function referencedPhotoIds() {
   const ids = new Set(allReportPhotos(reportData).map(p => p.id));
-  const add = (raw, pick) => {
-    try { pick(JSON.parse(raw || 'null')).forEach(rd => allReportPhotos(rd).forEach(p => ids.add(p.id))); } catch (e) {}
-  };
-  add(localStorage.getItem(DRAFT_KEY), d => [d && d.reportData]);
+  const keep = photos => photos.forEach(p => { if (p && p.id) ids.add(p.id); });
+  const read = key => { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { return null; } };
+  const draft = read(DRAFT_KEY);
+  if (draft) keep(allReportPhotos(draft.reportData));
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith(STORAGE_KEY)) add(localStorage.getItem(key), list => (list || []).map(r => r && r.reportData));
+    if (!key) continue;
+    try {
+      if (key.startsWith(STORAGE_KEY)) {
+        (read(key) || []).forEach(r => keep(jobPhotos(r)));
+      } else if (key.startsWith('korva_quotes')) {
+        Object.values(read(key) || {}).forEach(q => keep(treatmentRecordPhotos(q && q.treatment)));
+      } else if (key === 'korva_unsaved_sheets') {
+        Object.values(read(key) || {}).forEach(c => keep(treatmentRecordPhotos(c && c.data)));
+      }
+    } catch (e) {}
   }
   return ids;
 }

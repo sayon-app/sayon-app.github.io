@@ -391,6 +391,17 @@ function correctKnownMishearings(text) {
   fix(/\btermite or foam\b/gi, 'Termidor Foam');
   fix(/\bultra ?set\b/gi, 'Altriset');
   fix(/\bthermal track\b/gi, 'Termatrac');
+  // Every-section car test, 12 Nov 2026 (Whisper on an iPhone).
+  fix(/\bterminal foam\b/gi, 'Termidor Foam');
+  fix(/\bterminal\b(?=\s+(?:foam|dust|chemical\b|soil\b|barrier\b|treatment\b))/gi, 'Termidor');
+  fix(/\bturn my track\b/gi, 'Termatrac');
+  fix(/\bknown as found\b/gi, 'no nest found');
+  fix(/\bflood boards\b/gi, 'floorboards');
+  fix(/\bink capping\b/gi, 'ant capping');
+  fix(/\banubium\b/gi, 'Anobium');
+  fix(/\bacinasiformis\b/gi, 'acinaciformis');
+  // "The bearer is damaged" straight after a pier came back as "barrier".
+  text = text.replace(/(\bpiers?\b[^.!?]{0,80}[.!?]\s+)(the) barrier (is|was) damaged\b/gi, (m, pre, the, verb) => pre + the + ' bearer ' + verb + ' damaged');
   fix(/\bacid nasiformis\b/gi, 'acinaciformis');
   fix(/\brepurchase\b(?=\s+(?:timber\s+)?pest\b)/gi, 'pre-purchase');
   fix(/\bferry fibrous\b/gi, 'furry fibrous');
@@ -419,7 +430,7 @@ function correctKnownMishearings(text) {
 const TRANSCRIPTION_VOCAB = [
   'Kordon', 'Termidor', 'Altriset', 'Premise', 'Bifenthrin', 'Biflex',
   'Exterra', 'Sentricon', 'Trelona', 'Termimesh', 'Termatrac',
-  'Coptotermes', 'Schedorhinotermes', 'Nasutitermes', 'Cryptotermes',
+  'Coptotermes', 'acinaciformis', 'Schedorhinotermes', 'Nasutitermes', 'Cryptotermes', 'Anobium',
 ];
 
 // ── AI TRANSCRIPT CLEANUP (suggest-and-confirm, never automatic) ──────────

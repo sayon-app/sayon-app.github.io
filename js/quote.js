@@ -1705,7 +1705,9 @@ function renderQuoteStage() {
 // it (another device, a client's answer from the link) it takes that in.
 function useJobQuote(saved) {
   if (quoteScreenOpen()) return;
-  if (!saved) { quoteState = null; return; }
+  // A new construction job's record not saved yet keeps the quote made for
+  // it (newBuildRecordQuote in js/treatment.js).
+  if (!saved) { if (!(quoteState && quoteState.newBuild && quoteState.reportKey === currentReportId)) quoteState = null; return; }
   if (!saved.reportKey) saved.reportKey = currentReportId || 'draft';
   if (!quoteState || quoteState.reportKey !== saved.reportKey) { quoteState = saved; return; }
   if (quoteState === saved || JSON.stringify(quoteState) === JSON.stringify(saved)) return;

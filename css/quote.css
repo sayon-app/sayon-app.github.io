@@ -205,6 +205,13 @@ select.quote-input { cursor: pointer; }
 .treat-method input[type=checkbox] { width: 22px; height: 22px; flex-shrink: 0; accent-color: var(--accent); }
 .treat-method span { flex: 1; }
 .treat-method-qty { width: 92px; flex-shrink: 0; }
+/* A new construction job's record (NEW CONSTRUCTION in js/treatment.js). */
+.treat-area-chips { margin-top: 8px; }
+.treat-area-chips .qp-chip, #trFold5 .qp-chip, #trPhysicalWrap .qp-chip { min-height: 38px; padding: 6px 11px; }
+/* The parts that wait on an answer keep the fold's spacing. */
+#trBuildSlabWrap, #trCareWrap { display: flex; flex-direction: column; gap: 12px; }
+.treat-build-counts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.treat-build-counts .job-field-label { font-weight: 500; }
 .treat-product { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; }
 .treat-product .quote-link-btn, .treat-add-product { align-self: flex-start; }
 .treat-method { min-height: 50px; padding: 10px 12px; border-radius: 12px; font-size: calc(14px * var(--ts)); border-color: var(--border2); transition: background 0.2s, border-color 0.2s; }

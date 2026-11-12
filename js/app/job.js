@@ -1236,16 +1236,13 @@ function saveJobInfo() {
 }
 
 // ── DATE CHIPS ───────────────────────────────────────────────────────────
-// The booking's day and time in one tap each: Today, Tomorrow and the next
-// five days, then the usual start times. The chosen ones are lit (a day
-// further out shows as its own chip), and the date and time fields stay for
-// anything else, so nobody pages through a calendar month by month.
-const JOB_TIME_CHIPS = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
+// The booking's day in one tap: Today, Tomorrow and the next five days. The
+// chosen one is lit (a day further out shows as its own chip), and the date
+// field stays for anything else, so nobody pages through a calendar month by
+// month. The time is typed in its own box (the time buttons went 12 Nov 2026).
 function renderDateChips() {
   const dateWrap = document.getElementById('jobDateChips');
-  const timeWrap = document.getElementById('jobTimeChips');
   const date = document.getElementById('jobInspectionDate');
-  const time = document.getElementById('jobInspectionTime');
   if (!dateWrap || !date) return;
   const now = new Date();
   const days = Array.from({ length: 7 }, (_, i) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + i));
@@ -1256,19 +1253,12 @@ function renderDateChips() {
   const other = picked && !inRange ? new Date(picked + 'T00:00:00') : null;
   dateWrap.innerHTML = (other && !isNaN(other) ? chip(true, other.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }), `pickJobDate('${picked}')`) : '')
     + days.map((d, i) => chip(isoDate(d) === picked, dayLabel(d, i), `pickJobDate('${isoDate(d)}')`)).join('');
-  if (timeWrap && time) {
-    const t = (time.value || '').slice(0, 5);
-    timeWrap.innerHTML = JOB_TIME_CHIPS.map(v => chip(v === t, formatClockTime(v).replace(':00 ', ''), `pickJobTime('${v}')`)).join('');
-  }
   // The lit chip in view, without moving the page.
-  [dateWrap, timeWrap].forEach(w => {
-    const on = w && w.querySelector('.date-chip.on');
-    if (on && w.clientWidth && (on.offsetLeft + on.offsetWidth > w.scrollLeft + w.clientWidth || on.offsetLeft < w.scrollLeft)) w.scrollLeft = on.offsetLeft - 8;
-  });
+  const on = dateWrap.querySelector('.date-chip.on');
+  if (on && dateWrap.clientWidth && (on.offsetLeft + on.offsetWidth > dateWrap.scrollLeft + dateWrap.clientWidth || on.offsetLeft < dateWrap.scrollLeft)) dateWrap.scrollLeft = on.offsetLeft - 8;
 }
 
 function pickJobDate(iso) { setJobBookingField('jobInspectionDate', iso); }
-function pickJobTime(hhmm) { setJobBookingField('jobInspectionTime', hhmm); }
 function setJobBookingField(id, value) {
   const input = document.getElementById(id);
   if (!input || isReportLocked()) return;

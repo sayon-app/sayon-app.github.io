@@ -1585,7 +1585,7 @@ function buildTreatmentCertificatePDF(q) {
     ? 'The treatment above was carried out, and the system installed, by this technician in line with the manufacturer\'s directions, the product label and AS 3660.2. Neither repairs existing damage, and no treatment or system can guarantee termites will never return. Regular inspections are the best protection.'
     : 'The treatment above was carried out by this technician in line with the product label directions and AS 3660.2. It does not repair existing damage, and no treatment can guarantee termites will never return. Regular inspections are the best protection.';
   doc.setFontSize(7);
-  const signOffH = (t.supervisor ? 36 : 31) + doc.splitTextToSize(closing, CW).length * 3.2;
+  const signOffH = (t.supervisor ? 32 : 27) + doc.splitTextToSize(closing, CW).length * 3.2;
   doc.setFontSize(8.5);
   const notesLines = [t.warranty, t.notes].filter(Boolean).map(v => doc.splitTextToSize(v, t.warranty && t.notes ? (CW - 6) / 2 : CW).length);
   const notesH = notesLines.length ? 6.5 + Math.max(...notesLines) * 4 : 0;
@@ -1611,7 +1611,9 @@ function buildTreatmentCertificatePDF(q) {
   y += 3;
   // At the top of a page the running header's rule is already there.
   if (doc.internal.getNumberOfPages() === pages) { doc.setFillColor(...C.accent); doc.rect(M, y, CW, 0.5, 'F'); }
-  y += 19;
+  // Room for the signature (12.5 mm tall) over its line, and no more, so
+  // the sign-off stays on page 1 with what it signs for.
+  y += 15;
   const colW = (CW - 16) / 3;
   drawPdfOnLine(doc, t.technician, M, y, colW);
   drawPdfSignature(doc, { x: M, y, w: colW, caption: t.licence ? `Technician · Licence ${t.licence}` : 'Technician' });

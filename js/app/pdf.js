@@ -825,19 +825,6 @@ async function buildReportPdf() {
     gap(3);
   }
 
-  // The front of the house across the page, under its section's title.
-  function heroPhoto(p, h, caption) {
-    if (!p || !photoSrc[p.id]) return;
-    if (y + h + 8 > 278) newPage();
-    try { drawPhoto(photoSrc[p.id], M, y, CW, h, 'cover'); } catch (e) { return; }
-    y += h + 2;
-    if (caption) {
-      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C.inkMuted);
-      doc.text(caption, M, y + 3); y += 6;
-    }
-    y += 3;
-  }
-
   // The general photos, the ones that belong to no one finding, area or
   // condition. A report with none has no Photographs section (hasGallery).
   function photoGallery() {
@@ -1142,7 +1129,7 @@ async function buildReportPdf() {
   keep(fresh => {
     startPart('About the Property', fresh || summaryOnOnePage);
     sectionTitle('ABOUT THE PROPERTY', REPORT_PARTS.property);
-    heroPhoto(frontPhoto, 70, 'Front of the property');
+    // The front photo is the cover's; it isn't printed a second time here.
     facts([
       ['Structure Type', reportData.structureType],
       ['Height', RENAMED_CHOICES.height[reportData.height] || reportData.height],
@@ -1668,7 +1655,7 @@ async function buildReportPdf() {
   infoPara('This inspection does not involve moving furniture, lifting floor coverings, cutting into walls, removing ceiling linings, dismantling built-in cabinetry, or any other action that could cause damage to the property or its contents. The inspector uses visual observation, a probe or screwdriver for tapping and sounding, and a moisture meter where appropriate. Splinter testing of structural timbers in the subfloor or roof void may be carried out where it can be done safely and with the property owner\'s consent.');
 
   infoHeading('What is "Reasonable Access"?');
-  infoPara('Areas were inspected where there was safe and reasonable access, as applied under AS 4349.3-2010: they can be reached safely, without cutting access holes or removing, moving or dismantling anything. In practice that means a roof void access hole of at least 500 mm × 400 mm, reachable with a 3.6 m ladder, with at least 600 mm × 600 mm of crawl space; a roof exterior reachable with a 3.6 m ladder placed on the ground; and a subfloor access hole of at least 500 mm × 400 mm, with at least 400 mm of crawl space beneath the lowest bearer, or 500 mm beneath the lowest part of a concrete floor. Areas that did not meet these are outside the scope of this inspection and are listed in the report.');
+  infoPara('Areas were inspected where there was safe and reasonable access, as applied under AS 4349.3-2010: they can be reached safely, without cutting access holes or removing, moving or dismantling anything. The sizes that apply to the roof void, roof exterior and subfloor are under Reasonable Access in the definitions. Areas that did not meet these are outside the scope of this inspection and are listed in the report.');
 
   infoHeading('Does this inspection guarantee the property is free of termites?');
   infoPara('No. A visual, non-invasive inspection of this type cannot detect timber pest activity or damage concealed within walls, under floors, inside structural timbers, or in any area that was not accessible at the time of inspection. Termites frequently operate within concealed spaces without external evidence. This report reflects the observable condition of the property at the specific date and time of inspection only. Regular professional re-inspections are the most effective ongoing protection available.');
@@ -1820,12 +1807,14 @@ async function buildReportPdf() {
     disclaimer('This report is for the sole use of the client named above and is not intended for use by third parties. It is not suitable for use where the property is being bought or sold — a Prior-to-Purchase inspection with reference to AS 4349.3-2010 should be obtained for that purpose.');
     gap(2);
   }
-  disclaimer('The client acknowledges the contents of this report and that the inspection has limitations. This report does not conclusively determine that the property is free of termites.');
-
-  // The client signs the pre-inspection agreement before the job; its full
-  // wording is the appendix. Reports from before that change have a client
-  // signature captured at sign-off instead, printed as it was.
+  // The client signs the pre-inspection agreement before the job, not the
+  // report, so the words over that signature say so: it accepts the scope
+  // and limits, not what the report found. Reports from before that change
+  // have a client signature captured at sign-off instead, printed as it was.
   const agreement = reportData.agreement;
+  disclaimer(agreement
+    ? `${agreement.signerName || 'The client'} signed the pre-inspection agreement before the inspection, accepting the scope and limits of the inspection set out in it. Its full wording is the appendix to this report. This report does not conclusively determine that the property is free of termites.`
+    : 'The client acknowledges the contents of this report and that the inspection has limitations. This report does not conclusively determine that the property is free of termites.');
   if (y + 36 > 278) newPage();
   y += agreement ? 18 : 24;
   if (agreement) {
@@ -1836,9 +1825,6 @@ async function buildReportPdf() {
     onSigLine(formatAgreementSignedAt(agreement.signedAt), M + (sigColW + 8) * 2);
     drawPdfSignature(doc, { x: M + (sigColW + 8) * 2, y, w: sigColW, caption: agreement.method === 'other' ? 'Signed' : 'Signed before the inspection' });
     y += 9;
-    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...C.inkMuted);
-    doc.text('Signed as the pre-inspection agreement. Its full wording is the appendix to this report.', M, y);
-    y += 6;
   } else {
     if (!reportData.clientSignature) {
       doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...C.warn);
@@ -1915,7 +1901,7 @@ async function buildReportPdf() {
       ...(hasGallery ? [[partNo('photos'), 'Photographs', 'General photos. A photo of a finding, an area or a condition is in its own section.']] : []),
       [partNo('terms'), 'Scope, Limitations, Definitions & Terms', 'What this inspection covers, the terms used, and the terms and conditions.'],
       [partNo('inspector'), 'Inspector Details', 'The inspector, their licence and signature.'],
-      [partNo('acknowledgement'), 'Client Acknowledgement', 'The client\'s acknowledgement of the report and its limits.'],
+      [partNo('acknowledgement'), 'Client Acknowledgement', agreement ? 'The limits of this report, and the agreement the client signed before the inspection.' : 'The client\'s acknowledgement of the report and its limits.'],
       ...(agreement ? [['A', 'Appendix: Pre-Inspection Agreement', 'The agreement the client signed before the inspection.']] : []),
     ];
     CONTENTS.forEach(([no, title, desc]) => {

@@ -1263,7 +1263,7 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   pointer-events: auto;
 }
 
-/* Pocket lock: while recording, the page behind the voice popover can't be
+/* Pocket lock (the inspector locks it while recording): the page behind the voice popover can't be
    scrolled or tapped, so a phone in a pocket doesn't change the report. */
 .pocket-shield {
   position: fixed; inset: 0; z-index: 172;
@@ -3150,52 +3150,76 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
   padding: 0 max(18px, calc(50% - 340px)) calc(32px + env(safe-area-inset-bottom, 0px));
 }
 
-.dash-hero { padding: 18px 0 18px; }
+/* ── JOBS: THE ORDER OF THE PAGE ──
+   Read top to bottom the way a tech uses it: the day and how much needs
+   them (the headline, the biggest thing on the page), then which list
+   (To do, Waiting, Done, Due) with search beside it, then the jobs. The
+   controls sit quiet on the backdrop so the headline and the cards carry
+   the weight. */
+.dash-hero { position: relative; isolation: isolate; padding: 20px 0 22px; }
 .dash-hero-date {
-  display: block;
+  display: inline-flex; align-items: center; gap: 8px;
   font-size: calc(11.5px * var(--ts)); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
   color: var(--accent2);
 }
+/* A small live dot before the date: this is today's page. */
+.dash-hero-date::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px rgba(var(--accent-glow-rgb), 0.16); }
 .dash-hero-title {
-  margin: 6px 0 0;
+  margin: 10px 0 0;
   font-family: 'Space Grotesk', sans-serif;
-  font-size: calc(26px * var(--ts)); line-height: 1.15; font-weight: 700; letter-spacing: -0.02em;
-  color: var(--text);
+  font-size: calc(29px * var(--ts)); line-height: 1.08; font-weight: 700; letter-spacing: -0.03em;
+  color: var(--text); text-wrap: balance;
 }
 .dash-hero-title b { font-weight: 700; color: var(--accent2); }
+@media (min-width: 720px) { .dash-hero-title { font-size: calc(38px * var(--ts)); } }
 /* Under the headline: what's booked for later, and re-inspections that are
    overdue, which opens the Due tab. */
-.dash-hero-more { margin: 8px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: calc(14px * var(--ts)); line-height: 1.4; color: var(--text2); }
+.dash-hero-more { margin: 10px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: calc(14px * var(--ts)); line-height: 1.4; color: var(--text2); }
 .dash-hero-more i { font-style: normal; color: var(--text3); }
 .dash-hero-more button { min-height: 32px; padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--risk); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 
+/* Which list, and search: one band. On a phone the search sits under the
+   lists; on a wide screen they share a row. */
+.dash-controls { display: flex; flex-direction: column; gap: 10px; margin: 0 0 22px; }
+@media (min-width: 720px) {
+  .dash-controls { flex-direction: row; align-items: center; gap: 12px; }
+  .dash-controls .dash-tabs { flex: none; }
+  .dash-controls .dash-tab { flex: none; padding: 0 16px; }
+  .dash-controls .dash-search { flex: 1; min-width: 200px; }
+}
+/* The lists are a segmented track; the open one is a raised pill that
+   slides between them. */
 .dash-tabs {
   position: relative;
-  display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;
-  border-bottom: 1px solid var(--border);
+  display: flex; gap: 2px; padding: 4px; overflow-x: auto; scrollbar-width: none;
+  border-radius: 14px; background: var(--surface2); border: 1px solid var(--border);
 }
 .dash-tabs::-webkit-scrollbar { display: none; }
 .dash-tab {
+  position: relative; z-index: 1;
   flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: 46px; padding: 0 10px; border: 0; background: none;
+  min-height: 40px; padding: 0 10px; border: 0; border-radius: 10px; background: none;
   font: inherit; font-size: calc(14px * var(--ts)); font-weight: 600; letter-spacing: -0.01em; color: var(--text3); cursor: pointer;
-  white-space: nowrap; transition: color 0.2s;
+  white-space: nowrap; transition: color 0.2s, opacity 0.2s;
 }
-/* The count sits in a small pill; This job has none, so its pill hides. */
+/* The count sits in a small pill. */
 .dash-tab span {
   min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; box-sizing: border-box;
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: calc(11.5px * var(--ts)); font-weight: 700; background: var(--surface2); color: var(--text3);
+  font-size: calc(11.5px * var(--ts)); font-weight: 700; background: var(--surface); color: var(--text3);
   transition: background 0.2s, color 0.2s;
 }
 .dash-tab span:empty { display: none; }
 .dash-tab:hover { color: var(--text2); }
-.dash-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; border-radius: 8px; }
+.dash-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .dash-tab.active { color: var(--text); }
 .dash-tab.active span { background: rgba(var(--accent-rgb), 0.14); color: var(--accent2); }
+/* A list with nothing in it steps back. */
+.dash-tab.empty:not(.active) { opacity: 0.6; }
+.dash-tab.empty:not(.active) span { background: none; }
 .dash-tab-line {
-  position: absolute; left: 0; bottom: 0; width: 0; height: 2.5px;
-  border-radius: 99px; background: var(--accent);
+  position: absolute; left: 0; top: 4px; bottom: 4px; width: 0;
+  border-radius: 10px; background: var(--surface); box-shadow: 0 1px 3px rgba(16,24,40,0.12);
   transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), width 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s;
 }
 .dash-tabs.searching .dash-tab.active { color: var(--text3); }
@@ -3203,10 +3227,10 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 
 .dash-search {
   display: flex; align-items: center; gap: 10px;
-  height: 46px; margin: 16px 0 14px; padding: 0 14px;
+  height: 48px; margin: 0; padding: 0 14px;
   background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
-  color: var(--text3); box-shadow: 0 1px 2px rgba(16,24,40,0.04);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  color: var(--text3);
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
 .dash-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.14); }
 .dash-search input::placeholder { color: var(--text3); }
@@ -3266,7 +3290,10 @@ body .dash-card { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,
 .dash-none { margin: 0; padding: 36px 12px; text-align: center; font-size: calc(14px * var(--ts)); color: var(--text3); }
 /* To do, in the order the week runs: a heading where the day changes
    (still open from earlier, today, coming up). */
-.dash-part { margin: 10px 2px -2px; font-size: calc(11px * var(--ts)); font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); }
+.dash-part { display: flex; align-items: center; gap: 8px; margin: 14px 2px 0; font-size: calc(11px * var(--ts)); font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); }
+/* How many under it, then a hairline that fades out to the right. */
+.dash-part[data-count]::after { content: attr(data-count); order: 0; letter-spacing: 0; font-weight: 700; opacity: 0.7; }
+.dash-part::before { content: ''; order: 1; flex: 1; height: 1px; background: linear-gradient(90deg, currentColor, transparent); opacity: 0.3; }
 .dash-part:first-child { margin-top: 0; }
 /* Finished jobs a full phone handed to the account, under Done. */
 .dash-parked { margin: 16px 2px 0; font-size: calc(13.5px * var(--ts)); line-height: 1.5; color: var(--text2); }
@@ -4979,7 +5006,7 @@ body[data-voice="thinking"] .mic-fab:not(.open) .mic-fab-mic { animation: dockSp
 @media (prefers-reduced-motion: reduce) {
   body[data-voice="listening"] .tabbar .mic-fab, .mic-fab-time::before, body[data-voice="thinking"] .mic-fab .mic-fab-mic { animation: none; }
 }
-/* While recording the screen is locked, the tabs too; the mic stays live to stop. */
+/* Locked for a pocket, the tabs are too; the mic stays live to stop. */
 body.pocket-lock .tabbar .tab { pointer-events: none; opacity: 0.4; }
 .voice-popover { bottom: calc(var(--tabbar-h) + 10px); max-height: calc(100dvh - var(--tabbar-h) - 26px - env(safe-area-inset-top, 0px)); }
 
@@ -5053,13 +5080,37 @@ body .dash-hero-more i { color: var(--on-ink2); }
 body .dash-hero-more button { color: var(--pink); }
 body .dash-part { color: var(--accent-glow); }
 body .dash-parked .link-btn { color: var(--accent-glow); }
-body .dash-tabs { border-bottom-color: rgba(255,255,255,0.1); }
+body .dash-tabs { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); }
 body .dash-tab { color: var(--on-ink2); }
+body .dash-tab:hover { color: var(--on-ink); }
 body .dash-tab.active { color: var(--on-ink); }
 body .dash-tab span { background: rgba(255,255,255,0.1); color: var(--on-ink2); }
-body .dash-tab.active span { background: rgba(var(--accent-glow-rgb),0.18); color: var(--accent-glow); }
+body .dash-tab.empty:not(.active) span { background: none; }
+body .dash-tab.active span { background: rgba(var(--accent-glow-rgb),0.2); color: var(--accent-glow); }
 body .dash-tabs.searching .dash-tab.active { color: var(--on-ink2); }
-body .dash-tab-line { background: var(--accent-glow); box-shadow: 0 0 10px rgba(var(--glow-hi),0.6); }
+body .dash-tab-line {
+  background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.08));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), inset 0 0 0 1px rgba(var(--accent-glow-rgb),0.18), 0 6px 16px rgba(0,0,0,0.35);
+}
+/* Search is the quiet one on the page: glass, not a white slab, so it
+   never outshines the headline or the jobs. It lights when typed in. */
+body .dash-search { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); box-shadow: none; }
+body .dash-search:hover { border-color: rgba(255,255,255,0.14); }
+body .dash-search:focus-within { background: rgba(255,255,255,0.07); border-color: rgba(var(--accent-glow-rgb),0.6); box-shadow: 0 0 0 4px rgba(var(--accent-glow-rgb),0.12); }
+body .dash-search input { color: var(--on-ink); }
+body .dash-search input::placeholder { color: var(--on-ink2); }
+/* The Jobs bar melts into the page, so the headline under it is what the
+   eye meets first; New job carries a touch of the accent as the bar's
+   one action, the account button stays neutral. */
+body .dashboard-panel-header { background: transparent; border-bottom-color: transparent; border-image: none; }
+body .dashboard-panel-header .topbar-new { background: rgba(var(--accent-glow-rgb),0.1); border-color: rgba(var(--accent-glow-rgb),0.32); }
+body .dashboard-panel-header .topbar-new:hover { background: rgba(var(--accent-glow-rgb),0.16); }
+/* A faint glow behind the headline gives the top of the page its lift. */
+body .dash-hero::before {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  inset: 0 -20px;
+  background: radial-gradient(34% 46% at 26% 52%, rgba(var(--glow),0.2), transparent);
+}
 body .dash-none,
 body .dash-search,
 body .sidebar:not(.on-page) .drawer-group-label { color: var(--accent-glow); }
@@ -5887,7 +5938,7 @@ body .job-details.new .job-group { border-color: transparent; box-shadow: 0 10px
 }
 /* The tag on its row in Jobs. */
 /* An empty Jobs list starts the first job, and offers the sample. */
-.dashboard-panel-body.no-jobs .dash-tabs, .dashboard-panel-body.no-jobs .dash-search { display: none; }
+.dashboard-panel-body.no-jobs .dash-controls { display: none; }
 .dash-start {
   padding: 18px 16px 16px; border-radius: 16px; background: var(--surface); border-top: 3px solid var(--accent);
   box-shadow: 0 14px 36px rgba(0,0,0,0.25);
@@ -5919,8 +5970,8 @@ button.drawer-help { width: 100%; font-family: inherit; text-align: left; cursor
 /* ── VOICE CAPTURE, DOCKED ──
    The voice panel sits on the dock, as wide as the screen and only as tall
    as it needs, so the report stays readable above it. While it listens it
-   shrinks to the speak button and the last few lines heard; the page
-   behind isn't dimmed (it still can't be tapped). The mic and the photo
+   shrinks to one bar (LISTENING ON THE MOVE below) and the page behind
+   can still be scrolled and tapped. The mic and the photo
    button share a row; the sound bars take the close button's place. */
 #voicePopover {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-content: start;
@@ -5935,6 +5986,8 @@ button.drawer-help { width: 100%; font-family: inherit; text-align: left; cursor
 #voicePopoverTitleText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #voicePopover .voice-popover-close { margin: -6px -6px -6px 0; }
 #voicePopover > .waveform { grid-row: 1; grid-column: 2; align-self: center; height: 22px; margin-right: 4px; }
+/* Listening with the note open, the X (make it smaller) stays beside the bars. */
+body.voice-expanded:not(.pocket-lock) #voicePopover:not(.notes-voice) > .waveform { margin-right: 44px; pointer-events: none; }
 #voicePopover > .voice-btn { grid-column: 1; min-height: 52px; padding: 6px 12px; gap: 12px; border-radius: 14px; font-size: calc(14px * var(--ts)); }
 body #voicePopover .voice-btn .mic-svg { width: 20px; height: 20px; padding: 8px; }
 #voicePopover > .voice-photo-btn { grid-column: 2; position: relative; width: 52px; min-height: 52px; margin: 0; padding: 0; border-radius: 14px; }
@@ -5953,16 +6006,69 @@ body.large-touch #voicePopover > .extract-btn { min-height: 56px; }
 /* Nothing to fill in yet: no greyed-out button taking a row. */
 #voicePopover > .transcript-box:not(.active) ~ .extract-btn:disabled { display: none; }
 #voicePopover > .ai-bar { order: 2; justify-content: center; padding: 0; border: 0; background: transparent; font-size: calc(11.5px * var(--ts)); color: var(--text3); }
-/* Listening: the speak button and the newest lines, nothing else. */
-body.pocket-lock #voicePopover > .transcript-done,
-body.pocket-lock #voicePopover > .quick-phrases,
-body.pocket-lock #voicePopover > .extract-btn,
-body.pocket-lock #voicePopover > .ai-bar { display: none; }
-body.pocket-lock #voicePopover > .transcript-box { max-height: 4.6em; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.2em); mask-image: linear-gradient(to bottom, transparent 0, #000 1.2em); }
+/* Listening, the whole note open: the speak button, the newest lines and
+   two quiet buttons (fill in so far, lock for a pocket), nothing else. */
+body[data-voice="listening"] #voicePopover > .transcript-done,
+body[data-voice="listening"] #voicePopover > .quick-phrases,
+body[data-voice="listening"] #voicePopover > .extract-btn,
+body[data-voice="listening"] #voicePopover > .ai-bar { display: none; }
+body[data-voice="listening"] #voicePopover > .transcript-box { max-height: 7.6em; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.2em); mask-image: linear-gradient(to bottom, transparent 0, #000 1.2em); }
+body.pocket-lock #voicePopover > .transcript-box { max-height: 4.6em; }
 /* Clear of the dock's red timer while it listens. */
 body[data-voice="listening"] #voicePopover { bottom: calc(var(--tabbar-h) + 40px); }
-.pocket-shield { background: transparent; }
-.pocket-shield span { padding: 6px 12px; font-size: calc(12px * var(--ts)); opacity: 0.92; }
+/* Listening, it stays in sight over Jobs and This job too (under the dock and the sheets). */
+body[data-voice="listening"] #voicePopover { z-index: 230; }
+.pocket-shield { background: rgba(6,18,58,0.28); }
+.pocket-shield span { padding: 10px 16px; font-size: calc(12.5px * var(--ts)); opacity: 0.96; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; transition: transform 0.8s linear, background 0.8s linear; }
+.pocket-shield span.holding { transform: scale(1.06); background: var(--accent-wash); color: var(--accent2); }
+
+/* ── LISTENING ON THE MOVE ──
+   While the mic listens the panel is one bar on the dock: a red Listening
+   mark over the newest words (a tap opens the whole note), Fill in and the
+   photo button. Nothing covers the report, so it scrolls and takes taps
+   with the mic on (js/app/voice.js). */
+:root { --voice-live-h: 68px; }
+.voice-live, .voice-listen-actions { display: none; }
+body.listening-bar #voicePopover { padding: 6px 6px 6px 12px; gap: 6px; align-items: center; border-radius: 18px; }
+body.listening-bar #voicePopover > :not(.voice-live):not(.voice-photo-btn) { display: none; }
+body.listening-bar #voicePopover > .voice-live { display: flex; grid-column: 1; grid-row: 1; align-items: center; gap: 8px; min-width: 0; }
+body.listening-bar #voicePopover > .voice-photo-btn { grid-column: 2; grid-row: 1; width: 48px; min-height: 48px; border-radius: 13px; }
+.voice-live-note {
+  flex: 1; min-width: 0; min-height: 52px; padding: 4px 2px; border: 0; background: none;
+  display: flex; flex-direction: column; justify-content: center; gap: 3px;
+  text-align: left; color: var(--text); cursor: pointer; font: inherit;
+}
+.voice-live-head { display: flex; align-items: center; gap: 6px; font-size: calc(11px * var(--ts)); font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: var(--tone-bad, #D7261E); }
+.voice-live-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 0 rgba(215,38,30,0.5); animation: liveDot 1.4s ease-out infinite; flex-shrink: 0; }
+@keyframes liveDot { 0% { box-shadow: 0 0 0 0 rgba(215,38,30,0.5); } 70%, 100% { box-shadow: 0 0 0 7px rgba(215,38,30,0); } }
+/* The newest words: two lines, the end of the note always in sight. */
+.voice-live-text {
+  display: flex; flex-direction: column; justify-content: flex-end;
+  max-height: 2.7em; overflow: hidden; line-height: 1.35;
+  font-size: calc(14px * var(--ts)); font-weight: 500; color: var(--text);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 0.9em); mask-image: linear-gradient(to bottom, transparent 0, #000 0.9em);
+}
+.voice-live-text.empty { color: var(--text3); font-weight: 500; -webkit-mask-image: none; mask-image: none; }
+.voice-live-fill {
+  flex-shrink: 0; min-height: 48px; padding: 0 16px; border-radius: 13px;
+  border: 1.5px solid var(--accent-edge); background: var(--accent-wash); color: var(--accent2);
+  font: inherit; font-size: calc(14px * var(--ts)); font-weight: 700; cursor: pointer;
+}
+.voice-live-fill:disabled { opacity: 0.45; cursor: default; }
+body.large-touch .voice-live-fill, body.large-touch #voicePopover > .voice-photo-btn { min-height: 56px; }
+/* The whole note open while listening: two quiet buttons under it. */
+body.voice-expanded:not(.pocket-lock) #voicePopover:not(.notes-voice) > .voice-listen-actions { display: flex; gap: 8px; }
+.voice-listen-btn {
+  flex: 1; min-height: 44px; padding: 0 10px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--surface2); color: var(--text2);
+  font: inherit; font-size: calc(13px * var(--ts)); font-weight: 700; cursor: pointer;
+}
+.voice-listen-btn:first-child { color: var(--accent2); border-color: var(--accent-edge); background: var(--accent-wash); }
+/* The page under the bar can still be scrolled clear of it. */
+body.listening-bar .report-body { padding-bottom: calc(var(--voice-live-h) + 56px); }
+body.listening-bar .dashboard-panel-body, body.listening-bar .drawer-scroll, body.listening-bar .job-page-body { padding-bottom: calc(var(--voice-live-h) + 64px); }
+body.listening-bar:has(#app[style*="flex"]) .toast, body.listening-bar .toast { bottom: calc(var(--tabbar-h) + 48px + var(--voice-live-h)); }
+@media (prefers-reduced-motion: reduce) { .voice-live-dot { animation: none; } }
 
 /* ── MENU PAGES IN CARDS ────────────────────────────────────────────────
    Business details, Your prices, Chemical register, Your team, Settings

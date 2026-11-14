@@ -296,7 +296,9 @@ const NAV_SHEET_BACK = {
 function navBack() {
   const isOpen = id => { const el = document.getElementById(id); return !!(el && el.classList.contains('open')); };
   const shown = id => { const el = document.getElementById(id); return !!(el && !el.hidden); };
-  if (isRecording) { showToast('Tap Stop to finish recording first', 'info'); return true; }
+  // Back works while the mic listens (LISTENING ON THE MOVE in voice.js),
+  // except locked for a pocket or dictating one field's note.
+  if (isRecording && (activeNotesTargetKey || document.body.classList.contains('pocket-lock'))) { showToast('Tap Stop to finish recording first', 'info'); return true; }
   if (activeEditEl) { commitActive(); return true; }
   if (shown('photoMarkup')) { if (markupState.pendingLabel) closeMarkupLabel(); else closePhotoMarkup(); return true; }
   if (shown('photoViewer')) { closePhotoViewer(); return true; }
@@ -306,7 +308,10 @@ function navBack() {
     if (close) close(); else sheet.classList.remove('open');
     return true;
   }
-  if (isOpen('voicePopover')) { toggleVoicePopover(); return true; }
+  // While it listens, back makes the open note small again, then moves
+  // through the app as usual with the mic still on.
+  if (isOpen('voicePopover') && isRecording && !activeNotesTargetKey) { if (voiceExpanded) { collapseVoiceNote(); return true; } }
+  else if (isOpen('voicePopover')) { toggleVoicePopover(); return true; }
   if (isOpen('dashboardDetail')) { closeDashboardDetail(); return true; }
   if (isOpen('sidebarPanel')) { drawerBackTap(); return true; }
   const place = navPlace();

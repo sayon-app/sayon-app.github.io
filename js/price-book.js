@@ -162,6 +162,7 @@ function renderInvoicePayDetails(canEdit) {
   const days = document.getElementById('pbInvoiceDays');
   days.innerHTML = INVOICE_DAYS.map(d => `<option value="${d}"${d === invoiceDays() ? ' selected' : ''}>${d ? `Within ${d} days` : 'On receipt'}</option>`).join('');
   days.disabled = !canEdit;
+  renderXeroExport();
 }
 function onInvoicePayDetails() {
   if (!canEditBusiness()) return;

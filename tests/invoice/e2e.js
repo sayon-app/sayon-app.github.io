@@ -119,6 +119,35 @@ let shotN = 0;
   s = await job();
   check(s.group === 'done' && s.invoice.state === 'done' && /another app/.test(s.invoice.full) && emails.length === 1, 'Invoiced in another app: done, nothing sent');
 
+  // 8. For Xero: every real invoice in the period, one row a line, the sample
+  // and anything invoiced in another app left out.
+  const ex = await p.evaluate(() => {
+    const all = JSON.parse(localStorage.getItem(quotesStorageKey()) || '{}');
+    const base = { client: 'Sam "The Builder" Taylor', clientEmail: 'sam@example.com', address: '7 Made Up Road, Ryde NSW 2112', number: 'Q-20261110-1111', gst: true };
+    all.job_a = Object.assign({}, base, { reportKey: 'job_a', items: [], taxInvoice: { number: 'INV-20261110-1111', date: todayIsoDate(), due: addDaysIso(todayIsoDate(), 14), gst: true,
+      items: [{ desc: 'Chemical soil treatment', detail: 'Around the house', qty: 40, unit: 'lm', price: 28 }, { desc: 'Clear weep holes', qty: 1, unit: 'job', price: 180 }], subtotal: 1300, gstAmount: 130, total: 1430, sentAt: Date.now() } });
+    all.job_b = Object.assign({}, base, { reportKey: 'job_b', number: 'Q-2', items: [], taxInvoice: { number: 'INV-2', date: todayIsoDate(), due: todayIsoDate(), gst: true, items: [{ desc: 'Bait', qty: 1, price: 99 }], total: 108.9, elsewhereAt: Date.now() } });
+    all.job_c = Object.assign({}, base, { reportKey: 'job_c', number: 'Q-3', items: [], taxInvoice: { number: 'INV-3', date: '2020-01-05', due: '2020-01-12', gst: false, items: [{ desc: 'Old job', qty: 1, price: 50 }], total: 50 } });
+    localStorage.setItem(quotesStorageKey(), JSON.stringify(all));
+    const month = invoiceExportPeriods()[0];
+    return { month: invoicesForExport(month.from, month.to).map(x => x.inv.number), every: invoicesForExport('', '').map(x => x.inv.number), csv: xeroInvoicesCsv(invoicesForExport(month.from, month.to)) };
+  });
+  console.log('export:', JSON.stringify({ month: ex.month, every: ex.every }));
+  console.log(ex.csv);
+  const lines = ex.csv.trim().split('\r\n');
+  check(ex.month.length === 1 && ex.month[0] === 'INV-20261110-1111', 'this month\'s file holds the real invoice, not the sample\'s or one invoiced in another app');
+  check(ex.every.join() === 'INV-3,INV-20261110-1111', 'every invoice, oldest first');
+  check(lines.length === 3 && lines[0].startsWith('*ContactName,EmailAddress') && /\*AccountCode,\*TaxType/.test(lines[0]), 'Xero\'s columns, then a row for each line');
+  const today = await p.evaluate(() => { const [y, m, d] = todayIsoDate().split('-'); return `${d}/${m}/${y}`; });
+  check(lines[1].startsWith('"Sam ""The Builder"" Taylor",sam@example.com,') && lines[1].includes(`INV-20261110-1111,"7 Made Up Road, Ryde NSW 2112",${today},`)
+    && lines[1].includes('Chemical soil treatment: Around the house,40,28.00,,200,GST on Income,') && lines[1].includes(',AUD,'), 'a row: the client quoted, the address as the reference, dates as dd/mm/yyyy, ex GST price, account 200, GST on Income');
+  await p.evaluate(() => { closeJobPage(); openPriceBook(); }); await p.waitForTimeout(700);
+  await p.evaluate(() => document.getElementById('pbXeroDownload').scrollIntoView({ block: 'center' })); await shot('xero-export');
+  const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 8000 }).catch(() => null), p.tap('#pbXeroDownload')]);
+  check(dl && /^SAYON invoices for Xero, .+\.csv$/.test(dl.suggestedFilename()), 'Download for Xero saves the file: ' + (dl && dl.suggestedFilename()));
+  await p.selectOption('#pbXeroPeriod', 'last'); await p.tap('#pbXeroDownload'); await p.waitForTimeout(400);
+  check(/No invoices in /.test(await p.evaluate(() => document.getElementById('toast').innerText)), 'a period with no invoices says so');
+
   check(!errs.length, 'no page errors: ' + errs.join(' | '));
   await b.close();
   if (fails.length) { console.log(`\n${fails.length} FAILED`); process.exit(1); }

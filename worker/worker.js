@@ -4,6 +4,16 @@
  * The API keys are stored as Cloudflare secrets and never exposed to the
  * browser or public repo. See worker/README.md for setup and deploy steps.
  *
+ * CHANGES FROM v10 -> v11:
+ * - Card payments on invoices (Stripe Connect, direct charges). Each
+ *   business takes cards into its own Stripe account, so the money never
+ *   passes through SAYON's, and SAYON takes no fee. Five routes under
+ *   /stripe/connect/ (see STRIPE: CARD PAYMENTS ON INVOICES below).
+ *   Needs the column in supabase/card-payments.sql and Connect switched on
+ *   in Stripe. Until both are done /stripe/connect/status answers
+ *   { connected: false } and nothing else changes. No new secret, and the
+ *   webhook is untouched: the app asks whether a link has been paid.
+ *
  * CHANGES FROM v9.9 -> v10:
  * - POST /stripe/delete-customer: when the owner deletes their account,
  *   the app calls this just before the account itself is deleted, and the
@@ -852,6 +862,12 @@ async function handleStripeRoute(pathname, request, user, env, origin) {
       });
     }
 
+    // Card payments on invoices have their own rules about who may call
+    // them: an inspector on a team emails invoices too.
+    if (pathname.startsWith('/stripe/connect/')) {
+      return await handleConnectRoute(pathname, request, user, env, reply, businessId, sub);
+    }
+
     if (request.method !== 'POST') return reply(405, { message: 'Method not allowed' });
     if (!env.STRIPE_SECRET_KEY) return reply(503, { message: 'Billing is not configured yet' });
 
@@ -1090,6 +1106,162 @@ function safeReturnUrl(candidate, marker) {
   return `${DEFAULT_APP_URL}?billing=${marker}`;
 }
 
+// ── STRIPE: CARD PAYMENTS ON INVOICES ────────────────────────────────────
+// A business that wants its clients to pay an invoice by card connects its
+// own Stripe account (Stripe Connect, direct charges). The client pays on
+// Stripe's page, into that account: the business is the merchant, pays
+// Stripe's fee and handles its own refunds and disputes. Nothing passes
+// through SAYON's Stripe account and SAYON takes no fee.
+//
+// The business's account id is kept on its `subscriptions` row
+// (stripe_connect_account_id, supabase/card-payments.sql), which only this
+// Worker can read or write. Every call below uses the id from the caller's
+// own business's row; one sent by the app is never used.
+//
+//   GET  /stripe/connect/status          { connected, ready }
+//   POST /stripe/connect/onboard         owner only: { url } of Stripe's sign-up
+//   POST /stripe/connect/payment-link    { id, url } for one invoice
+//   POST /stripe/connect/payment-status  { paid: { <link id>: { at } | false } }
+//   POST /stripe/connect/close-link      switches a link off (paid another way)
+//
+// A link is card only (so a finished payment is a paid one), in AUD, and
+// takes one payment. There is no webhook for these: the app asks.
+const CONNECT_MIN_CENTS = 100;       // $1
+const CONNECT_MAX_CENTS = 5000000;   // $50,000
+const CONNECT_STATUS_MAX = 20;       // links asked about in one call
+const PAYMENT_LINK_ID = /^plink_[A-Za-z0-9]+$/;
+
+// One line of text from the app, for a Stripe description or metadata.
+function cleanLine(value, max) {
+  return String(value === undefined || value === null ? '' : value).replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+async function handleConnectRoute(pathname, request, user, env, reply, businessId, sub) {
+  if (!env.STRIPE_SECRET_KEY) return reply(503, { message: 'Card payments are not set up yet' });
+  const account = sub.stripe_connect_account_id || '';
+  const on = { account };
+  // The business took SAYON off its Stripe account, or the account is gone.
+  const gone = err => err && (err.status === 401 || err.status === 403 || err.status === 404);
+
+  if (pathname === '/stripe/connect/status') {
+    if (request.method !== 'GET') return reply(405, { message: 'Method not allowed' });
+    if (!account) return reply(200, { connected: false, ready: false });
+    try {
+      const acct = await stripeRequest(env, 'GET', `/accounts/${encodeURIComponent(account)}`);
+      return reply(200, { connected: true, ready: !!(acct.charges_enabled && acct.details_submitted) });
+    } catch (err) {
+      if (!gone(err)) throw err;
+      return reply(200, { connected: false, ready: false });
+    }
+  }
+
+  if (request.method !== 'POST') return reply(405, { message: 'Method not allowed' });
+  let body = {};
+  try { body = await request.json(); } catch { /* empty body is fine */ }
+
+  if (pathname === '/stripe/connect/onboard') {
+    // The Stripe account is the business's: only its owner opens one.
+    if (!(await isBusinessOwner(businessId, user.id, env))) {
+      return reply(403, { message: 'Only the business owner can set up card payments' });
+    }
+    let id = account;
+    if (id) {
+      try { await stripeRequest(env, 'GET', `/accounts/${encodeURIComponent(id)}`); }
+      catch (err) { if (!gone(err)) throw err; id = ''; }
+    }
+    if (!id) {
+      const acct = await stripeRequest(env, 'POST', '/accounts', {
+        type: 'standard',
+        country: 'AU',
+        email: user.email,
+        metadata: { business_id: businessId },
+      });
+      // Only lands if the row still holds what we read, so two taps can't
+      // leave the business pointing at one account and onboarding another.
+      const row = await patchSubscriptionIf(sub.id, { stripe_connect_account_id: account || null }, { stripe_connect_account_id: acct.id }, env);
+      id = row ? acct.id : ((await readSubscription(sub.id, env)).stripe_connect_account_id || acct.id);
+    }
+    const back = safeReturnUrl(body.returnUrl, 'cards');
+    const link = await stripeRequest(env, 'POST', '/account_links', {
+      account: id,
+      type: 'account_onboarding',
+      refresh_url: back,
+      return_url: back,
+    });
+    return reply(200, { url: link.url });
+  }
+
+  if (pathname === '/stripe/connect/payment-link') {
+    if (!account) return reply(409, { code: 'NOT_CONNECTED', message: 'Card payments are not set up' });
+    const cents = body.amount_cents;
+    if (typeof cents !== 'number' || !Number.isInteger(cents) || cents < CONNECT_MIN_CENTS || cents > CONNECT_MAX_CENTS) {
+      return reply(400, { message: 'That amount can\'t be paid by card' });
+    }
+    const number = cleanLine(body.number, 40);
+    if (!number) return reply(400, { message: 'The invoice has no number' });
+    const address = cleanLine(body.address, 120);
+    let acct;
+    try { acct = await stripeRequest(env, 'GET', `/accounts/${encodeURIComponent(account)}`); }
+    catch (err) { if (!gone(err)) throw err; acct = null; }
+    if (!acct || !acct.charges_enabled) return reply(409, { code: 'NOT_READY', message: 'Card payments aren\'t finished being set up' });
+
+    const price = await stripeRequest(env, 'POST', '/prices', {
+      currency: 'aud',
+      unit_amount: cents,
+      product_data: { name: `Invoice ${number}${address ? `, ${address}` : ''}` },
+    }, on);
+    const meta = { sayon_invoice: number, sayon_report: cleanLine(body.report_id, 80), sayon_business: businessId };
+    const link = await stripeRequest(env, 'POST', '/payment_links', {
+      line_items: [{ price: price.id, quantity: 1 }],
+      payment_method_types: ['card'],
+      restrictions: { completed_sessions: { limit: 1 } },
+      inactive_message: 'This invoice has been paid or is no longer open. Please contact us if you have a question.',
+      payment_intent_data: { description: `Invoice ${number}` },
+      metadata: meta,
+    }, on);
+    return reply(200, { id: link.id, url: link.url });
+  }
+
+  if (pathname === '/stripe/connect/payment-status') {
+    const ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).filter(id => typeof id === 'string' && PAYMENT_LINK_ID.test(id)))].slice(0, CONNECT_STATUS_MAX);
+    const paid = {};
+    if (!account) return reply(200, { paid });
+    await Promise.all(ids.map(async id => {
+      try {
+        const link = await stripeRequest(env, 'GET', `/payment_links/${id}`, null, on);
+        const done = link.restrictions && link.restrictions.completed_sessions;
+        if (!(done && done.count >= 1)) { paid[id] = false; return; }
+        // When it was paid, if Stripe will say; today otherwise.
+        let at = Math.floor(Date.now() / 1000);
+        try {
+          const sessions = await stripeRequest(env, 'GET', `/checkout/sessions?payment_link=${id}&status=complete&limit=1`, null, on);
+          if (sessions.data && sessions.data[0] && sessions.data[0].created) at = sessions.data[0].created;
+        } catch (err) { /* the count already says it's paid */ }
+        paid[id] = { at };
+      } catch (err) {
+        if (!gone(err)) throw err;
+        paid[id] = false;
+      }
+    }));
+    return reply(200, { paid });
+  }
+
+  if (pathname === '/stripe/connect/close-link') {
+    const id = typeof body.id === 'string' && PAYMENT_LINK_ID.test(body.id) ? body.id : '';
+    if (!id) return reply(400, { message: 'Unknown link' });
+    if (!account) return reply(200, { closed: false });
+    try {
+      await stripeRequest(env, 'POST', `/payment_links/${id}`, { active: false }, on);
+      return reply(200, { closed: true });
+    } catch (err) {
+      if (!gone(err)) throw err;
+      return reply(200, { closed: false });
+    }
+  }
+
+  return reply(404, { message: 'Not found' });
+}
+
 // ── STRIPE: WEBHOOK ──────────────────────────────────────────────────────
 // Keeps the `subscriptions` row in step with Stripe: which plan was paid
 // for, and whether it's active, past due or canceled. Subscribe the
@@ -1235,11 +1407,13 @@ function timingSafeEqual(a, b) {
 
 // ── STRIPE: API CLIENT ───────────────────────────────────────────────────
 
-async function stripeRequest(env, method, path, params) {
+// opts.account: act on that connected account (Stripe Connect), not SAYON's.
+async function stripeRequest(env, method, path, params, opts) {
   const init = {
     method,
     headers: { 'Authorization': `Bearer ${env.STRIPE_SECRET_KEY}` },
   };
+  if (opts && opts.account) init.headers['Stripe-Account'] = opts.account;
   if (params) {
     init.headers['Content-Type'] = 'application/x-www-form-urlencoded';
     init.body = encodeStripeParams(params);

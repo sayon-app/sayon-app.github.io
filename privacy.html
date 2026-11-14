@@ -108,7 +108,7 @@
 
 
   <h1>Privacy Policy</h1>
-  <div class="updated">Last updated: 14 November 2026 · Version 10</div>
+  <div class="updated">Last updated: 14 November 2026 · Version 11</div>
 
   <p>SAYON ("we", "us") is an app that licensed timber pest inspectors in Australia use to record inspection findings and write reports, quotes, certificates and invoices. This policy explains what personal information the app collects, how it is used, who it is shared with, how long it is kept, and how to contact us or complain.</p>
   <p>It covers information about the inspectors and businesses who use the app ("inspectors"), and about the property owners, occupants and other clients whose properties they inspect ("clients").</p>
@@ -130,6 +130,7 @@
     <li><strong>App usage and error information</strong>: which screens and steps are used, how long the AI takes, error messages and crash details, the type of device and browser, and the network address the app connects from. This is linked to a random account number, not to the inspector's name or email, and never includes client details, spoken notes, report text, photos or signatures. It is on by default, and the inspector can turn it off in Menu › Settings › Send crash reports and usage.</li>
     <li><strong>Problem reports</strong>: when an inspector sends one (Menu › Report a problem, or after the app closes unexpectedly), what they write, and unless they untick it, the app version, device and browser, where they were in the app and the errors the phone kept. It is stored in our database (Supabase) with their account so we can look into it and reply. The technical details never include client details, report text or photos; anything the inspector writes themselves is sent as written. It is only sent when they press Send.</li>
     <li><strong>Billing information</strong> for paid plans. Card details are entered directly with Stripe. We don't see or store full card details.</li>
+    <li><strong>Card payments on invoices.</strong> A business can let its clients pay an invoice by card. The client pays on a page run by Stripe and the money goes into the business's own Stripe account, not through us. The client's card details are entered directly with Stripe, and we don't see or store them. The app keeps the payment link and whether it has been paid.</li>
   </ul>
   <p>The only bank account details the app keeps are the ones a business enters to print on its own invoices. We don't collect clients' bank account details, and we don't knowingly collect health information or government identifiers (such as tax file numbers) through the app.</p>
 
@@ -164,7 +165,7 @@
     <li><strong>Apple</strong> or <strong>Google</strong> (United States): the browser's built-in speech recognition, when the app's own speech-to-text can't be used.</li>
     <li><strong>Google</strong> (United States): address suggestions (it receives the typed address), the weather (it receives the property's location, or the phone's rounded location), and the fonts the pages use (it receives the device's network address).</li>
     <li><strong>Resend</strong> (United States): emails reports, quotes, certificates and invoices to the client when the inspector sends them from the app. It receives the email, its PDF attachments and the client's email address.</li>
-    <li><strong>Stripe</strong> (United States and other countries): processes plan payments. It receives the account holder's billing details, not client or inspection information.</li>
+    <li><strong>Stripe</strong> (United States and other countries): processes plan payments, for which it receives the account holder's billing details and no client or inspection information. For a business that sets up card payments on its invoices, Stripe also opens that business's own Stripe account (it receives the owner's email address from the app, and the business gives Stripe its own details there) and runs the page its clients pay on. For each invoice it receives the invoice number, the property address and the amount from the app, and whatever the client enters on that page. Stripe holds these in the business's Stripe account under its own terms with that business, and the account stays open if the SAYON account is deleted.</li>
     <li><strong>Sentry</strong> (United States), to tell us when the app breaks, and <strong>PostHog</strong> (United States), to show us which parts of the app get used. They receive the usage and error information described above, not client or inspection information.</li>
     <li><strong>GitHub Pages</strong> (United States), which hosts the app's pages, and <strong>cdnjs</strong>, run by Cloudflare, which serves the PDF library. They receive the device's network address and browser details when the app loads.</li>
     <li><strong>data.gov.au</strong>, the Australian Government's open data site: once a week, and when a number is typed, the app looks up the APVMA numbers in the business's chemical register on the APVMA's list of registered products. It receives those numbers and the device's network address.</li>

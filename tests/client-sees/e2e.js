@@ -219,6 +219,7 @@ const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
   check(ver(privacy) === legal.privacy && ver(terms) === legal.terms, `sign-up records the versions the pages carry: privacy ${ver(privacy)} and ${legal.privacy}, terms ${ver(terms)} and ${legal.terms}`);
   check(!/Analyse/.test(privacy) && /taps Describe or Insect ID on a photo/.test(privacy), 'the privacy policy names the photo buttons as the app does');
   check(/bank account details and PayID the business prints on its invoices/.test(privacy) && !/knowingly collect health information, bank account details/.test(privacy) && /certificates and invoices to the client/.test(privacy), 'the privacy policy says an invoice keeps the business\'s bank details and goes by email');
+  check(/goes into the business's own Stripe account, not through us/.test(privacy) && /the invoice number, the property address and the amount/.test(privacy), 'the privacy policy says where a card payment goes and what Stripe is sent');
   check(/A photo goes to it too/.test(site) && !/download every report and quote/.test(site) && !/tap your initials/.test(site), 'the website says photos go to the AI too, what Download gives, and where Billing is');
 
   // The samples are files, made by docs/handover/samples/make-site-samples.js.

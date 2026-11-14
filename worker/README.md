@@ -13,6 +13,11 @@ calls:
 | `POST /stripe/create-portal-session` | Manage button | Returns a Stripe Billing Portal link (card, invoices, cancel) |
 | `POST /stripe/delete-customer` | Delete my account (v10) | Deletes the owner's Stripe customer just before the account goes. Refuses with 409 `ACTIVE_SUBSCRIPTION` or `HAS_TEAM`, like the account deletion |
 | `POST /stripe/webhook` | Stripe | Updates the `subscriptions` row when someone pays, changes plan or cancels |
+| `GET /stripe/connect/status` | Your prices › Getting paid (v11) | Whether the business has set up card payments on invoices: `{ connected, ready }` |
+| `POST /stripe/connect/onboard` | Set up card payments (v11) | Owner only. Opens the business's own Stripe account if it has none, keeps its id on the `subscriptions` row and returns Stripe's sign-up link |
+| `POST /stripe/connect/payment-link` | Emailing an invoice (v11) | Makes the Pay by card link for one invoice on the business's own Stripe account: card only, AUD, one payment, $1 to $50,000 |
+| `POST /stripe/connect/payment-status` | Opening Jobs, Check now (v11) | Says which of up to 20 Pay by card links have been paid, and when |
+| `POST /stripe/connect/close-link` | Mark paid, Invoiced in another app (v11) | Switches a Pay by card link off, so an invoice paid another way can't be paid again by card |
 | `POST /send-email` | Send, Email to client, Email certificate | Emails the PDFs to the client from the business through Resend, with a copy to the business; answers 501 until Resend is set up, and the app then uses the phone's mail app |
 | `GET /maps-key` | Street Address box | Returns the Google Maps browser key from the `GOOGLE_MAPS_KEY` secret, so address suggestions work; answers 501 until it's set, and the box stays plain text |
 | `GET /weather` | Picking the address, or Fill from the weather | Returns the conditions, temperature, humidity and past 24 hours of rain at a location from Google's Weather API, using the `GOOGLE_WEATHER_KEY` secret; answers 501 until it's set |
@@ -97,6 +102,36 @@ repeat with live keys when you're ready to charge real cards.
    end of the period). Leave "switch plans" and "change quantity" off: the
    app switches plans and changes the number of inspectors itself, so it
    can check them against the team.
+
+## Card payments on invoices (Stripe Connect)
+
+A business can let its clients pay an invoice by card. It connects its own
+Stripe account, the client pays on Stripe's page, and the money goes to that
+account: the business is the merchant, pays Stripe's fee, and handles its own
+refunds and disputes. Nothing passes through SAYON's Stripe account, SAYON
+takes no fee, and under this set-up Stripe charges SAYON nothing for Connect.
+
+Set it up once, in **test mode** first:
+
+1. **Run `supabase/card-payments.sql`** in the Supabase SQL editor. It adds
+   one column, `subscriptions.stripe_connect_account_id`.
+2. **Turn on Connect.** Stripe › Connect › Get started. Choose the set-up
+   where each connected business pays Stripe's fees itself and has the full
+   Stripe dashboard (Stripe has called these Standard accounts). The Worker
+   opens accounts with `type=standard`.
+3. **Brand the sign-up page.** Connect › Settings › Branding: the name SAYON
+   and the icon.
+4. **Deploy this Worker.** No new secret. If `STRIPE_SECRET_KEY` is a
+   restricted key, give it write access to Connect.
+
+There is no webhook for card payments. The app asks `/stripe/connect/payment-status`
+about the links that are out when Jobs opens, the way it asks about agreement
+and quote links.
+
+Check it works (test mode): Menu › Your prices › Getting paid › Set up card
+payments, finish Stripe's sign-up with its test details, email an invoice from
+a job, open the Pay by card link in the email and pay with `4242 4242 4242 4242`.
+Open Jobs: the invoice reads "Paid by card" and the job moves on.
 
 ## Add the secrets to the Worker
 

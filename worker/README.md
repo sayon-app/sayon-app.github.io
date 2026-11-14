@@ -60,7 +60,8 @@ text. Google gives a free allowance each month; set a budget alert anyway.
    **Places API (New)**.
 3. APIs & Services › Credentials › Create credentials › API key. Open the key:
    - Application restrictions › **Websites**, add
-     `https://sayon-app.github.io/*` and `https://*--sayon-preview.netlify.app/*`
+     `https://app.sayon.com.au/*`, `https://sayon-app.github.io/*` and
+     `https://*--sayon-preview.netlify.app/*`
    - API restrictions › **Restrict key** › tick Maps JavaScript API and
      Places API (New). Save.
 4. Cloudflare › Workers & Pages › `korva` › Settings › Variables and Secrets ›

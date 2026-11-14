@@ -1,6 +1,6 @@
 # SAYON — guide for working on this repo
 
-A voice-to-report PWA for Australian timber pest inspectors. The chain is: pre-inspection agreement → voice inspection report → quote → client's answer and signature → treatment record and certificate, each sent to the client. It is a static site on GitHub Pages: no build step and no framework. Plain HTML, CSS and JS that load in the browser.
+A voice-to-report PWA for Australian timber pest inspectors. The chain is: pre-inspection agreement → voice inspection report → quote → client's answer and signature → treatment record and certificate, each sent to the client. It is a static site, published from the `live` branch by GitHub Pages (sayon-app.github.io) and Cloudflare Pages (app.sayon.com.au, where it's moving): no build step and no framework. Plain HTML, CSS and JS that load in the browser.
 
 **New to this repo, or starting a larger task? Read `docs/handover/README.md` first.** It covers the owner, what's live, the go-live recipe and the traps, and points to the rest.
 
@@ -29,6 +29,7 @@ Read only the files your task needs. The app's own code is split into 19 files i
 | `css/app.css`, `css/quote.css` | Styles |
 | `service-worker.js` | Offline cache. **Bump `CACHE_VERSION` (korva-vNN) whenever cached files change** |
 | `worker/worker.js` | Cloudflare Worker `korva`: AI proxy, `/transcribe`, Stripe (the plan, and `/stripe/connect/*` for card payments on invoices), `/send-email`. Pasted into Cloudflare by hand. Its Stripe routes have their own tests, run on their own: `node tests/billing-worker/seats.mjs` and `connect.mjs` |
+| `_headers` | Response headers on Cloudflare Pages (GitHub Pages ignores it): the manifest is readable from the old address, for the move |
 | `netlify.toml` | Netlify preview links only (`deploy-preview-N--sayon-preview.netlify.app`). Never the live site |
 | `supabase/*.sql` | SQL baz applies in the Supabase SQL editor |
 | `terms.html`, `privacy.html` | Legal pages |
@@ -64,7 +65,7 @@ They are plain scripts, not modules: every top-level name is shared across all o
 
 ## Rules that aren't obvious from the code
 
-- **Merging is not deploying.** GitHub Pages publishes the `live` branch. Work goes into `main` by PR. Going live is a separate PR into `live`, built from `origin/live` plus cherry-picked commits, and only after the owner says "deploy". Never push to `live`.
+- **Merging is not deploying.** GitHub Pages and Cloudflare Pages publish the `live` branch. Work goes into `main` by PR. Going live is a separate PR into `live`, built from `origin/live` plus cherry-picked commits, and only after the owner says "deploy". Never push to `live`.
 - **Worker, Supabase and Stripe changes** are applied by hand, and only after the owner has seen the exact change.
 - **Don't rename stored keys.** That covers `korva_*` localStorage keys, the `korvus-photos` IndexedDB and the Worker URL; renaming them loses users' data. The brand was renamed KORVUS → SAYON in display text only.
 - **Font sizes grow with Settings › Text size.** Write one as `calc(13px * var(--ts))`, not `13px`, which stays the same at Large and Extra large (`tests/text-size/e2e.js` checks).

@@ -46,7 +46,7 @@ For an AI model taking over this repo with no context. Last checked 2026-10-05: 
 - If something private gets committed, stop and tell baz. Don't rewrite history.
 
 ### Merging is not deploying (the most important rule)
-- Work goes into `main` by PR, which changes nothing live. GitHub Pages publishes the `live` branch.
+- Work goes into `main` by PR, which changes nothing live. GitHub Pages (sayon-app.github.io) and Cloudflare Pages (app.sayon.com.au, once baz has set it up) both publish the `live` branch, so a merge into `live` updates both.
 - Rulesets: `live` requires a PR and blocks force pushes and deletion; `main` blocks force pushes and deletion. One check runs on each PR into `main` (`.github/workflows/tests.yml`): `node --check` on every script, then `node tests/run-all.js`. A red check is a failing test; the run's Artifacts hold its screenshots and PDFs. Go-live PRs into `live` don't run it. Still run the tests yourself before pushing.
 - `gh pr …` uses GraphQL, which Claude Code sessions block. Use `gh api repos/{owner}/{repo}/pulls…` from the clone, or `list_project_prs`.
 - Go-live, only after baz says "deploy <thing>":
@@ -57,7 +57,7 @@ For an AI model taking over this repo with no context. Last checked 2026-10-05: 
      - The website's samples go with the PDFs. If that list has a file that draws a client's PDF (`js/app/pdf.js`, `js/quote.js`, `js/treatment.js`, `js/site-plan.js`), it should have `samples/` in it too: the sign-in screen and the website link to `samples/sample-report.pdf`, `sample-quote.pdf` and `sample-certificate.pdf`, and they are only true while they are made by the code that's live. Remake them on `main` in the PR that changes the PDF (`node docs/handover/samples/make-site-samples.js <jspdfDir> samples`, usage at the top of the script), read the three through, and cherry-pick that commit with the rest.
   5. If a cherry-pick conflicts or a check fails: for `CACHE_VERSION` take the higher of live+1 and the commit's number; if `CLAUDE.md`, `docs/` or `tests/` came along (a grep hit in `docs/` means they did), `git rm -r` them and `git commit --amend`. Keeping docs and tests in separate commits from app changes avoids this.
   6. `git push --force-with-lease origin <your-branch>`, open the PR into `live`, and give baz "GitHub → merge PR #N". Never merge, approve or turn on auto-merge for it yourself.
-  7. After he merges, confirm the "pages build and deployment" run on `live` succeeded for the merge commit (section 5). github.io may be unreachable from the sandbox; a failed fetch doesn't mean the deploy failed.
+  7. After he merges, confirm the "pages build and deployment" run on `live` succeeded for the merge commit (section 5). Cloudflare's build shows in its dashboard, not on GitHub; baz can check it there. github.io may be unreachable from the sandbox; a failed fetch doesn't mean the deploy failed.
 - While a go-live PR from your branch is open, keep new commits local. Pushing would add them to the go-live.
 - **Never go live by merging `main` into `live`.** `main` carries things that must stay off the site:
   - (Resolved.) PR #32's Terms and Privacy rewrite, voice privacy hint and e-sign sentence used to be main-only. They are live now: `terms.html` and `privacy.html` have been the same on `live` and `main` since 1 Nov 2026 (`abecd2b`), with no placeholders left, and the e-sign sentence has been live since go-live `d7a8e1c` (7 Oct).

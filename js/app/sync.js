@@ -401,7 +401,7 @@ document.addEventListener('visibilitychange', async () => {
   pushUnsyncedReports();
   checkAddressMove();
   // A client may have signed or answered while the phone was away.
-  if (!isRecording) checkLinksOut();
+  if (!isRecording) { checkLinksOut(); checkInvoicePayLinks(); }
 });
 window.addEventListener('pagehide', saveBeforeLeaving);
 window.addEventListener('beforeunload', saveBeforeLeaving);

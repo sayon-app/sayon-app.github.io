@@ -63,6 +63,8 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 
 `tests/jobs-numbers/e2e.js <outDir>` checks the month's numbers under the lists: nothing until there's a real job (the sample doesn't count), one closed line on a phone that opens, each row against made-up jobs dated this month and last, Owed to you now opening Waiting, no money rows for a business that doesn't invoice from SAYON, and the wide screen's rail showing its foot beside a long list.
 
+`tests/card-pay/e2e.js <outDir>` checks card payments on the invoice with Stripe and the Worker stood in for: nothing shows while the Worker has no such routes, the owner sets them up from Getting paid and comes back to On, an emailed invoice has the Pay by card link in the email and on the PDF, Check now and opening Jobs mark it paid by card, Mark paid by hand switches the link off, a link that can't be made doesn't stop the invoice going, and an inspector on a team can't set them up. The Worker's side is `node tests/billing-worker/connect.mjs`, which runs on its own.
+
 ## New job
 
 `tests/visual/new-job.js <outDir> [width]` taps New job on the Jobs list and types a job in by hand, checking on the way: the job page opens empty with the address ready to type and today's date, the page shows the address as it's typed, a postcode fills in the state (but not over one picked by hand), Sign on this phone with no address asks for one, Save it for later puts the job on the Jobs list, and once saved the job page leads with the agreement. It shoots the empty page, the filled-in page, the Jobs list and the saved job's page. Before and after shots are in `docs/screenshots/new-job/`.

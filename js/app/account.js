@@ -556,6 +556,9 @@ function handleBillingReturn() {
       showToast('Checkout cancelled. Nothing was changed', 'info');
     } else if (billing === 'updated') {
       loadBillingStatus();
+    } else if (billing === 'cards') {
+      // Back from setting up card payments on invoices (js/invoice.js).
+      setTimeout(() => cardPayReturned(), 400);
     }
 
     params.delete('billing');
@@ -726,7 +729,7 @@ function stopAuthAutoRefresh() {
 // ── SIGN UP ──────────────────────────────────────────────────────────────
 // The Terms and Privacy versions a new account agrees to at sign-up. Raise
 // these with the "Version N" lines at the top of terms.html and privacy.html.
-const LEGAL_VERSIONS = { terms: 3, privacy: 10 };
+const LEGAL_VERSIONS = { terms: 3, privacy: 11 };
 
 async function signUp() {
   const name     = document.getElementById('suName').value.trim();

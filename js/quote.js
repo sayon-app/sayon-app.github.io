@@ -1857,8 +1857,9 @@ function quoteContentHash(q) {
   const content = Object.assign({}, q);
   // 'booking' and 'invoice' are left over from features that were removed;
   // older quotes may still carry them, and they never counted as content.
+  // 'taxInvoice' is the invoice made from the quote (js/invoice.js).
   ['updatedAt', 'createdAt', 'sentAt', 'sentHash', 'certificateSentAt', 'certificateHandedAt', 'reportKey', 'answer', 'booking', 'treatment', 'baitVisits', 'invoice',
-    'sourceAddress', 'issuedAt', 'issuedHash', 'linkRequest', 'aiPlan', 'clientSeen'].forEach(k => delete content[k]);
+    'sourceAddress', 'issuedAt', 'issuedHash', 'linkRequest', 'aiPlan', 'clientSeen', 'taxInvoice'].forEach(k => delete content[k]);
   return sha256Hex(stableJson(content));
 }
 // The day this version of the quote was first given to the client. The PDF
@@ -1899,8 +1900,8 @@ function certificateGiven(q) { return !!(q && (q.certificateSentAt || q.certific
 // takes the same times.
 function storeSentQuote(q) {
   if (quoteState && quoteState !== q && quoteState.reportKey === q.reportKey) {
-    ['sentAt', 'sentHash', 'certificateSentAt', 'certificateHandedAt', 'issuedAt', 'issuedHash', 'linkRequest', 'answer'].forEach(k => {
-      if (q[k]) quoteState[k] = q[k]; else if (k === 'certificateHandedAt' || k === 'linkRequest' || k === 'answer') delete quoteState[k];
+    ['sentAt', 'sentHash', 'certificateSentAt', 'certificateHandedAt', 'issuedAt', 'issuedHash', 'linkRequest', 'answer', 'taxInvoice'].forEach(k => {
+      if (q[k]) quoteState[k] = q[k]; else if (k === 'certificateHandedAt' || k === 'linkRequest' || k === 'answer' || k === 'taxInvoice') delete quoteState[k];
     });
   }
   const all = readJSON(quotesStorageKey(), {});

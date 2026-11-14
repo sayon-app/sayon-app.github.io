@@ -13,6 +13,8 @@ One name for each thing, everywhere: on the screens, in the emails and PDFs, on 
 | **your note** | What the inspector says into the mic. Notes waiting to go in are saved notes. | `Voice capture` |
 | **Say it** | The mic on a box or a sheet. | `Dictate`, `Dictating` |
 | **Fill in the report** | The AI filling the report from a note. | `Extract data`, `AI ready` |
+| **Listening** | The mic on, as a bar on the dock: the newest words, Fill in (fills the report from what's been said so far and keeps listening) and the photo button. The report can still be used behind it. | `Recording mode` |
+| **Lock for your pocket** | Covers the screen while listening so a pocket can't tap it. Press and hold the top label to unlock. | `Pocket mode`, `Screen lock` |
 | **Describe** | The AI's caption for a photo. | `Analyse` |
 | **Report done** | The inspector's mark that the report is finished. It can still change. | `Mark complete` |
 | **Finalise** | A job's one ending: it locks the report and quote as a version and makes the job PDF. Amend unlocks it. | `Complete job` |

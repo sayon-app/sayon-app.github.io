@@ -373,7 +373,9 @@ function populateFields(data, transcript) {
   return new Promise(resolve => {
     setTimeout(() => {
       if (reportData !== target) { resolve(); return; }
-      autoReveal(data);
+      // While the mic listens the tech may be moving through the report
+      // themselves, so showFilledStep decides whether to turn it.
+      if (!isRecording) autoReveal(data);
       ensureTreatmentForLiveTermites();
       placeTalkPhotos();
       saveDraft();

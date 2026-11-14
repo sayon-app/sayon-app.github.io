@@ -2598,13 +2598,24 @@
       </div>
     </div><!-- /mainPanel -->
 
-  <!-- POCKET LOCK: covers the page while recording, under the voice popover -->
-  <div class="pocket-shield" id="pocketShield" hidden><span>Screen locked while recording. Tap Stop to unlock.</span></div>
+  <!-- POCKET LOCK: covers the page while recording, under the voice popover.
+       Off unless the inspector locks it for a pocket (see LISTENING ON THE MOVE in js/app/voice.js). -->
+  <div class="pocket-shield" id="pocketShield" hidden><span id="pocketShieldHold">Locked for your pocket. Press and hold here to unlock</span></div>
   <!-- VOICE POPOVER -->
   <div class="voice-popover" id="voicePopover">
     <div class="voice-popover-header">
       <span class="voice-popover-title"><svg class="icon " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span id="voicePopoverTitleText">Your note</span><span class="test-mode-badge" id="testModeBadge" hidden>Test mode on</span></span>
-      <button class="voice-popover-close" onclick="toggleVoicePopover()"><svg class="icon " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+      <button class="voice-popover-close" id="voicePopoverClose" onclick="closeVoicePanel()" aria-label="Close"><svg class="icon " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+    </div>
+
+    <!-- While it listens the panel shrinks to this bar, so the report behind
+         can still be scrolled and tapped (LISTENING ON THE MOVE in js/app/). -->
+    <div class="voice-live" id="voiceLive">
+      <button type="button" class="voice-live-note" onclick="expandVoiceNote()" aria-label="Listening. Show your whole note">
+        <span class="voice-live-head"><span class="voice-live-dot" aria-hidden="true"></span><span id="voiceLiveState">Listening</span></span>
+        <span class="voice-live-text" id="voiceLiveText"></span>
+      </button>
+      <button type="button" class="voice-live-fill" id="voiceLiveFill" onclick="fillNowWhileListening()">Fill in</button>
     </div>
 
     <button class="voice-btn" id="voiceBtn" onclick="toggleRecording()">
@@ -2690,6 +2701,11 @@
         <summary>Show notes</summary>
         <div id="pendingNotesList"></div>
       </details>
+    </div>
+
+    <div class="voice-listen-actions" id="voiceListenActions">
+      <button type="button" class="voice-listen-btn" onclick="fillNowWhileListening()">Fill in so far</button>
+      <button type="button" class="voice-listen-btn" onclick="lockForPocket()">Lock for your pocket</button>
     </div>
 
     <button class="extract-btn" id="extractBtn" onclick="processTranscript()" disabled>

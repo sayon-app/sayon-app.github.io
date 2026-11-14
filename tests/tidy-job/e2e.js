@@ -164,7 +164,7 @@ const emails = [];
   console.log('voice listening:', JSON.stringify(v), 'scroll left', scrolled);
   check(v.h < 230, `while listening it's the speak button and the last lines (${Math.round(v.h)}px)`);
   check(scrolled <= 2, 'the newest words are in sight');
-  check(v.shieldBg === 'rgba(0, 0, 0, 0)', 'the report behind isn\'t dimmed while listening');
+  check(v.shieldBg && v.shieldBg !== 'rgba(0, 0, 0, 0)', 'locked for a pocket, the report behind is dimmed so it reads as locked (tests/live-voice has listening unlocked)');
   await shot('6-voice-listening');
   await p.evaluate(() => stopRecording());
 

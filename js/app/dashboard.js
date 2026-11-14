@@ -413,21 +413,24 @@ function renderDashboard() {
   parkJobPanel();
   const today = new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
   body.innerHTML = `
-    <div class="dash-hero">
-      <span class="dash-hero-date">${today}</span>
-      <p class="dash-hero-title" id="dashboardLead"></p>
-      <p class="dash-hero-more" id="dashboardMore" hidden></p>
-    </div>
-    <div class="dash-controls">
-      <div class="dash-tabs" id="dashboardTabs" role="tablist">
-        <span class="dash-tab-line" aria-hidden="true"></span>
-        ${DASHBOARD_TABS.map(([key, label]) => `<button type="button" role="tab" class="dash-tab" data-tab="${key}" onclick="setDashboardTab('${key}')">${label} <span></span></button>`).join('')}
+    <aside class="dash-side">
+      <div class="dash-hero">
+        <span class="dash-hero-date">${today}</span>
+        <p class="dash-hero-title" id="dashboardLead"></p>
+        <p class="dash-hero-more" id="dashboardMore" hidden></p>
       </div>
-      <label class="dash-search" id="dashboardSearchWrap">
-        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z"/><path d="m21 21-4.3-4.3"/></svg>
-        <input id="dashboardSearch" type="search" placeholder="Search address or client" autocomplete="off" oninput="renderDashboardJobs()" aria-label="Search jobs">
-      </label>
-    </div>
+      <div class="dash-controls">
+        <div class="dash-tabs" id="dashboardTabs" role="tablist">
+          <span class="dash-tab-line" aria-hidden="true"></span>
+          ${DASHBOARD_TABS.map(([key, label]) => `<button type="button" role="tab" class="dash-tab" data-tab="${key}" onclick="setDashboardTab('${key}')">${label} <span></span></button>`).join('')}
+        </div>
+        <label class="dash-search" id="dashboardSearchWrap">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="dashboardSearch" type="search" placeholder="Search address or client" autocomplete="off" oninput="renderDashboardJobs()" aria-label="Search jobs">
+        </label>
+      </div>
+      <div class="dash-numbers" id="dashboardNumbers" hidden></div>
+    </aside>
     <div id="dashboardJobs"></div>
   `;
   readDashboardJobs();

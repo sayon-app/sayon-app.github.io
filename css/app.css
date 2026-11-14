@@ -3175,6 +3175,16 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 .dash-hero-more i { font-style: normal; color: var(--text3); }
 .dash-hero-more button { min-height: 32px; padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--risk); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 
+/* Start with: the day's first job and its next step, one tap to its page. */
+.dash-hero-first {
+  display: block; max-width: 100%; min-height: 44px; margin: 8px 0 0; padding: 10px 0; box-sizing: border-box;
+  border: 0; background: none; font: inherit; font-size: calc(15px * var(--ts)); line-height: 1.45; font-weight: 500; color: var(--text2); text-align: left; cursor: pointer;
+}
+.dash-hero-first b { font-weight: 650; color: var(--text); }
+.dash-hero-first::after { content: '\2192'; display: inline-block; margin-left: 8px; transition: transform 0.15s; }
+.dash-hero-first:hover b { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.dash-hero-first:hover::after { transform: translateX(3px); }
+.dash-hero-first:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 .dash-controls { display: flex; flex-direction: column; gap: 14px; margin: 0 0 22px; }
 /* The four lists as a strip: each one's count big, its name under it,
    ruled off from the next. The open one is underlined. */
@@ -5079,6 +5089,8 @@ body .dash-hero-date { color: var(--on-ink2); }
 body .dash-hero-title, body .dash-hero-title b { color: var(--on-ink); }
 body .dash-hero-more, body .dash-parked { color: var(--on-ink2); }
 body .dash-hero-more i { color: var(--on-ink2); }
+body .dash-hero-first { color: var(--on-ink2); }
+body .dash-hero-first b { color: var(--on-ink); }
 body .dash-hero-more button { color: var(--pink); }
 body .dash-part { color: var(--on-ink); }
 body .dash-part[data-count]::after { color: var(--on-ink2); }

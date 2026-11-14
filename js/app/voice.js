@@ -1150,7 +1150,8 @@ function startRecording() {
     });
   } else listen();
   holdScreenAwake();
-  setPocketLock(true);
+  voiceExpanded = false;
+  setNoteBoxEditable(false);
   isRecording = true;
   updateVoiceHud();
   document.getElementById('voiceBtn').classList.add('recording');
@@ -1182,26 +1183,152 @@ function waitForRecognitionEnd(rec) {
   });
 }
 
-// Pocket lock: while recording, a shield under the voice popover takes
-// every touch, so the page behind can't be scrolled or tapped from a pocket,
-// the transcript box can't be typed into and the popover's close button is
-// hidden. A tap on Stop (or "Stop Sayon") ends the recording.
+// Pocket lock: a shield under the voice popover takes every touch, so the
+// page behind can't be scrolled or tapped from a pocket and the popover's
+// close button is hidden. It used to go on with every recording; since
+// 14 Nov it's the inspector's choice ("Lock for your pocket"), so the
+// report can be used while the mic listens (LISTENING ON THE MOVE below).
+// Press and hold the shield's label, Stop, or "Stop Sayon" ends it.
 function setPocketLock(on) {
   const shield = document.getElementById('pocketShield');
   if (shield) shield.hidden = !on;
   document.body.classList.toggle('pocket-lock', on);
-  const box = document.getElementById('transcriptBox');
-  if (box) box.setAttribute('contenteditable', on ? 'false' : 'true');
   if (on && document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  syncVoiceLive();
 }
 document.getElementById('pocketShield')?.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+(() => {
+  const hold = document.getElementById('pocketShieldHold');
+  if (!hold) return;
+  let timer = 0;
+  const end = () => { clearTimeout(timer); hold.classList.remove('holding'); };
+  hold.addEventListener('pointerdown', () => {
+    hold.classList.add('holding');
+    timer = setTimeout(() => { end(); setPocketLock(false); playTone(660, 100, 0.15); }, 800);
+  });
+  ['pointerup', 'pointercancel'].forEach(t => hold.addEventListener(t, end));
+})();
+
+// The note box can't be typed in while the mic writes into it.
+function setNoteBoxEditable(on) {
+  const box = document.getElementById('transcriptBox');
+  if (box) box.setAttribute('contenteditable', on ? 'true' : 'false');
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// LISTENING ON THE MOVE
+// ══════════════════════════════════════════════════════════════════════════
+// While the mic listens the voice panel shrinks to one bar on the dock: the
+// newest words, Fill in and the photo button. The report behind it scrolls
+// and takes taps, so the inspector can move step to step, check a field or
+// type in one without stopping. The note keeps up as they go:
+//   - leaving a step fills the report from what's been said so far, so the
+//     note never runs far ahead of the report (fillOnTheMove);
+//   - Fill in on the bar, or "fill it in, Sayon", does the same at any time;
+//   - a fill doesn't pull the report away from a tech who's using it: within
+//     a few seconds of a touch on the page it stays put and the toast has
+//     Show. Hands off (the phone in a cradle or a pocket), the report still
+//     turns to the step it filled.
+// A tap on the bar opens the whole note; a tap anywhere outside the panel
+// shrinks it back. The panel's X shrinks it too, so only Stop stops.
+let voiceExpanded = false;
+let lastHandsOnAt = 0;
+const HANDS_ON_MS = 8000;
+const MOVE_FILL_MIN_WORDS = 6;
+
+function syncVoiceLive() {
+  const body = document.body;
+  const notes = !!activeNotesTargetKey;
+  const live = !!isRecording && !voiceExpanded && !notes && !body.classList.contains('pocket-lock');
+  body.classList.toggle('listening-bar', live);
+  body.classList.toggle('voice-expanded', !!isRecording && !live);
+  const pop = document.getElementById('voicePopover');
+  if (pop) pop.classList.toggle('notes-voice', notes);
+  const close = document.getElementById('voicePopoverClose');
+  if (close) close.setAttribute('aria-label', isRecording && !notes ? 'Make the note smaller' : 'Close');
+  updateVoiceLiveText();
+}
+
+function updateVoiceLiveText() {
+  const text = document.getElementById('voiceLiveText');
+  const state = document.getElementById('voiceLiveState');
+  const fill = document.getElementById('voiceLiveFill');
+  if (!text) return;
+  const box = document.getElementById('transcriptBox');
+  const said = box && box.classList.contains('active') ? box.textContent.replace(/\s+/g, ' ').trim() : '';
+  const filling = document.body.classList.contains('ai-busy');
+  text.textContent = said ? (said.length > 140 ? '…' + said.slice(-140) : said) : 'Say "fill it in, Sayon" as you go, or tap Fill in';
+  text.classList.toggle('empty', !said);
+  if (state) state.textContent = filling ? 'Listening · filling in the report' : 'Listening';
+  if (fill) fill.disabled = !currentTranscript.trim() || filling;
+}
+
+function expandVoiceNote() {
+  voiceExpanded = true;
+  syncVoiceLive();
+}
+
+function collapseVoiceNote() {
+  if (!voiceExpanded) return;
+  voiceExpanded = false;
+  syncVoiceLive();
+}
+
+// The panel's X: while listening it only makes the note smaller.
+function closeVoicePanel() {
+  if (isRecording && !activeNotesTargetKey) { collapseVoiceNote(); return; }
+  toggleVoicePopover();
+}
+
+function fillNowWhileListening() {
+  if (!currentTranscript.trim()) { showToast('Nothing said yet to fill in. Still listening', 'info'); return; }
+  if (!isRecording) { processTranscript(); return; }
+  processTranscript({ whileRecording: true });
+}
+
+// Moving to another step while talking: what's been said so far goes in, if
+// there's enough of it to be worth the AI call.
+function fillOnTheMove() {
+  if (!isRecording || activeNotesTargetKey) return;
+  const words = currentTranscript.trim().split(/\s+/).filter(Boolean).length;
+  if (words < MOVE_FILL_MIN_WORDS) return;
+  processTranscript({ whileRecording: true });
+}
+
+function lockForPocket() {
+  if (!isRecording) return;
+  voiceExpanded = false; // unlocked, it's back to the bar
+  setPocketLock(true);
+}
+
+// Has the inspector touched the page (not the voice panel) in the last
+// few seconds? A fill then leaves the report where they are.
+function handsOnReport() {
+  return Date.now() - lastHandsOnAt < HANDS_ON_MS;
+}
+(() => {
+  const mark = e => {
+    const t = e.target;
+    if (t && t.closest && t.closest('#voicePopover, #micFab, .toast')) return;
+    lastHandsOnAt = Date.now();
+  };
+  ['pointerdown', 'wheel', 'keydown', 'touchmove'].forEach(type => document.addEventListener(type, mark, { capture: true, passive: true }));
+  // A tap outside the open note shrinks it back to the bar, and the tap
+  // still does what it was for.
+  document.addEventListener('pointerdown', e => {
+    if (!isRecording || !voiceExpanded || activeNotesTargetKey) return;
+    const t = e.target;
+    if (t && t.closest && t.closest('#voicePopover, #micFab, #askOverlay, .toast, #pocketShield')) return;
+    collapseVoiceNote();
+  }, { capture: true, passive: true });
+})();
 
 // The note box keeps its newest words in sight: while listening only a few
 // lines show. Left alone while the inspector is typing in it.
 (() => {
   const box = document.getElementById('transcriptBox');
   if (!box || typeof MutationObserver !== 'function') return;
-  new MutationObserver(() => { if (document.activeElement !== box) box.scrollTop = box.scrollHeight; })
+  new MutationObserver(() => { if (document.activeElement !== box) box.scrollTop = box.scrollHeight; if (isRecording) updateVoiceLiveText(); })
     .observe(box, { childList: true, characterData: true, subtree: true });
 })();
 
@@ -1222,6 +1349,8 @@ function stopRecording() {
   stopWhisperListening();
   releaseScreenAwake();
   setPocketLock(false);
+  voiceExpanded = false;
+  setNoteBoxEditable(true);
   const recognitionEnded = waitForRecognitionEnd(recognition);
   if (recognition) recognition.stop();
   isRecording = false;
@@ -1438,6 +1567,7 @@ function updateVoiceHud() {
   if (state) document.body.dataset.voice = state;
   else delete document.body.dataset.voice;
   syncDockTalk(state);
+  syncVoiceLive();
 }
 
 // Talk in the bottom dock follows the voice state: the time while it

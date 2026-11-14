@@ -680,13 +680,14 @@ async function runFill({ whileRecording = false } = {}) {
   if (warnElDone) warnElDone.classList.remove('show');
   dismissCleanupSuggestion();
   dismissServerTranscript();
-  const step = extracted ? showFilledStep(before) : null;
+  const step = extracted ? showFilledStep(before, { whileRecording }) : null;
   if (extracted && whileRecording) {
     const n = countExtractFilled(before);
     if (n) {
       playTone(880, 120, 0.2);
       const tab = step && document.querySelector(`#tab-${step} .tab-label`);
-      showToast(`Filled ${n} field${n !== 1 ? 's' : ''}${tab ? ' in ' + tab.textContent.trim() : ''}. Still listening`, 'info');
+      const show = revealFilled;
+      showToast(`Filled ${n} field${n !== 1 ? 's' : ''}${tab ? ' in ' + tab.textContent.trim() : ''}. Still listening`, 'info', show ? { label: 'Show', run: show } : undefined);
     } else showToast('Nothing new to fill from that. Still listening', 'info');
   } else if (extracted) showExtractSummary(before);
   return extracted;
@@ -696,8 +697,13 @@ async function runFill({ whileRecording = false } = {}) {
 // scrolls to the first thing filled there, with each new answer outlined
 // for a moment, so the sections follow along as the tech talks. Nothing is
 // focused (a phone would bring up its keyboard), and the report stays put
-// while they're typing in it. Returns the step's id, or null.
-function showFilledStep(before) {
+// while they're typing in it. A fill while the mic listens also leaves it
+// put when the tech has just touched the page (they're moving through it
+// themselves) or isn't on the report: revealFilled() then shows it on a tap.
+// Returns the step's id, or null.
+let revealFilled = null;
+function showFilledStep(before, { whileRecording = false } = {}) {
+  revealFilled = null;
   if (!before || typeof REPORT_STEPS === 'undefined') return null;
   const changed = {}; // step id -> the report elements that changed in it
   const add = (section, el) => {
@@ -725,10 +731,21 @@ function showFilledStep(before) {
   if (!best) return null;
   const active = document.activeElement;
   const typing = active && active.closest && active.closest('#reportBody') && (/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.isContentEditable);
-  if (typing) return best;
-  if (best !== currentStep) goStep(best);
   const els = changed[best].filter(el => el && el.isConnected)
     .sort((a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
+  const reveal = () => {
+    if (navPlace() !== 'report') tabGo('report');
+    if (best !== currentStep) goStep(best, { byFill: true });
+    flashFilled(els);
+  };
+  if (typing) return best;
+  if (whileRecording && (handsOnReport() || navPlace() !== 'report')) { revealFilled = reveal; return best; }
+  reveal();
+  return best;
+}
+
+function flashFilled(els) {
+  els = els.filter(el => el && el.isConnected);
   if (els.length) {
     els.forEach(el => openFieldGroups(el));
     setTimeout(() => {
@@ -743,7 +760,6 @@ function showFilledStep(before) {
       setTimeout(() => els.forEach(el => el.classList.remove('extract-blank-flash')), 2500);
     }, 80);
   }
-  return best;
 }
 
 // ── WAITING NOTES ───────────────────────────────────────────────────────
@@ -1037,7 +1053,8 @@ function goToExtractBlank(i) {
 // opened, scrolled into view and flashed.
 function goToReportField(target, referral) {
   const popover = document.getElementById('voicePopover');
-  if (popover && popover.classList.contains('open')) toggleVoicePopover();
+  if (isRecording && !activeNotesTargetKey) collapseVoiceNote();
+  else if (popover && popover.classList.contains('open')) toggleVoicePopover();
   let el = document.getElementById(target);
   if (!el) return;
   if (el.classList.contains('choice-source')) el = document.getElementById(target.replace(/^f-/, 'choices-')) || el;

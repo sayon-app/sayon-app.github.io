@@ -625,9 +625,14 @@ function showSection(name) {
 
 // A tap on a step tab or a Next button. Groups with every question
 // answered fold to their one-line summary, so what's left is in view.
-function goStep(id) {
+// Moving on while the mic listens fills the report from what's been said
+// so far (fillOnTheMove in js/app/voice.js); a fill turning the report
+// itself (byFill) doesn't.
+function goStep(id, opts) {
+  const moving = stepOf(id).id !== currentStep;
   showSection(id);
   foldAnsweredGroups(id);
+  if (moving && !(opts && opts.byFill) && typeof fillOnTheMove === 'function') fillOnTheMove();
 }
 
 // ── QUESTION GROUPS ──

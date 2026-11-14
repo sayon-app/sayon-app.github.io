@@ -231,6 +231,13 @@ function sampleQuote(id, address, inspector, clientSignature) {
     at: sampleTime(SAMPLE_DAYS.treated, '11:50'),
   };
   q.certificateSentAt = sampleTime(SAMPLE_DAYS.treated, '12:05');
+  // Invoiced the day of the work and paid two days later (js/invoice.js).
+  if (typeof ensureInvoice === 'function') {
+    const inv = ensureInvoice(q);
+    inv.date = treated; inv.due = addDaysIso(treated, invoiceDays());
+    inv.madeAt = inv.sentAt = sampleTime(SAMPLE_DAYS.treated, '12:10');
+    inv.paidDate = addDaysIso(treated, 2); inv.paidAt = new Date(inv.paidDate + 'T10:00:00').getTime();
+  }
   return q;
 }
 

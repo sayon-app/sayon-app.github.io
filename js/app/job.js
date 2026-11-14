@@ -111,7 +111,7 @@ function drawerBackTap() {
 // The open job's page, and the one list of its steps: where it's up to
 // and the next step, then every step in the order a job runs. Job details,
 // the client's answer, the treatment (with its certificate) and bait
-// visits open in place; the agreement, the report and the quote open their
+// visits and the invoice open in place; the agreement, the report and the quote open their
 // own screen. Built from the same reading of a job as the dashboard's list.
 function currentJobSummary() {
   saveOpenReportNow();
@@ -219,6 +219,7 @@ function jobStepLine(j, st) {
   if (st.to === 'quote' && open) return 'Not written yet';
   if (st.to === 'answer' && open) return j.q && j.q.sentAt ? `Waiting on ${who} since ${dashDate(j.q.sentAt)}` : 'Once the quote is sent';
   if (st.to === 'treatment' && open && !(j.q && j.q.treatment)) return j.newBuild ? 'Not recorded yet' : quoteHasItems(j.q) && (quoteAnswerState(j.q) || {}).status === 'accepted' ? 'Accepted, not recorded yet' : `Once ${who} accepts`;
+  if (st.to === 'invoice') return st.full || st.text;
   if (st.state === 'now' || st.state === 'bad' || st.state === 'skip' || !st.full) return st.text;
   return st.full.replace(/ · /g, ', ');
 }
@@ -238,6 +239,7 @@ function jobStepPanel(st, q) {
   if (st.to === 'answer') return quoteHasItems(q) ? quoteAnswerPanel(q) : '';
   if (st.to === 'treatment') return q && q.treatment ? treatmentRecordLine(q) + treatmentCertificateCard(q) : '';
   if (st.to === 'bait') return q ? renderBaitBlock(q) : '';
+  if (st.to === 'invoice') return q ? invoicePanel(q) : '';
   return '';
 }
 
@@ -288,6 +290,7 @@ function jobNextAction(next, q) {
   if (to === 'answer' && quoteHasItems(q)) return quoteAnswerButtons(q, true);
   if (to === 'certificate' && q && q.treatment) return treatmentCertificateCard(q);
   if (to === 'signedQuote' && q) return signedQuoteNext(q);
+  if (to === 'invoice' && q) return invoiceNext(q);
   const b = to === 'bait' && q && typeof baitProgram === 'function' ? baitProgram(q) : null;
   if (b && b.last && !b.last.sentAt) {
     const first = (q.client || '').trim().split(/\s+/)[0];
@@ -368,6 +371,7 @@ const JOB_ICONS = {
   treatment: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
   certificate: '<circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/>',
   bait: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  invoice: '<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
   jobpdf: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h8"/><path d="M8 17h5"/>',
   details: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
@@ -521,7 +525,7 @@ function renderJobPage(opening) {
 // (SHEETS OPENED FROM A PAGE in js/app/shell.js).
 function jobGo(to, from) {
   from = from || navPlace();
-  const onJob = to === 'job' || to === 'details' || to === 'agreementLink' || to === 'answer' || to === 'signedQuote' || to === 'treatment' || to === 'certificate' || to === 'bait';
+  const onJob = to === 'job' || to === 'details' || to === 'agreementLink' || to === 'answer' || to === 'signedQuote' || to === 'treatment' || to === 'certificate' || to === 'bait' || to === 'invoice';
   if (!onJob) closeJobPage();
   if (document.getElementById('quoteScreen').classList.contains('open') && to !== 'quote') {
     closeQuote();
@@ -544,8 +548,8 @@ function jobGo(to, from) {
   }
   // The certificate's Email button, the signed quote's, or the agreement's
   // link button, lit so it's the obvious next tap.
-  if (to === 'certificate' || to === 'agreementLink' || to === 'signedQuote') {
-    const btn = document.querySelector(`#jobOverlay .job-next ${{ certificate: '.qp-cert-email', signedQuote: '.job-signed-email' }[to] || '.job-way-link'}`);
+  if (to === 'certificate' || to === 'agreementLink' || to === 'signedQuote' || to === 'invoice') {
+    const btn = document.querySelector(`#jobOverlay .job-next ${{ certificate: '.qp-cert-email', signedQuote: '.job-signed-email', invoice: '.job-invoice-next' }[to] || '.job-way-link'}`);
     if (btn) { btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 2400); }
   }
 }

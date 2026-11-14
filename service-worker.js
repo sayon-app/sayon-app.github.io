@@ -14,7 +14,7 @@
 // with every index.html change from here on - it's what forces activate() to
 // drop the old cache and install() to pre-cache the new files, so a redeploy
 // takes effect on the very next load instead of needing an extra refresh.
-const CACHE_VERSION = 'korva-v298';
+const CACHE_VERSION = 'korva-v303';
 
 
 const APP_SHELL = [
@@ -48,6 +48,7 @@ const APP_SHELL = [
   './js/treatment-plan.js',
   './js/treatment.js',
   './js/bait.js',
+  './js/invoice.js',
   './js/safety.js',
   './js/reinspection.js',
   './js/job-pack.js',

@@ -21,6 +21,7 @@ function openDashboard() {
     if (fallback) setDashboardTab(fallback);
   }
   checkLinksOut();
+  checkInvoicePayLinks();
 }
 
 // Opens the open job's details, on its page.
@@ -215,6 +216,29 @@ function dashboardJob(r, quotes) {
     hint = 'Finished. ' + who.charAt(0).toUpperCase() + who.slice(1) + ' has their treatment certificate and visit reports.';
   }
 
+  // The invoice, once the work is done and the client has their
+  // certificate (js/invoice.js): To do until it's emailed, then Waiting on
+  // the client to pay. Paid, or invoiced in another app, and it's done.
+  // A bait visit or report still to send comes first.
+  const invoice = typeof invoiceWanted === 'function' && !newBuild && invoiceWanted(q);
+  if (invoice && q.treatment && certificateGiven(q) && !invoiceSettled(q) && (group === 'done' || baitWaiting)) {
+    const inv = q.taxInvoice, amount = formatAUD(inv ? inv.total : total);
+    const first = r.client ? who.split(/\s+/)[0] : 'the client';
+    if (!(inv && inv.sentAt)) {
+      group = 'todo'; status = 'Send the invoice'; baitWaiting = false;
+      hint = `The work is done and ${who} has the certificate. Email ${r.client ? first : 'them'} the invoice for ${amount}.`;
+      next = { label: `Email the invoice`, to: 'invoice' };
+    } else if (group === 'done') {
+      const late = invoiceOverdue(inv);
+      group = 'waiting'; status = late ? `Invoice overdue since ${dashDay(inv.due)}` : `Invoice due ${dashDay(inv.due)}`;
+      // With a Pay by card link out, a card payment marks itself (js/invoice.js).
+      hint = invoicePayLinkOpen(inv)
+        ? `Waiting on ${who} to pay ${amount}. A card payment marks it paid for you; mark a bank transfer paid when it's in.`
+        : `Waiting on ${who} to pay ${amount}. Mark it paid when the money's in.`;
+      next = { label: 'Mark paid', to: 'invoice' };
+    }
+  }
+
   const answered = a && !a.stale;
   const sentOn = d.issue ? d.issue.completedAt : d.sent ? d.sent.at : null;
   const treatStep = { label: 'Treatment', to: 'treatment', state: q && q.treatment ? 'done' : answered && a.status !== 'accepted' || !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
@@ -234,6 +258,7 @@ function dashboardJob(r, quotes) {
         : a.status === 'accepted' ? `Accepted${a.by ? ' by ' + a.by : ''} ${dashDay(a.date)}`
         : `Declined ${dashDay(a.date)}${a.note ? ' · ' + a.note : ''}` },
     treatStep,
+    ...(invoice ? [invoiceJobStep(q)] : []),
   ];
   steps.forEach(s => { if (s.state === 'skip') s.text = clientNotGoingAhead ? 'Skipped, client not going ahead' : 'Not needed'; });
   // Each step just says whether it's done; the preview has the detail. A declined answer keeps its wording.
@@ -259,6 +284,7 @@ function dashboardJob(r, quotes) {
   if (group !== 'done' && !steps.some(s => s.state === 'now')) { const s = steps.find(s => s.state === 'todo'); if (s) s.state = 'now'; }
   // Everything the job needs is done (bait checks may still be coming):
   // the job page offers to finalise it into one PDF.
+  // Waiting on the client to pay isn't finished: the job ends when it's paid.
   const finished = group === 'done' || baitWaiting || onlyReportUnsent;
   return { r, q, group, status, hint, next, steps, total, time: dashboardJobTime(r), finished, onlyReportUnsent, reportStale, clientNotGoingAhead, newBuild };
 }
@@ -397,7 +423,7 @@ function readDashboardJobs() {
   title.innerHTML = !dashboardJobs.some(j => !isSampleJob(j.r)) ? 'No jobs yet.'
     : need.today ? `<b>${need.today} job${need.today === 1 ? '' : 's'}</b> need${need.today === 1 ? 's' : ''} you today.`
     : need.later ? 'Nothing needs you today.'
-    : 'You\'re all caught up.';
+    : 'All caught up.';
   const overdue = typeof reinspectionsDue === 'function' ? reinspectionsDue().filter(it => it.overdue).length : 0;
   const more = document.getElementById('dashboardMore');
   more.innerHTML = [
@@ -405,7 +431,131 @@ function readDashboardJobs() {
     overdue ? `<button type="button" onclick="setDashboardTab('due')">${overdue} re-inspection${overdue === 1 ? '' : 's'} overdue</button>` : '',
   ].filter(Boolean).join('<i aria-hidden="true">·</i>');
   more.hidden = !more.innerHTML;
+  // Start with: the earliest job that's the inspector's move today,
+  // named with its next step, so the day opens on one thing to do.
+  const first = document.getElementById('dashboardFirst');
+  const start = dashboardJobs.filter(j => j.group === 'todo' && dashDaysAway(j.time) <= 0 && !dashNext(j).sent)
+    .sort((a, b) => a.time - b.time)[0];
+  if (first) {
+    const step = start && dashNext(start).status;
+    const street = start && String(start.r.address || '').split(', ')[0].trim();
+    first.hidden = !(step && street);
+    if (!first.hidden) {
+      first.innerHTML = `Start with <b>${escapeHtml(street)}</b>: ${escapeHtml(lowerFirst(step))}`;
+      first.onclick = () => openDashboardJob(start.r.id, 'job');
+    }
+  }
+  renderDashboardNumbers();
 }
+
+// ── THE MONTH'S NUMBERS ───────────────────────────────────────────────────
+// What the business did in a month, under the lists: reports sent,
+// treatments done, quotes sent and accepted and, once it invoices from
+// SAYON (js/invoice.js), what was invoiced, paid and is still owed. Read
+// from the jobs on this sign-in, the sample left out, so nothing is typed
+// in for it. On a phone it's one line that opens, so the jobs stay near
+// the top; in the wide screen's rail it's always open.
+let dashNumbersMonth = 0;     // 0 this month, -1 last month
+let dashNumbersOpen = false;  // opened, on a phone
+const DASH_WIDE = window.matchMedia('(min-width: 1100px)');
+DASH_WIDE.addEventListener('change', () => renderDashboardNumbers());
+const dashMoney = v => '$' + Math.round(v).toLocaleString('en-AU');
+
+// jobs: as dashboardJob reads them ({ r, q }). offset: months from this one.
+function monthNumbers(jobs, offset = 0, now = new Date()) {
+  const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const ym = isoDate(first).slice(0, 7);
+  const inTs = ts => !!ts && isoDate(new Date(ts)).slice(0, 7) === ym;
+  const inIso = iso => String(iso || '').slice(0, 7) === ym;
+  const n = { label: first.toLocaleDateString('en-AU', { month: 'long' }), reports: 0, treatments: 0, quotesSent: 0, quoted: 0, quotesWon: 0, won: 0,
+    invoices: false, invoiced: 0, paid: 0, owed: 0, overdue: 0 };
+  jobs.forEach(({ r, q }) => {
+    if (isSampleJob(r)) return;
+    const d = r.reportData || {};
+    // The report went by email, on the quote's link, or with the finalised job.
+    const withQuote = q && q.sentAt && q.linkRequest && q.linkRequest.files && q.linkRequest.files.report ? q.sentAt : 0;
+    if (inTs((d.sent && d.sent.at) || withQuote || (d.issue && d.issue.completedAt))) n.reports++;
+    if (!q) return;
+    if (q.treatment && inIso(q.treatment.date)) n.treatments++;
+    if (quoteHasItems(q)) {
+      const total = quoteTotals(q).total;
+      if (inTs(q.sentAt)) { n.quotesSent++; n.quoted += total; }
+      const a = quoteAnswerState(q);
+      if (a && !a.stale && a.status === 'accepted' && inIso(a.date)) { n.quotesWon++; n.won += total; }
+    }
+    // An invoice sent from another app isn't SAYON's to count.
+    const inv = q.taxInvoice;
+    if (!inv || inv.elsewhereAt) return;
+    n.invoices = true;
+    if (inTs(inv.sentAt)) n.invoiced += inv.total || 0;
+    if (inv.paidAt && inIso(inv.paidDate || isoDate(new Date(inv.paidAt)))) n.paid += inv.total || 0;
+    // Owed is as it stands today, whichever month the invoice went.
+    if (inv.sentAt && !inv.paidAt) {
+      n.owed += inv.total || 0;
+      if (typeof invoiceOverdue === 'function' && invoiceOverdue(inv)) n.overdue++;
+    }
+  });
+  return n;
+}
+
+function renderDashboardNumbers() {
+  const el = document.getElementById('dashboardNumbers');
+  if (!el) return;
+  const jobs = dashboardJobs.filter(j => !isSampleJob(j.r));
+  el.hidden = !jobs.length;
+  if (el.hidden) { el.innerHTML = ''; return; }
+  const n = monthNumbers(jobs, dashNumbersMonth);
+  const wide = DASH_WIDE.matches, open = wide || dashNumbersOpen;
+  const plural = (c, word) => `${c} ${word}${c === 1 ? '' : 's'}`;
+  // The closed line says the money first, or the work when nothing's been invoiced.
+  // What's owed is as of today, so it isn't said of last month.
+  let lead = [n.invoiced && `${dashMoney(n.invoiced)} invoiced`, !dashNumbersMonth && n.owed && `${dashMoney(n.owed)} owed`].filter(Boolean);
+  if (!lead.length) lead = [n.reports && `${plural(n.reports, 'report')} sent`, n.quoted && `${dashMoney(n.quoted)} quoted`].filter(Boolean);
+  if (!lead.length) lead = [dashNumbersMonth ? 'Nothing sent' : 'Nothing sent yet'];
+  const row = (label, count, amount) => `<div class="dash-numbers-row"><dt>${label}</dt><dd class="n">${count}</dd><dd>${amount}</dd></div>`;
+  const rows = [
+    row('Reports sent', '', n.reports),
+    row('Treatments done', '', n.treatments),
+    row('Quotes sent', n.quotesSent || '', n.quotesSent ? dashMoney(n.quoted) : 0),
+    row('Quotes accepted', n.quotesWon || '', n.quotesWon ? dashMoney(n.won) : 0),
+    // A business that doesn't invoice from SAYON has no money rows.
+    n.invoices ? row('Invoiced', '', dashMoney(n.invoiced)) + row('Paid', '', dashMoney(n.paid)) : '',
+  ].join('');
+  const owed = !n.invoices ? '' : n.owed ? `
+      <button type="button" class="dash-numbers-owed" onclick="showOwedJobs()">
+        <span>Owed to you now${n.overdue ? `<em>${plural(n.overdue, 'invoice')} overdue</em>` : ''}</span><b>${dashMoney(n.owed)}</b>
+      </button>` : '<p class="dash-numbers-owed"><span>Owed to you now</span><b>$0</b></p>';
+  const month = offset => new Date(new Date().getFullYear(), new Date().getMonth() + offset, 1).toLocaleDateString('en-AU', { month: 'long' });
+  const chev = '<svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>';
+  el.innerHTML = `
+    ${wide ? `<h3 class="dash-numbers-head"><span class="dash-numbers-month">${n.label}</span></h3>`
+      : `<button type="button" class="dash-numbers-head" aria-expanded="${open}" aria-controls="dashNumbersBody" onclick="toggleDashNumbers()">
+        <span class="dash-numbers-line"><span class="dash-numbers-month">${n.label}</span><span class="dash-numbers-lead">${lead.join(' · ')}</span></span>${chev}
+      </button>`}
+    <div class="dash-numbers-body" id="dashNumbersBody"${open ? '' : ' hidden'}>
+      <dl class="dash-numbers-rows">${rows}</dl>${owed}
+      <button type="button" class="dash-numbers-other" onclick="setDashNumbersMonth(${dashNumbersMonth ? 0 : -1})">${dashNumbersMonth ? `Back to ${month(0)}` : `See ${month(-1)}`}</button>
+    </div>`;
+  fitDashRail();
+}
+function toggleDashNumbers() { dashNumbersOpen = !dashNumbersOpen; renderDashboardNumbers(); }
+function setDashNumbersMonth(offset) { dashNumbersMonth = offset; renderDashboardNumbers(); }
+// The jobs that owe: Waiting, where an invoice that's out sits. On a phone
+// the numbers close so the list is what's in view.
+function showOwedJobs() {
+  dashNumbersOpen = false;
+  setDashboardTab('waiting');
+  renderDashboardNumbers();
+}
+// On a wide screen the rail stays put beside the list. With the numbers
+// under the lists it can be taller than the window, so it goes up with
+// the page until its foot is in view and holds there.
+function fitDashRail() {
+  const body = document.getElementById('dashboardBody'), side = body && body.querySelector('.dash-side');
+  if (!side) return;
+  side.style.top = DASH_WIDE.matches ? Math.min(0, body.clientHeight - side.offsetHeight) + 'px' : '';
+}
+window.addEventListener('resize', fitDashRail);
 
 function renderDashboard() {
   const body = document.getElementById('dashboardBody');
@@ -413,21 +563,25 @@ function renderDashboard() {
   parkJobPanel();
   const today = new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
   body.innerHTML = `
-    <div class="dash-hero">
-      <span class="dash-hero-date">${today}</span>
-      <p class="dash-hero-title" id="dashboardLead"></p>
-      <p class="dash-hero-more" id="dashboardMore" hidden></p>
-    </div>
-    <div class="dash-controls">
-      <div class="dash-tabs" id="dashboardTabs" role="tablist">
-        <span class="dash-tab-line" aria-hidden="true"></span>
-        ${DASHBOARD_TABS.map(([key, label]) => `<button type="button" role="tab" class="dash-tab" data-tab="${key}" onclick="setDashboardTab('${key}')">${label} <span></span></button>`).join('')}
+    <aside class="dash-side">
+      <div class="dash-hero">
+        <span class="dash-hero-date">${today}</span>
+        <p class="dash-hero-title" id="dashboardLead"></p>
+        <p class="dash-hero-more" id="dashboardMore" hidden></p>
+        <button type="button" class="dash-hero-first" id="dashboardFirst" hidden></button>
       </div>
-      <label class="dash-search" id="dashboardSearchWrap">
-        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z"/><path d="m21 21-4.3-4.3"/></svg>
-        <input id="dashboardSearch" type="search" placeholder="Search address or client" autocomplete="off" oninput="renderDashboardJobs()" aria-label="Search jobs">
-      </label>
-    </div>
+      <div class="dash-controls">
+        <div class="dash-tabs" id="dashboardTabs" role="tablist">
+          <span class="dash-tab-line" aria-hidden="true"></span>
+          ${DASHBOARD_TABS.map(([key, label]) => `<button type="button" role="tab" class="dash-tab" data-tab="${key}" onclick="setDashboardTab('${key}')">${label} <span></span></button>`).join('')}
+        </div>
+        <label class="dash-search" id="dashboardSearchWrap">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="dashboardSearch" type="search" placeholder="Street, suburb or client" autocomplete="off" oninput="renderDashboardJobs()" aria-label="Search jobs">
+        </label>
+      </div>
+      <div class="dash-numbers" id="dashboardNumbers" hidden></div>
+    </aside>
     <div id="dashboardJobs"></div>
   `;
   readDashboardJobs();
@@ -454,7 +608,7 @@ function renderDashboardJobs(fade) {
   // comes. The other lists (and a search) are newest first.
   const byDay = dashboardTab === 'todo' && !query;
   if (byDay) shown.sort((a, b) => a.time - b.time);
-  const part = j => { const n = dashDaysAway(j.time); return n < 0 ? 'Still open from earlier' : n ? 'Coming up' : 'Today'; };
+  const part = j => { const n = dashDaysAway(j.time); return n < 0 ? 'Carried over' : n ? 'Coming up' : 'Today'; };
   const parted = byDay && new Set(shown.map(part)).size > 1;
   // Each heading carries how many jobs sit under it (drawn by css, so the
   // heading's own words stay as they are).
@@ -489,7 +643,7 @@ function renderDashboardJobs(fade) {
   }
   const empty = query ? `No jobs match "${escapeHtml(searchEl.value.trim())}".`
     : !dashboardJobs.length ? 'Your jobs will show up here once you save a report.'
-    : { todo: 'Nothing to do right now.', waiting: 'Nothing is waiting on a client.', done: 'No finished jobs yet.' }[dashboardTab];
+    : { todo: 'Nothing to do. New jobs and answered quotes land here.', waiting: 'Nothing is out with a client right now.', done: 'Finished jobs show up here.' }[dashboardTab];
   if (dashboardTab === 'due' && !query && typeof renderReinspectionList === 'function') { wrap.innerHTML = renderReinspectionList(fade); return; }
   wrap.innerHTML = (shown.length ? `
     <div class="dash-cards${fade ? ' fade-in' : ''}">

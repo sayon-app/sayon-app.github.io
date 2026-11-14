@@ -130,8 +130,9 @@ function renderPriceBook() {
   if (gst) { gst.classList.toggle('on', defaultQuoteGst()); gst.setAttribute('aria-pressed', String(defaultQuoteGst())); gst.disabled = !canEdit; }
   const terms = document.getElementById('pbTerms');
   if (terms) { terms.value = defaultPaymentTerms(); terms.disabled = !canEdit; }
+  renderInvoicePayDetails(canEdit);
   const back = document.getElementById('pbBackToQuote');
-  if (back) back.hidden = !priceBookFromQuote;
+  if (back) { back.hidden = !priceBookFromQuote && !priceBookFromJob; back.textContent = priceBookFromJob ? '‹ Back to the job' : '‹ Back to the quote'; }
   const owner = document.getElementById('pbOwnerNote');
   if (owner) owner.hidden = canEdit;
   renderPriceBookSummary();
@@ -150,16 +151,49 @@ function onPriceBookTerms(el) {
   rememberPaymentTerms(el.value.trim());
 }
 
+// Getting paid: the bank details and how long an invoice gives the client
+// (js/invoice.js prints them).
+function renderInvoicePayDetails(canEdit) {
+  if (!document.getElementById('pbPay') || typeof invoicePayDetails !== 'function') return;
+  const p = invoicePayDetails();
+  [['pbPayName', p.name], ['pbPayBsb', p.bsb], ['pbPayAccount', p.account], ['pbPayId', p.payid]].forEach(([id, v]) => {
+    const el = document.getElementById(id); el.value = v; el.disabled = !canEdit;
+  });
+  const days = document.getElementById('pbInvoiceDays');
+  days.innerHTML = INVOICE_DAYS.map(d => `<option value="${d}"${d === invoiceDays() ? ' selected' : ''}>${d ? `Within ${d} days` : 'On receipt'}</option>`).join('');
+  days.disabled = !canEdit;
+  renderXeroExport();
+  // Card payments: what's kept shows at once, then what the Worker says.
+  renderCardPay();
+  if (Date.now() - cardPayStatusAt > 30000) loadCardPayStatus();
+}
+function onInvoicePayDetails() {
+  if (!canEditBusiness()) return;
+  const val = id => document.getElementById(id).value.trim();
+  const bsb = document.getElementById('pbPayBsb');
+  bsb.value = tidyBsb(bsb.value);
+  rememberInvoicePayDetails({ name: val('pbPayName'), bsb: val('pbPayBsb'), account: val('pbPayAccount'), payid: val('pbPayId') });
+  rememberInvoiceDays(+document.getElementById('pbInvoiceDays').value);
+}
+
 // The menu lives on the report screen, so from a quote the quote closes,
 // the list opens, and "Back to the quote" reopens it with the lines that
 // were still at SAYON's price moved to the new prices.
 let priceBookFromQuote = false;
+// Opened from This job's invoice, to add the bank details: back goes there.
+let priceBookFromJob = false;
 
-function openPriceBook() {
+function openPriceBook(fromJob) {
   const screen = document.getElementById('quoteScreen');
   priceBookFromQuote = !!(quoteState && screen && screen.classList.contains('open'));
+  priceBookFromJob = !priceBookFromQuote && !!fromJob;
   if (priceBookFromQuote) closeQuote();
   openMenuPage('pricesPanel');
+}
+
+function backFromPrices() {
+  if (priceBookFromJob) { priceBookFromJob = false; showMenuPage(null); if (document.getElementById('sidebarPanel').classList.contains('open')) toggleDrawer(); jobGo('invoice'); return; }
+  backToQuoteFromPrices();
 }
 
 function backToQuoteFromPrices() {

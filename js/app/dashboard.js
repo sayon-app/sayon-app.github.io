@@ -418,14 +418,16 @@ function renderDashboard() {
       <p class="dash-hero-title" id="dashboardLead"></p>
       <p class="dash-hero-more" id="dashboardMore" hidden></p>
     </div>
-    <div class="dash-tabs" id="dashboardTabs" role="tablist">
-      ${DASHBOARD_TABS.map(([key, label]) => `<button type="button" role="tab" class="dash-tab" data-tab="${key}" onclick="setDashboardTab('${key}')">${label} <span></span></button>`).join('')}
-      <span class="dash-tab-line" aria-hidden="true"></span>
+    <div class="dash-controls">
+      <div class="dash-tabs" id="dashboardTabs" role="tablist">
+        <span class="dash-tab-line" aria-hidden="true"></span>
+        ${DASHBOARD_TABS.map(([key, label]) => `<button type="button" role="tab" class="dash-tab" data-tab="${key}" onclick="setDashboardTab('${key}')">${label} <span></span></button>`).join('')}
+      </div>
+      <label class="dash-search" id="dashboardSearchWrap">
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="dashboardSearch" type="search" placeholder="Search address or client" autocomplete="off" oninput="renderDashboardJobs()" aria-label="Search jobs">
+      </label>
     </div>
-    <label class="dash-search" id="dashboardSearchWrap">
-      <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z"/><path d="m21 21-4.3-4.3"/></svg>
-      <input id="dashboardSearch" type="search" placeholder="Search address or client" autocomplete="off" oninput="renderDashboardJobs()" aria-label="Search jobs">
-    </label>
     <div id="dashboardJobs"></div>
   `;
   readDashboardJobs();
@@ -454,7 +456,10 @@ function renderDashboardJobs(fade) {
   if (byDay) shown.sort((a, b) => a.time - b.time);
   const part = j => { const n = dashDaysAway(j.time); return n < 0 ? 'Still open from earlier' : n ? 'Coming up' : 'Today'; };
   const parted = byDay && new Set(shown.map(part)).size > 1;
-  const cards = shown.map((j, i) => (parted && (!i || part(shown[i - 1]) !== part(j)) ? `<h3 class="dash-part">${part(j)}</h3>` : '') + dashCardHTML(j)).join('');
+  // Each heading carries how many jobs sit under it (drawn by css, so the
+  // heading's own words stay as they are).
+  const partCount = {}; if (parted) shown.forEach(j => { partCount[part(j)] = (partCount[part(j)] || 0) + 1; });
+  const cards = shown.map((j, i) => (parted && (!i || part(shown[i - 1]) !== part(j)) ? `<h3 class="dash-part" data-count="${partCount[part(j)]}">${part(j)}</h3>` : '') + dashCardHTML(j)).join('');
   // Finished jobs taken off a full phone are still in the account: the
   // line sits where they'd be looked for, under Done and under a search.
   const parked = getArchivedReportIds().length;
@@ -468,6 +473,8 @@ function renderDashboardJobs(fade) {
     tabs.querySelectorAll('.dash-tab').forEach(btn => {
       const on = btn.dataset.tab === dashboardTab;
       btn.classList.toggle('active', on);
+      // A list with nothing in it steps back, so the eye lands on the ones that have work.
+      btn.classList.toggle('empty', !counts[btn.dataset.tab]);
       btn.setAttribute('aria-selected', on);
       btn.querySelector('span').textContent = counts[btn.dataset.tab];
     });

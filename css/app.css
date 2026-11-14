@@ -5260,6 +5260,11 @@ body .sidebar:not(.on-page) .drawer-signout { color: var(--on-ink2); }
 .pb-pay-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .pb-pay-pair { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 10px; }
 .pb-pay .job-input { width: 100%; }
+.pb-pay-export { display: flex; flex-direction: column; gap: 6px; padding-top: 14px; border-top: 1px solid var(--border); }
+.pb-pay-export .settings-row-desc { margin: 0; }
+.pb-pay-export-row { display: flex; gap: 10px; align-items: stretch; }
+.pb-pay-export-row .job-input { flex: 1 1 auto; min-width: 0; }
+.pb-pay-export-row .quote-link-btn { flex: none; min-height: 44px; padding: 0 16px; }
 
 /* Two fields that belong together (the termite system and its name),
    joined down the left by the same side line as the job sheet. */

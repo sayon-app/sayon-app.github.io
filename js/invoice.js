@@ -317,3 +317,86 @@ function buildInvoicePDF(q) {
   drawPdfDocFooters(doc, `${title} ${inv.number}${company.name ? `  ·  ${company.name}` : ''}`, q.reportKey);
   return { blob: doc.output('blob'), fname: pdfFileName('Invoice', q.address, { ref: inv.number }) };
 }
+
+// ── FOR XERO ────────────────────────────────────────────────────────────────
+// Every invoice SAYON made in a period, as the CSV Xero's sales invoice
+// import reads (Business › Invoices › Import), one row per line. Prices go
+// in ex GST, so the import is run as "Tax exclusive"; lines go to account
+// 200 (Sales), the account Xero's Australian chart starts with. Invoices
+// marked "Invoiced in another app" are already in the books, and the sample
+// job's isn't real, so neither goes. MYOB reads a different file; later.
+const XERO_COLUMNS = ['*ContactName', 'EmailAddress', 'POAddressLine1', 'POAddressLine2', 'POAddressLine3', 'POAddressLine4', 'POCity', 'PORegion',
+  'POPostalCode', 'POCountry', '*InvoiceNumber', 'Reference', '*InvoiceDate', '*DueDate', 'Total', 'InventoryItemCode', '*Description', '*Quantity',
+  '*UnitAmount', 'Discount', '*AccountCode', '*TaxType', 'TaxAmount', 'TrackingName1', 'TrackingOption1', 'TrackingName2', 'TrackingOption2', 'Currency', 'BrandingTheme'];
+const XERO_SALES_ACCOUNT = '200';
+
+// The periods offered: this month, last month, or every invoice.
+function invoiceExportPeriods(now = new Date()) {
+  const month = (y, m) => ({ from: isoDate(new Date(y, m, 1)), to: isoDate(new Date(y, m + 1, 0)),
+    label: new Date(y, m, 1).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' }) });
+  const y = now.getFullYear(), m = now.getMonth();
+  return [Object.assign(month(y, m), { key: 'this' }), Object.assign(month(y, m - 1), { key: 'last' }), { key: 'all', from: '', to: '', label: 'Every invoice' }];
+}
+
+// The invoices to export, oldest first: [{ q, inv }].
+function invoicesForExport(from, to) {
+  return Object.entries(getSavedQuotes())
+    .filter(([id, q]) => !isSampleJob(id) && q && q.taxInvoice && !q.taxInvoice.elsewhereAt)
+    .map(([, q]) => ({ q, inv: q.taxInvoice }))
+    .filter(({ inv }) => (!from || inv.date >= from) && (!to || inv.date <= to))
+    .sort((a, b) => a.inv.date < b.inv.date ? -1 : a.inv.date > b.inv.date ? 1 : 0);
+}
+
+function xeroInvoicesCsv(list) {
+  // A typed name that starts like a formula is kept as text if the file is opened in a spreadsheet.
+  const cell = v => { let s = String(v == null ? '' : v); if (/^[=+@]/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const day = iso => { const [y, m, d] = String(iso || '').split('-'); return d ? `${d}/${m}/${y}` : ''; };
+  const rows = [XERO_COLUMNS];
+  list.forEach(({ q, inv }) => {
+    const items = (inv.items || []).filter(it => (it.desc || '').trim() || lineTotal(it));
+    items.forEach(it => {
+      const qty = parseFloat(it.qty), price = parseFloat(it.price);
+      const desc = [(it.desc || '').trim() || 'Item', (it.detail || '').trim()].filter(Boolean).join(': ');
+      const row = Object.fromEntries(XERO_COLUMNS.map(c => [c, '']));
+      Object.assign(row, {
+        '*ContactName': (q.client || '').trim() || q.address || 'Client',
+        EmailAddress: (q.clientEmail || '').trim(),
+        '*InvoiceNumber': inv.number, Reference: q.address || '',
+        '*InvoiceDate': day(inv.date), '*DueDate': day(inv.due || inv.date),
+        '*Description': desc, '*Quantity': isFinite(qty) ? +qty.toFixed(4) : 0, '*UnitAmount': isFinite(price) ? price.toFixed(2) : '0.00',
+        '*AccountCode': XERO_SALES_ACCOUNT, '*TaxType': inv.gst ? 'GST on Income' : 'GST Free Income', Currency: 'AUD',
+      });
+      rows.push(XERO_COLUMNS.map(c => row[c]));
+    });
+  });
+  return rows.map(r => r.map(cell).join(',')).join('\r\n') + '\r\n';
+}
+
+// Your prices › Getting paid › Download for Xero. On a phone that can share
+// a file it opens the share sheet (save to Files, email it to the office);
+// otherwise it downloads.
+async function downloadInvoicesForXero() {
+  const sel = document.getElementById('pbXeroPeriod');
+  const period = invoiceExportPeriods().find(p => p.key === (sel ? sel.value : 'this')) || invoiceExportPeriods()[0];
+  const list = invoicesForExport(period.from, period.to);
+  if (!list.length) { showToast(period.key === 'all' ? 'No invoices yet' : `No invoices in ${period.label}`, 'info'); return; }
+  const fname = `SAYON invoices for Xero, ${period.key === 'all' ? 'every invoice' : period.label}.csv`.replace(/[\\/:*?"<>|]/g, '');
+  const blob = new Blob([xeroInvoicesCsv(list)], { type: 'text/csv' });
+  const file = new File([blob], fname, { type: 'text/csv' });
+  const n = `${list.length} invoice${list.length === 1 ? '' : 's'}`;
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ title: fname, files: [file] }); track('invoices_exported', { count: list.length }); }
+    catch (e) { if (e.name !== 'AbortError') showToast('Could not open sharing on this device', 'error'); }
+    return;
+  }
+  downloadBlob(blob, fname);
+  track('invoices_exported', { count: list.length });
+  showToast(`${n} downloaded. In Xero, import it as Tax exclusive`, 'success');
+}
+
+function renderXeroExport() {
+  const sel = document.getElementById('pbXeroPeriod');
+  if (!sel) return;
+  const keep = sel.value || 'this';
+  sel.innerHTML = invoiceExportPeriods().map(p => `<option value="${p.key}"${p.key === keep ? ' selected' : ''}>${escapeHtml(p.label)}</option>`).join('');
+}

@@ -1438,6 +1438,14 @@
               <label class="settings-row-title" for="pbInvoiceDays">Invoices are due</label>
               <select class="job-input" id="pbInvoiceDays"></select>
             </div>
+            <div class="pb-pay-export">
+              <label class="settings-row-title" for="pbXeroPeriod">Invoices for Xero</label>
+              <div class="settings-row-desc">A file for Xero's invoice import. Import it as Tax exclusive; the lines go to account 200, Sales.</div>
+              <div class="pb-pay-export-row">
+                <select class="job-input" id="pbXeroPeriod"></select>
+                <button type="button" class="quote-link-btn" id="pbXeroDownload" onclick="downloadInvoicesForXero()">Download</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -1263,7 +1263,7 @@ input.job-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
   pointer-events: auto;
 }
 
-/* Pocket lock: while recording, the page behind the voice popover can't be
+/* Pocket lock (the inspector locks it while recording): the page behind the voice popover can't be
    scrolled or tapped, so a phone in a pocket doesn't change the report. */
 .pocket-shield {
   position: fixed; inset: 0; z-index: 172;
@@ -4979,7 +4979,7 @@ body[data-voice="thinking"] .mic-fab:not(.open) .mic-fab-mic { animation: dockSp
 @media (prefers-reduced-motion: reduce) {
   body[data-voice="listening"] .tabbar .mic-fab, .mic-fab-time::before, body[data-voice="thinking"] .mic-fab .mic-fab-mic { animation: none; }
 }
-/* While recording the screen is locked, the tabs too; the mic stays live to stop. */
+/* Locked for a pocket, the tabs are too; the mic stays live to stop. */
 body.pocket-lock .tabbar .tab { pointer-events: none; opacity: 0.4; }
 .voice-popover { bottom: calc(var(--tabbar-h) + 10px); max-height: calc(100dvh - var(--tabbar-h) - 26px - env(safe-area-inset-top, 0px)); }
 
@@ -5919,8 +5919,8 @@ button.drawer-help { width: 100%; font-family: inherit; text-align: left; cursor
 /* ── VOICE CAPTURE, DOCKED ──
    The voice panel sits on the dock, as wide as the screen and only as tall
    as it needs, so the report stays readable above it. While it listens it
-   shrinks to the speak button and the last few lines heard; the page
-   behind isn't dimmed (it still can't be tapped). The mic and the photo
+   shrinks to one bar (LISTENING ON THE MOVE below) and the page behind
+   can still be scrolled and tapped. The mic and the photo
    button share a row; the sound bars take the close button's place. */
 #voicePopover {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-content: start;
@@ -5935,6 +5935,8 @@ button.drawer-help { width: 100%; font-family: inherit; text-align: left; cursor
 #voicePopoverTitleText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #voicePopover .voice-popover-close { margin: -6px -6px -6px 0; }
 #voicePopover > .waveform { grid-row: 1; grid-column: 2; align-self: center; height: 22px; margin-right: 4px; }
+/* Listening with the note open, the X (make it smaller) stays beside the bars. */
+body.voice-expanded:not(.pocket-lock) #voicePopover:not(.notes-voice) > .waveform { margin-right: 44px; pointer-events: none; }
 #voicePopover > .voice-btn { grid-column: 1; min-height: 52px; padding: 6px 12px; gap: 12px; border-radius: 14px; font-size: calc(14px * var(--ts)); }
 body #voicePopover .voice-btn .mic-svg { width: 20px; height: 20px; padding: 8px; }
 #voicePopover > .voice-photo-btn { grid-column: 2; position: relative; width: 52px; min-height: 52px; margin: 0; padding: 0; border-radius: 14px; }
@@ -5953,16 +5955,69 @@ body.large-touch #voicePopover > .extract-btn { min-height: 56px; }
 /* Nothing to fill in yet: no greyed-out button taking a row. */
 #voicePopover > .transcript-box:not(.active) ~ .extract-btn:disabled { display: none; }
 #voicePopover > .ai-bar { order: 2; justify-content: center; padding: 0; border: 0; background: transparent; font-size: calc(11.5px * var(--ts)); color: var(--text3); }
-/* Listening: the speak button and the newest lines, nothing else. */
-body.pocket-lock #voicePopover > .transcript-done,
-body.pocket-lock #voicePopover > .quick-phrases,
-body.pocket-lock #voicePopover > .extract-btn,
-body.pocket-lock #voicePopover > .ai-bar { display: none; }
-body.pocket-lock #voicePopover > .transcript-box { max-height: 4.6em; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.2em); mask-image: linear-gradient(to bottom, transparent 0, #000 1.2em); }
+/* Listening, the whole note open: the speak button, the newest lines and
+   two quiet buttons (fill in so far, lock for a pocket), nothing else. */
+body[data-voice="listening"] #voicePopover > .transcript-done,
+body[data-voice="listening"] #voicePopover > .quick-phrases,
+body[data-voice="listening"] #voicePopover > .extract-btn,
+body[data-voice="listening"] #voicePopover > .ai-bar { display: none; }
+body[data-voice="listening"] #voicePopover > .transcript-box { max-height: 7.6em; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.2em); mask-image: linear-gradient(to bottom, transparent 0, #000 1.2em); }
+body.pocket-lock #voicePopover > .transcript-box { max-height: 4.6em; }
 /* Clear of the dock's red timer while it listens. */
 body[data-voice="listening"] #voicePopover { bottom: calc(var(--tabbar-h) + 40px); }
-.pocket-shield { background: transparent; }
-.pocket-shield span { padding: 6px 12px; font-size: calc(12px * var(--ts)); opacity: 0.92; }
+/* Listening, it stays in sight over Jobs and This job too (under the dock and the sheets). */
+body[data-voice="listening"] #voicePopover { z-index: 230; }
+.pocket-shield { background: rgba(6,18,58,0.28); }
+.pocket-shield span { padding: 10px 16px; font-size: calc(12.5px * var(--ts)); opacity: 0.96; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; transition: transform 0.8s linear, background 0.8s linear; }
+.pocket-shield span.holding { transform: scale(1.06); background: var(--accent-wash); color: var(--accent2); }
+
+/* ── LISTENING ON THE MOVE ──
+   While the mic listens the panel is one bar on the dock: a red Listening
+   mark over the newest words (a tap opens the whole note), Fill in and the
+   photo button. Nothing covers the report, so it scrolls and takes taps
+   with the mic on (js/app/voice.js). */
+:root { --voice-live-h: 68px; }
+.voice-live, .voice-listen-actions { display: none; }
+body.listening-bar #voicePopover { padding: 6px 6px 6px 12px; gap: 6px; align-items: center; border-radius: 18px; }
+body.listening-bar #voicePopover > :not(.voice-live):not(.voice-photo-btn) { display: none; }
+body.listening-bar #voicePopover > .voice-live { display: flex; grid-column: 1; grid-row: 1; align-items: center; gap: 8px; min-width: 0; }
+body.listening-bar #voicePopover > .voice-photo-btn { grid-column: 2; grid-row: 1; width: 48px; min-height: 48px; border-radius: 13px; }
+.voice-live-note {
+  flex: 1; min-width: 0; min-height: 52px; padding: 4px 2px; border: 0; background: none;
+  display: flex; flex-direction: column; justify-content: center; gap: 3px;
+  text-align: left; color: var(--text); cursor: pointer; font: inherit;
+}
+.voice-live-head { display: flex; align-items: center; gap: 6px; font-size: calc(11px * var(--ts)); font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: var(--tone-bad, #D7261E); }
+.voice-live-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 0 rgba(215,38,30,0.5); animation: liveDot 1.4s ease-out infinite; flex-shrink: 0; }
+@keyframes liveDot { 0% { box-shadow: 0 0 0 0 rgba(215,38,30,0.5); } 70%, 100% { box-shadow: 0 0 0 7px rgba(215,38,30,0); } }
+/* The newest words: two lines, the end of the note always in sight. */
+.voice-live-text {
+  display: flex; flex-direction: column; justify-content: flex-end;
+  max-height: 2.7em; overflow: hidden; line-height: 1.35;
+  font-size: calc(14px * var(--ts)); font-weight: 500; color: var(--text);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 0.9em); mask-image: linear-gradient(to bottom, transparent 0, #000 0.9em);
+}
+.voice-live-text.empty { color: var(--text3); font-weight: 500; -webkit-mask-image: none; mask-image: none; }
+.voice-live-fill {
+  flex-shrink: 0; min-height: 48px; padding: 0 16px; border-radius: 13px;
+  border: 1.5px solid var(--accent-edge); background: var(--accent-wash); color: var(--accent2);
+  font: inherit; font-size: calc(14px * var(--ts)); font-weight: 700; cursor: pointer;
+}
+.voice-live-fill:disabled { opacity: 0.45; cursor: default; }
+body.large-touch .voice-live-fill, body.large-touch #voicePopover > .voice-photo-btn { min-height: 56px; }
+/* The whole note open while listening: two quiet buttons under it. */
+body.voice-expanded:not(.pocket-lock) #voicePopover:not(.notes-voice) > .voice-listen-actions { display: flex; gap: 8px; }
+.voice-listen-btn {
+  flex: 1; min-height: 44px; padding: 0 10px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--surface2); color: var(--text2);
+  font: inherit; font-size: calc(13px * var(--ts)); font-weight: 700; cursor: pointer;
+}
+.voice-listen-btn:first-child { color: var(--accent2); border-color: var(--accent-edge); background: var(--accent-wash); }
+/* The page under the bar can still be scrolled clear of it. */
+body.listening-bar .report-body { padding-bottom: calc(var(--voice-live-h) + 56px); }
+body.listening-bar .dashboard-panel-body, body.listening-bar .drawer-scroll, body.listening-bar .job-page-body { padding-bottom: calc(var(--voice-live-h) + 64px); }
+body.listening-bar:has(#app[style*="flex"]) .toast, body.listening-bar .toast { bottom: calc(var(--tabbar-h) + 48px + var(--voice-live-h)); }
+@media (prefers-reduced-motion: reduce) { .voice-live-dot { animation: none; } }
 
 /* ── MENU PAGES IN CARDS ────────────────────────────────────────────────
    Business details, Your prices, Chemical register, Your team, Settings

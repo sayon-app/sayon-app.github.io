@@ -564,7 +564,7 @@ function stopAuthAutoRefresh() {
 // ── SIGN UP ──────────────────────────────────────────────────────────────
 // The Terms and Privacy versions a new account agrees to at sign-up. Raise
 // these with the "Version N" lines at the top of terms.html and privacy.html.
-const LEGAL_VERSIONS = { terms: 3, privacy: 9 };
+const LEGAL_VERSIONS = { terms: 3, privacy: 10 };
 
 async function signUp() {
   const name     = document.getElementById('suName').value.trim();

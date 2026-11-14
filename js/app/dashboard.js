@@ -397,7 +397,7 @@ function readDashboardJobs() {
   title.innerHTML = !dashboardJobs.some(j => !isSampleJob(j.r)) ? 'No jobs yet.'
     : need.today ? `<b>${need.today} job${need.today === 1 ? '' : 's'}</b> need${need.today === 1 ? 's' : ''} you today.`
     : need.later ? 'Nothing needs you today.'
-    : 'You\'re all caught up.';
+    : 'All caught up.';
   const overdue = typeof reinspectionsDue === 'function' ? reinspectionsDue().filter(it => it.overdue).length : 0;
   const more = document.getElementById('dashboardMore');
   more.innerHTML = [
@@ -405,6 +405,20 @@ function readDashboardJobs() {
     overdue ? `<button type="button" onclick="setDashboardTab('due')">${overdue} re-inspection${overdue === 1 ? '' : 's'} overdue</button>` : '',
   ].filter(Boolean).join('<i aria-hidden="true">·</i>');
   more.hidden = !more.innerHTML;
+  // Start with: the earliest job that's the inspector's move today,
+  // named with its next step, so the day opens on one thing to do.
+  const first = document.getElementById('dashboardFirst');
+  const start = dashboardJobs.filter(j => j.group === 'todo' && dashDaysAway(j.time) <= 0 && !dashNext(j).sent)
+    .sort((a, b) => a.time - b.time)[0];
+  if (first) {
+    const step = start && dashNext(start).status;
+    const street = start && String(start.r.address || '').split(', ')[0].trim();
+    first.hidden = !(step && street);
+    if (!first.hidden) {
+      first.innerHTML = `Start with <b>${escapeHtml(street)}</b>: ${escapeHtml(lowerFirst(step))}`;
+      first.onclick = () => openDashboardJob(start.r.id, 'job');
+    }
+  }
 }
 
 function renderDashboard() {
@@ -418,6 +432,7 @@ function renderDashboard() {
         <span class="dash-hero-date">${today}</span>
         <p class="dash-hero-title" id="dashboardLead"></p>
         <p class="dash-hero-more" id="dashboardMore" hidden></p>
+        <button type="button" class="dash-hero-first" id="dashboardFirst" hidden></button>
       </div>
       <div class="dash-controls">
         <div class="dash-tabs" id="dashboardTabs" role="tablist">
@@ -426,7 +441,7 @@ function renderDashboard() {
         </div>
         <label class="dash-search" id="dashboardSearchWrap">
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z"/><path d="m21 21-4.3-4.3"/></svg>
-          <input id="dashboardSearch" type="search" placeholder="Search address or client" autocomplete="off" oninput="renderDashboardJobs()" aria-label="Search jobs">
+          <input id="dashboardSearch" type="search" placeholder="Street, suburb or client" autocomplete="off" oninput="renderDashboardJobs()" aria-label="Search jobs">
         </label>
       </div>
       <div class="dash-numbers" id="dashboardNumbers" hidden></div>
@@ -457,7 +472,7 @@ function renderDashboardJobs(fade) {
   // comes. The other lists (and a search) are newest first.
   const byDay = dashboardTab === 'todo' && !query;
   if (byDay) shown.sort((a, b) => a.time - b.time);
-  const part = j => { const n = dashDaysAway(j.time); return n < 0 ? 'Still open from earlier' : n ? 'Coming up' : 'Today'; };
+  const part = j => { const n = dashDaysAway(j.time); return n < 0 ? 'Carried over' : n ? 'Coming up' : 'Today'; };
   const parted = byDay && new Set(shown.map(part)).size > 1;
   // Each heading carries how many jobs sit under it (drawn by css, so the
   // heading's own words stay as they are).
@@ -492,7 +507,7 @@ function renderDashboardJobs(fade) {
   }
   const empty = query ? `No jobs match "${escapeHtml(searchEl.value.trim())}".`
     : !dashboardJobs.length ? 'Your jobs will show up here once you save a report.'
-    : { todo: 'Nothing to do right now.', waiting: 'Nothing is waiting on a client.', done: 'No finished jobs yet.' }[dashboardTab];
+    : { todo: 'Nothing to do. New jobs and answered quotes land here.', waiting: 'Nothing is out with a client right now.', done: 'Finished jobs show up here.' }[dashboardTab];
   if (dashboardTab === 'due' && !query && typeof renderReinspectionList === 'function') { wrap.innerHTML = renderReinspectionList(fade); return; }
   wrap.innerHTML = (shown.length ? `
     <div class="dash-cards${fade ? ' fade-in' : ''}">

@@ -215,6 +215,26 @@ function dashboardJob(r, quotes) {
     hint = 'Finished. ' + who.charAt(0).toUpperCase() + who.slice(1) + ' has their treatment certificate and visit reports.';
   }
 
+  // The invoice, once the work is done and the client has their
+  // certificate (js/invoice.js): To do until it's emailed, then Waiting on
+  // the client to pay. Paid, or invoiced in another app, and it's done.
+  // A bait visit or report still to send comes first.
+  const invoice = typeof invoiceWanted === 'function' && !newBuild && invoiceWanted(q);
+  if (invoice && q.treatment && certificateGiven(q) && !invoiceSettled(q) && (group === 'done' || baitWaiting)) {
+    const inv = q.taxInvoice, amount = formatAUD(inv ? inv.total : total);
+    const first = r.client ? who.split(/\s+/)[0] : 'the client';
+    if (!(inv && inv.sentAt)) {
+      group = 'todo'; status = 'Send the invoice'; baitWaiting = false;
+      hint = `The work is done and ${who} has the certificate. Email ${r.client ? first : 'them'} the invoice for ${amount}.`;
+      next = { label: `Email the invoice`, to: 'invoice' };
+    } else if (group === 'done') {
+      const late = invoiceOverdue(inv);
+      group = 'waiting'; status = late ? `Invoice overdue since ${dashDay(inv.due)}` : `Invoice due ${dashDay(inv.due)}`;
+      hint = `Waiting on ${who} to pay ${amount}. Mark it paid when the money's in.`;
+      next = { label: 'Mark paid', to: 'invoice' };
+    }
+  }
+
   const answered = a && !a.stale;
   const sentOn = d.issue ? d.issue.completedAt : d.sent ? d.sent.at : null;
   const treatStep = { label: 'Treatment', to: 'treatment', state: q && q.treatment ? 'done' : answered && a.status !== 'accepted' || !hasQuote && reportDone && !needsQuote ? 'skip' : 'todo',
@@ -234,6 +254,7 @@ function dashboardJob(r, quotes) {
         : a.status === 'accepted' ? `Accepted${a.by ? ' by ' + a.by : ''} ${dashDay(a.date)}`
         : `Declined ${dashDay(a.date)}${a.note ? ' · ' + a.note : ''}` },
     treatStep,
+    ...(invoice ? [invoiceJobStep(q)] : []),
   ];
   steps.forEach(s => { if (s.state === 'skip') s.text = clientNotGoingAhead ? 'Skipped, client not going ahead' : 'Not needed'; });
   // Each step just says whether it's done; the preview has the detail. A declined answer keeps its wording.
@@ -259,6 +280,7 @@ function dashboardJob(r, quotes) {
   if (group !== 'done' && !steps.some(s => s.state === 'now')) { const s = steps.find(s => s.state === 'todo'); if (s) s.state = 'now'; }
   // Everything the job needs is done (bait checks may still be coming):
   // the job page offers to finalise it into one PDF.
+  // Waiting on the client to pay isn't finished: the job ends when it's paid.
   const finished = group === 'done' || baitWaiting || onlyReportUnsent;
   return { r, q, group, status, hint, next, steps, total, time: dashboardJobTime(r), finished, onlyReportUnsent, reportStale, clientNotGoingAhead, newBuild };
 }

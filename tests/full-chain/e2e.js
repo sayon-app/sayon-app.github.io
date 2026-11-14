@@ -225,9 +225,9 @@ let shotN = 0;
   console.log('file names:', names);
   check(names.length >= 4 && names.every(n => /^[\w-]+\.pdf$/.test(n) && /Epping_NSW_2121/.test(n)), 'PDF file names keep the whole address with no commas: ' + names.join(', '));
 
-  // 11. Back on the dashboard, the job shows as done.
+  // 11. Back on the dashboard, the work is done and the invoice is what's left (tests/invoice).
   await tap(p.locator('.tab[data-tab="dashboard"]'), 'Dashboard tab'); await p.waitForTimeout(1200); await shot('dashboard-end');
-  check(/Treated/.test(await p.evaluate(() => document.getElementById('dashboardOverlay').innerText)), 'the dashboard shows the job as treated');
+  check(/Send the invoice/.test(await p.evaluate(() => document.getElementById('dashboardOverlay').innerText)), 'the dashboard shows the job treated, with the invoice to send');
 
   // 12. Everything survives a reload.
   await p.reload(); await p.waitForTimeout(3000);

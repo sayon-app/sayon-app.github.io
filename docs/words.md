@@ -24,6 +24,8 @@ One name for each thing, everywhere: on the screens, in the emails and PDFs, on 
 | **Download a copy** | The backup file of everything, to load back into SAYON. Not the PDFs. | `Export your data` |
 | **Menu, Billing** | Where the plan is changed or cancelled. | `tap your initials` |
 | **Email to Sam** | A button that sends says how and to whom. Once sent: Email again, Send it again. | `Send anyway` |
+| **invoice** | The bill for the work, made from the accepted quote once the treatment is done and the certificate has gone: emailed to the client with the business's bank details, then marked paid. The job's step after the treatment, on This job. Its PDF is a Tax Invoice when the business adds GST and has an ABN. "Invoiced in another app" settles it for a business that invoices from Xero or the like. | |
+| **Getting paid** | The bank details, PayID and how long an invoice gives the client, set in Your prices beside the payment terms. | |
 | **treatment certificate** | The one certificate for the work done. A system left in place (a barrier, bait stations, reticulation) has its own row on it, System installed, and its own care lines. | `Certificate of Installation`, `Certificate of installation`, `installation certificate` |
 | **site plan** | The drawing of the property: started on the report if the inspector wants one, and the treatment record adds the treatment and stations to it. | |
 | **client** | The person the job is for. | |

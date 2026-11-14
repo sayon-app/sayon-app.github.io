@@ -3151,88 +3151,102 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 
 /* ── JOBS: THE ORDER OF THE PAGE ──
    Read top to bottom the way a tech uses it: the day and how much needs
-   them (the headline, the biggest thing on the page), then which list
-   (To do, Waiting, Done, Due) with search beside it, then the jobs. The
-   controls sit quiet on the backdrop so the headline and the cards carry
-   the weight. */
-.dash-hero { position: relative; isolation: isolate; padding: 20px 0 22px; }
+   them (the headline, the biggest words on the page), then the four lists
+   as a strip of numbers, then search, then the jobs. Plain type and
+   hairlines, no glows: it should read like a well-set job sheet. On a wide
+   screen the headline, lists and search become a rail beside the jobs. */
+.dash-side { min-width: 0; }
+.dash-hero { padding: 22px 0 20px; }
 .dash-hero-date {
-  display: inline-flex; align-items: center; gap: 8px;
-  font-size: calc(11.5px * var(--ts)); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--accent2);
+  display: block;
+  font-size: calc(14px * var(--ts)); font-weight: 600;
+  color: var(--text3);
 }
-/* A small live dot before the date: this is today's page. */
-.dash-hero-date::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px rgba(var(--accent-glow-rgb), 0.16); }
 .dash-hero-title {
-  margin: 10px 0 0;
+  margin: 6px 0 0;
   font-family: 'Space Grotesk', sans-serif;
-  font-size: calc(29px * var(--ts)); line-height: 1.08; font-weight: 700; letter-spacing: -0.03em;
+  font-size: calc(30px * var(--ts)); line-height: 1.1; font-weight: 700; letter-spacing: -0.025em;
   color: var(--text); text-wrap: balance;
 }
-.dash-hero-title b { font-weight: 700; color: var(--accent2); }
-@media (min-width: 720px) { .dash-hero-title { font-size: calc(38px * var(--ts)); } }
+.dash-hero-title b { font-weight: 700; font-variant-numeric: tabular-nums; }
 /* Under the headline: what's booked for later, and re-inspections that are
    overdue, which opens the Due tab. */
-.dash-hero-more { margin: 10px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: calc(14px * var(--ts)); line-height: 1.4; color: var(--text2); }
+.dash-hero-more { margin: 8px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: calc(14px * var(--ts)); line-height: 1.4; color: var(--text2); }
 .dash-hero-more i { font-style: normal; color: var(--text3); }
 .dash-hero-more button { min-height: 32px; padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--risk); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 
-/* Which list, and search: one band. On a phone the search sits under the
-   lists; on a wide screen they share a row. */
-.dash-controls { display: flex; flex-direction: column; gap: 10px; margin: 0 0 22px; }
-@media (min-width: 720px) {
-  .dash-controls { flex-direction: row; align-items: center; gap: 12px; }
-  .dash-controls .dash-tabs { flex: none; }
-  .dash-controls .dash-tab { flex: none; padding: 0 16px; }
-  .dash-controls .dash-search { flex: 1; min-width: 200px; }
+/* Start with: the day's first job and its next step, one tap to its page. */
+.dash-hero-first {
+  display: block; max-width: 100%; min-height: 44px; margin: 8px 0 0; padding: 10px 0; box-sizing: border-box;
+  border: 0; background: none; font: inherit; font-size: calc(15px * var(--ts)); line-height: 1.45; font-weight: 500; color: var(--text2); text-align: left; cursor: pointer;
 }
-/* The lists are a segmented track; the open one is a raised pill that
-   slides between them. */
+.dash-hero-first b { font-weight: 650; color: var(--text); }
+.dash-hero-first::after { content: '\2192'; display: inline-block; margin-left: 8px; transition: transform 0.15s; }
+.dash-hero-first:hover b { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.dash-hero-first:hover::after { transform: translateX(3px); }
+.dash-hero-first:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.dash-controls { display: flex; flex-direction: column; gap: 14px; margin: 0 0 22px; }
+/* The four lists as a strip: each one's count big, its name under it,
+   ruled off from the next. The open one is underlined. */
 .dash-tabs {
   position: relative;
-  display: flex; gap: 2px; padding: 4px; overflow-x: auto; scrollbar-width: none;
-  border-radius: 14px; background: var(--surface2); border: 1px solid var(--border);
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
 }
-.dash-tabs::-webkit-scrollbar { display: none; }
 .dash-tab {
-  position: relative; z-index: 1;
-  flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: 40px; padding: 0 10px; border: 0; border-radius: 10px; background: none;
-  font: inherit; font-size: calc(14px * var(--ts)); font-weight: 600; letter-spacing: -0.01em; color: var(--text3); cursor: pointer;
-  white-space: nowrap; transition: color 0.2s, opacity 0.2s;
+  display: flex; flex-direction: column-reverse; align-items: flex-start; justify-content: flex-end; gap: 2px;
+  min-width: 0; min-height: 72px; padding: 12px 12px 14px; border: 0; background: none;
+  font: inherit; font-size: calc(13px * var(--ts)); font-weight: 600; color: var(--text3); text-align: left; cursor: pointer;
+  white-space: nowrap; transition: color 0.2s;
 }
-/* The count sits in a small pill. */
+.dash-tab + .dash-tab { border-left: 1px solid var(--border); }
 .dash-tab span {
-  min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; box-sizing: border-box;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: calc(11.5px * var(--ts)); font-weight: 700; background: var(--surface); color: var(--text3);
-  transition: background 0.2s, color 0.2s;
+  font-family: 'Space Grotesk', sans-serif; font-size: calc(26px * var(--ts)); line-height: 1.05; font-weight: 700;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--text2);
 }
 .dash-tab span:empty { display: none; }
 .dash-tab:hover { color: var(--text2); }
 .dash-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.dash-tab.active { color: var(--text); }
-.dash-tab.active span { background: rgba(var(--accent-rgb), 0.14); color: var(--accent2); }
+.dash-tab.active, .dash-tab.active span { color: var(--text); }
 /* A list with nothing in it steps back. */
-.dash-tab.empty:not(.active) { opacity: 0.6; }
-.dash-tab.empty:not(.active) span { background: none; }
+.dash-tab.empty:not(.active) span { opacity: 0.4; }
 .dash-tab-line {
-  position: absolute; left: 0; top: 4px; bottom: 4px; width: 0;
-  border-radius: 10px; background: var(--surface); box-shadow: 0 1px 3px rgba(16,24,40,0.12);
+  position: absolute; left: 0; bottom: -1px; width: 0; height: 2px; background: var(--text);
   transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), width 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s;
 }
-.dash-tabs.searching .dash-tab.active { color: var(--text3); }
+.dash-tabs.searching .dash-tab.active, .dash-tabs.searching .dash-tab.active span { color: var(--text3); }
 .dash-tabs.searching .dash-tab-line { opacity: 0; }
 
 .dash-search {
   display: flex; align-items: center; gap: 10px;
-  height: 48px; margin: 0; padding: 0 14px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  height: 46px; margin: 0; padding: 0 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
   color: var(--text3);
-  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  transition: border-color 0.15s;
 }
-.dash-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.14); }
+.dash-search:focus-within { border-color: var(--accent); }
 .dash-search input::placeholder { color: var(--text3); }
+
+/* The business's monthly numbers will sit here, under the lists: on a
+   phone after the day's work is in view, in the rail on a wide screen. */
+.dash-numbers { margin: 0 0 22px; }
+
+@media (min-width: 1100px) {
+  .dashboard-panel-body:not(.no-jobs) {
+    display: grid; grid-template-columns: 280px minmax(0, 1fr); column-gap: 48px; align-items: start;
+    padding-left: max(32px, calc(50% - 560px)); padding-right: max(32px, calc(50% - 560px));
+  }
+  .dashboard-panel-header.page-topbar { padding-left: max(32px, calc(50% - 560px)); padding-right: max(32px, calc(50% - 560px)); }
+  .dashboard-panel-body:not(.no-jobs) .dash-side { position: sticky; top: 0; padding-bottom: 24px; }
+  .dashboard-panel-body:not(.no-jobs) #dashboardJobs { padding-top: 26px; }
+  /* In the rail the lists stand in a column: name left, count right, the
+     open one on a solid row. */
+  .dashboard-panel-body:not(.no-jobs) .dash-tabs { grid-template-columns: 1fr; border: 0; gap: 2px; }
+  .dashboard-panel-body:not(.no-jobs) .dash-tab { flex-direction: row; align-items: center; justify-content: space-between; min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px; font-size: calc(15px * var(--ts)); }
+  .dashboard-panel-body:not(.no-jobs) .dash-tab span { font-family: inherit; font-size: calc(14px * var(--ts)); font-weight: 650; letter-spacing: 0; }
+  .dashboard-panel-body:not(.no-jobs) .dash-tab.active { background: var(--surface2); }
+  .dashboard-panel-body:not(.no-jobs) .dash-tab-line { display: none; }
+}
 .dash-search input {
   flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none;
   font: inherit; font-size: calc(15px * var(--ts)); color: var(--text);
@@ -3289,10 +3303,10 @@ body .dash-card { border-color: transparent; box-shadow: 0 10px 26px rgba(0,0,0,
 .dash-none { margin: 0; padding: 36px 12px; text-align: center; font-size: calc(14px * var(--ts)); color: var(--text3); }
 /* To do, in the order the week runs: a heading where the day changes
    (still open from earlier, today, coming up). */
-.dash-part { display: flex; align-items: center; gap: 8px; margin: 14px 2px 0; font-size: calc(11px * var(--ts)); font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); }
-/* How many under it, then a hairline that fades out to the right. */
-.dash-part[data-count]::after { content: attr(data-count); order: 0; letter-spacing: 0; font-weight: 700; opacity: 0.7; }
-.dash-part::before { content: ''; order: 1; flex: 1; height: 1px; background: linear-gradient(90deg, currentColor, transparent); opacity: 0.3; }
+.dash-part { display: flex; align-items: center; gap: 8px; margin: 16px 2px 0; font-size: calc(14px * var(--ts)); font-weight: 650; color: var(--text); }
+/* How many under it, then a hairline to the edge. */
+.dash-part[data-count]::after { content: attr(data-count); order: 0; font-weight: 600; color: var(--text3); }
+.dash-part::before { content: ''; order: 1; flex: 1; height: 1px; background: var(--border); }
 .dash-part:first-child { margin-top: 0; }
 /* Finished jobs a full phone handed to the account, under Done. */
 .dash-parked { margin: 16px 2px 0; font-size: calc(13.5px * var(--ts)); line-height: 1.5; color: var(--text2); }
@@ -5071,47 +5085,37 @@ body .page-topbar .topbar-new svg { color: var(--accent-glow); }
 body .dashboard-overlay,
 body .job-overlay,
 body .sidebar:not(.on-page) { background: var(--backdrop); background-color: #070B10; color-scheme: dark; }
-body .dash-hero-date { color: var(--accent-glow); }
-body .dash-hero-title { color: var(--on-ink); }
-body .dash-hero-title b { color: var(--pink); }
+body .dash-hero-date { color: var(--on-ink2); }
+body .dash-hero-title, body .dash-hero-title b { color: var(--on-ink); }
 body .dash-hero-more, body .dash-parked { color: var(--on-ink2); }
 body .dash-hero-more i { color: var(--on-ink2); }
+body .dash-hero-first { color: var(--on-ink2); }
+body .dash-hero-first b { color: var(--on-ink); }
 body .dash-hero-more button { color: var(--pink); }
-body .dash-part { color: var(--accent-glow); }
+body .dash-part { color: var(--on-ink); }
+body .dash-part[data-count]::after { color: var(--on-ink2); }
+body .dash-part::before { background: rgba(255,255,255,0.1); }
 body .dash-parked .link-btn { color: var(--accent-glow); }
-body .dash-tabs { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); }
+body .dash-tabs { border-color: rgba(255,255,255,0.1); }
+body .dash-tab + .dash-tab { border-left-color: rgba(255,255,255,0.1); }
 body .dash-tab { color: var(--on-ink2); }
+body .dash-tab span { color: rgba(232,240,246,0.85); }
 body .dash-tab:hover { color: var(--on-ink); }
-body .dash-tab.active { color: var(--on-ink); }
-body .dash-tab span { background: rgba(255,255,255,0.1); color: var(--on-ink2); }
-body .dash-tab.empty:not(.active) span { background: none; }
-body .dash-tab.active span { background: rgba(var(--accent-glow-rgb),0.2); color: var(--accent-glow); }
-body .dash-tabs.searching .dash-tab.active { color: var(--on-ink2); }
-body .dash-tab-line {
-  background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.08));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), inset 0 0 0 1px rgba(var(--accent-glow-rgb),0.18), 0 6px 16px rgba(0,0,0,0.35);
-}
-/* Search is the quiet one on the page: glass, not a white slab, so it
-   never outshines the headline or the jobs. It lights when typed in. */
-body .dash-search { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); box-shadow: none; }
-body .dash-search:hover { border-color: rgba(255,255,255,0.14); }
-body .dash-search:focus-within { background: rgba(255,255,255,0.07); border-color: rgba(var(--accent-glow-rgb),0.6); box-shadow: 0 0 0 4px rgba(var(--accent-glow-rgb),0.12); }
+body .dash-tab.active, body .dash-tab.active span { color: var(--on-ink); }
+body .dash-tabs.searching .dash-tab.active, body .dash-tabs.searching .dash-tab.active span { color: var(--on-ink2); }
+body .dash-tab-line { background: var(--on-ink); }
+body .dash-search { background: #0F161D; border-color: rgba(255,255,255,0.1); color: var(--on-ink2); }
+body .dash-search:hover { border-color: rgba(255,255,255,0.18); }
+body .dash-search:focus-within { border-color: var(--accent-glow); }
 body .dash-search input { color: var(--on-ink); }
 body .dash-search input::placeholder { color: var(--on-ink2); }
-/* The Jobs bar melts into the page, so the headline under it is what the
-   eye meets first; New job carries a touch of the accent as the bar's
-   one action, the account button stays neutral. */
+/* The Jobs bar sits on the page with no bar of its own, so the headline
+   under it is what the eye meets first. */
 body .dashboard-panel-header { background: transparent; border-bottom-color: transparent; border-image: none; }
-body .dashboard-panel-header .topbar-new { background: rgba(var(--accent-glow-rgb),0.1); border-color: rgba(var(--accent-glow-rgb),0.32); }
-body .dashboard-panel-header .topbar-new:hover { background: rgba(var(--accent-glow-rgb),0.16); }
-/* A faint glow behind the headline gives the top of the page its lift. */
-body .dash-hero::before {
-  content: ''; position: absolute; z-index: -1; pointer-events: none;
-  inset: 0 -20px;
-  background: radial-gradient(34% 46% at 26% 52%, rgba(var(--glow),0.2), transparent);
+@media (min-width: 1100px) {
+  body .dashboard-panel-body:not(.no-jobs) .dash-tab.active { background: rgba(255,255,255,0.08); }
 }
 body .dash-none,
-body .dash-search,
 body .sidebar:not(.on-page) .drawer-group-label { color: var(--accent-glow); }
 body .sidebar:not(.on-page) .drawer-group-label::after { background: linear-gradient(90deg, rgba(var(--glow-hi),0.6), rgba(var(--glow-hi),0)); }
 body .sidebar:not(.on-page) .drawer-legal,
@@ -5649,9 +5653,8 @@ body .agreement-banner.last-visit-banner .agreement-banner-btn { background: var
    an icon-only PDF button. */
 @media (max-width: 359px) {
   .dashboard-panel-body { padding-left: 14px; padding-right: 14px; }
-  .dash-tabs { gap: 0; }
-  .dash-tab { padding: 0 6px; gap: 4px; font-size: calc(13px * var(--ts)); }
-  .dash-tab span { min-width: 18px; height: 18px; padding: 0 5px; font-size: calc(11px * var(--ts)); }
+  .dash-tab { padding: 10px 8px 12px; font-size: calc(12px * var(--ts)); }
+  .dash-tab span { font-size: calc(22px * var(--ts)); }
   .quote-bar-label { white-space: nowrap; }
   .quote-bar .quote-bar-pdf { width: 46px; padding: 0; justify-content: center; font-size: 0; gap: 0; }
   .quote-bar .quote-bar-pdf .icon { width: 18px; height: 18px; }

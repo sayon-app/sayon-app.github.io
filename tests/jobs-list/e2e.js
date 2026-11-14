@@ -98,7 +98,7 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
   check(head.count === '2', 'the dock\'s Jobs count is the same number: ' + head.count);
   let list = await cards();
   check(list.map(c => c.street).join(' | ') === '7 Gum Road | 12 Wattle Street | 3 Banksia Court | 40 Later Lane', 'To do runs earlier, today, tomorrow, later: ' + list.map(c => c.street).join(' | '));
-  check(head.parts.join(' | ').toLowerCase() === 'still open from earlier | today | coming up', 'a heading where the day changes: ' + head.parts.join(' | '));
+  check(head.parts.join(' | ').toLowerCase() === 'carried over | today | coming up', 'a heading where the day changes: ' + head.parts.join(' | '));
   check(list[1].when === 'Today 9am' && list[2].when === 'Tomorrow 2:30pm', 'a booking still to come shows its time: ' + list[1].when + ', ' + list[2].when);
   check(!/\d(am|pm)/.test(list[0].when), 'a day that\'s gone shows just the day: ' + list[0].when);
   await p.screenshot({ path: `${OUT}/1-todo.png` });

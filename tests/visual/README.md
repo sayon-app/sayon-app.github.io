@@ -61,6 +61,8 @@ Things the 2026-10-30 review found, to check again after PDF or layout changes: 
 
 `tests/jobs-list/e2e.js <outDir>` checks what the list says: the headline counts today's jobs (and says what's booked for later and which re-inspections are overdue), To do runs earlier, today, coming up with a booking's time on its card, an agreement whose link is out says when it went and who it waits on, opening Jobs asks about every link that's out in one request and a signed agreement or answered quote moves its job, a clash copy and a job the account doesn't hold are tagged, the dock names the open job by its street on Jobs and its mic won't record into a finished report, and deleting says "Job deleted".
 
+`tests/jobs-numbers/e2e.js <outDir>` checks the month's numbers under the lists: nothing until there's a real job (the sample doesn't count), one closed line on a phone that opens, each row against made-up jobs dated this month and last, Owed to you now opening Waiting, no money rows for a business that doesn't invoice from SAYON, and the wide screen's rail showing its foot beside a long list.
+
 ## New job
 
 `tests/visual/new-job.js <outDir> [width]` taps New job on the Jobs list and types a job in by hand, checking on the way: the job page opens empty with the address ready to type and today's date, the page shows the address as it's typed, a postcode fills in the state (but not over one picked by hand), Sign on this phone with no address asks for one, Save it for later puts the job on the Jobs list, and once saved the job page leads with the agreement. It shoots the empty page, the filled-in page, the Jobs list and the saved job's page. Before and after shots are in `docs/screenshots/new-job/`.

@@ -17,7 +17,7 @@ For an AI model taking over this repo with no context. Last checked 2026-10-05: 
   3. Quote
   4. The client's answer (signed on the phone, or recorded as by email, by phone or on paper), printed on the quote PDF
   5. Treatment record and a one-page certificate
-- **Deliberately cut:** invoices, dashboard follow-ups, office job assigning and schedule, treatment booking, and the label calculator. Don't rebuild them: field-service and accounting apps do them better. **Team came back** in a small form for the per-inspector Team and Business plans: Menu › Your team, where the owner invites by email (supabase/team-seats.sql, tests/team-seats).
+- **Deliberately cut:** dashboard follow-ups, office job assigning and schedule, treatment booking, and the label calculator. Don't rebuild them unless the owner asks: field-service and accounting apps do them better. **Invoices came back** on 2026-11-14 in a thin form (`js/invoice.js`: from the accepted quote, bank transfer and PayID, Mark paid, a file for Xero), with the month's numbers on Jobs; the decision is in `state.md`. **Team came back** in a small form for the per-inspector Team and Business plans: Menu › Your team, where the owner invites by email (supabase/team-seats.sql, tests/team-seats).
 - **Later, not now:** one generic job-in, report-out format so SAYON works alongside field-service apps, with no per-vendor links. Don't start it.
 
 ## 2. Working with baz

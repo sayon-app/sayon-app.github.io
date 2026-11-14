@@ -800,9 +800,9 @@ function reportSummary() {
         { YES: 'warn', NO: 'good' }[reportData.previousTreatment] || 'none', REPORT_PARTS.findings, whatWhere(reportData.previousTreatmentDetails, reportData.previousTreatmentWhere)],
     ] },
     { title: 'Safety & risk', items: [
-      ['Builder or engineer referral?', structural ? 'YES' : unanswered.length ? 'NOT ANSWERED' : fs.length ? 'NO' : NR,
-        structural ? 'bad' : unanswered.length ? 'warn' : fs.length ? 'good' : 'none', REPORT_PARTS.findings,
-        !structural && unanswered.length ? `Finding${unanswered.length === 1 ? '' : 's'} ${unanswered.join(', ')}: not answered` : ''],
+      ['Builder or engineer referral?', structural ? 'YES' : unanswered.length ? NR : fs.length ? 'NO' : NR,
+        structural ? 'bad' : fs.length && !unanswered.length ? 'good' : 'none', REPORT_PARTS.findings,
+        !structural && unanswered.length ? `Finding${unanswered.length === 1 ? '' : 's'} ${unanswered.join(', ')}: not recorded` : ''],
       ['Conditions conducive to timber pests?', conducive.length ? `${conducive.length} FOUND` : conduciveAnswered ? 'NONE FOUND' : NR, conducive.length ? 'warn' : conduciveAnswered ? 'good' : 'none', REPORT_PARTS.conducive,
         conducive.join('; ').replace(/^./, ch => ch.toUpperCase())],
       ['Termite treatment recommended?', { YES: 'YES', NO: 'NO' }[termiteTreatment] || NR,

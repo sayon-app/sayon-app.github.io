@@ -441,7 +441,117 @@ function readDashboardJobs() {
       first.onclick = () => openDashboardJob(start.r.id, 'job');
     }
   }
+  renderDashboardNumbers();
 }
+
+// ── THE MONTH'S NUMBERS ───────────────────────────────────────────────────
+// What the business did in a month, under the lists: reports sent,
+// treatments done, quotes sent and accepted and, once it invoices from
+// SAYON (js/invoice.js), what was invoiced, paid and is still owed. Read
+// from the jobs on this sign-in, the sample left out, so nothing is typed
+// in for it. On a phone it's one line that opens, so the jobs stay near
+// the top; in the wide screen's rail it's always open.
+let dashNumbersMonth = 0;     // 0 this month, -1 last month
+let dashNumbersOpen = false;  // opened, on a phone
+const DASH_WIDE = window.matchMedia('(min-width: 1100px)');
+DASH_WIDE.addEventListener('change', () => renderDashboardNumbers());
+const dashMoney = v => '$' + Math.round(v).toLocaleString('en-AU');
+
+// jobs: as dashboardJob reads them ({ r, q }). offset: months from this one.
+function monthNumbers(jobs, offset = 0, now = new Date()) {
+  const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const ym = isoDate(first).slice(0, 7);
+  const inTs = ts => !!ts && isoDate(new Date(ts)).slice(0, 7) === ym;
+  const inIso = iso => String(iso || '').slice(0, 7) === ym;
+  const n = { label: first.toLocaleDateString('en-AU', { month: 'long' }), reports: 0, treatments: 0, quotesSent: 0, quoted: 0, quotesWon: 0, won: 0,
+    invoices: false, invoiced: 0, paid: 0, owed: 0, overdue: 0 };
+  jobs.forEach(({ r, q }) => {
+    if (isSampleJob(r)) return;
+    const d = r.reportData || {};
+    // The report went by email, on the quote's link, or with the finalised job.
+    const withQuote = q && q.sentAt && q.linkRequest && q.linkRequest.files && q.linkRequest.files.report ? q.sentAt : 0;
+    if (inTs((d.sent && d.sent.at) || withQuote || (d.issue && d.issue.completedAt))) n.reports++;
+    if (!q) return;
+    if (q.treatment && inIso(q.treatment.date)) n.treatments++;
+    if (quoteHasItems(q)) {
+      const total = quoteTotals(q).total;
+      if (inTs(q.sentAt)) { n.quotesSent++; n.quoted += total; }
+      const a = quoteAnswerState(q);
+      if (a && !a.stale && a.status === 'accepted' && inIso(a.date)) { n.quotesWon++; n.won += total; }
+    }
+    // An invoice sent from another app isn't SAYON's to count.
+    const inv = q.taxInvoice;
+    if (!inv || inv.elsewhereAt) return;
+    n.invoices = true;
+    if (inTs(inv.sentAt)) n.invoiced += inv.total || 0;
+    if (inv.paidAt && inIso(inv.paidDate || isoDate(new Date(inv.paidAt)))) n.paid += inv.total || 0;
+    // Owed is as it stands today, whichever month the invoice went.
+    if (inv.sentAt && !inv.paidAt) {
+      n.owed += inv.total || 0;
+      if (typeof invoiceOverdue === 'function' && invoiceOverdue(inv)) n.overdue++;
+    }
+  });
+  return n;
+}
+
+function renderDashboardNumbers() {
+  const el = document.getElementById('dashboardNumbers');
+  if (!el) return;
+  const jobs = dashboardJobs.filter(j => !isSampleJob(j.r));
+  el.hidden = !jobs.length;
+  if (el.hidden) { el.innerHTML = ''; return; }
+  const n = monthNumbers(jobs, dashNumbersMonth);
+  const wide = DASH_WIDE.matches, open = wide || dashNumbersOpen;
+  const plural = (c, word) => `${c} ${word}${c === 1 ? '' : 's'}`;
+  // The closed line says the money first, or the work when nothing's been invoiced.
+  // What's owed is as of today, so it isn't said of last month.
+  let lead = [n.invoiced && `${dashMoney(n.invoiced)} invoiced`, !dashNumbersMonth && n.owed && `${dashMoney(n.owed)} owed`].filter(Boolean);
+  if (!lead.length) lead = [n.reports && `${plural(n.reports, 'report')} sent`, n.quoted && `${dashMoney(n.quoted)} quoted`].filter(Boolean);
+  if (!lead.length) lead = [dashNumbersMonth ? 'Nothing sent' : 'Nothing sent yet'];
+  const row = (label, count, amount) => `<div class="dash-numbers-row"><dt>${label}</dt><dd class="n">${count}</dd><dd>${amount}</dd></div>`;
+  const rows = [
+    row('Reports sent', '', n.reports),
+    row('Treatments done', '', n.treatments),
+    row('Quotes sent', n.quotesSent || '', n.quotesSent ? dashMoney(n.quoted) : 0),
+    row('Quotes accepted', n.quotesWon || '', n.quotesWon ? dashMoney(n.won) : 0),
+    // A business that doesn't invoice from SAYON has no money rows.
+    n.invoices ? row('Invoiced', '', dashMoney(n.invoiced)) + row('Paid', '', dashMoney(n.paid)) : '',
+  ].join('');
+  const owed = !n.invoices ? '' : n.owed ? `
+      <button type="button" class="dash-numbers-owed" onclick="showOwedJobs()">
+        <span>Owed to you now${n.overdue ? `<em>${plural(n.overdue, 'invoice')} overdue</em>` : ''}</span><b>${dashMoney(n.owed)}</b>
+      </button>` : '<p class="dash-numbers-owed"><span>Owed to you now</span><b>$0</b></p>';
+  const month = offset => new Date(new Date().getFullYear(), new Date().getMonth() + offset, 1).toLocaleDateString('en-AU', { month: 'long' });
+  const chev = '<svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>';
+  el.innerHTML = `
+    ${wide ? `<h3 class="dash-numbers-head"><span class="dash-numbers-month">${n.label}</span></h3>`
+      : `<button type="button" class="dash-numbers-head" aria-expanded="${open}" aria-controls="dashNumbersBody" onclick="toggleDashNumbers()">
+        <span class="dash-numbers-line"><span class="dash-numbers-month">${n.label}</span><span class="dash-numbers-lead">${lead.join(' · ')}</span></span>${chev}
+      </button>`}
+    <div class="dash-numbers-body" id="dashNumbersBody"${open ? '' : ' hidden'}>
+      <dl class="dash-numbers-rows">${rows}</dl>${owed}
+      <button type="button" class="dash-numbers-other" onclick="setDashNumbersMonth(${dashNumbersMonth ? 0 : -1})">${dashNumbersMonth ? `Back to ${month(0)}` : `See ${month(-1)}`}</button>
+    </div>`;
+  fitDashRail();
+}
+function toggleDashNumbers() { dashNumbersOpen = !dashNumbersOpen; renderDashboardNumbers(); }
+function setDashNumbersMonth(offset) { dashNumbersMonth = offset; renderDashboardNumbers(); }
+// The jobs that owe: Waiting, where an invoice that's out sits. On a phone
+// the numbers close so the list is what's in view.
+function showOwedJobs() {
+  dashNumbersOpen = false;
+  setDashboardTab('waiting');
+  renderDashboardNumbers();
+}
+// On a wide screen the rail stays put beside the list. With the numbers
+// under the lists it can be taller than the window, so it goes up with
+// the page until its foot is in view and holds there.
+function fitDashRail() {
+  const body = document.getElementById('dashboardBody'), side = body && body.querySelector('.dash-side');
+  if (!side) return;
+  side.style.top = DASH_WIDE.matches ? Math.min(0, body.clientHeight - side.offsetHeight) + 'px' : '';
+}
+window.addEventListener('resize', fitDashRail);
 
 function renderDashboard() {
   const body = document.getElementById('dashboardBody');

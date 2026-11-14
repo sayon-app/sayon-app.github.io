@@ -3227,9 +3227,45 @@ body.large-touch .findings-gate .choice-card { min-height: 88px; }
 .dash-search:focus-within { border-color: var(--accent); }
 .dash-search input::placeholder { color: var(--text3); }
 
-/* The business's monthly numbers will sit here, under the lists: on a
-   phone after the day's work is in view, in the rail on a wide screen. */
-.dash-numbers { margin: 0 0 22px; }
+/* The month's numbers, under the lists (THE MONTH'S NUMBERS in
+   js/app/dashboard.js): on a phone one ruled line that opens, so the jobs
+   stay near the top; open in the rail on a wide screen. Set like the
+   lists' strip: plain type on the ink, hairlines, tabular figures. */
+.dash-numbers { margin: 0 0 22px; border-top: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--on-ink2); }
+.dash-numbers-head {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; margin: 0; padding: 8px 2px; border: 0; background: none;
+  font: inherit; font-size: calc(14px * var(--ts)); font-weight: 500; color: inherit; text-align: left;
+}
+button.dash-numbers-head { cursor: pointer; }
+button.dash-numbers-head:focus-visible, .dash-numbers-owed:focus-visible, .dash-numbers-other:focus-visible { outline: 2px solid var(--accent-glow); outline-offset: 2px; border-radius: 4px; }
+/* The month, then its line: beside it where there's room, under it on a
+   narrow phone or at a larger text size. */
+.dash-numbers-line { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; row-gap: 1px; line-height: 1.35; }
+.dash-numbers-month { font-weight: 650; color: var(--on-ink); }
+.dash-numbers-lead { min-width: 0; font-variant-numeric: tabular-nums; }
+.dash-numbers-head svg { flex: none; transition: transform 0.2s; }
+.dash-numbers-head[aria-expanded="true"] svg { transform: rotate(90deg); }
+.dash-numbers-body { padding: 0 2px 10px; }
+.dash-numbers-rows { margin: 0; }
+.dash-numbers-row, .dash-numbers-owed {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(76px, auto); align-items: baseline; column-gap: 12px;
+  padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.06); font-size: calc(14px * var(--ts)); line-height: 1.35;
+}
+.dash-numbers-row dt { min-width: 0; }
+.dash-numbers-row dd, .dash-numbers-owed b { margin: 0; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--on-ink); }
+.dash-numbers-row dd.n { font-weight: 500; color: var(--on-ink2); }
+/* What's owed stands apart from the month's rows: it's as of today. */
+.dash-numbers-owed {
+  grid-template-columns: minmax(0, 1fr) auto; width: 100%; margin: 0; padding: 12px 0; border: 0; border-top: 1px solid rgba(255,255,255,0.16); background: none;
+  font-family: inherit; font-weight: 500; color: var(--on-ink); text-align: left;
+}
+button.dash-numbers-owed { cursor: pointer; }
+button.dash-numbers-owed:hover span { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.dash-numbers-owed em { display: block; margin-top: 2px; font-style: normal; font-size: calc(13px * var(--ts)); color: var(--pink); text-decoration: none; }
+.dash-numbers-other {
+  min-height: 36px; margin: 2px 0 0; padding: 0; border: 0; background: none;
+  font: inherit; font-size: calc(13.5px * var(--ts)); font-weight: 650; color: var(--accent-glow); cursor: pointer;
+}
 
 @media (min-width: 1100px) {
   .dashboard-panel-body:not(.no-jobs) {

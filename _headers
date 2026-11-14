@@ -1,0 +1,9 @@
+# Response headers for Cloudflare Pages, which serves app.sayon.com.au from
+# the `live` branch. GitHub Pages ignores this file.
+
+# The copy still at the old address, sayon-app.github.io, reads the new
+# address's manifest to know the move is ready (ADDRESS MOVE in
+# js/app/shell.js). A page can only read another address's file when that
+# file says so.
+/manifest.json
+  Access-Control-Allow-Origin: *

@@ -35,14 +35,18 @@ function reloadForUpdate() {
 }
 
 // ── ADDRESS MOVE ──────────────────────────────────────────────────────────
-// The site is moving to sayon-app.github.io, because the GitHub account it
-// lives under is being renamed. Browsers keep a site's saved data per
-// address, so once the new address is up, the copy still cached on a phone
-// at the old one backs the inspector's work up to their account and sends
-// them across. Signing in there brings the reports (with their quotes),
-// photos, company details and prices back.
-const OLD_APP_ORIGIN = 'https://byronguyatt2-droid.github.io';
-const NEW_APP_URL = 'https://sayon-app.github.io/';
+// SAYON is moving from sayon-app.github.io to its own domain,
+// app.sayon.com.au (Cloudflare Pages, published from the same `live`
+// branch). Browsers keep a site's saved data per address, so once the new
+// address is up, the copy still cached on a phone at the old one backs the
+// inspector's work up to their account and sends them across. Signing in
+// there brings the reports (with their quotes), photos, company details and
+// prices back. Nothing shows until the new address answers with SAYON's
+// manifest (Cloudflare sends it with the header `_headers` asks for). The
+// same code runs at both addresses; only the old one shows the notice.
+// (The October move, from byronguyatt2-droid.github.io, was the same notice.)
+const OLD_APP_ORIGIN = 'https://sayon-app.github.io';
+const NEW_APP_URL = 'https://app.sayon.com.au/';
 let moveNoticeShown = false;
 
 async function checkAddressMove() {

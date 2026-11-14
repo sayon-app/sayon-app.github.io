@@ -14,7 +14,7 @@
 // Browsers that can't share files (desktop) download the PDFs and open a
 // new email to the client instead. The share sheet only opens straight
 // from a tap, so the PDFs must already be built when this is called.
-function clientMessage({ client, address, docs, note, signOff, link }) {
+function clientMessage({ client, address, docs, note, signOff, link, linkText }) {
   const company = getCompanyDetails();
   const firstName = greetingName(client);
   return [
@@ -22,8 +22,9 @@ function clientMessage({ client, address, docs, note, signOff, link }) {
     '',
     `Please find attached your ${docs} for ${address || 'the property'}.${note ? ` ${note}` : ''}`,
     '',
-    // The client link: read the quote and accept or decline it on a phone.
-    ...(link ? ['You can read the quote and accept or decline it on your phone here:', link, ''] : []),
+    // The client link: read the quote and accept or decline it on a phone,
+    // or (linkText) another link, such as an invoice's Pay by card.
+    ...(link ? [linkText || 'You can read the quote and accept or decline it on your phone here:', link, ''] : []),
     ...questionsLine(),
     'Kind regards,',
     ...[signOff, company.name].filter(Boolean),

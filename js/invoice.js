@@ -8,7 +8,9 @@
 // 2026-10-05 cut may still carry that key, and quoteContentHash leaves both
 // out, so the invoice never makes the quote read as changed):
 //   { number, date, due, items, gst, subtotal, gstAmount, total,
-//     madeAt, sentAt, paidAt, paidDate, elsewhereAt }
+//     madeAt, sentAt, paidAt, paidDate, paidBy, elsewhereAt, payLink }
+// paidBy is 'card' when the client paid on the Pay by card link (PAY BY
+// CARD below); payLink is that link.
 // The lines and amounts are a copy taken when the invoice is made, so the
 // invoice stays as it went out. number follows the quote's
 // (Q-20261114-4821 → INV-20261114-4821), so it's unique without a counter
@@ -121,9 +123,9 @@ function invoicePanel(q) {
   const total = inv ? inv.total : quoteTotals(q).total;
   const amount = `${formatAUD(total)}${(inv ? inv.gst : q.gst !== false) ? ' inc GST' : ''}`;
   const to = quoteClientEmail(q);
-  const status = inv && inv.paidAt ? `Paid ${formatAnswerDate(inv.paidDate || isoDate(new Date(inv.paidAt)))}`
+  const status = inv && inv.paidAt ? `Paid ${inv.paidBy === 'card' ? 'by card ' : ''}${formatAnswerDate(inv.paidDate || isoDate(new Date(inv.paidAt)))}`
     : inv && inv.elsewhereAt ? 'Invoiced in another app, so SAYON leaves it there'
-    : inv && inv.sentAt ? `Emailed ${formatIssueDate(inv.sentAt)}${who ? ` to ${who}` : ''}. ${invoiceOverdue(inv) ? 'Overdue since' : 'Due'} ${formatAnswerDate(inv.due)}`
+    : inv && inv.sentAt ? `Emailed ${formatIssueDate(inv.sentAt)}${who ? ` to ${who}` : ''}${invoicePayLinkOpen(inv) ? ', with a Pay by card link' : ''}. ${invoiceOverdue(inv) ? 'Overdue since' : 'Due'} ${formatAnswerDate(inv.due)}`
     : `${to ? `Goes to ${to}` : 'Not sent yet'}, due ${invoiceDays() ? `within ${invoiceDays()} days` : 'on receipt'}`;
   const settled = invoiceSettled(q);
   const pay = invoicePayDetailsSet();
@@ -136,6 +138,10 @@ function invoicePanel(q) {
         ${settled && inv.paidAt ? '' : `<button type="button" class="${inv && inv.sentAt || !q.treatment ? 'quote-link-btn' : 'quote-btn primary'} qp-invoice-email" onclick="emailInvoice()">${inv && inv.sentAt ? 'Email again' : `Email${first ? ' to ' + esc(first) : ''}`}</button>`}
         <button type="button" class="quote-link-btn" onclick="downloadInvoice()">PDF</button>
       </div>`}
+      ${!settled && invoicePayLinkOpen(inv) ? `<div class="qp-links">
+        <button type="button" class="quote-text-btn" onclick="checkInvoicePayLinks(true)">Check now</button>
+        <button type="button" class="quote-text-btn" onclick="shareInvoicePayLink()">Share the link</button>
+      </div>` : ''}
       ${!inv || (!inv.sentAt && !inv.elsewhereAt) ? `<button type="button" class="qp-cert-handed" onclick="markInvoicedElsewhere()">Invoicing from Xero or another app? <span>Mark as invoiced</span></button>` : ''}
       ${inv && (inv.paidAt || inv.elsewhereAt) ? `<div class="qp-links"><button type="button" class="quote-text-btn" onclick="undoInvoiceSettled()">${inv.paidAt ? 'Not paid after all' : 'Invoice from SAYON after all'}</button></div>` : ''}
     </div>`;
@@ -162,14 +168,37 @@ function emailInvoice() {
       .catch(e => showToast((e && e.message) || 'Could not load the PDF tools', 'error'));
     return;
   }
-  const inv = ensureInvoice(q);
+  ensureInvoice(q);
+  // A business that takes cards has the Pay by card link made first. The
+  // Worker's email can wait for it; the phone's own email opens only inside
+  // a tap, so there it takes a second one. If the link can't be made, the
+  // next tap sends the invoice with the bank details alone.
+  if (invoicePayLinkWanted(q)) {
+    showToast('Making the Pay by card link…', 'info');
+    ensureInvoicePayLink(q).then(link => {
+      if (!link) invoicePayLinkSkip[q.reportKey] = true;
+      if (link && directEmail && quoteClientEmail(q)) { sendInvoiceEmail(q); return; }
+      showToast(link ? 'Ready. Tap Email again to send it' : 'The Pay by card link couldn\'t be made. Tap Email again to send the invoice without it', link ? 'info' : 'error');
+    });
+    return;
+  }
+  sendInvoiceEmail(q);
+}
+
+function sendInvoiceEmail(q) {
+  const inv = q.taxInvoice;
   const due = inv.due > inv.date ? ` It's due by ${formatLongDate(inv.due)}.` : '';
+  const card = invoicePayLinkOpen(inv) ? inv.payLink.url : '';
+  const how = !card ? 'How to pay is on the invoice.'
+    : invoicePayDetailsSet() ? 'You can pay by card at the link below, or by bank transfer with the details on the invoice.'
+    : 'You can pay by card at the link below.';
   sendPdfsToClient({
     files: [buildInvoicePDF(q)],
     to: quoteClientEmail(q),
     subject: `Invoice ${inv.number} — ${q.address || 'your property'}`,
-    body: clientMessage({ client: q.client, address: q.address, docs: 'invoice', note: `${due} How to pay is on the invoice.`.trim(), signOff: inspectorDisplayName() }),
+    body: clientMessage({ client: q.client, address: q.address, docs: 'invoice', note: `${due} ${how}`.trim(), signOff: inspectorDisplayName(), link: card, linkText: 'Pay by card:' }),
   }).then(sent => {
+    delete invoicePayLinkSkip[q.reportKey];
     if (!sent) { storeSentQuote(q); return; }
     // The due date runs from the day it first went.
     if (!inv.sentAt && inv.date !== todayIsoDate()) { inv.date = todayIsoDate(); inv.due = addDaysIso(inv.date, invoiceDays()); }
@@ -181,8 +210,9 @@ function emailInvoice() {
 function downloadInvoice() {
   const q = quoteState;
   if (!q || !invoiceWanted(q)) return;
-  ensureJsPDFLoaded().then(() => {
+  ensureJsPDFLoaded().then(async () => {
     ensureInvoice(q);
+    if (invoicePayLinkWanted(q)) await ensureInvoicePayLink(q);
     const { blob, fname } = buildInvoicePDF(q);
     storeSentQuote(q); refreshJobsList();
     return deliverPdfBlob(blob, fname, { title: 'Invoice', text: 'Invoice', readyToast: 'Invoice ready' });
@@ -202,6 +232,7 @@ async function markInvoicePaid() {
   }))) return;
   inv.paidAt = Date.now();
   inv.paidDate = todayIsoDate();
+  closeInvoicePayLink(q);
   storeSentQuote(q); refreshJobsList(); track('invoice_paid');
   showToast('Marked paid', 'success');
   jobShowNext();
@@ -212,6 +243,7 @@ function markInvoicedElsewhere() {
   if (!q || !invoiceWanted(q)) return;
   const inv = ensureInvoice(q);
   inv.elsewhereAt = Date.now();
+  closeInvoicePayLink(q);
   storeSentQuote(q); refreshJobsList();
   jobShowNext();
 }
@@ -221,10 +253,17 @@ function undoInvoiceSettled() {
   const q = quoteState;
   const inv = q && q.taxInvoice;
   if (!inv) return;
-  if (inv.paidAt) { delete inv.paidAt; delete inv.paidDate; }
+  // A Pay by card link that was paid on or switched off can't be used
+  // again: the next email makes a new one. One still waiting to be
+  // switched off (no signal at the time) is still live, so it's kept on.
+  const link = inv.payLink;
+  if (link && (inv.paidBy === 'card' || link.closedAt)) delete inv.payLink;
+  else if (link) delete link.closeWanted;
+  if (inv.paidAt) { delete inv.paidAt; delete inv.paidDate; delete inv.paidBy; }
   else if (inv.elsewhereAt) {
-    // Nothing went from SAYON: start again from the quote.
-    if (!inv.sentAt) delete q.taxInvoice; else delete inv.elsewhereAt;
+    // Nothing went from SAYON: start again from the quote. An invoice
+    // with a live link keeps it, so the link is never left untracked.
+    if (!inv.sentAt && !inv.payLink) delete q.taxInvoice; else delete inv.elsewhereAt;
   }
   storeSentQuote(q); refreshJobsList();
 }
@@ -281,21 +320,30 @@ function buildInvoicePDF(q) {
   const payRows = [['Account name', p.name || (invoicePayDetailsSet(p) && p.bsb ? company.name : '')], ['BSB', p.bsb ? tidyBsb(p.bsb) : ''], ['Account no.', p.account], ['PayID', p.payid]]
     .map(([k, v]) => [k, (v || '').trim()]).filter(([, v]) => v);
   const leftW = CW - PDF_TOTALS_BOX_W - 10;
+  const cardUrl = !inv.paidAt && invoicePayLinkOpen(inv) ? inv.payLink.url : '';
   doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...C.inkMuted);
   pdfTracked(doc, inv.paidAt ? 'PAYMENT' : 'HOW TO PAY', M, y + 6.5, { cs: 0.5 });
   let py = y + 12;
   if (inv.paidAt) {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...C.ink);
-    doc.text(`Paid in full on ${formatLongDate(inv.paidDate || isoDate(new Date(inv.paidAt)))}. Thank you.`, M, py);
+    doc.text(`Paid in full${inv.paidBy === 'card' ? ' by card' : ''} on ${formatLongDate(inv.paidDate || isoDate(new Date(inv.paidAt)))}. Thank you.`, M, py);
     py += 5;
-  } else if (payRows.length) {
-    payRows.concat([['Reference', inv.number]]).forEach(([k, v]) => {
+  } else if (payRows.length || cardUrl) {
+    payRows.concat(payRows.length ? [['Reference', inv.number]] : []).forEach(([k, v]) => {
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...C.inkLight);
       doc.text(k, M, py);
       doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.ink);
       doc.text(pdfFitText(doc, v, leftW - 28), M + 28, py);
       py += 5;
     });
+    // The Pay by card link, to tap on a screen or type from the page.
+    if (cardUrl) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...C.inkLight);
+      doc.text('Pay by card', M, py);
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.accentDark);
+      doc.textWithLink(pdfFitText(doc, cardUrl.replace(/^https:\/\//, ''), leftW - 28), M + 28, py, { url: cardUrl });
+      py += 5;
+    }
   } else {
     const terms = (q.paymentTerms || '').trim() || 'Please contact us to arrange payment.';
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...C.ink);
@@ -308,14 +356,250 @@ function buildInvoicePDF(q) {
   // A thank you, and the business's terms if they say more than bank details.
   if (!inv.paidAt) {
     doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); doc.setTextColor(...C.inkMuted);
-    const line = inv.due > inv.date ? `Please pay by ${formatLongDate(inv.due)}, using the invoice number as the reference. Thank you for your business.`
-      : 'Payment is due on receipt. Please use the invoice number as the reference. Thank you for your business.';
+    // With only a card link to pay on, there's no reference to quote.
+    const ref = payRows.length || !cardUrl ? ', using the invoice number as the reference' : '';
+    const line = inv.due > inv.date ? `Please pay by ${formatLongDate(inv.due)}${ref}. Thank you for your business.`
+      : `Payment is due on receipt${ref ? '. Please use the invoice number as the reference' : ''}. Thank you for your business.`;
     if (y + 8 > BOTTOM) y = newPage();
     doc.text(doc.splitTextToSize(line, CW), M, y);
   }
 
   drawPdfDocFooters(doc, `${title} ${inv.number}${company.name ? `  ·  ${company.name}` : ''}`, q.reportKey);
   return { blob: doc.output('blob'), fname: pdfFileName('Invoice', q.address, { ref: inv.number }) };
+}
+
+// ── PAY BY CARD ─────────────────────────────────────────────────────────────
+// A business that has set up card payments (Your prices › Getting paid) has
+// a Pay by card link on each invoice: Stripe's payment page for the
+// invoice's amount, paid into the business's own Stripe account. SAYON
+// never holds the money; the Worker's /stripe/connect/ routes make the
+// link and say whether it's been paid (worker/README.md).
+//   inv.payLink = { id, url, at, closeWanted, closedAt }
+// The link is made when the invoice is first emailed or saved as a PDF,
+// takes one payment, and is switched off if the invoice is marked paid by
+// hand or invoiced in another app. Paid links are found when Jobs opens,
+// the way agreement and quote links are (LINKS OUT in js/app/dashboard.js).
+//
+// Whether card payments are on is kept with the prices (__cardPay: true,
+// or 'pending' while Stripe still needs details), written by the owner's
+// phone and synced, so every phone on the business knows without asking.
+let cardPayStatus = null;      // what the Worker last said: { connected, ready }
+let cardPayBusy = false;       // on the way to Stripe's sign-up
+let cardPayStatusAt = 0;       // when the Worker was last asked for it
+let cardPayCheckedAt = 0;      // when the links that are out were last asked about
+const invoicePayLinkBusy = {}; // report → the request making its link
+const invoicePayLinkSkip = {}; // report → its link couldn't be made; the next tap sends without
+const jsonPost = body => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+function cardPayOn() {
+  return cardPayStatus ? cardPayStatus.ready : quotePriceMemory().__cardPay === true;
+}
+// Only the owner's phone writes it: a technician's copy of the prices is
+// the owner's, and a write here would make it look newer than theirs.
+function rememberCardPay(state) {
+  if (!isBusinessOwner()) return;
+  const mem = quotePriceMemory();
+  if ((mem.__cardPay || false) === (state || false)) return;
+  if (state) mem.__cardPay = state; else delete mem.__cardPay;
+  storeQuotePriceMemory(mem);
+}
+
+// Asks the Worker where card payments are up to. A Worker that doesn't
+// have them yet answers with an error, and the row stays hidden.
+async function loadCardPayStatus() {
+  if (!authSession || !navigator.onLine) { renderCardPay(); return; }
+  cardPayStatusAt = Date.now();
+  try {
+    const res = await workerFetch('/stripe/connect/status');
+    if (res.ok) {
+      const s = await res.json();
+      cardPayStatus = { connected: !!s.connected, ready: !!s.ready };
+      rememberCardPay(cardPayStatus.ready ? true : cardPayStatus.connected ? 'pending' : false);
+    } else {
+      cardPayStatus = null;
+    }
+  } catch (e) { /* no signal: what's kept with the prices stands */ }
+  renderCardPay();
+}
+
+// The Card payments row in Getting paid.
+function renderCardPay() {
+  const box = document.getElementById('pbCardPay');
+  if (!box) return;
+  const kept = quotePriceMemory().__cardPay;
+  const s = cardPayStatus || (kept ? { connected: true, ready: kept === true } : null);
+  box.hidden = !s;
+  if (!s) return;
+  const owner = isBusinessOwner();
+  document.getElementById('pbCardPayText').textContent = s.ready
+    ? 'On. Each invoice has a Pay by card link, and SAYON marks it paid when the client pays. The money goes into your own Stripe account.'
+    : s.connected ? 'Stripe still needs a few details before your clients can pay by card.'
+    : `Let clients pay an invoice by card. The money goes into your own Stripe account, and Stripe's fee comes out of each payment.${owner ? '' : ' The business owner sets this up.'}`;
+  const btn = document.getElementById('pbCardPayBtn');
+  btn.hidden = s.ready || !owner;
+  btn.textContent = s.connected ? 'Finish setting up' : 'Set up card payments';
+  btn.disabled = cardPayBusy;
+}
+
+// Off to Stripe's own sign-up page; Stripe sends the owner back here.
+async function setUpCardPayments() {
+  if (cardPayBusy) return;
+  if (!navigator.onLine) { showToast('You\'re offline. Set up card payments when you have signal', 'error'); return; }
+  cardPayBusy = true; renderCardPay();
+  try {
+    const res = await workerFetch('/stripe/connect/onboard', jsonPost({ returnUrl: billingReturnUrl('cards') }));
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.url) throw new Error(data.message || 'HTTP ' + res.status);
+    window.location.href = data.url;
+  } catch (e) {
+    cardPayBusy = false; renderCardPay();
+    showToast('Couldn\'t open Stripe just now. Try again in a moment', 'error');
+  }
+}
+
+// Back from Stripe's sign-up (handleBillingReturn in js/app/account.js).
+async function cardPayReturned() {
+  openPriceBook();
+  await loadCardPayStatus();
+  const box = document.getElementById('pbCardPay');
+  if (box && !box.hidden) box.scrollIntoView({ block: 'center' });
+  if (!cardPayStatus) return;
+  showToast(cardPayStatus.ready ? 'Card payments are on. Your invoices now have a Pay by card link'
+    : 'Stripe still needs a few details. Finish setting up when you\'re ready', cardPayStatus.ready ? 'success' : 'info');
+}
+
+// The invoice's link, while a client could still pay on it.
+function invoicePayLinkOpen(inv) {
+  const link = inv && inv.payLink;
+  return !!(link && link.url && !link.closeWanted && !link.closedAt);
+}
+// The invoice is about to go and should carry a link it doesn't have yet.
+function invoicePayLinkWanted(q) {
+  const inv = q && q.taxInvoice;
+  return !!inv && cardPayOn() && !inv.paidAt && !inv.elsewhereAt && !invoicePayLinkOpen(inv) && !invoicePayLinkSkip[q.reportKey]
+    && !isSampleJob(q.reportKey) && navigator.onLine && !!authSession;
+}
+// Makes the link and keeps it on the invoice. Null if it couldn't be made.
+function ensureInvoicePayLink(q) {
+  const inv = q && q.taxInvoice;
+  if (!inv) return Promise.resolve(null);
+  if (invoicePayLinkOpen(inv)) return Promise.resolve(inv.payLink);
+  if (invoicePayLinkBusy[q.reportKey]) return invoicePayLinkBusy[q.reportKey];
+  const run = (async () => {
+    try {
+      const res = await workerFetch('/stripe/connect/payment-link', jsonPost({ number: inv.number, address: q.address || '', amount_cents: Math.round(inv.total * 100), report_id: q.reportKey }));
+      // Card payments were taken off, or aren't finished: invoices go without.
+      if (res.status === 409) { cardPayStatus = { connected: true, ready: false }; rememberCardPay('pending'); return null; }
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data.id || !data.url) return null;
+      inv.payLink = { id: data.id, url: data.url, at: Date.now() };
+      storeSentQuote(q);
+      return inv.payLink;
+    } catch (e) {
+      return null;
+    } finally {
+      delete invoicePayLinkBusy[q.reportKey];
+    }
+  })();
+  invoicePayLinkBusy[q.reportKey] = run;
+  return run;
+}
+
+// Paid another way: the link is switched off so it can't be paid twice.
+// The caller saves the quote. If Stripe can't be reached now, the next
+// check tries again.
+function closeInvoicePayLink(q) {
+  const link = q && q.taxInvoice && q.taxInvoice.payLink;
+  if (!link || link.closedAt) return;
+  link.closeWanted = true;
+  if (!navigator.onLine || !authSession) return;
+  workerFetch('/stripe/connect/close-link', jsonPost({ id: link.id })).then(res => {
+    // Any answer that isn't an error ends it: the link is off, or the
+    // business's Stripe account is out of SAYON's reach and it can't be.
+    if (!res.ok) return;
+    const now = getSavedQuotes()[q.reportKey], kept = now && now.taxInvoice && now.taxInvoice.payLink;
+    if (!kept || kept.id !== link.id) return;
+    kept.closedAt = Date.now();
+    // Storing it also gives This job, if it's open, the invoice as it now is.
+    storeSentQuote(now);
+  }).catch(() => {});
+}
+
+// Text or email the link on its own, for a client who'd rather tap than
+// open the PDF.
+async function shareInvoicePayLink() {
+  const q = quoteState, inv = q && q.taxInvoice;
+  if (!invoicePayLinkOpen(inv)) return;
+  const url = inv.payLink.url;
+  const text = `Invoice ${inv.number} for ${q.address || 'your property'}: ${formatAUD(inv.total)}. Pay by card here:`;
+  if (navigator.share) {
+    try { await navigator.share({ title: `Invoice ${inv.number}`, text, url }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  try {
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    showToast('Link copied. Paste it into a text or email to the client', 'success');
+  } catch (e) {
+    showLinkToCopy(url);
+  }
+}
+
+// Every saved invoice with a link a client could still pay on, and the
+// links still to switch off.
+function invoicePayLinks() {
+  const quotes = getSavedQuotes(), out = [], closing = [];
+  getSavedReports().forEach(r => {
+    const q = quotes[r.id] || r.quote, inv = q && q.taxInvoice, link = inv && inv.payLink;
+    if (!link || link.closedAt || isSampleJob(r)) return;
+    if (link.closeWanted) closing.push(q);
+    else if (!inv.paidAt && !inv.elsewhereAt) out.push({ id: r.id, link: link.id, street: r.jobAddress || (r.address || '').split(',')[0] });
+  });
+  return { out, closing };
+}
+
+// Asks whether the links that are out have been paid, and marks the
+// invoices that have. Runs when Jobs opens and when SAYON comes back to
+// the front, at most once a minute; now: from Check now, which says what
+// it found.
+async function checkInvoicePayLinks(now) {
+  if (!authSession || !navigator.onLine) { if (now) showToast('You\'re offline. Check again when you have signal', 'error'); return; }
+  if (!now && Date.now() - cardPayCheckedAt < LINKS_CHECK_MS) return;
+  // An owner still waiting on Stripe finds out here when it's ready.
+  if (!now && quotePriceMemory().__cardPay === 'pending' && isBusinessOwner() && Date.now() - cardPayStatusAt > LINKS_CHECK_MS) loadCardPayStatus();
+  const { out, closing } = invoicePayLinks();
+  closing.forEach(q => closeInvoicePayLink(q));
+  if (!out.length) return;
+  cardPayCheckedAt = Date.now();
+  try {
+    const back = [];
+    for (let i = 0; i < out.length; i += 20) {
+      const some = out.slice(i, i + 20);
+      const res = await workerFetch('/stripe/connect/payment-status', jsonPost({ ids: some.map(o => o.link) }));
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const paid = (await res.json()).paid || {};
+      some.forEach(o => { if (paid[o.link] && takeCardPayment(o.id, o.link, paid[o.link])) back.push(o); });
+    }
+    if (!back.length) { if (now) showToast('Not paid by card yet', 'info'); return; }
+    refreshJobsList();
+    if (document.getElementById('jobOverlay').classList.contains('open')) renderJobPage();
+    if (back.length === 1) showToast(`Paid by card: ${back[0].street || 'an invoice'}`, 'success', now ? undefined : { label: 'Open', run: () => openDashboardJob(back[0].id, 'job') });
+    else showToast(`${back.length} invoices paid by card: ${back.map(b => b.street).filter(Boolean).join(', ')}`, 'success');
+  } catch (e) {
+    if (now) showToast('Couldn\'t check just now. Try again in a moment', 'error');
+  }
+}
+
+// Stripe says the link was paid: the invoice is, on the day it was.
+function takeCardPayment(reportId, linkId, paid) {
+  const q = getSavedQuotes()[reportId], inv = q && q.taxInvoice;
+  if (!inv || inv.paidAt || inv.elsewhereAt || !inv.payLink || inv.payLink.id !== linkId) return false;
+  inv.paidAt = paid.at ? paid.at * 1000 : Date.now();
+  inv.paidDate = isoDate(new Date(inv.paidAt));
+  inv.paidBy = 'card';
+  storeSentQuote(q);
+  track('invoice_paid_by_card');
+  return true;
 }
 
 // ── FOR XERO ────────────────────────────────────────────────────────────────

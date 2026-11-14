@@ -21,6 +21,7 @@ function openDashboard() {
     if (fallback) setDashboardTab(fallback);
   }
   checkLinksOut();
+  checkInvoicePayLinks();
 }
 
 // Opens the open job's details, on its page.
@@ -230,7 +231,10 @@ function dashboardJob(r, quotes) {
     } else if (group === 'done') {
       const late = invoiceOverdue(inv);
       group = 'waiting'; status = late ? `Invoice overdue since ${dashDay(inv.due)}` : `Invoice due ${dashDay(inv.due)}`;
-      hint = `Waiting on ${who} to pay ${amount}. Mark it paid when the money's in.`;
+      // With a Pay by card link out, a card payment marks itself (js/invoice.js).
+      hint = invoicePayLinkOpen(inv)
+        ? `Waiting on ${who} to pay ${amount}. A card payment marks it paid for you; mark a bank transfer paid when it's in.`
+        : `Waiting on ${who} to pay ${amount}. Mark it paid when the money's in.`;
       next = { label: 'Mark paid', to: 'invoice' };
     }
   }

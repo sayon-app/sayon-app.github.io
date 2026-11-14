@@ -163,6 +163,9 @@ function renderInvoicePayDetails(canEdit) {
   days.innerHTML = INVOICE_DAYS.map(d => `<option value="${d}"${d === invoiceDays() ? ' selected' : ''}>${d ? `Within ${d} days` : 'On receipt'}</option>`).join('');
   days.disabled = !canEdit;
   renderXeroExport();
+  // Card payments: what's kept shows at once, then what the Worker says.
+  renderCardPay();
+  if (Date.now() - cardPayStatusAt > 30000) loadCardPayStatus();
 }
 function onInvoicePayDetails() {
   if (!canEditBusiness()) return;

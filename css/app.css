@@ -5296,6 +5296,9 @@ body .sidebar:not(.on-page) .drawer-signout { color: var(--on-ink2); }
 .pb-pay-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .pb-pay-pair { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 10px; }
 .pb-pay .job-input { width: 100%; }
+.pb-pay-card { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding-top: 14px; border-top: 1px solid var(--border); }
+.pb-pay-card .settings-row-desc { margin: 0; }
+.pb-pay-card .quote-link-btn { min-height: 44px; margin-top: 4px; padding: 0 16px; }
 .pb-pay-export { display: flex; flex-direction: column; gap: 6px; padding-top: 14px; border-top: 1px solid var(--border); }
 .pb-pay-export .settings-row-desc { margin: 0; }
 .pb-pay-export-row { display: flex; gap: 10px; align-items: stretch; }

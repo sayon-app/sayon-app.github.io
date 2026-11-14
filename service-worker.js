@@ -14,7 +14,7 @@
 // with every index.html change from here on - it's what forces activate() to
 // drop the old cache and install() to pre-cache the new files, so a redeploy
 // takes effect on the very next load instead of needing an extra refresh.
-const CACHE_VERSION = 'korva-v303';
+const CACHE_VERSION = 'korva-v304';
 
 
 const APP_SHELL = [
@@ -72,6 +72,14 @@ const APP_SHELL_PATHS = new Set(APP_SHELL.map((path) => new URL(path, self.locat
 const EXTERNAL_ASSETS = [
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
 ];
+
+// Cloudflare Pages (app.sayon.com.au) answers /index.html with a redirect
+// to /. A page can't be opened from a response that went through a redirect,
+// so the Home Screen icon (start_url ./index.html) would fail to open. The
+// copy handed to the page is rebuilt without that mark.
+const unredirected = (response) => (response && response.redirected)
+  ? new Response(response.body, { status: response.status, statusText: response.statusText, headers: response.headers })
+  : response;
 
 // ── INSTALL: pre-cache the app shell ────────────────────────────────────
 self.addEventListener('install', (event) => {
@@ -135,12 +143,13 @@ self.addEventListener('fetch', (event) => {
           // By URL, because a navigation Request can't take extra options.
           const networkFetch = (isAppShell ? fetch(request.url, { cache: 'no-cache' }) : fetch(request))
             .then((response) => {
+              response = unredirected(response);
               if (response.ok) cache.put(request, response.clone());
               return response;
             })
-            .catch(() => cached); // offline fallback to cache if network fails
+            .catch(() => cached); // only reached when there's no cached copy to fall back on
 
-          return cached || networkFetch;
+          return unredirected(cached) || networkFetch;
         })
       )
     );
@@ -160,6 +169,6 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => caches.match(request).then((cached) =>
-        cached || (request.mode === 'navigate' ? caches.match('./index.html') : Response.error())))
+        unredirected(cached) || (request.mode === 'navigate' ? caches.match('./index.html').then(unredirected) : Response.error())))
   );
 });

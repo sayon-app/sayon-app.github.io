@@ -4,6 +4,10 @@
  * The API keys are stored as Cloudflare secrets and never exposed to the
  * browser or public repo. See worker/README.md for setup and deploy steps.
  *
+ * ALSO IN v11 (and pasted into the running v10 on its own, one line):
+ * - app.sayon.com.au, the app's own domain (Cloudflare Pages), is an
+ *   allowed origin, so the app works there before people are moved to it.
+ *
  * CHANGES FROM v10 -> v11:
  * - Card payments on invoices (Stripe Connect, direct charges). Each
  *   business takes cards into its own Stripe account, so the money never
@@ -221,6 +225,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // must match exactly: a prefix check would also let in a look-alike such as
 // https://sayon-app.github.io.example.com.
 const ALLOWED_ORIGINS = [
+  'https://app.sayon.com.au',  // the app's own domain (Cloudflare Pages)
   'https://sayon-app.github.io',
   'https://byronguyatt2-droid.github.io', // the old address, still cached on phones
   'capacitor://localhost',     // Capacitor's default iOS origin
@@ -233,7 +238,7 @@ const LOCALHOST_ORIGIN = /^https?:\/\/localhost(:\d+)?$/;
 
 // Netlify preview copies of the app (one per pull request or branch), e.g.
 // https://deploy-preview-12--sayon-preview.netlify.app. Previews only: the
-// real site is still GitHub Pages.
+// real site is app.sayon.com.au (and sayon-app.github.io until the move).
 const PREVIEW_ORIGIN = /^https:\/\/([a-z0-9-]+--)?sayon-preview\.netlify\.app$/;
 
 function isAllowedOrigin(origin) {

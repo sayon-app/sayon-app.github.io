@@ -48,6 +48,7 @@ const APP_SHELL = [
   './js/treatment-plan.js',
   './js/treatment.js',
   './js/bait.js',
+  './js/invoice.js',
   './js/safety.js',
   './js/reinspection.js',
   './js/job-pack.js',

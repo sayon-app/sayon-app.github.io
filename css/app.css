@@ -5246,9 +5246,20 @@ body .sidebar:not(.on-page) .drawer-signout { color: var(--on-ink2); }
 .qp-cert-handed { display: block; min-height: 44px; margin: 2px 0 -8px; padding: 0; border: none; background: none; cursor: pointer;
   font: 500 calc(12.5px * var(--ts)) 'Inter', sans-serif; color: var(--text3); text-align: left; }
 .qp-cert-handed span { font-weight: 650; color: var(--accent2); }
-.qp-cert-email.flash, .job-way-link.flash, .job-signed-email.flash { animation: qp-flash 0.8s ease-in-out 3; }
+.qp-cert-email.flash, .job-way-link.flash, .job-signed-email.flash, .job-invoice-next.flash { animation: qp-flash 0.8s ease-in-out 3; }
 @keyframes qp-flash { 50% { box-shadow: 0 0 0 6px rgba(var(--accent-rgb), 0.3); } }
-@media (prefers-reduced-motion: reduce) { .qp-cert-email.flash, .job-way-link.flash, .job-signed-email.flash { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .qp-cert-email.flash, .job-way-link.flash, .job-signed-email.flash, .job-invoice-next.flash { animation: none; } }
+/* The invoice card (js/invoice.js): the certificate's card, with the amount on its title line. */
+.qp-invoice .qp-cert-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.qp-invoice-amount { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+.qp-invoice .qp-cert-actions .qp-invoice-paid, .qp-invoice .qp-cert-actions .qp-invoice-email.quote-btn { flex: 1 1 auto; }
+
+/* Your prices › Getting paid: the bank details an invoice prints. */
+.menu-card.pb-pay { display: flex; flex-direction: column; gap: 12px; padding: 14px 14px 16px; }
+.pb-pay-intro { margin: 0; }
+.pb-pay-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pb-pay-pair { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 10px; }
+.pb-pay .job-input { width: 100%; }
 
 /* Two fields that belong together (the termite system and its name),
    joined down the left by the same side line as the job sheet. */
